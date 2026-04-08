@@ -14,6 +14,7 @@ import { Link } from 'expo-router'
 import * as AppleAuthentication from 'expo-apple-authentication'
 import { signInWithEmail } from '../../src/hooks/useAuth'
 import { signInWithApple } from '../../src/services/appleAuth'
+import { signInWithGoogle } from '../../src/services/googleAuth'
 import { Colors, Typography, Spacing, Radius } from '../../src/theme'
 
 export default function SignInScreen() {
@@ -41,6 +42,14 @@ export default function SignInScreen() {
       if (err.code !== 'ERR_REQUEST_CANCELED') {
         Alert.alert('Apple Sign-In failed', err.message)
       }
+    }
+  }
+
+  async function handleGoogleSignIn() {
+    try {
+      await signInWithGoogle()
+    } catch (err: any) {
+      Alert.alert('Google Sign-In failed', err.message)
     }
   }
 
@@ -97,13 +106,21 @@ export default function SignInScreen() {
           </Pressable>
         </View>
 
-        {appleAvailable && (
-          <View style={styles.social}>
-            <View style={styles.dividerRow}>
-              <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>or</Text>
-              <View style={styles.dividerLine} />
-            </View>
+        <View style={styles.social}>
+          <View style={styles.dividerRow}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>or continue with</Text>
+            <View style={styles.dividerLine} />
+          </View>
+
+          {/* Google — available on iOS + Android */}
+          <Pressable style={styles.socialButton} onPress={handleGoogleSignIn}>
+            <Text style={styles.socialButtonIcon}>G</Text>
+            <Text style={styles.socialButtonText}>Continue with Google</Text>
+          </Pressable>
+
+          {/* Apple — iOS only */}
+          {appleAvailable && (
             <AppleAuthentication.AppleAuthenticationButton
               buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
               buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
@@ -111,8 +128,8 @@ export default function SignInScreen() {
               style={styles.appleButton}
               onPress={handleAppleSignIn}
             />
-          </View>
-        )}
+          )}
+        </View>
 
         <View style={styles.footer}>
           <Text style={styles.footerText}>Don't have an account? </Text>
@@ -226,5 +243,26 @@ const styles = StyleSheet.create({
   appleButton: {
     width: '100%',
     height: 50,
+  },
+  socialButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+    height: 50,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.card,
+  },
+  socialButtonIcon: {
+    fontFamily: Typography.fontFamily.sansBold,
+    fontSize: Typography.size.md,
+    color: '#4285F4', // Google blue
+  },
+  socialButtonText: {
+    fontFamily: Typography.fontFamily.sansSemiBold,
+    fontSize: Typography.size.base,
+    color: Colors.text,
   },
 })
