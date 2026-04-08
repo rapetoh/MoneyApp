@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   View,
   Text,
@@ -12,16 +12,14 @@ import {
   Platform,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { useRouter } from 'expo-router'
+import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useAuth } from '../../src/hooks/useAuth'
 import { useCategories } from '../../src/hooks/useCategories'
 import { supabase } from '../../src/lib/supabase'
 import { CategoryPicker } from '../../src/components/CategoryPicker'
 import { Colors, Typography, Spacing, Radius } from '../../src/theme'
-import type { TransactionDirection, PaymentMethod } from '@voice-expense/shared'
-import * as Crypto from 'expo-crypto'
+import type { Transaction, TransactionDirection, PaymentMethod } from '@voice-expense/shared'
 
-// Payment method options
 const PAYMENT_METHODS: { value: PaymentMethod; label: string }[] = [
   { value: 'cash', label: 'Cash' },
   { value: 'credit_card', label: 'Credit Card' },
@@ -30,10 +28,15 @@ const PAYMENT_METHODS: { value: PaymentMethod; label: string }[] = [
   { value: 'bank_transfer', label: 'Bank Transfer' },
 ]
 
-export default function RecordScreen() {
+export default function EditTransactionScreen() {
+  const { id } = useLocalSearchParams<{ id: string }>()
   const { user } = useAuth()
   const { categories, createCategory } = useCategories(user?.id)
   const router = useRouter()
+
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [txn, setTxn] = useState<Transaction | null>(null)
 
   const [amount, setAmount] = useState('')
   const [merchant, setMerchant] = useState('')
@@ -41,7 +44,28 @@ export default function RecordScreen() {
   const [categoryId, setCategoryId] = useState<string | null>(null)
   const [direction, setDirection] = useState<TransactionDirection>('debit')
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash')
-  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    if (!id) return
+    supabase
+      .from('transactions')
+      .select('*')
+      .eq('id', id)
+      .single()
+      .then(({ data }) => {
+        if (data) {
+          const t = data as Transaction
+          setTxn(t)
+          setAmount(String(t.amount))
+          setMerchant(t.merchant ?? '')
+          setNote(t.note ?? '')
+          setCategoryId(t.category_id)
+          setDirection(t.direction)
+          setPaymentMethod(t.payment_method ?? 'cash')
+        }
+        setLoading(false)
+      })
+  }, [id])
 
   async function handleSave() {
     const parsedAmount = parseFloat(amount.replace(',', '.'))
@@ -49,46 +73,40 @@ export default function RecordScreen() {
       Alert.alert('Invalid amount', 'Enter a valid amount greater than 0')
       return
     }
-    if (!user) return
+    if (!txn) return
 
     setSaving(true)
-    const clientId = Crypto.randomUUID()
-    const now = new Date().toISOString()
-
-    const { error } = await supabase.from('transactions').insert({
-      user_id: user.id,
-      amount: parsedAmount,
-      direction,
-      currency_code: 'USD',
-      merchant: merchant.trim() || null,
-      note: note.trim() || null,
-      category_id: categoryId,
-      payment_method: paymentMethod,
-      transacted_at: now,
-      source: 'manual',
-      client_id: clientId,
-      client_created_at: now,
-      version: 1,
-      is_deleted: false,
-    })
+    const { error } = await supabase
+      .from('transactions')
+      .update({
+        amount: parsedAmount,
+        direction,
+        merchant: merchant.trim() || null,
+        note: note.trim() || null,
+        category_id: categoryId,
+        payment_method: paymentMethod,
+        version: txn.version + 1,
+      })
+      .eq('id', txn.id)
 
     setSaving(false)
-
     if (error) {
       Alert.alert('Error', error.message)
     } else {
-      setAmount('')
-      setMerchant('')
-      setNote('')
-      setCategoryId(null)
-      setDirection('debit')
-      setPaymentMethod('cash')
-      router.push('/(tabs)')
+      router.back()
     }
   }
 
+  if (loading) {
+    return (
+      <View style={styles.centered}>
+        <ActivityIndicator color={Colors.primary} />
+      </View>
+    )
+  }
+
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <SafeAreaView style={styles.safe} edges={['bottom']}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -98,17 +116,13 @@ export default function RecordScreen() {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          <Text style={styles.title}>Add Expense</Text>
-
           {/* Direction toggle */}
           <View style={styles.directionRow}>
             <Pressable
               style={[styles.directionBtn, direction === 'debit' && styles.directionBtnActive]}
               onPress={() => setDirection('debit')}
             >
-              <Text
-                style={[styles.directionLabel, direction === 'debit' && styles.directionLabelActive]}
-              >
+              <Text style={[styles.directionLabel, direction === 'debit' && styles.directionLabelActive]}>
                 Expense
               </Text>
             </Pressable>
@@ -116,12 +130,7 @@ export default function RecordScreen() {
               style={[styles.directionBtn, direction === 'credit' && styles.directionBtnActiveIncome]}
               onPress={() => setDirection('credit')}
             >
-              <Text
-                style={[
-                  styles.directionLabel,
-                  direction === 'credit' && styles.directionLabelActiveIncome,
-                ]}
-              >
+              <Text style={[styles.directionLabel, direction === 'credit' && styles.directionLabelActiveIncome]}>
                 Income
               </Text>
             </Pressable>
@@ -141,7 +150,6 @@ export default function RecordScreen() {
             />
           </View>
 
-          {/* Fields */}
           <View style={styles.fields}>
             <View style={styles.field}>
               <Text style={styles.label}>Merchant / Source</Text>
@@ -185,9 +193,7 @@ export default function RecordScreen() {
                       style={[styles.chip, paymentMethod === m.value && styles.chipActive]}
                       onPress={() => setPaymentMethod(m.value)}
                     >
-                      <Text
-                        style={[styles.chipLabel, paymentMethod === m.value && styles.chipLabelActive]}
-                      >
+                      <Text style={[styles.chipLabel, paymentMethod === m.value && styles.chipLabelActive]}>
                         {m.label}
                       </Text>
                     </Pressable>
@@ -197,7 +203,6 @@ export default function RecordScreen() {
             </View>
           </View>
 
-          {/* Save button */}
           <Pressable
             style={[styles.saveButton, saving && styles.saveButtonDisabled]}
             onPress={handleSave}
@@ -206,7 +211,7 @@ export default function RecordScreen() {
             {saving ? (
               <ActivityIndicator color={Colors.white} />
             ) : (
-              <Text style={styles.saveButtonText}>Save</Text>
+              <Text style={styles.saveButtonText}>Save Changes</Text>
             )}
           </Pressable>
         </ScrollView>
@@ -216,20 +221,9 @@ export default function RecordScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
-  content: {
-    padding: Spacing.base,
-    gap: Spacing.base,
-    paddingBottom: Spacing['3xl'],
-  },
-  title: {
-    fontFamily: Typography.fontFamily.sansBold,
-    fontSize: Typography.size['2xl'],
-    color: Colors.text,
-  },
+  safe: { flex: 1, backgroundColor: Colors.background },
+  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.background },
+  content: { padding: Spacing.base, gap: Spacing.base, paddingBottom: Spacing['3xl'] },
   directionRow: {
     flexDirection: 'row',
     backgroundColor: Colors.card,
@@ -238,29 +232,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
   },
-  directionBtn: {
-    flex: 1,
-    paddingVertical: Spacing.sm,
-    alignItems: 'center',
-    borderRadius: Radius.sm,
-  },
-  directionBtnActive: {
-    backgroundColor: Colors.expense,
-  },
-  directionBtnActiveIncome: {
-    backgroundColor: Colors.income,
-  },
-  directionLabel: {
-    fontFamily: Typography.fontFamily.sansSemiBold,
-    fontSize: Typography.size.sm,
-    color: Colors.textSecondary,
-  },
-  directionLabelActive: {
-    color: Colors.white,
-  },
-  directionLabelActiveIncome: {
-    color: Colors.white,
-  },
+  directionBtn: { flex: 1, paddingVertical: Spacing.sm, alignItems: 'center', borderRadius: Radius.sm },
+  directionBtnActive: { backgroundColor: Colors.expense },
+  directionBtnActiveIncome: { backgroundColor: Colors.income },
+  directionLabel: { fontFamily: Typography.fontFamily.sansSemiBold, fontSize: Typography.size.sm, color: Colors.textSecondary },
+  directionLabelActive: { color: Colors.white },
+  directionLabelActiveIncome: { color: Colors.white },
   amountContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -271,28 +248,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
   },
-  currencySymbol: {
-    fontFamily: Typography.fontFamily.monoBold,
-    fontSize: Typography.size['2xl'],
-    color: Colors.textSecondary,
-  },
-  amountInput: {
-    flex: 1,
-    fontFamily: Typography.fontFamily.monoBold,
-    fontSize: Typography.size['3xl'],
-    color: Colors.text,
-  },
-  fields: {
-    gap: Spacing.base,
-  },
-  field: {
-    gap: Spacing.xs,
-  },
-  label: {
-    fontFamily: Typography.fontFamily.sansSemiBold,
-    fontSize: Typography.size.sm,
-    color: Colors.text,
-  },
+  currencySymbol: { fontFamily: Typography.fontFamily.monoBold, fontSize: Typography.size['2xl'], color: Colors.textSecondary },
+  amountInput: { flex: 1, fontFamily: Typography.fontFamily.monoBold, fontSize: Typography.size['3xl'], color: Colors.text },
+  fields: { gap: Spacing.base },
+  field: { gap: Spacing.xs },
+  label: { fontFamily: Typography.fontFamily.sansSemiBold, fontSize: Typography.size.sm, color: Colors.text },
   input: {
     backgroundColor: Colors.card,
     borderRadius: Radius.md,
@@ -304,44 +264,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
   },
-  chipRow: {
-    flexDirection: 'row',
-    gap: Spacing.sm,
-  },
-  chip: {
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: Radius.full,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    backgroundColor: Colors.card,
-  },
-  chipActive: {
-    backgroundColor: Colors.primaryLight,
-    borderColor: Colors.primary,
-  },
-  chipLabel: {
-    fontFamily: Typography.fontFamily.sans,
-    fontSize: Typography.size.sm,
-    color: Colors.textSecondary,
-  },
-  chipLabelActive: {
-    color: Colors.primary,
-    fontFamily: Typography.fontFamily.sansSemiBold,
-  },
-  saveButton: {
-    backgroundColor: Colors.primary,
-    borderRadius: Radius.md,
-    paddingVertical: Spacing.base,
-    alignItems: 'center',
-    marginTop: Spacing.sm,
-  },
-  saveButtonDisabled: {
-    opacity: 0.6,
-  },
-  saveButtonText: {
-    fontFamily: Typography.fontFamily.sansBold,
-    fontSize: Typography.size.base,
-    color: Colors.white,
-  },
+  chipRow: { flexDirection: 'row', gap: Spacing.sm },
+  chip: { paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, borderRadius: Radius.full, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.card },
+  chipActive: { backgroundColor: Colors.primaryLight, borderColor: Colors.primary },
+  chipLabel: { fontFamily: Typography.fontFamily.sans, fontSize: Typography.size.sm, color: Colors.textSecondary },
+  chipLabelActive: { color: Colors.primary, fontFamily: Typography.fontFamily.sansSemiBold },
+  saveButton: { backgroundColor: Colors.primary, borderRadius: Radius.md, paddingVertical: Spacing.base, alignItems: 'center', marginTop: Spacing.sm },
+  saveButtonDisabled: { opacity: 0.6 },
+  saveButtonText: { fontFamily: Typography.fontFamily.sansBold, fontSize: Typography.size.base, color: Colors.white },
 })

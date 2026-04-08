@@ -15,7 +15,8 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.voiceexpense.app"
+      "bundleIdentifier": "com.voiceexpense.app",
+      "usesAppleSignIn": true
     },
     "android": {
       "adaptiveIcon": {
@@ -33,7 +34,8 @@
           "backgroundColor": "#F5F0EB"
         }
       ],
-      "expo-localization"
+      "expo-localization",
+      "expo-apple-authentication"
     ],
     "experiments": {
       "typedRoutes": true

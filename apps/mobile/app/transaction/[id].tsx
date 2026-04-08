@@ -113,6 +113,12 @@ export default function TransactionDetailScreen() {
 
         {/* Actions */}
         <View style={styles.actions}>
+          <Pressable
+            style={styles.editButton}
+            onPress={() => router.push({ pathname: '/transaction/edit', params: { id: txn.id } })}
+          >
+            <Text style={styles.editButtonText}>Edit</Text>
+          </Pressable>
           <Pressable style={styles.deleteButton} onPress={handleDelete}>
             <Text style={styles.deleteButtonText}>Delete</Text>
           </Pressable>
@@ -196,6 +202,19 @@ const styles = StyleSheet.create({
   },
   actions: {
     gap: Spacing.sm,
+  },
+  editButton: {
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: Radius.md,
+    paddingVertical: Spacing.base,
+    alignItems: 'center',
+    backgroundColor: Colors.card,
+  },
+  editButtonText: {
+    fontFamily: Typography.fontFamily.sansSemiBold,
+    fontSize: Typography.size.base,
+    color: Colors.text,
   },
   deleteButton: {
     borderWidth: 1,

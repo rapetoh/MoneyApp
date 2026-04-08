@@ -7,6 +7,7 @@ import { Colors, Typography, Spacing } from '../theme'
 
 interface Props {
   transaction: Transaction
+  categoryName?: string | null
   onPress?: () => void
 }
 
@@ -15,7 +16,7 @@ function formatTime(isoString: string): string {
   return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
 
-export function TransactionRow({ transaction, onPress }: Props) {
+export function TransactionRow({ transaction, categoryName, onPress }: Props) {
   const isCredit = transaction.direction === 'credit'
   const amountColor = isCredit ? Colors.income : Colors.text
   const amountPrefix = isCredit ? '+' : '-'
@@ -27,9 +28,9 @@ export function TransactionRow({ transaction, onPress }: Props) {
         <Text style={styles.merchant} numberOfLines={1}>
           {transaction.merchant ?? 'Unknown'}
         </Text>
-        {transaction.category_id && (
+        {categoryName && (
           <Text style={styles.category} numberOfLines={1}>
-            {transaction.category_id}
+            {categoryName}
           </Text>
         )}
       </View>

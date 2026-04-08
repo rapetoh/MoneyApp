@@ -51,6 +51,15 @@ export default function RootLayout() {
             presentation: 'modal',
           }}
         />
+        <Stack.Screen
+          name="transaction/edit"
+          options={{
+            headerShown: true,
+            headerTitle: 'Edit Transaction',
+            headerBackTitle: 'Back',
+            presentation: 'modal',
+          }}
+        />
       </Stack>
     </>
   )

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   View,
   Text,
@@ -11,13 +11,20 @@ import {
   Alert,
 } from 'react-native'
 import { Link } from 'expo-router'
+import * as AppleAuthentication from 'expo-apple-authentication'
 import { signInWithEmail } from '../../src/hooks/useAuth'
+import { signInWithApple } from '../../src/services/appleAuth'
 import { Colors, Typography, Spacing, Radius } from '../../src/theme'
 
 export default function SignInScreen() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
+  const [appleAvailable, setAppleAvailable] = useState(false)
+
+  useEffect(() => {
+    AppleAuthentication.isAvailableAsync().then(setAppleAvailable)
+  }, [])
 
   async function handleSignIn() {
     if (!email || !password) return
@@ -25,7 +32,16 @@ export default function SignInScreen() {
     const { error } = await signInWithEmail(email.trim(), password)
     setLoading(false)
     if (error) Alert.alert('Sign in failed', error.message)
-    // On success, _layout.tsx auth listener handles redirect
+  }
+
+  async function handleAppleSignIn() {
+    try {
+      await signInWithApple()
+    } catch (err: any) {
+      if (err.code !== 'ERR_REQUEST_CANCELED') {
+        Alert.alert('Apple Sign-In failed', err.message)
+      }
+    }
   }
 
   return (
@@ -80,6 +96,23 @@ export default function SignInScreen() {
             )}
           </Pressable>
         </View>
+
+        {appleAvailable && (
+          <View style={styles.social}>
+            <View style={styles.dividerRow}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>or</Text>
+              <View style={styles.dividerLine} />
+            </View>
+            <AppleAuthentication.AppleAuthenticationButton
+              buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
+              buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
+              cornerRadius={Radius.md}
+              style={styles.appleButton}
+              onPress={handleAppleSignIn}
+            />
+          </View>
+        )}
 
         <View style={styles.footer}>
           <Text style={styles.footerText}>Don't have an account? </Text>
@@ -171,5 +204,27 @@ const styles = StyleSheet.create({
     fontFamily: Typography.fontFamily.sansSemiBold,
     fontSize: Typography.size.sm,
     color: Colors.primary,
+  },
+  social: {
+    gap: Spacing.md,
+  },
+  dividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: Colors.border,
+  },
+  dividerText: {
+    fontFamily: Typography.fontFamily.sans,
+    fontSize: Typography.size.sm,
+    color: Colors.textMuted,
+  },
+  appleButton: {
+    width: '100%',
+    height: 50,
   },
 })

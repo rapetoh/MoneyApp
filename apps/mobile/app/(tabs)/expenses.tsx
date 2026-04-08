@@ -12,6 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 import { useAuth } from '../../src/hooks/useAuth'
 import { useTransactions } from '../../src/hooks/useTransactions'
+import { useCategories } from '../../src/hooks/useCategories'
 import { TransactionRow } from '../../src/components/TransactionRow'
 import { Colors, Typography, Spacing, Radius } from '../../src/theme'
 import type { Transaction } from '@voice-expense/shared'
@@ -43,6 +44,7 @@ function groupByDate(transactions: Transaction[]) {
 export default function ExpensesScreen() {
   const { user } = useAuth()
   const { transactions, loading } = useTransactions(user?.id)
+  const { categoryMap } = useCategories(user?.id)
   const [search, setSearch] = useState('')
   const router = useRouter()
 
@@ -91,11 +93,12 @@ export default function ExpensesScreen() {
           renderSectionHeader={({ section: { title } }) => (
             <Text style={styles.dateHeader}>{title}</Text>
           )}
-          renderItem={({ item, index, section }) => (
+          renderItem={({ item, index }) => (
             <View>
               {index > 0 && <View style={styles.divider} />}
               <TransactionRow
                 transaction={item}
+                categoryName={item.category_id ? categoryMap[item.category_id]?.name : null}
                 onPress={() => router.push(`/transaction/${item.id}`)}
               />
             </View>

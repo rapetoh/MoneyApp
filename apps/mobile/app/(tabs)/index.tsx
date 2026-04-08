@@ -3,10 +3,13 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 import { useAuth } from '../../src/hooks/useAuth'
 import { useTransactions, useMonthSummary } from '../../src/hooks/useTransactions'
+import { useCategories } from '../../src/hooks/useCategories'
+import { useProfile } from '../../src/hooks/useProfile'
+import { useMonthlyBudget } from '../../src/hooks/useBudget'
 import { SafeToSpend } from '../../src/components/SafeToSpend'
 import { TransactionRow } from '../../src/components/TransactionRow'
 import { Colors, Typography, Spacing, Radius } from '../../src/theme'
-import { formatCurrency } from '@voice-expense/shared'
+import { formatCurrency, t } from '@voice-expense/shared'
 
 function SummaryCard({
   label,
@@ -31,10 +34,14 @@ export default function HomeScreen() {
   const { user } = useAuth()
   const { transactions, loading } = useTransactions(user?.id)
   const { totalIncome, totalExpenses, netBalance, monthTxns } = useMonthSummary(transactions)
+  const { categoryMap } = useCategories(user?.id)
+  const { profile } = useProfile(user?.id)
+  const { budget } = useMonthlyBudget(user?.id)
   const router = useRouter()
 
-  const displayName = user?.email?.split('@')[0] ?? 'there'
-  const currency = 'USD' // TODO: from profile
+  const locale = profile?.locale ?? 'en'
+  const displayName = profile?.display_name ?? user?.email?.split('@')[0] ?? 'there'
+  const currency = profile?.currency_code ?? 'USD'
   const recentTransactions = transactions.slice(0, 5)
 
   return (
@@ -54,7 +61,7 @@ export default function HomeScreen() {
 
         {/* Safe to Spend */}
         <SafeToSpend
-          monthlyBudget={null}
+          monthlyBudget={budget?.amount ?? null}
           totalSpent={totalExpenses}
           upcomingRecurring={0}
           currency={currency}
@@ -63,13 +70,13 @@ export default function HomeScreen() {
         {/* Income / Expenses Summary */}
         <View style={styles.summaryRow}>
           <SummaryCard
-            label="Income"
+            label={t('home.income', locale)}
             amount={totalIncome}
             currency={currency}
             color={Colors.income}
           />
           <SummaryCard
-            label="Expenses"
+            label={t('home.expenses', locale)}
             amount={totalExpenses}
             currency={currency}
             color={Colors.expense}
@@ -79,9 +86,9 @@ export default function HomeScreen() {
         {/* Recent Activity */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Recent Activity</Text>
+            <Text style={styles.sectionTitle}>{t('home.recent_activity', locale)}</Text>
             <Text style={styles.viewAll} onPress={() => router.push('/(tabs)/expenses')}>
-              View All
+              {t('home.view_all', locale)}
             </Text>
           </View>
 
@@ -100,6 +107,7 @@ export default function HomeScreen() {
                   {i > 0 && <View style={styles.divider} />}
                   <TransactionRow
                     transaction={txn}
+                    categoryName={txn.category_id ? categoryMap[txn.category_id]?.name : null}
                     onPress={() => router.push(`/transaction/${txn.id}`)}
                   />
                 </View>
