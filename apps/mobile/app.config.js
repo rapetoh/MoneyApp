@@ -38,8 +38,7 @@ module.exports = {
     },
     extra: {
       eas: {
-        // projectId will be filled in by `eas build:configure`
-        projectId: process.env.EAS_PROJECT_ID ?? '',
+        projectId: '79c8d5ab-eb60-4c21-a17d-c9607a5d9cc0',
       },
     },
   },

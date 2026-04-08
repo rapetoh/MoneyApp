@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm --version)",
+      "Bash(pnpm --version)",
+      "Bash(npx supabase:*)",
+      "Bash(npm install:*)",
+      "Bash(SUPABASE_DB_PASSWORD=OseVPCWAvsKkpf4o npx supabase db push --db-url \"postgresql://postgres.ohaqhwampmyoeaopdybd:OseVPCWAvsKkpf4o@aws-0-eu-central-1.pooler.supabase.com:6543/postgres\")",
+      "Bash(SUPABASE_ACCESS_TOKEN=sbp_981b37269ac114fde22a3da5d7b30bfe909b5c21 npx supabase link --project-ref ohaqhwampmyoeaopdybd)",
+      "Bash(SUPABASE_ACCESS_TOKEN=sbp_981b37269ac114fde22a3da5d7b30bfe909b5c21 npx supabase db push)",
+      "Bash(SUPABASE_ACCESS_TOKEN=sbp_981b37269ac114fde22a3da5d7b30bfe909b5c21 npx supabase db diff)",
+      "Bash(curl -s \"https://ohaqhwampmyoeaopdybd.supabase.co/rest/v1/?apikey=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9oYXFod2FtcG15b2Vhb3BkeWJkIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NTYwNjMwMiwiZXhwIjoyMDkxMTgyMzAyfQ.h8goCxGv5B4udQC7gBlrOdupoMCHM5t0h46QBIBiPek\")",
+      "Bash(python -m json.tool)",
+      "Bash(npx turbo:*)",
+      "Bash(npx prettier:*)",
+      "Bash(npx create-expo-app@latest mobile --template blank-typescript)",
+      "Bash(npx expo:*)",
+      "Bash(npx tsc:*)",
+      "Bash(eas --version)",
+      "Bash(node -e ':*)",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(d.get\\('dependencies', {}\\).get\\('@supabase/supabase-js', 'not found'\\)\\)\")"
+    ]
+  }
+}

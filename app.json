@@ -1,0 +1,15 @@
+{
+  "expo": {
+    "extra": {
+      "eas": {
+        "projectId": "79c8d5ab-eb60-4c21-a17d-c9607a5d9cc0"
+      }
+    },
+    "ios": {
+      "bundleIdentifier": "com.voiceexpense.app",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    }
+  }
+}
