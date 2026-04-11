@@ -45,6 +45,9 @@ supabase/.temp/
 .DS_Store
 Thumbs.db
 
+# Claude Code local settings (may contain API keys)
+.claude/
+
 # IDE
 .vscode/
 .idea/

@@ -11,8 +11,8 @@
       },
       "env": {
         "EXPO_PUBLIC_SUPABASE_URL": "https://ohaqhwampmyoeaopdybd.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9oYXFod2FtcG15b2Vhb3BkeWJkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU2MDYzMDIsImV4cCI6MjA5MTE4MjMwMn0.7QBY_f4EocHcR7txvanWhi2ZrpK447adFdcAxEAU8F8",
-        "EXPO_PUBLIC_API_BASE_URL": "http://localhost:3000"
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_HseSmiHYgNP-C3J5XvG6ag_UK6JbfDU",
+        "EXPO_PUBLIC_API_BASE_URL": "https://money-app-web-w6su.vercel.app"
       }
     },
     "development-simulator": {
@@ -23,21 +23,24 @@
       },
       "env": {
         "EXPO_PUBLIC_SUPABASE_URL": "https://ohaqhwampmyoeaopdybd.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9oYXFod2FtcG15b2Vhb3BkeWJkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU2MDYzMDIsImV4cCI6MjA5MTE4MjMwMn0.7QBY_f4EocHcR7txvanWhi2ZrpK447adFdcAxEAU8F8"
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_HseSmiHYgNP-C3J5XvG6ag_UK6JbfDU",
+        "EXPO_PUBLIC_API_BASE_URL": "https://money-app-web-w6su.vercel.app"
       }
     },
     "preview": {
       "distribution": "internal",
       "env": {
         "EXPO_PUBLIC_SUPABASE_URL": "https://ohaqhwampmyoeaopdybd.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9oYXFod2FtcG15b2Vhb3BkeWJkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU2MDYzMDIsImV4cCI6MjA5MTE4MjMwMn0.7QBY_f4EocHcR7txvanWhi2ZrpK447adFdcAxEAU8F8"
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_HseSmiHYgNP-C3J5XvG6ag_UK6JbfDU",
+        "EXPO_PUBLIC_API_BASE_URL": "https://money-app-web-w6su.vercel.app"
       }
     },
     "production": {
       "autoIncrement": true,
       "env": {
         "EXPO_PUBLIC_SUPABASE_URL": "https://ohaqhwampmyoeaopdybd.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9oYXFod2FtcG15b2Vhb3BkeWJkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU2MDYzMDIsImV4cCI6MjA5MTE4MjMwMn0.7QBY_f4EocHcR7txvanWhi2ZrpK447adFdcAxEAU8F8"
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_HseSmiHYgNP-C3J5XvG6ag_UK6JbfDU",
+        "EXPO_PUBLIC_API_BASE_URL": "https://money-app-web-w6su.vercel.app"
       }
     }
   },
