@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
   // 4. Call Gemini
   try {
     const model = genai.getGenerativeModel({
-      model: process.env.AI_PARSE_MODEL ?? 'gemini-2.0-flash',
+      model: process.env.AI_PARSE_MODEL ?? 'gemini-1.5-flash',
       systemInstruction: systemPrompt,
       generationConfig: {
         maxOutputTokens: 200,
