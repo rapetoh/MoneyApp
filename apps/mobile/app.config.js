@@ -17,6 +17,11 @@ module.exports = {
       supportsTablet: false,
       bundleIdentifier: 'com.voiceexpense.app',
       usesAppleSignIn: true,
+      infoPlist: {
+        NSAppTransportSecurity: {
+          NSAllowsArbitraryLoads: true,
+        },
+      },
     },
     android: {
       adaptiveIcon: {
@@ -32,6 +37,22 @@ module.exports = {
       'expo-localization',
       'expo-apple-authentication',
       'expo-web-browser',
+      'expo-sqlite',
+      [
+        'expo-speech-recognition',
+        {
+          microphonePermission: 'Allow Voice Expense Tracker to use the microphone to record expenses.',
+          speechRecognitionPermission: 'Allow Voice Expense Tracker to recognize your speech to log expenses.',
+        },
+      ],
+      [
+        'expo-image-picker',
+        {
+          cameraPermission: 'Allow Voice Expense Tracker to use the camera to scan receipts and paychecks.',
+        },
+      ],
+      // Android-only: adds MoneyNotificationListenerService to AndroidManifest.xml
+      ['./modules/notification-listener/plugin', {}],
     ],
     experiments: {
       typedRoutes: true,

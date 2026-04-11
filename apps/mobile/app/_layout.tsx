@@ -3,6 +3,8 @@ import { Stack, useRouter, useSegments } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import * as SplashScreen from 'expo-splash-screen'
 import { useAuth } from '../src/hooks/useAuth'
+import { syncManager } from '../src/services/sync/SyncManager'
+import { useShortcutHandler } from '../src/hooks/useShortcutHandler'
 
 SplashScreen.preventAutoHideAsync()
 
@@ -10,6 +12,14 @@ export default function RootLayout() {
   const { session, loading } = useAuth()
   const segments = useSegments()
   const router = useRouter()
+
+  // Handles voiceexpense://shortcut?amount=XX&merchant=... deep links from iOS Shortcuts
+  useShortcutHandler()
+
+  useEffect(() => {
+    syncManager.start()
+    return () => syncManager.stop()
+  }, [])
 
   useEffect(() => {
     if (loading) return

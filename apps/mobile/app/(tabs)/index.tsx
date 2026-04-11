@@ -5,7 +5,7 @@ import { useAuth } from '../../src/hooks/useAuth'
 import { useTransactions, useMonthSummary } from '../../src/hooks/useTransactions'
 import { useCategories } from '../../src/hooks/useCategories'
 import { useProfile } from '../../src/hooks/useProfile'
-import { useMonthlyBudget } from '../../src/hooks/useBudget'
+import { useActiveBudget, usePeriodSpend } from '../../src/hooks/useBudget'
 import { SafeToSpend } from '../../src/components/SafeToSpend'
 import { TransactionRow } from '../../src/components/TransactionRow'
 import { Colors, Typography, Spacing, Radius } from '../../src/theme'
@@ -36,7 +36,8 @@ export default function HomeScreen() {
   const { totalIncome, totalExpenses, netBalance, monthTxns } = useMonthSummary(transactions)
   const { categoryMap } = useCategories(user?.id)
   const { profile } = useProfile(user?.id)
-  const { budget } = useMonthlyBudget(user?.id)
+  const { budget } = useActiveBudget(user?.id)
+  const periodSpend = usePeriodSpend(budget, transactions)
   const router = useRouter()
 
   const locale = profile?.locale ?? 'en'
@@ -62,9 +63,10 @@ export default function HomeScreen() {
         {/* Safe to Spend */}
         <SafeToSpend
           monthlyBudget={budget?.amount ?? null}
-          totalSpent={totalExpenses}
+          totalSpent={periodSpend}
           upcomingRecurring={0}
           currency={currency}
+          period={budget?.period}
         />
 
         {/* Income / Expenses Summary */}
@@ -108,6 +110,7 @@ export default function HomeScreen() {
                   <TransactionRow
                     transaction={txn}
                     categoryName={txn.category_id ? categoryMap[txn.category_id]?.name : null}
+                    currency={currency}
                     onPress={() => router.push(`/transaction/${txn.id}`)}
                   />
                 </View>

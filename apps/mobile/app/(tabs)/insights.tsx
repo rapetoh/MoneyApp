@@ -1,48 +1,57 @@
 import { View, Text, StyleSheet, ScrollView } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useAuth } from '../../src/hooks/useAuth'
+import { useProfile } from '../../src/hooks/useProfile'
 import { useTransactions, useMonthSummary } from '../../src/hooks/useTransactions'
+import { useCategories } from '../../src/hooks/useCategories'
 import { Colors, Typography, Spacing, Radius } from '../../src/theme'
-import { formatCurrency } from '@voice-expense/shared'
+import { formatCurrency, t, type Locale } from '@voice-expense/shared'
 
 export default function InsightsScreen() {
   const { user } = useAuth()
+  const { profile } = useProfile(user?.id)
   const { transactions } = useTransactions(user?.id)
+  const { categoryMap } = useCategories(user?.id)
   const { totalIncome, totalExpenses, netBalance, monthTxns } = useMonthSummary(transactions)
-  const currency = 'USD'
 
-  // Top categories this month
-  const byCategory: Record<string, number> = {}
-  for (const t of monthTxns) {
-    if (t.direction === 'debit') {
-      const cat = t.category_id ?? 'Uncategorized'
-      byCategory[cat] = (byCategory[cat] ?? 0) + t.amount
+  const locale = (profile?.locale ?? 'en') as Locale
+  const currency = profile?.currency_code ?? 'USD'
+
+  const byCategory: Record<string, { name: string; amount: number }> = {}
+  for (const txn of monthTxns) {
+    if (txn.direction === 'debit') {
+      const catId = txn.category_id ?? '__uncategorized__'
+      const catName = txn.category_id
+        ? (categoryMap[txn.category_id]?.name ?? t('voice.category', locale))
+        : t('transactions.uncategorized', locale)
+      if (!byCategory[catId]) byCategory[catId] = { name: catName, amount: 0 }
+      byCategory[catId].amount += txn.amount
     }
   }
-  const topCategories = Object.entries(byCategory)
-    .sort(([, a], [, b]) => b - a)
+  const topCategories = Object.values(byCategory)
+    .sort((a, b) => b.amount - a.amount)
     .slice(0, 5)
 
-  const maxCatAmount = topCategories[0]?.[1] ?? 1
+  const maxCatAmount = topCategories[0]?.amount ?? 1
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <Text style={styles.title}>Insights</Text>
+        <Text style={styles.title}>{t('tabs.insights', locale)}</Text>
 
         {/* Month totals */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>This Month</Text>
+          <Text style={styles.cardTitle}>{t('home.net_balance', locale)}</Text>
           <View style={styles.metricRow}>
             <View style={styles.metric}>
-              <Text style={styles.metricLabel}>Income</Text>
+              <Text style={styles.metricLabel}>{t('home.income', locale)}</Text>
               <Text style={[styles.metricValue, { color: Colors.income }]}>
                 {formatCurrency(totalIncome, currency)}
               </Text>
             </View>
             <View style={styles.metricDivider} />
             <View style={styles.metric}>
-              <Text style={styles.metricLabel}>Expenses</Text>
+              <Text style={styles.metricLabel}>{t('home.expenses', locale)}</Text>
               <Text style={styles.metricValue}>{formatCurrency(totalExpenses, currency)}</Text>
             </View>
             <View style={styles.metricDivider} />
@@ -62,33 +71,29 @@ export default function InsightsScreen() {
 
         {/* Top categories */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Top Categories</Text>
+          <Text style={styles.cardTitle}>{t('voice.category', locale)}</Text>
           {topCategories.length === 0 ? (
-            <Text style={styles.emptyText}>No expenses this month</Text>
+            <Text style={styles.emptyText}>{t('transactions.empty', locale)}</Text>
           ) : (
             <View style={styles.categoryList}>
-              {topCategories.map(([cat, amount]) => (
-                <View key={cat} style={styles.categoryRow}>
+              {topCategories.map((cat) => (
+                <View key={cat.name} style={styles.categoryRow}>
                   <Text style={styles.categoryName} numberOfLines={1}>
-                    {cat}
+                    {cat.name}
                   </Text>
                   <View style={styles.barTrack}>
                     <View
                       style={[
                         styles.barFill,
-                        { width: `${(amount / maxCatAmount) * 100}%` as any },
+                        { width: `${(cat.amount / maxCatAmount) * 100}%` as any },
                       ]}
                     />
                   </View>
-                  <Text style={styles.categoryAmount}>{formatCurrency(amount, currency)}</Text>
+                  <Text style={styles.categoryAmount}>{formatCurrency(cat.amount, currency)}</Text>
                 </View>
               ))}
             </View>
           )}
-        </View>
-
-        <View style={styles.comingSoon}>
-          <Text style={styles.comingSoonText}>More charts coming in Phase 5 🚀</Text>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -96,15 +101,8 @@ export default function InsightsScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
-  content: {
-    padding: Spacing.base,
-    gap: Spacing.base,
-    paddingBottom: Spacing['3xl'],
-  },
+  safe: { flex: 1, backgroundColor: Colors.background },
+  content: { padding: Spacing.base, gap: Spacing.base, paddingBottom: Spacing['3xl'] },
   title: {
     fontFamily: Typography.fontFamily.sansBold,
     fontSize: Typography.size['2xl'],
@@ -126,15 +124,8 @@ const styles = StyleSheet.create({
     fontSize: Typography.size.base,
     color: Colors.text,
   },
-  metricRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  metric: {
-    flex: 1,
-    alignItems: 'center',
-    gap: Spacing.xs,
-  },
+  metricRow: { flexDirection: 'row', alignItems: 'center' },
+  metric: { flex: 1, alignItems: 'center', gap: Spacing.xs },
   metricLabel: {
     fontFamily: Typography.fontFamily.sans,
     fontSize: Typography.size.xs,
@@ -145,19 +136,9 @@ const styles = StyleSheet.create({
     fontSize: Typography.size.base,
     color: Colors.text,
   },
-  metricDivider: {
-    width: 1,
-    height: 32,
-    backgroundColor: Colors.border,
-  },
-  categoryList: {
-    gap: Spacing.md,
-  },
-  categoryRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-  },
+  metricDivider: { width: 1, height: 32, backgroundColor: Colors.border },
+  categoryList: { gap: Spacing.md },
+  categoryRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
   categoryName: {
     fontFamily: Typography.fontFamily.sans,
     fontSize: Typography.size.sm,
@@ -189,14 +170,5 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     textAlign: 'center',
     paddingVertical: Spacing.base,
-  },
-  comingSoon: {
-    alignItems: 'center',
-    paddingVertical: Spacing.lg,
-  },
-  comingSoonText: {
-    fontFamily: Typography.fontFamily.sans,
-    fontSize: Typography.size.sm,
-    color: Colors.textMuted,
   },
 })

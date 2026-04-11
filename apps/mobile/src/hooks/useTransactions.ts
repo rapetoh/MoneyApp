@@ -1,41 +1,53 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabase'
+import { getTransactions, upsertTransaction, softDeleteTransaction, updateTransactionFields } from '../services/sync/transactionStore'
+import { enqueue } from '../services/sync/syncQueue'
+import { syncManager } from '../services/sync/SyncManager'
+import { DataEvents } from '../events/dataEvents'
 import type { Transaction } from '@voice-expense/shared'
+import * as Crypto from 'expo-crypto'
 
 export function useTransactions(userId: string | undefined) {
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const lastSyncedAt = useRef<string | undefined>(undefined)
 
-  const fetchTransactions = useCallback(async () => {
+  const loadLocal = useCallback(async () => {
     if (!userId) return
-    setLoading(true)
-    const { data, error } = await supabase
-      .from('transactions')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('is_deleted', false)
-      .order('transacted_at', { ascending: false })
-      .limit(200)
-
-    if (error) {
-      setError(error.message)
-    } else {
-      setTransactions((data as Transaction[]) ?? [])
-    }
+    const local = await getTransactions(userId)
+    setTransactions(local)
     setLoading(false)
   }, [userId])
 
-  useEffect(() => {
-    fetchTransactions()
-  }, [fetchTransactions])
-
-  // Realtime subscription
+  // Initial load: read SQLite immediately, then pull remote
   useEffect(() => {
     if (!userId) return
 
+    setLoading(true)
+    loadLocal().then(() => {
+      syncManager.pullRemote(userId, lastSyncedAt.current).then(() => {
+        lastSyncedAt.current = new Date().toISOString()
+        loadLocal()
+      })
+    })
+  }, [userId, loadLocal])
+
+  // Cross-screen sync: when another hook instance writes, reload immediately
+  useEffect(() => {
+    if (!userId) return
+    return DataEvents.onTransactions(userId, loadLocal)
+  }, [userId, loadLocal])
+
+  // Realtime: when Supabase pushes a change, upsert into SQLite then reload.
+  // Channel name includes a unique ID so React Strict Mode's double-invoke never hits
+  // the same channel instance — each effect run gets a fresh subscription.
+  useEffect(() => {
+    if (!userId) return
+
+    const channelName = `transactions:${userId}:${Math.random().toString(36).slice(2)}`
     const channel = supabase
-      .channel(`transactions:${userId}`)
+      .channel(channelName)
       .on(
         'postgres_changes',
         {
@@ -44,19 +56,111 @@ export function useTransactions(userId: string | undefined) {
           table: 'transactions',
           filter: `user_id=eq.${userId}`,
         },
-        () => {
-          // Re-fetch on any change
-          fetchTransactions()
+        async (payload) => {
+          if (payload.new && typeof payload.new === 'object' && 'id' in payload.new) {
+            await upsertTransaction(payload.new as Transaction)
+          }
+          await loadLocal()
         },
       )
       .subscribe()
 
     return () => {
+      channel.unsubscribe()
       supabase.removeChannel(channel)
     }
-  }, [userId, fetchTransactions])
+  }, [userId]) // loadLocal is stable per userId — not needed as a separate dep
 
-  return { transactions, loading, error, refetch: fetchTransactions }
+  async function createTransaction(
+    fields: Pick<Transaction, 'amount' | 'direction' | 'currency_code' | 'merchant' | 'note' | 'category_id' | 'payment_method'> &
+      Partial<Pick<Transaction, 'source' | 'raw_transcript' | 'ai_confidence'>>,
+  ): Promise<{ error: string | null }> {
+    if (!userId) return { error: 'Not authenticated' }
+
+    const now = new Date().toISOString()
+    const clientId = Crypto.randomUUID()
+    const txn: Transaction = {
+      id: clientId,
+      user_id: userId,
+      amount: fields.amount,
+      direction: fields.direction,
+      currency_code: fields.currency_code,
+      category_id: fields.category_id,
+      merchant: fields.merchant,
+      note: fields.note,
+      payment_method: fields.payment_method,
+      transacted_at: now,
+      source: fields.source ?? 'manual',
+      raw_transcript: fields.raw_transcript ?? null,
+      ai_confidence: fields.ai_confidence ?? null,
+      is_recurring: false,
+      recurring_rule_id: null,
+      client_id: clientId,
+      client_created_at: now,
+      version: 1,
+      is_deleted: false,
+      deleted_at: null,
+      synced_at: null,
+      created_at: now,
+      updated_at: now,
+    }
+
+    // Write to SQLite immediately (optimistic)
+    await upsertTransaction(txn)
+    await loadLocal()
+    DataEvents.emitTransactions(userId)
+
+    // Queue for Supabase sync
+    await enqueue('create', txn.id, txn)
+    syncManager.drainQueue()
+
+    return { error: null }
+  }
+
+  async function deleteTransaction(id: string): Promise<{ error: string | null }> {
+    if (!userId) return { error: 'Not authenticated' }
+
+    await softDeleteTransaction(id)
+    await loadLocal()
+    DataEvents.emitTransactions(userId)
+
+    const txn = transactions.find((t) => t.id === id)
+    if (txn) {
+      await enqueue('delete', id, {
+        id,
+        user_id: userId,
+        is_deleted: true,
+        deleted_at: new Date().toISOString(),
+        version: (txn.version ?? 1) + 1,
+      })
+      syncManager.drainQueue()
+    }
+
+    return { error: null }
+  }
+
+  async function editTransaction(
+    id: string,
+    fields: Partial<Pick<Transaction, 'amount' | 'merchant' | 'note' | 'category_id' | 'payment_method' | 'direction'>>,
+  ): Promise<{ error: string | null }> {
+    if (!userId) return { error: 'Not authenticated' }
+
+    await updateTransactionFields(id, fields)
+    await loadLocal()
+    DataEvents.emitTransactions(userId)
+
+    const updated = await import('../services/sync/transactionStore').then((m) =>
+      m.getTransactionById(id),
+    )
+    if (updated) {
+      await enqueue('update', id, updated)
+      syncManager.drainQueue()
+    }
+
+    return { error: null }
+  }
+
+  return { transactions, loading, error, createTransaction, deleteTransaction, editTransaction }
 }
 
 // Current month summary

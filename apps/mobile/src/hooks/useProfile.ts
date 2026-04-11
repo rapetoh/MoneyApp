@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
+import { DataEvents } from '../events/dataEvents'
 import type { Profile, ProfileUpdate } from '@voice-expense/shared'
 
 export function useProfile(userId: string | undefined) {
@@ -21,13 +22,22 @@ export function useProfile(userId: string | undefined) {
     fetch()
   }, [fetch])
 
+  // Reload when another screen updates the profile (e.g. language/currency change)
+  useEffect(() => {
+    if (!userId) return
+    return DataEvents.onProfile(userId, fetch)
+  }, [userId, fetch])
+
   async function updateProfile(updates: ProfileUpdate) {
     if (!userId) return false
     const { error } = await supabase
       .from('profiles')
       .update(updates)
       .eq('id', userId)
-    if (!error) await fetch()
+    if (!error) {
+      await fetch()
+      DataEvents.emitProfile(userId)
+    }
     return !error
   }
 

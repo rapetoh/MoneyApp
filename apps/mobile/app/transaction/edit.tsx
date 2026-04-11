@@ -14,8 +14,10 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useAuth } from '../../src/hooks/useAuth'
+import { useProfile } from '../../src/hooks/useProfile'
 import { useCategories } from '../../src/hooks/useCategories'
-import { supabase } from '../../src/lib/supabase'
+import { useTransactions } from '../../src/hooks/useTransactions'
+import { getTransactionById } from '../../src/services/sync/transactionStore'
 import { CategoryPicker } from '../../src/components/CategoryPicker'
 import { Colors, Typography, Spacing, Radius } from '../../src/theme'
 import type { Transaction, TransactionDirection, PaymentMethod } from '@voice-expense/shared'
@@ -31,7 +33,10 @@ const PAYMENT_METHODS: { value: PaymentMethod; label: string }[] = [
 export default function EditTransactionScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const { user } = useAuth()
+  const { profile } = useProfile(user?.id)
   const { categories, createCategory } = useCategories(user?.id)
+  const { editTransaction } = useTransactions(user?.id)
+  const currency = profile?.currency_code ?? 'USD'
   const router = useRouter()
 
   const [loading, setLoading] = useState(true)
@@ -47,24 +52,18 @@ export default function EditTransactionScreen() {
 
   useEffect(() => {
     if (!id) return
-    supabase
-      .from('transactions')
-      .select('*')
-      .eq('id', id)
-      .single()
-      .then(({ data }) => {
-        if (data) {
-          const t = data as Transaction
-          setTxn(t)
-          setAmount(String(t.amount))
-          setMerchant(t.merchant ?? '')
-          setNote(t.note ?? '')
-          setCategoryId(t.category_id)
-          setDirection(t.direction)
-          setPaymentMethod(t.payment_method ?? 'cash')
-        }
-        setLoading(false)
-      })
+    getTransactionById(id).then((data) => {
+      if (data) {
+        setTxn(data)
+        setAmount(String(data.amount))
+        setMerchant(data.merchant ?? '')
+        setNote(data.note ?? '')
+        setCategoryId(data.category_id)
+        setDirection(data.direction)
+        setPaymentMethod(data.payment_method ?? 'cash')
+      }
+      setLoading(false)
+    })
   }, [id])
 
   async function handleSave() {
@@ -76,22 +75,18 @@ export default function EditTransactionScreen() {
     if (!txn) return
 
     setSaving(true)
-    const { error } = await supabase
-      .from('transactions')
-      .update({
-        amount: parsedAmount,
-        direction,
-        merchant: merchant.trim() || null,
-        note: note.trim() || null,
-        category_id: categoryId,
-        payment_method: paymentMethod,
-        version: txn.version + 1,
-      })
-      .eq('id', txn.id)
+    const { error } = await editTransaction(txn.id, {
+      amount: parsedAmount,
+      direction,
+      merchant: merchant.trim() || null,
+      note: note.trim() || null,
+      category_id: categoryId,
+      payment_method: paymentMethod,
+    })
 
     setSaving(false)
     if (error) {
-      Alert.alert('Error', error.message)
+      Alert.alert('Error', error)
     } else {
       router.back()
     }
@@ -138,7 +133,7 @@ export default function EditTransactionScreen() {
 
           {/* Amount */}
           <View style={styles.amountContainer}>
-            <Text style={styles.currencySymbol}>$</Text>
+            <Text style={styles.currencySymbol}>{currency}</Text>
             <TextInput
               style={styles.amountInput}
               value={amount}

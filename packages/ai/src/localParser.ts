@@ -10,7 +10,7 @@ const AMOUNT_PATTERNS = [
 
 const MERCHANT_PATTERNS = [
   // "at Starbucks", "chez Starbucks", "en Starbucks", "no Starbucks"
-  /(?:at|chez|en|no|@)\s+([A-Za-zÀ-ÿ\s']+?)(?:\s*,|\s*$)/i,
+  /(?:at|chez|en|no|@)\s+([A-Za-zÀ-ÿ0-9\s'\-&.]+?)(?:\s*,|\s*$)/i,
 ]
 
 function parseAmount(transcript: string): number | null {

@@ -1,6 +1,7 @@
 import React from 'react'
 import { View, Text, StyleSheet } from 'react-native'
 import { formatCurrency } from '@voice-expense/shared'
+import type { BudgetPeriod } from '@voice-expense/shared'
 import { Colors, Typography, Spacing, Radius } from '../theme'
 
 interface Props {
@@ -8,17 +9,38 @@ interface Props {
   totalSpent: number
   upcomingRecurring: number
   currency: string
+  period?: BudgetPeriod
 }
 
-export function SafeToSpend({ monthlyBudget, totalSpent, upcomingRecurring, currency }: Props) {
+function periodLabel(period: BudgetPeriod | undefined): string {
+  switch (period) {
+    case 'weekly': return 'Weekly'
+    case 'biweekly': return 'Bi-weekly'
+    case 'quarterly': return 'Quarterly'
+    case 'yearly': return 'Yearly'
+    default: return 'Monthly'
+  }
+}
+
+function spentLabel(period: BudgetPeriod | undefined): string {
+  switch (period) {
+    case 'weekly': return 'Spent this week'
+    case 'biweekly': return 'Spent (last 14 days)'
+    case 'quarterly': return 'Spent this quarter'
+    case 'yearly': return 'Spent this year'
+    default: return 'Spent this month'
+  }
+}
+
+export function SafeToSpend({ monthlyBudget, totalSpent, upcomingRecurring, currency, period }: Props) {
   const hasBudget = monthlyBudget !== null && monthlyBudget > 0
 
   if (!hasBudget) {
     return (
       <View style={styles.card}>
-        <Text style={styles.label}>Spent This Month</Text>
+        <Text style={styles.label}>{spentLabel(period)}</Text>
         <Text style={styles.amount}>{formatCurrency(totalSpent, currency)}</Text>
-        <Text style={styles.hint}>Set a monthly budget to see Safe to Spend</Text>
+        <Text style={styles.hint}>Set a budget to see Safe to Spend</Text>
       </View>
     )
   }
@@ -32,7 +54,7 @@ export function SafeToSpend({ monthlyBudget, totalSpent, upcomingRecurring, curr
     <View style={styles.card}>
       <Text style={styles.label}>Safe to Spend</Text>
       <Text style={[styles.amount, isOverBudget && styles.overBudget]}>
-        {isOverBudget ? '$0' : formatCurrency(remaining, currency)}
+        {isOverBudget ? formatCurrency(0, currency) : formatCurrency(remaining, currency)}
       </Text>
       {isOverBudget && (
         <View style={styles.warningRow}>
@@ -41,7 +63,7 @@ export function SafeToSpend({ monthlyBudget, totalSpent, upcomingRecurring, curr
       )}
       <View style={styles.breakdown}>
         <View style={styles.breakdownRow}>
-          <Text style={styles.breakdownLabel}>Spent so far</Text>
+          <Text style={styles.breakdownLabel}>{spentLabel(period)}</Text>
           <Text style={styles.breakdownValue}>{formatCurrency(totalSpent, currency)}</Text>
         </View>
         {upcomingRecurring > 0 && (
@@ -51,7 +73,7 @@ export function SafeToSpend({ monthlyBudget, totalSpent, upcomingRecurring, curr
           </View>
         )}
         <View style={styles.breakdownRow}>
-          <Text style={styles.breakdownLabel}>Monthly budget</Text>
+          <Text style={styles.breakdownLabel}>{periodLabel(period)} budget</Text>
           <Text style={styles.breakdownValue}>{formatCurrency(monthlyBudget, currency)}</Text>
         </View>
       </View>

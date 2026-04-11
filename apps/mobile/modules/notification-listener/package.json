@@ -1,0 +1,7 @@
+{
+  "name": "@voice-expense/notification-listener",
+  "version": "1.0.0",
+  "description": "Android notification listener for payment notifications",
+  "main": "src/index.ts",
+  "expo-module-config": "expo-module.config.json"
+}

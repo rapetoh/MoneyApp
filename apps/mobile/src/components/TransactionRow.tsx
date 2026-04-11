@@ -1,13 +1,14 @@
 import React from 'react'
 import { View, Text, Pressable, StyleSheet } from 'react-native'
 import type { Transaction } from '@voice-expense/shared'
-import { formatAmount } from '@voice-expense/shared'
+import { formatCurrency } from '@voice-expense/shared'
 import { MerchantAvatar } from './MerchantAvatar'
 import { Colors, Typography, Spacing } from '../theme'
 
 interface Props {
   transaction: Transaction
   categoryName?: string | null
+  currency: string   // always the profile currency — ensures all rows are consistent
   onPress?: () => void
 }
 
@@ -16,7 +17,7 @@ function formatTime(isoString: string): string {
   return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
 
-export function TransactionRow({ transaction, categoryName, onPress }: Props) {
+export function TransactionRow({ transaction, categoryName, currency, onPress }: Props) {
   const isCredit = transaction.direction === 'credit'
   const amountColor = isCredit ? Colors.income : Colors.text
   const amountPrefix = isCredit ? '+' : '-'
@@ -37,7 +38,7 @@ export function TransactionRow({ transaction, categoryName, onPress }: Props) {
       <View style={styles.right}>
         <Text style={[styles.amount, { color: amountColor }]}>
           {amountPrefix}
-          {formatAmount(transaction.amount, transaction.currency_code)}
+          {formatCurrency(transaction.amount, currency)}
         </Text>
         <Text style={styles.time}>{formatTime(transaction.transacted_at)}</Text>
       </View>

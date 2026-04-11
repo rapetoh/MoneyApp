@@ -3,7 +3,6 @@ import {
   View,
   Text,
   TextInput,
-  FlatList,
   StyleSheet,
   ActivityIndicator,
   SectionList,
@@ -13,11 +12,13 @@ import { useRouter } from 'expo-router'
 import { useAuth } from '../../src/hooks/useAuth'
 import { useTransactions } from '../../src/hooks/useTransactions'
 import { useCategories } from '../../src/hooks/useCategories'
+import { useProfile } from '../../src/hooks/useProfile'
 import { TransactionRow } from '../../src/components/TransactionRow'
 import { Colors, Typography, Spacing, Radius } from '../../src/theme'
+import { t, type Locale } from '@voice-expense/shared'
 import type { Transaction } from '@voice-expense/shared'
 
-function groupByDate(transactions: Transaction[]) {
+function groupByDate(transactions: Transaction[], locale: Locale) {
   const groups: Record<string, Transaction[]> = {}
   for (const txn of transactions) {
     const date = new Date(txn.transacted_at)
@@ -27,11 +28,11 @@ function groupByDate(transactions: Transaction[]) {
 
     let label: string
     if (date.toDateString() === today.toDateString()) {
-      label = 'Today'
+      label = t('transactions.today', locale)
     } else if (date.toDateString() === yesterday.toDateString()) {
-      label = 'Yesterday'
+      label = t('transactions.yesterday', locale)
     } else {
-      label = date.toLocaleDateString('en', { weekday: 'long', month: 'long', day: 'numeric' })
+      label = date.toLocaleDateString(locale, { weekday: 'long', month: 'long', day: 'numeric' })
     }
 
     if (!groups[label]) groups[label] = []
@@ -45,30 +46,34 @@ export default function ExpensesScreen() {
   const { user } = useAuth()
   const { transactions, loading } = useTransactions(user?.id)
   const { categoryMap } = useCategories(user?.id)
+  const { profile } = useProfile(user?.id)
   const [search, setSearch] = useState('')
   const router = useRouter()
+
+  const locale = (profile?.locale ?? 'en') as Locale
+  const currency = profile?.currency_code ?? 'USD'
 
   const filtered = useMemo(() => {
     if (!search.trim()) return transactions
     const q = search.toLowerCase()
     return transactions.filter(
-      (t) =>
-        (t.merchant ?? '').toLowerCase().includes(q) ||
-        (t.note ?? '').toLowerCase().includes(q),
+      (txn) =>
+        (txn.merchant ?? '').toLowerCase().includes(q) ||
+        (txn.note ?? '').toLowerCase().includes(q),
     )
   }, [transactions, search])
 
-  const sections = useMemo(() => groupByDate(filtered), [filtered])
+  const sections = useMemo(() => groupByDate(filtered, locale), [filtered, locale])
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
-        <Text style={styles.title}>Expenses</Text>
+        <Text style={styles.title}>{t('transactions.title', locale)}</Text>
         <TextInput
           style={styles.search}
           value={search}
           onChangeText={setSearch}
-          placeholder="Search transactions..."
+          placeholder={t('transactions.search', locale)}
           placeholderTextColor={Colors.textMuted}
           clearButtonMode="while-editing"
         />
@@ -79,9 +84,13 @@ export default function ExpensesScreen() {
       ) : sections.length === 0 ? (
         <View style={styles.emptyState}>
           <Text style={styles.emptyIcon}>{search ? '🔍' : '💸'}</Text>
-          <Text style={styles.emptyTitle}>{search ? 'No results' : 'No transactions yet'}</Text>
+          <Text style={styles.emptyTitle}>
+            {search ? t('common.error', locale) : t('transactions.empty', locale)}
+          </Text>
           <Text style={styles.emptySubtitle}>
-            {search ? 'Try a different search' : 'Tap the mic tab to log your first expense'}
+            {search
+              ? t('common.retry', locale)
+              : t('voice.subtitle', locale)}
           </Text>
         </View>
       ) : (
@@ -99,6 +108,7 @@ export default function ExpensesScreen() {
               <TransactionRow
                 transaction={item}
                 categoryName={item.category_id ? categoryMap[item.category_id]?.name : null}
+                currency={currency}
                 onPress={() => router.push(`/transaction/${item.id}`)}
               />
             </View>
@@ -112,14 +122,8 @@ export default function ExpensesScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
-  header: {
-    padding: Spacing.base,
-    gap: Spacing.md,
-  },
+  safe: { flex: 1, backgroundColor: Colors.background },
+  header: { padding: Spacing.base, gap: Spacing.md },
   title: {
     fontFamily: Typography.fontFamily.sansBold,
     fontSize: Typography.size['2xl'],
@@ -136,10 +140,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
   },
-  listContent: {
-    paddingHorizontal: Spacing.base,
-    paddingBottom: Spacing['3xl'],
-  },
+  listContent: { paddingHorizontal: Spacing.base, paddingBottom: Spacing['3xl'] },
   dateHeader: {
     fontFamily: Typography.fontFamily.sansSemiBold,
     fontSize: Typography.size.sm,
@@ -152,9 +153,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.border,
     marginLeft: 44 + Spacing.md + Spacing.base,
   },
-  sectionGap: {
-    height: Spacing.sm,
-  },
+  sectionGap: { height: Spacing.sm },
   emptyState: {
     flex: 1,
     alignItems: 'center',
@@ -162,9 +161,7 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
     paddingHorizontal: Spacing['2xl'],
   },
-  emptyIcon: {
-    fontSize: 40,
-  },
+  emptyIcon: { fontSize: 40 },
   emptyTitle: {
     fontFamily: Typography.fontFamily.sansBold,
     fontSize: Typography.size.md,

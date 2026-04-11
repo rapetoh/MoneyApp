@@ -1,4 +1,4 @@
-export type BudgetPeriod = 'weekly' | 'monthly' | 'quarterly' | 'yearly'
+export type BudgetPeriod = 'weekly' | 'biweekly' | 'monthly' | 'quarterly' | 'yearly'
 
 export interface Budget {
   id: string
