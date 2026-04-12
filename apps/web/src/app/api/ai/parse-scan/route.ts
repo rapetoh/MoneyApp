@@ -1,21 +1,19 @@
-import { GoogleGenAI } from '@google/genai'
+import OpenAI from 'openai'
 import { validateToken } from '../../../../lib/auth'
 import { getScanPrompt } from '@voice-expense/ai'
 import type { NextRequest } from 'next/server'
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! })
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! })
+const MODEL = process.env.AI_SCAN_MODEL ?? 'gpt-4o-mini'
 
-// Max image size: 4MB base64
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024
 
 export async function POST(req: NextRequest) {
-  // 1. Auth
   const userId = await validateToken(req.headers.get('Authorization'))
   if (!userId) {
     return Response.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  // 2. Parse body
   let body: { imageBase64?: string; scanType?: 'receipt' | 'paycheck'; currency?: string }
   try {
     body = await req.json()
@@ -33,44 +31,29 @@ export async function POST(req: NextRequest) {
     return Response.json({ error: 'Image too large. Max 4MB.' }, { status: 413 })
   }
 
-  // IMPORTANT: the image is never stored — passed directly to Gemini and discarded.
-
-  // 3. Build prompt
   const prompt = getScanPrompt(scanType, currency)
 
-  // 4. Call Gemini vision
   try {
-    const response = await ai.models.generateContent({
-      model: process.env.AI_PARSE_MODEL ?? 'gemini-2.5-flash',
-      contents: [
+    const completion = await openai.chat.completions.create({
+      model: MODEL,
+      response_format: { type: 'json_object' },
+      max_tokens: 300,
+      messages: [
         {
-          parts: [
-            { text: prompt },
-            { inlineData: { mimeType: 'image/jpeg', data: imageBase64 } },
+          role: 'user',
+          content: [
+            { type: 'text', text: prompt },
+            { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${imageBase64}` } },
           ],
         },
       ],
-      config: {
-        maxOutputTokens: 300,
-        responseMimeType: 'application/json',
-      },
     })
 
-    const text = response.text ?? ''
-
-    let parsed: unknown
-    const stripped = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
-    try {
-      parsed = JSON.parse(stripped)
-    } catch {
-      const match = stripped.match(/\{[\s\S]*\}/)
-      if (!match) throw new Error('No JSON object found in model response')
-      parsed = JSON.parse(match[0])
-    }
-
+    const text = completion.choices[0].message.content ?? '{}'
+    const parsed = JSON.parse(text)
     return Response.json(parsed)
   } catch (err) {
-    console.error('[parse-scan] Gemini error:', err)
+    console.error('[parse-scan] OpenAI error:', err)
     return Response.json({ error: 'Scan parsing failed' }, { status: 500 })
   }
 }
