@@ -47,8 +47,17 @@ export async function POST(req: NextRequest) {
     })
 
     const text = response.text ?? ''
-    const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
-    const parsed = JSON.parse(cleaned)
+
+    // Extract JSON robustly — model may wrap it in prose or markdown
+    let parsed: unknown
+    const stripped = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+    try {
+      parsed = JSON.parse(stripped)
+    } catch {
+      const match = stripped.match(/\{[\s\S]*\}/)
+      if (!match) throw new Error('No JSON object found in model response')
+      parsed = JSON.parse(match[0])
+    }
 
     return Response.json(parsed)
   } catch (err) {
