@@ -1,9 +1,9 @@
-import { GoogleGenerativeAI } from '@google/generative-ai'
+import { GoogleGenAI } from '@google/genai'
 import { validateToken } from '../../../../lib/auth'
 import { getScanPrompt } from '@voice-expense/ai'
 import type { NextRequest } from 'next/server'
 
-const genai = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! })
 
 // Max image size: 4MB base64
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024
@@ -29,39 +29,34 @@ export async function POST(req: NextRequest) {
     return Response.json({ error: 'imageBase64 is required' }, { status: 400 })
   }
 
-  // Size guard — reject oversized images
   if (imageBase64.length > MAX_IMAGE_BYTES * 1.37) {
-    // base64 overhead is ~37%
     return Response.json({ error: 'Image too large. Max 4MB.' }, { status: 413 })
   }
 
-  // IMPORTANT: the image is never stored — it is passed directly to Gemini and discarded.
-  // Only the extracted structured data is returned and saved by the client.
+  // IMPORTANT: the image is never stored — passed directly to Gemini and discarded.
 
   // 3. Build prompt
   const prompt = getScanPrompt(scanType, currency)
 
   // 4. Call Gemini vision
   try {
-    const model = genai.getGenerativeModel({
-      model: process.env.AI_PARSE_MODEL ?? 'gemini-1.5-flash',
-      generationConfig: {
+    const response = await ai.models.generateContent({
+      model: process.env.AI_PARSE_MODEL ?? 'gemini-2.5-flash',
+      contents: [
+        {
+          parts: [
+            { text: prompt },
+            { inlineData: { mimeType: 'image/jpeg', data: imageBase64 } },
+          ],
+        },
+      ],
+      config: {
         maxOutputTokens: 300,
         responseMimeType: 'application/json',
       },
     })
 
-    const result = await model.generateContent([
-      prompt,
-      {
-        inlineData: {
-          mimeType: 'image/jpeg',
-          data: imageBase64,
-        },
-      },
-    ])
-
-    const text = result.response.text()
+    const text = response.text ?? ''
     const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
     const parsed = JSON.parse(cleaned)
 

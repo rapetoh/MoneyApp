@@ -28,7 +28,7 @@ if (typeof globalThis.crypto?.subtle?.digest !== 'function') {
       return result.buffer
     },
   }
-  ;(globalThis as any).crypto = { ...(globalThis.crypto ?? {}), subtle }
+  ;(globalThis.crypto as any).subtle = subtle
 }
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL!

@@ -1,10 +1,10 @@
-import { GoogleGenerativeAI } from '@google/generative-ai'
+import { GoogleGenAI } from '@google/genai'
 import { validateToken } from '../../../../lib/auth'
 import { getPrompt } from '@voice-expense/ai'
 import type { Locale } from '@voice-expense/shared'
 import type { NextRequest } from 'next/server'
 
-const genai = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! })
 
 export async function POST(req: NextRequest) {
   // 1. Auth
@@ -36,19 +36,17 @@ export async function POST(req: NextRequest) {
 
   // 4. Call Gemini
   try {
-    const model = genai.getGenerativeModel({
-      model: process.env.AI_PARSE_MODEL ?? 'gemini-1.5-flash',
-      systemInstruction: systemPrompt,
-      generationConfig: {
+    const response = await ai.models.generateContent({
+      model: process.env.AI_PARSE_MODEL ?? 'gemini-2.5-flash',
+      contents: transcript,
+      config: {
+        systemInstruction: systemPrompt,
         maxOutputTokens: 200,
         responseMimeType: 'application/json',
       },
     })
 
-    const result = await model.generateContent(transcript)
-    const text = result.response.text()
-
-    // Strip markdown fences if present
+    const text = response.text ?? ''
     const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
     const parsed = JSON.parse(cleaned)
 
