@@ -14,7 +14,7 @@ export function getPrompt(ctx: PromptContext): string {
 
 Rules:
 - Return ONLY valid JSON, no prose, no markdown.
-- amount: numeric, positive, no currency symbols.
+- amount: numeric, positive, no currency symbols. Speech-to-text often drops decimals — "450" said in a retail/food context (coffee, groceries, fast food) almost certainly means 4.50, not 450. Use price context to infer the correct decimal placement.
 - currency: ISO 4217 code. Default to ${ctx.currency} if not stated.
 - direction: "debit" (spending) or "credit" (income). Default "debit".
 - merchant: name of store/service if identifiable, else null.
@@ -25,6 +25,8 @@ Rules:
 - confidence: float 0.0-1.0.
 - needs_clarification: true if amount is ambiguous or missing.
 - clarifying_question: string if needs_clarification is true, else null.
+- is_recurring_suggestion: REASON about whether this expense has an inherent recurring nature by its category or obligation, not just whether a specific brand name appears. Ask yourself: "Would a reasonable person expect to pay this again on a regular schedule?" Set TRUE for: any housing cost (rent, mortgage, HOA, property tax), any subscription or membership (streaming, software SaaS, gym, club, magazine, storage unit), any recurring obligation (child support, alimony, tuition, daycare, car payment, lease, loan payment, insurance premium of any kind), any utility (electric, water, gas, internet, phone, trash), any recurring income (salary, paycheck, pension, social security, dividend). Set FALSE for one-off purchases (groceries, restaurant meals, coffee, shopping, gas/fuel for the car, taxi/uber rides, entertainment tickets, gifts). When uncertain, lean TRUE if the amount is large and round (often signals a bill) and the context words suggest obligation ("paid", "bill", "for [the]").
+- recurring_frequency_suggestion: "daily"|"weekly"|"biweekly"|"monthly"|"quarterly"|"yearly"|null. Required when is_recurring_suggestion is true. Match the natural billing cadence: housing/utilities/subscriptions/memberships/loan-payments/child-support/tuition/daycare = "monthly"; salary/paycheck = "biweekly" unless the user said otherwise; car insurance, life insurance = "monthly" (or what the user states); property tax = "yearly". If the user explicitly says a period (e.g. "every week", "yearly", "per quarter"), honor that. Null only when is_recurring_suggestion is false.
 
 User's locale: ${ctx.locale}. Parse numbers and dates according to this locale's conventions.
 User's existing categories: ${categoriesList}
@@ -46,7 +48,9 @@ Return ONLY valid JSON:
   "transacted_at": ISO 8601 date string,
   "confidence": float 0.0-1.0,
   "needs_clarification": boolean,
-  "clarifying_question": string or null
+  "clarifying_question": string or null,
+  "is_recurring_suggestion": false,
+  "recurring_frequency_suggestion": null
 }
 
 If the image is too blurry or not a receipt, set needs_clarification to true and explain in clarifying_question.`
@@ -65,7 +69,9 @@ Return ONLY valid JSON:
   "transacted_at": ISO 8601 date string (pay date),
   "confidence": float 0.0-1.0,
   "needs_clarification": boolean,
-  "clarifying_question": string or null
+  "clarifying_question": string or null,
+  "is_recurring_suggestion": true,
+  "recurring_frequency_suggestion": "biweekly"
 }
 
 If the image is too blurry or not a paycheck, set needs_clarification to true.`
