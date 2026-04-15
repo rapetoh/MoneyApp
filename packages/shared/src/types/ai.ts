@@ -12,6 +12,9 @@ export interface ParsedExpense {
   confidence: number // 0.0 - 1.0
   needs_clarification: boolean
   clarifying_question: string | null
+  // Recurring intelligence — AI guesses based on merchant/category context
+  is_recurring_suggestion: boolean
+  recurring_frequency_suggestion: 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'quarterly' | 'yearly' | null
 }
 
 export interface AdvisorContext {
