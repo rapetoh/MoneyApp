@@ -12,6 +12,7 @@ import {
   AppState,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { Ionicons } from '@expo/vector-icons'
 import * as Linking from 'expo-linking'
 import { useAuth, signOut } from '../../src/hooks/useAuth'
 import { useProfile } from '../../src/hooks/useProfile'
@@ -21,6 +22,7 @@ import { Colors, Typography, Spacing, Radius } from '../../src/theme'
 import { t, type Locale } from '@voice-expense/shared'
 import type { BudgetPeriod } from '@voice-expense/shared'
 import { useApiUrl } from '../../src/hooks/useApiUrl'
+import { useRouter } from 'expo-router'
 
 const LOCALES: { value: Locale; label: string }[] = [
   { value: 'en', label: 'English' },
@@ -31,10 +33,10 @@ const LOCALES: { value: Locale; label: string }[] = [
 
 const CURRENCIES = ['USD', 'EUR', 'GBP', 'CAD', 'CHF', 'JPY', 'AUD', 'XAF', 'NGN', 'GHS']
 
-const BUDGET_PERIODS: { value: BudgetPeriod; label: string }[] = [
-  { value: 'weekly', label: 'Weekly' },
-  { value: 'biweekly', label: 'Bi-weekly (every 2 weeks)' },
-  { value: 'monthly', label: 'Monthly' },
+const BUDGET_PERIODS: { value: BudgetPeriod; key: string }[] = [
+  { value: 'weekly', key: 'settings.period_weekly' },
+  { value: 'biweekly', key: 'settings.period_biweekly' },
+  { value: 'monthly', key: 'settings.period_monthly' },
 ]
 
 function SettingsRow({
@@ -50,7 +52,7 @@ function SettingsRow({
     <Pressable onPress={onPress} style={styles.row} disabled={!onPress}>
       <Text style={styles.rowLabel}>{label}</Text>
       {value ? <Text style={styles.rowValue}>{value}</Text> : null}
-      {onPress && <Text style={styles.rowChevron}>›</Text>}
+      {onPress && <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} style={styles.rowChevron} />}
     </Pressable>
   )
 }
@@ -68,6 +70,7 @@ export default function SettingsScreen() {
   const { user } = useAuth()
   const { profile, updateProfile } = useProfile(user?.id)
   const { budget, setBudget } = useActiveBudget(user?.id)
+  const router = useRouter()
 
   const [budgetModal, setBudgetModal] = useState(false)
   const [budgetInput, setBudgetInput] = useState('')
@@ -84,13 +87,14 @@ export default function SettingsScreen() {
   const currency = profile?.currency_code ?? 'USD'
   const localeName = LOCALES.find((l) => l.value === locale)?.label ?? 'English'
 
-  const periodLabel = BUDGET_PERIODS.find((p) => p.value === (budget?.period ?? 'monthly'))?.label ?? 'Monthly'
+  const periodKey = BUDGET_PERIODS.find((p) => p.value === (budget?.period ?? 'monthly'))?.key ?? 'settings.period_monthly'
+  const periodLabel = t(periodKey, locale)
   const budgetDisplay = budget
     ? `${currency} ${budget.amount.toFixed(0)} / ${periodLabel}`
     : '—'
 
   async function handleSignOut() {
-    Alert.alert(t('auth.sign_out', locale), 'Are you sure?', [
+    Alert.alert(t('auth.sign_out', locale), t('settings.confirm_sign_out', locale), [
       { text: t('common.cancel', locale), style: 'cancel' },
       { text: t('auth.sign_out', locale), style: 'destructive', onPress: () => signOut() },
     ])
@@ -105,11 +109,11 @@ export default function SettingsScreen() {
   async function handleSaveBudget() {
     const amount = parseFloat(budgetInput.replace(',', '.'))
     if (isNaN(amount) || amount <= 0) {
-      Alert.alert(t('common.error', locale), 'Enter a valid budget amount.')
+      Alert.alert(t('common.error', locale), t('settings.invalid_budget', locale))
       return
     }
     const ok = await setBudget(amount, budgetPeriod, currency)
-    if (!ok) Alert.alert(t('common.error', locale), 'Could not save budget.')
+    if (!ok) Alert.alert(t('common.error', locale), t('settings.budget_save_error', locale))
     setBudgetModal(false)
     setBudgetInput('')
   }
@@ -129,8 +133,8 @@ export default function SettingsScreen() {
   const handleNotificationToggle = useCallback(async () => {
     if (permissionGranted) {
       Alert.alert(
-        'Disable Payment Notifications',
-        'To disable, open Settings > Apps > Special app access > Notification access and remove this app.',
+        t('settings.disable_notifications', locale),
+        t('settings.disable_notifications_msg', locale),
         [{ text: 'OK' }],
       )
       return
@@ -151,12 +155,29 @@ export default function SettingsScreen() {
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <Text style={styles.title}>{t('settings.title', locale)}</Text>
 
+        {/* Profile card */}
+        <View style={styles.profileCard}>
+          <View style={styles.avatarCircle}>
+            <Text style={styles.avatarInitial}>
+              {(profile?.display_name ?? user?.email ?? '?').charAt(0).toUpperCase()}
+            </Text>
+          </View>
+          <View style={styles.profileInfo}>
+            <Text style={styles.profileName} numberOfLines={1}>
+              {profile?.display_name ?? user?.email?.split('@')[0] ?? '—'}
+            </Text>
+            <Text style={styles.profileEmail} numberOfLines={1}>
+              {user?.email ?? ''}
+            </Text>
+          </View>
+        </View>
+
         {/* Account */}
-        <SettingsSection title="Account">
+        <SettingsSection title={t('settings.account', locale)}>
           <SettingsRow label={t('auth.email', locale)} value={user?.email ?? '—'} />
           <View style={styles.divider} />
           <SettingsRow
-            label="Display Name"
+            label={t('settings.display_name', locale)}
             value={profile?.display_name ?? '—'}
             onPress={() => {
               setNameInput(profile?.display_name ?? '')
@@ -166,7 +187,7 @@ export default function SettingsScreen() {
         </SettingsSection>
 
         {/* Preferences */}
-        <SettingsSection title="Preferences">
+        <SettingsSection title={t('settings.preferences', locale)}>
           <SettingsRow
             label={t('settings.income', locale)}
             value={budgetDisplay}
@@ -184,14 +205,19 @@ export default function SettingsScreen() {
             value={currency}
             onPress={() => setCurrencyModal(true)}
           />
+          <View style={styles.divider} />
+          <SettingsRow
+            label={t('settings.recurring', locale)}
+            onPress={() => router.push('/recurring')}
+          />
         </SettingsSection>
 
         {/* Automations */}
-        <SettingsSection title="Automations">
+        <SettingsSection title={t('settings.automations', locale)}>
           {Platform.OS === 'ios' && (
             <SettingsRow
-              label="Apple Pay Shortcut"
-              value="Set Up"
+              label={t('settings.apple_pay_shortcut', locale)}
+              value={t('settings.set_up', locale)}
               onPress={() => Linking.openURL(SHORTCUT_INSTALL_URL)}
             />
           )}
@@ -199,9 +225,9 @@ export default function SettingsScreen() {
             <>
               <View style={styles.automationRow}>
                 <View style={styles.automationTextGroup}>
-                  <Text style={styles.rowLabel}>Payment Notifications</Text>
+                  <Text style={styles.rowLabel}>{t('settings.payment_notifications', locale)}</Text>
                   <Text style={styles.automationHint}>
-                    Auto-detect charges from banking apps
+                    {t('settings.payment_notifications_hint', locale)}
                   </Text>
                 </View>
                 <Pressable
@@ -214,32 +240,30 @@ export default function SettingsScreen() {
               </View>
               {!permissionGranted && (
                 <Text style={styles.automationDisclaimer}>
-                  Tap to grant Notification Access. Only payment amounts and merchant names are
-                  captured — raw notification text is never stored.
+                  {t('settings.notification_disclaimer_android', locale)}
                 </Text>
               )}
             </>
           )}
           {Platform.OS === 'ios' && (
             <Text style={styles.automationDisclaimer}>
-              Install the Apple Pay Shortcut to automatically log charges. The shortcut opens the
-              app with the amount pre-filled — you confirm before it saves.
+              {t('settings.shortcut_disclaimer_ios', locale)}
             </Text>
           )}
         </SettingsSection>
 
         {/* Developer */}
-        <SettingsSection title="Developer">
+        <SettingsSection title={t('settings.developer', locale)}>
           <SettingsRow
-            label="AI Server URL"
+            label={t('settings.ai_server_url', locale)}
             value={apiUrl}
             onPress={() => { setApiUrlInput(apiUrl); setApiUrlModal(true) }}
           />
         </SettingsSection>
 
         {/* About */}
-        <SettingsSection title="About">
-          <SettingsRow label="Version" value="1.0.0" />
+        <SettingsSection title={t('settings.about', locale)}>
+          <SettingsRow label={t('settings.version', locale)} value="1.0.0" />
         </SettingsSection>
 
         {/* Sign out */}
@@ -262,7 +286,7 @@ export default function SettingsScreen() {
           </View>
           <ScrollView contentContainerStyle={styles.modalBody}>
             <Text style={styles.modalHint}>
-              Set your spending budget. Safe to Spend will track your remaining amount.
+              {t('settings.budget_hint', locale)}
             </Text>
             <View style={styles.amountRow}>
               <Text style={styles.currencySymbol}>{currency}</Text>
@@ -276,7 +300,7 @@ export default function SettingsScreen() {
                 autoFocus
               />
             </View>
-            <Text style={styles.modalSectionLabel}>Budget Period</Text>
+            <Text style={styles.modalSectionLabel}>{t('settings.budget_period', locale)}</Text>
             <View style={styles.periodList}>
               {BUDGET_PERIODS.map((p, i) => (
                 <View key={p.value}>
@@ -285,7 +309,7 @@ export default function SettingsScreen() {
                     style={styles.periodRow}
                     onPress={() => setBudgetPeriod(p.value)}
                   >
-                    <Text style={styles.periodLabel}>{p.label}</Text>
+                    <Text style={styles.periodLabel}>{t(p.key, locale)}</Text>
                     {budgetPeriod === p.value && (
                       <Text style={styles.periodCheck}>✓</Text>
                     )}
@@ -360,17 +384,16 @@ export default function SettingsScreen() {
         <View style={styles.modal}>
           <View style={styles.modalHeader}>
             <Pressable onPress={() => setApiUrlModal(false)}>
-              <Text style={styles.modalCancel}>Cancel</Text>
+              <Text style={styles.modalCancel}>{t('common.cancel', locale)}</Text>
             </Pressable>
-            <Text style={styles.modalTitle}>AI Server URL</Text>
+            <Text style={styles.modalTitle}>{t('settings.ai_server_url', locale)}</Text>
             <Pressable onPress={async () => { await setApiUrl(apiUrlInput); setApiUrlModal(false) }}>
-              <Text style={styles.modalDone}>Save</Text>
+              <Text style={styles.modalDone}>{t('common.save', locale)}</Text>
             </Pressable>
           </View>
           <View style={styles.modalBody}>
             <Text style={styles.modalHint}>
-              Enter the URL of your local Next.js dev server (e.g. http://192.168.1.5:3000).
-              Change this without rebuilding the app.
+              {t('settings.ai_url_hint', locale)}
             </Text>
             <TextInput
               style={styles.nameInput}
@@ -386,7 +409,7 @@ export default function SettingsScreen() {
             />
             <Pressable onPress={async () => { await resetApiUrl(); setApiUrlModal(false) }}>
               <Text style={[styles.modalCancel, { color: Colors.primary, textAlign: 'center', marginTop: Spacing.sm }]}>
-                Reset to default
+                {t('settings.reset_default', locale)}
               </Text>
             </Pressable>
           </View>
@@ -400,7 +423,7 @@ export default function SettingsScreen() {
             <Pressable onPress={() => setNameModal(false)}>
               <Text style={styles.modalCancel}>{t('common.cancel', locale)}</Text>
             </Pressable>
-            <Text style={styles.modalTitle}>Display Name</Text>
+            <Text style={styles.modalTitle}>{t('settings.display_name', locale)}</Text>
             <Pressable onPress={handleSaveName}>
               <Text style={styles.modalDone}>{t('common.save', locale)}</Text>
             </Pressable>
@@ -410,7 +433,7 @@ export default function SettingsScreen() {
               style={styles.nameInput}
               value={nameInput}
               onChangeText={setNameInput}
-              placeholder="Your name"
+              placeholder={t('settings.your_name', locale)}
               placeholderTextColor={Colors.textMuted}
               autoFocus
               returnKeyType="done"
@@ -425,7 +448,7 @@ export default function SettingsScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
-  content: { padding: Spacing.base, gap: Spacing.base, paddingBottom: Spacing['3xl'] },
+  content: { padding: Spacing.base, gap: Spacing.base, paddingBottom: 120 },
   title: { fontFamily: Typography.fontFamily.sansBold, fontSize: Typography.size['2xl'], color: Colors.text },
   section: { gap: Spacing.xs },
   sectionTitle: {
@@ -440,7 +463,44 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: Spacing.md, paddingHorizontal: Spacing.base },
   rowLabel: { fontFamily: Typography.fontFamily.sans, fontSize: Typography.size.base, color: Colors.text, flex: 1 },
   rowValue: { fontFamily: Typography.fontFamily.sans, fontSize: Typography.size.base, color: Colors.textSecondary },
-  rowChevron: { fontSize: 18, color: Colors.textMuted, marginLeft: Spacing.sm },
+  rowChevron: { marginLeft: Spacing.sm },
+  profileCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    backgroundColor: Colors.card,
+    borderRadius: Radius.lg,
+    padding: Spacing.base,
+    shadowColor: Colors.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  avatarCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: Colors.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarInitial: {
+    fontFamily: Typography.fontFamily.sansBold,
+    fontSize: 24,
+    color: Colors.primary,
+  },
+  profileInfo: { flex: 1, gap: 2 },
+  profileName: {
+    fontFamily: Typography.fontFamily.sansBold,
+    fontSize: Typography.size.md,
+    color: Colors.text,
+  },
+  profileEmail: {
+    fontFamily: Typography.fontFamily.sans,
+    fontSize: Typography.size.sm,
+    color: Colors.textSecondary,
+  },
   divider: { height: 1, backgroundColor: Colors.border, marginLeft: Spacing.base },
   signOutButton: {
     backgroundColor: Colors.card,

@@ -9,15 +9,16 @@ import {
   StyleSheet,
   Alert,
 } from 'react-native'
-import type { Category } from '@voice-expense/shared'
+import type { Category, Locale } from '@voice-expense/shared'
 import { Colors, Typography, Spacing, Radius } from '../theme'
-import { merchantColor } from '@voice-expense/shared'
+import { merchantColor, t } from '@voice-expense/shared'
 
 interface Props {
   categories: Category[]
   selectedId: string | null
   onSelect: (id: string | null) => void
   onCreateCategory: (name: string) => Promise<Category | null>
+  locale?: Locale
 }
 
 function CategoryChip({ category, selected, onPress }: {
@@ -39,7 +40,7 @@ function CategoryChip({ category, selected, onPress }: {
   )
 }
 
-export function CategoryPicker({ categories, selectedId, onSelect, onCreateCategory }: Props) {
+export function CategoryPicker({ categories, selectedId, onSelect, onCreateCategory, locale = 'en' }: Props) {
   const [modalVisible, setModalVisible] = useState(false)
   const [newName, setNewName] = useState('')
   const [creating, setCreating] = useState(false)
@@ -57,7 +58,7 @@ export function CategoryPicker({ categories, selectedId, onSelect, onCreateCateg
       setNewName('')
       setModalVisible(false)
     } else {
-      Alert.alert('Error', 'Could not create category. It may already exist.')
+      Alert.alert(t('common.error', locale), t('category.create_error', locale))
     }
   }
 
@@ -73,7 +74,7 @@ export function CategoryPicker({ categories, selectedId, onSelect, onCreateCateg
             <Text style={styles.triggerSelected}>{selected.name}</Text>
           </>
         ) : (
-          <Text style={styles.triggerPlaceholder}>Select category…</Text>
+          <Text style={styles.triggerPlaceholder}>{t('category.select', locale)}</Text>
         )}
         <Text style={styles.triggerChevron}>›</Text>
       </Pressable>
@@ -81,9 +82,9 @@ export function CategoryPicker({ categories, selectedId, onSelect, onCreateCateg
       <Modal visible={modalVisible} animationType="slide" presentationStyle="pageSheet">
         <View style={styles.modal}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Category</Text>
+            <Text style={styles.modalTitle}>{t('voice.category', locale)}</Text>
             <Pressable onPress={() => setModalVisible(false)}>
-              <Text style={styles.modalClose}>Done</Text>
+              <Text style={styles.modalClose}>{t('common.done', locale)}</Text>
             </Pressable>
           </View>
 
@@ -92,7 +93,7 @@ export function CategoryPicker({ categories, selectedId, onSelect, onCreateCateg
             style={[styles.listRow, !selectedId && styles.listRowSelected]}
             onPress={() => { onSelect(null); setModalVisible(false) }}
           >
-            <Text style={styles.listRowLabel}>None</Text>
+            <Text style={styles.listRowLabel}>{t('common.none', locale)}</Text>
             {!selectedId && <Text style={styles.checkmark}>✓</Text>}
           </Pressable>
 
@@ -111,13 +112,13 @@ export function CategoryPicker({ categories, selectedId, onSelect, onCreateCateg
             )}
             ListFooterComponent={
               <View style={styles.createSection}>
-                <Text style={styles.createLabel}>New category</Text>
+                <Text style={styles.createLabel}>{t('category.new', locale)}</Text>
                 <View style={styles.createRow}>
                   <TextInput
                     style={styles.createInput}
                     value={newName}
                     onChangeText={setNewName}
-                    placeholder="Category name"
+                    placeholder={t('category.name_placeholder', locale)}
                     placeholderTextColor={Colors.textMuted}
                     onSubmitEditing={handleCreate}
                     returnKeyType="done"
@@ -127,7 +128,7 @@ export function CategoryPicker({ categories, selectedId, onSelect, onCreateCateg
                     onPress={handleCreate}
                     disabled={!newName.trim() || creating}
                   >
-                    <Text style={styles.createButtonText}>Add</Text>
+                    <Text style={styles.createButtonText}>{t('category.add', locale)}</Text>
                   </Pressable>
                 </View>
               </View>

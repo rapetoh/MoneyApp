@@ -1,52 +1,29 @@
-import * as WebBrowser from 'expo-web-browser'
-import * as AuthSession from 'expo-auth-session'
+import { GoogleSignin } from '@react-native-google-signin/google-signin'
 import { supabase } from '../lib/supabase'
 
-// Required: closes the browser when it redirects back to the app
-WebBrowser.maybeCompleteAuthSession()
+GoogleSignin.configure({
+  // Web client ID — used by Supabase to verify the ID token
+  webClientId: '1092158800862-ndbjsv5hr5l2eqf4bpgiqk8h48actjs3.apps.googleusercontent.com',
+  // iOS client ID — required for native Google Sign-In on iOS
+  iosClientId: '1092158800862-pe2oj85tpofl4ccr2pdgd2luobt2gojq.apps.googleusercontent.com',
+})
 
 export async function signInWithGoogle() {
-  const redirectUrl = AuthSession.makeRedirectUri({
-    scheme: 'voiceexpense',
-    path: 'auth/callback',
-  })
+  await GoogleSignin.hasPlayServices()
+  const response = await GoogleSignin.signIn()
+  const idToken = response.data?.idToken
+  if (!idToken) throw new Error('No ID token returned from Google Sign-In')
 
-  const { data, error } = await supabase.auth.signInWithOAuth({
+  // Sign in with ID token only — no nonce.
+  // @react-native-google-signin/google-signin v14 does NOT support passing
+  // a nonce to signIn(). The parameter is silently ignored, so Google never
+  // embeds a nonce in the JWT. Passing a nonce to Supabase then causes a
+  // "Nonces mismatch" error because Supabase expects to find one in the
+  // token but there is none.
+  const { data, error } = await supabase.auth.signInWithIdToken({
     provider: 'google',
-    options: {
-      redirectTo: redirectUrl,
-      skipBrowserRedirect: true,
-    },
+    token: idToken,
   })
-
-  if (error || !data.url) throw error ?? new Error('No OAuth URL returned')
-
-  const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl)
-
-  if (result.type !== 'success') return null
-
-  // Supabase PKCE flow returns ?code=xxx — exchange it for a session
-  if (result.url.includes('code=')) {
-    const { data: session, error: sessionError } =
-      await supabase.auth.exchangeCodeForSession(result.url)
-    if (sessionError) throw sessionError
-    return session
-  }
-
-  // Fallback: implicit flow returns #access_token=xxx&refresh_token=xxx
-  const fragment = result.url.split('#')[1] ?? ''
-  const params = new URLSearchParams(fragment)
-  const accessToken = params.get('access_token')
-  const refreshToken = params.get('refresh_token')
-
-  if (accessToken && refreshToken) {
-    const { data: session, error: sessionError } = await supabase.auth.setSession({
-      access_token: accessToken,
-      refresh_token: refreshToken,
-    })
-    if (sessionError) throw sessionError
-    return session
-  }
-
-  return null
+  if (error) throw error
+  return data
 }

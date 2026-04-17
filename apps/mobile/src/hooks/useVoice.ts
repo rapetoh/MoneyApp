@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import {
   ExpoSpeechRecognitionModule,
   useSpeechRecognitionEvent,
@@ -34,6 +34,14 @@ export function useVoice(
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const finalTranscriptRef = useRef('')
   const lastInterimRef = useRef('')
+
+  // Use refs so the speech-end callback always reads the latest values
+  const categoriesRef = useRef(userCategories)
+  const currencyRef = useRef(userCurrency)
+  const localeRef = useRef(userLocale)
+  useEffect(() => { categoriesRef.current = userCategories }, [userCategories])
+  useEffect(() => { currencyRef.current = userCurrency }, [userCurrency])
+  useEffect(() => { localeRef.current = userLocale }, [userLocale])
 
   // Interim results (shown in real-time while speaking)
   useSpeechRecognitionEvent('result', (event) => {
@@ -85,9 +93,9 @@ export function useVoice(
         const apiBaseUrl = await getApiUrl()
         const result = await parseExpense({
           transcript: text,
-          locale: userLocale as any,
-          currency: userCurrency,
-          categories: userCategories,
+          locale: localeRef.current as any,
+          currency: currencyRef.current,
+          categories: categoriesRef.current,
           apiBaseUrl,
           authToken: token,
         })
@@ -99,7 +107,7 @@ export function useVoice(
         setState('error')
       }
     },
-    [userCurrency, userCategories, userLocale],
+    [],
   )
 
   const startListening = useCallback(async (locale: string) => {

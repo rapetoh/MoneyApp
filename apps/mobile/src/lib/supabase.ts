@@ -1,35 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
 import * as SecureStore from 'expo-secure-store'
-import * as ExpoCrypto from 'expo-crypto'
-
-// React Native does not have crypto.subtle. supabase-js needs it to generate
-// S256 PKCE challenges. Without it, it falls back to 'plain' which the new
-// Supabase auth system rejects. This polyfill uses expo-crypto (already
-// installed) to implement the only method supabase-js actually calls.
-if (typeof globalThis.crypto?.subtle?.digest !== 'function') {
-  const subtle = {
-    async digest(_algorithm: AlgorithmIdentifier, data: BufferSource): Promise<ArrayBuffer> {
-      const uint8 = ArrayBuffer.isView(data)
-        ? new Uint8Array(data.buffer, data.byteOffset, data.byteLength)
-        : new Uint8Array(data as ArrayBuffer)
-      let str = ''
-      for (let i = 0; i < uint8.length; i++) {
-        str += String.fromCharCode(uint8[i])
-      }
-      const hex = await ExpoCrypto.digestStringAsync(
-        ExpoCrypto.CryptoDigestAlgorithm.SHA256,
-        str,
-        { encoding: ExpoCrypto.CryptoEncoding.HEX },
-      )
-      const result = new Uint8Array(hex.length / 2)
-      for (let i = 0; i < hex.length; i += 2) {
-        result[i / 2] = parseInt(hex.slice(i, i + 2), 16)
-      }
-      return result.buffer
-    },
-  }
-  ;(globalThis.crypto as any).subtle = subtle
-}
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!
@@ -96,6 +66,6 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: false,
-    flowType: 'pkce', // Required for OAuth in native apps
+    flowType: 'pkce',
   },
 })

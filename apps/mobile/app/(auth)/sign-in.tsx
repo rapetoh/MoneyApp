@@ -16,8 +16,11 @@ import { signInWithEmail } from '../../src/hooks/useAuth'
 import { signInWithApple } from '../../src/services/appleAuth'
 import { signInWithGoogle } from '../../src/services/googleAuth'
 import { Colors, Typography, Spacing, Radius } from '../../src/theme'
+import { t } from '@voice-expense/shared'
+import type { Locale } from '@voice-expense/shared'
 
 export default function SignInScreen() {
+  const locale: Locale = 'en'
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -32,7 +35,7 @@ export default function SignInScreen() {
     setLoading(true)
     const { error } = await signInWithEmail(email.trim(), password)
     setLoading(false)
-    if (error) Alert.alert('Sign in failed', error.message)
+    if (error) Alert.alert(t('auth.sign_in_failed', locale), error.message)
   }
 
   async function handleAppleSignIn() {
@@ -40,7 +43,7 @@ export default function SignInScreen() {
       await signInWithApple()
     } catch (err: any) {
       if (err.code !== 'ERR_REQUEST_CANCELED') {
-        Alert.alert('Apple Sign-In failed', err.message)
+        Alert.alert(t('auth.apple_failed', locale), err.message)
       }
     }
   }
@@ -49,7 +52,7 @@ export default function SignInScreen() {
     try {
       await signInWithGoogle()
     } catch (err: any) {
-      Alert.alert('Google Sign-In failed', err.message)
+      Alert.alert(t('auth.google_failed', locale), err.message)
     }
   }
 
@@ -61,13 +64,13 @@ export default function SignInScreen() {
       <View style={styles.inner}>
         <View style={styles.header}>
           <Text style={styles.logo}>🎙</Text>
-          <Text style={styles.title}>Welcome back</Text>
-          <Text style={styles.subtitle}>Sign in to continue</Text>
+          <Text style={styles.title}>{t('auth.welcome_back', locale)}</Text>
+          <Text style={styles.subtitle}>{t('auth.sign_in_continue', locale)}</Text>
         </View>
 
         <View style={styles.form}>
           <View style={styles.field}>
-            <Text style={styles.label}>Email</Text>
+            <Text style={styles.label}>{t('auth.email', locale)}</Text>
             <TextInput
               style={styles.input}
               value={email}
@@ -81,7 +84,7 @@ export default function SignInScreen() {
           </View>
 
           <View style={styles.field}>
-            <Text style={styles.label}>Password</Text>
+            <Text style={styles.label}>{t('auth.password', locale)}</Text>
             <TextInput
               style={styles.input}
               value={password}
@@ -101,7 +104,7 @@ export default function SignInScreen() {
             {loading ? (
               <ActivityIndicator color={Colors.white} />
             ) : (
-              <Text style={styles.buttonText}>Sign In</Text>
+              <Text style={styles.buttonText}>{t('auth.sign_in', locale)}</Text>
             )}
           </Pressable>
         </View>
@@ -109,14 +112,14 @@ export default function SignInScreen() {
         <View style={styles.social}>
           <View style={styles.dividerRow}>
             <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>or continue with</Text>
+            <Text style={styles.dividerText}>{t('auth.or_continue_with', locale)}</Text>
             <View style={styles.dividerLine} />
           </View>
 
           {/* Google — available on iOS + Android */}
           <Pressable style={styles.socialButton} onPress={handleGoogleSignIn}>
             <Text style={styles.socialButtonIcon}>G</Text>
-            <Text style={styles.socialButtonText}>Continue with Google</Text>
+            <Text style={styles.socialButtonText}>{t('auth.continue_google', locale)}</Text>
           </Pressable>
 
           {/* Apple — iOS only */}
@@ -132,9 +135,9 @@ export default function SignInScreen() {
         </View>
 
         <View style={styles.footer}>
-          <Text style={styles.footerText}>Don't have an account? </Text>
+          <Text style={styles.footerText}>{t('auth.no_account', locale)} </Text>
           <Link href="/(auth)/sign-up">
-            <Text style={styles.link}>Create one</Text>
+            <Text style={styles.link}>{t('auth.create_one', locale)}</Text>
           </Link>
         </View>
       </View>

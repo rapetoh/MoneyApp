@@ -2,11 +2,15 @@ import { useEffect, useRef } from 'react'
 import { View, Animated, StyleSheet } from 'react-native'
 import { Colors } from '../theme'
 
-const BAR_COUNT = 5
+const BAR_COUNT = 7
 const BAR_WIDTH = 4
-const BAR_GAP = 4
+const BAR_GAP = 6
 const MIN_HEIGHT = 6
 const MAX_HEIGHT = 36
+
+// Idle profile — fixed-height silhouette shown when not recording.
+// Shape: short → tall → short (mimics a voice equalizer at rest).
+const IDLE_HEIGHTS = [10, 18, 28, 36, 28, 18, 10]
 
 interface Props {
   active: boolean
@@ -14,13 +18,17 @@ interface Props {
 
 export function VoiceWaveform({ active }: Props) {
   const animations = useRef(
-    Array.from({ length: BAR_COUNT }, () => new Animated.Value(MIN_HEIGHT)),
+    IDLE_HEIGHTS.map((h) => new Animated.Value(h)),
   ).current
 
   useEffect(() => {
     if (!active) {
-      animations.forEach((anim) => {
-        Animated.spring(anim, { toValue: MIN_HEIGHT, useNativeDriver: false }).start()
+      // Settle bars back to their idle profile
+      animations.forEach((anim, i) => {
+        Animated.spring(anim, {
+          toValue: IDLE_HEIGHTS[i],
+          useNativeDriver: false,
+        }).start()
       })
       return
     }
@@ -57,7 +65,8 @@ export function VoiceWaveform({ active }: Props) {
             styles.bar,
             {
               height: anim,
-              backgroundColor: active ? Colors.primary : Colors.border,
+              backgroundColor: Colors.primary,
+              opacity: active ? 1 : 0.35,
             },
           ]}
         />

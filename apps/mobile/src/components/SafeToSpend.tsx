@@ -1,7 +1,7 @@
 import React from 'react'
 import { View, Text, StyleSheet } from 'react-native'
-import { formatCurrency } from '@voice-expense/shared'
-import type { BudgetPeriod } from '@voice-expense/shared'
+import { formatCurrency, t } from '@voice-expense/shared'
+import type { BudgetPeriod, Locale } from '@voice-expense/shared'
 import { Colors, Typography, Spacing, Radius } from '../theme'
 
 interface Props {
@@ -10,37 +10,38 @@ interface Props {
   upcomingRecurring: number
   currency: string
   period?: BudgetPeriod
+  locale?: Locale
 }
 
-function periodLabel(period: BudgetPeriod | undefined): string {
+function spentKey(period: BudgetPeriod | undefined): string {
   switch (period) {
-    case 'weekly': return 'Weekly'
-    case 'biweekly': return 'Bi-weekly'
-    case 'quarterly': return 'Quarterly'
-    case 'yearly': return 'Yearly'
-    default: return 'Monthly'
+    case 'weekly': return 'home.spent_weekly'
+    case 'biweekly': return 'home.spent_biweekly'
+    case 'quarterly': return 'home.spent_quarterly'
+    case 'yearly': return 'home.spent_yearly'
+    default: return 'home.spent_monthly'
   }
 }
 
-function spentLabel(period: BudgetPeriod | undefined): string {
+function budgetKey(period: BudgetPeriod | undefined): string {
   switch (period) {
-    case 'weekly': return 'Spent this week'
-    case 'biweekly': return 'Spent (last 14 days)'
-    case 'quarterly': return 'Spent this quarter'
-    case 'yearly': return 'Spent this year'
-    default: return 'Spent this month'
+    case 'weekly': return 'home.budget_weekly'
+    case 'biweekly': return 'home.budget_biweekly'
+    case 'quarterly': return 'home.budget_quarterly'
+    case 'yearly': return 'home.budget_yearly'
+    default: return 'home.budget_monthly'
   }
 }
 
-export function SafeToSpend({ monthlyBudget, totalSpent, upcomingRecurring, currency, period }: Props) {
+export function SafeToSpend({ monthlyBudget, totalSpent, upcomingRecurring, currency, period, locale = 'en' }: Props) {
   const hasBudget = monthlyBudget !== null && monthlyBudget > 0
 
   if (!hasBudget) {
     return (
       <View style={styles.card}>
-        <Text style={styles.label}>{spentLabel(period)}</Text>
+        <Text style={styles.label}>{t(spentKey(period), locale)}</Text>
         <Text style={styles.amount}>{formatCurrency(totalSpent, currency)}</Text>
-        <Text style={styles.hint}>Set a budget to see Safe to Spend</Text>
+        <Text style={styles.hint}>{t('home.set_budget', locale)}</Text>
       </View>
     )
   }
@@ -52,28 +53,28 @@ export function SafeToSpend({ monthlyBudget, totalSpent, upcomingRecurring, curr
 
   return (
     <View style={styles.card}>
-      <Text style={styles.label}>Safe to Spend</Text>
+      <Text style={styles.label}>{t('home.safe_to_spend', locale)}</Text>
       <Text style={[styles.amount, isOverBudget && styles.overBudget]}>
         {isOverBudget ? formatCurrency(0, currency) : formatCurrency(remaining, currency)}
       </Text>
       {isOverBudget && (
         <View style={styles.warningRow}>
-          <Text style={styles.warningText}>Over budget by {formatCurrency(overBy, currency)}</Text>
+          <Text style={styles.warningText}>{t('home.over_budget', locale)} {formatCurrency(overBy, currency)}</Text>
         </View>
       )}
       <View style={styles.breakdown}>
         <View style={styles.breakdownRow}>
-          <Text style={styles.breakdownLabel}>{spentLabel(period)}</Text>
+          <Text style={styles.breakdownLabel}>{t(spentKey(period), locale)}</Text>
           <Text style={styles.breakdownValue}>{formatCurrency(totalSpent, currency)}</Text>
         </View>
         {upcomingRecurring > 0 && (
           <View style={styles.breakdownRow}>
-            <Text style={styles.breakdownLabel}>Upcoming</Text>
+            <Text style={styles.breakdownLabel}>{t('home.upcoming', locale)}</Text>
             <Text style={styles.breakdownValue}>{formatCurrency(upcomingRecurring, currency)}</Text>
           </View>
         )}
         <View style={styles.breakdownRow}>
-          <Text style={styles.breakdownLabel}>{periodLabel(period)} budget</Text>
+          <Text style={styles.breakdownLabel}>{t(budgetKey(period), locale)}</Text>
           <Text style={styles.breakdownValue}>{formatCurrency(monthlyBudget, currency)}</Text>
         </View>
       </View>
@@ -87,6 +88,11 @@ const styles = StyleSheet.create({
     borderRadius: Radius.xl,
     padding: Spacing.xl,
     gap: Spacing.sm,
+    shadowColor: '#F97316',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
   },
   label: {
     fontFamily: Typography.fontFamily.sans,

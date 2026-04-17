@@ -18,48 +18,47 @@ Everything we depend on outside our own code. Reviewed before Phase 0.
 
 ---
 
-## 2. Google Gemini API — AI (Parsing, Scanning, Advisor)
+## 2. OpenAI API — AI (Parsing, Scanning, Advisor)
 **What we use it for**: Voice transcript parsing, receipt/paycheck OCR, financial advisor responses  
-**URL**: ai.google.dev
+**URL**: platform.openai.com  
+**Status**: Active primary provider (switched from Google Gemini — April 2026)
 
 | Model | Input (per 1M tokens) | Output (per 1M tokens) | Vision | Notes |
 |-------|----------------------|------------------------|--------|-------|
-| Gemini 2.0 Flash | $0.10 | $0.40 | Yes | Our primary model |
-| Gemini 1.5 Flash | $0.075 | $0.30 | Yes | Even cheaper fallback option |
+| GPT-4o-mini | $0.15 | $0.60 | Yes | Primary model for parsing + scanning |
+| GPT-4o | $2.50 | $10.00 | Yes | Reserved for advisor if quality upgrade needed |
 
-**Free tier**: 15 requests/minute, 1,500 requests/day — enough for development.  
+**Why we switched from Gemini**: Google's `@google/generative-ai` SDK was deprecated in November 2025. New Gemini models are no longer available via that SDK. After repeated 404 and 429 errors in production, we switched to OpenAI permanently. All AI calls now go through `openai.chat.completions.create()` with `response_format: { type: 'json_object' }` which strictly enforces JSON output.
+
 **Our cost estimate at scale**:
-- Avg parse call: ~250 input + ~80 output tokens = ~$0.000057/call
-- 40% skipped by local parser → effective cost ~$0.000034/entry
-- 1,000 active users × 100 entries/month = 100K entries → ~$3.40/month in parsing costs
+- Avg parse call: ~250 input + ~80 output tokens = ~$0.000085/call (GPT-4o-mini)
+- 40% skipped by local parser → effective cost ~$0.000051/entry
+- 1,000 active users × 100 entries/month = 100K entries → ~$5.10/month in parsing costs
 - Very manageable. Scales linearly.
 
----
-
-## 3. OpenAI API — AI Fallback
-**What we use it for**: Fallback if Gemini API is down; escalation for advisor if Gemini quality is insufficient  
-**URL**: platform.openai.com
-
-| Model | Input (per 1M tokens) | Output (per 1M tokens) | Vision | When used |
-|-------|----------------------|------------------------|--------|-----------|
-| GPT-4o-mini | $0.15 | $0.60 | Yes | Fallback for parsing/scanning |
-| GPT-4o | $2.50 | $10.00 | Yes | Escalation for advisor only |
-
-**Our usage**: Only triggered when Gemini is unavailable or advisor quality needs upgrading. Budget $10-20/month as safety net.
+**API routes using OpenAI**:
+- `apps/web/src/app/api/ai/parse-expense/route.ts` — voice transcript parsing
+- `apps/web/src/app/api/ai/parse-scan/route.ts` — receipt + paycheck OCR (vision)
 
 ---
 
-## 4. Clearbit Logo API — Merchant Logos
-**What we use it for**: Fetching real merchant/brand logos for transaction display  
-**URL**: logo.clearbit.com/{domain}
+## 4. Google Favicon V2 — Merchant Logos
+**What we use it for**: Fetching real merchant/brand logos (favicons) for transaction display  
+**URL**: `https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=http://{domain}&size=128`
 
 | Tier | Price | Limits |
 |------|-------|--------|
-| Free | $0 | ~2,500 requests/month |
-| Paid | Contact Clearbit | Higher volume |
+| Free | $0 | No documented rate limits |
 
-**Alternative**: Logo.dev — Free tier + paid plans from ~$49/month if Clearbit limits are hit.  
-**Our usage**: Logos are cached locally after first fetch. 1,000 users × ~20 distinct merchants each = 20,000 unique logo fetches total (not per month — cached forever). Free tier covers us for a long time.
+**Why we switched from Clearbit**: Clearbit Logo API (`logo.clearbit.com`) is completely dead — DNS no longer resolves (ERR_NAME_NOT_RESOLVED as of April 2026). Google Favicon V2 is backed by Google CDN infrastructure (`gstatic.com`), requires no API key, and returns proper PNG images.
+
+**Quality notes**:
+- Returns the largest favicon the website publishes, up to the requested `size` (128px). Does not upscale.
+- Most major merchants return 64-128px logos (sufficient for 44-72px avatars on retina screens).
+- Some merchants (e.g. Domino's) only publish 16x16 favicons — this is a limitation of the website, not the API. The app falls back to a colored circle with the merchant's initial when the image fails.
+- `size=128` is the reliable sweet spot. `size=256` causes 404s for some domains.
+
+**Our usage**: Logos are cached by React Native's Image component. No rate limit concerns at our scale.
 
 ---
 
@@ -89,7 +88,8 @@ Everything we depend on outside our own code. Reviewed before Phase 0.
 
 ## 7. Vercel — Next.js Hosting (Web + API Routes)
 **What we use it for**: Hosting the Next.js web app (browser dashboard) and all API routes (AI proxy, export, etc.)  
-**URL**: vercel.com
+**URL**: vercel.com  
+**Status**: Deployed and live — `https://money-app-web-w6su.vercel.app`
 
 | Tier | Price | Limits | When we need it |
 |------|-------|--------|-----------------|
@@ -97,6 +97,8 @@ Everything we depend on outside our own code. Reviewed before Phase 0.
 | Pro | $20/month | Commercial use, better performance, team features | Before public launch |
 
 **Important**: Vercel's free tier prohibits commercial use. We must upgrade to Pro before we charge users.
+
+**Current deployment**: The Next.js app is deployed on Vercel. The mobile app (`EXPO_PUBLIC_API_BASE_URL`) points to this Vercel URL — no local dev server needed for mobile development or testing. Env vars declared in `turbo.json` build task `env` array (required for Turborepo to pass them through to the build).
 
 ---
 
@@ -170,14 +172,13 @@ Everything we depend on outside our own code. Reviewed before Phase 0.
 |---------|-------------|
 | Supabase Pro | $25 |
 | Vercel Pro | $20 |
-| Gemini API (est. 1K users) | ~$5 |
-| OpenAI fallback (est.) | ~$5 |
+| OpenAI API / GPT-4o-mini (est. 1K users) | ~$5 |
 | Sentry Free | $0 |
 | PostHog Free | $0 |
 | GitHub Free | $0 |
 | Expo EAS Production | $99 |
-| **Total (active development)** | **~$154/month** |
-| **Total (post-launch, EAS downgraded)** | **~$55/month** |
+| **Total (active development)** | **~$149/month** |
+| **Total (post-launch, EAS downgraded)** | **~$50/month** |
 
 **One-time costs**:
 - Apple Developer Program: $99/year
@@ -199,4 +200,4 @@ Everything we depend on outside our own code. Reviewed before Phase 0.
 
 ---
 
-*Last updated: April 2026*
+*Last updated: April 14, 2026 — replaced dead Clearbit Logo API with Google Favicon V2; updated Supabase key format (legacy JWT → publishable key)*

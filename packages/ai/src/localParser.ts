@@ -10,7 +10,8 @@ const AMOUNT_PATTERNS = [
 
 const MERCHANT_PATTERNS = [
   // "at Starbucks", "chez Starbucks", "en Starbucks", "no Starbucks"
-  /(?:at|chez|en|no|@)\s+([A-Za-zÀ-ÿ0-9\s'\-&.]+?)(?:\s*,|\s*$)/i,
+  // Stop at digits, "for", "," or end of string — prevents capturing "for 450" etc.
+  /(?:at|chez|en|no|@)\s+([A-Za-zÀ-ÿ'\-&.]+(?:\s+[A-Za-zÀ-ÿ'\-&.]+)*)(?=\s+(?:for\b|\d)|\s*,|\s*$)/i,
 ]
 
 function parseAmount(transcript: string): number | null {
@@ -41,9 +42,14 @@ export function parseExpenseLocally(transcript: string): {
   if (!amount) return { result: null, confidence: 0 }
 
   const merchant = parseMerchant(transcript)
-  const confidence = merchant ? 0.87 : 0.75
+  // Always send to AI when we have a merchant — the AI provides category,
+  // merchant_domain, and recurring detection that the local parser can't.
+  // Only skip AI for bare amounts with no merchant (e.g. "twenty dollars").
+  if (merchant) return { result: null, confidence: 0 }
 
-  // Only skip AI if confidence is high enough
+  const confidence = 0.75
+
+  // Bare amount without merchant — low confidence, will go to AI
   if (confidence < 0.85) return { result: null, confidence }
 
   const result: ParsedExpense = {
@@ -58,6 +64,8 @@ export function parseExpenseLocally(transcript: string): {
     confidence,
     needs_clarification: false,
     clarifying_question: null,
+    is_recurring_suggestion: false,
+    recurring_frequency_suggestion: null,
   }
 
   return { result, confidence }

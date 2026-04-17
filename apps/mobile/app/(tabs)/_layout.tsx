@@ -1,57 +1,21 @@
 import { Tabs } from 'expo-router'
 import { View, StyleSheet } from 'react-native'
+import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '../../src/hooks/useAuth'
 import { useProfile } from '../../src/hooks/useProfile'
 import { Colors, Typography } from '../../src/theme'
 import { t, type Locale } from '@voice-expense/shared'
 
-function HomeIcon({ focused }: { focused: boolean }) {
-  return (
-    <View style={styles.iconWrap}>
-      <View style={[styles.houseBase, focused && styles.houseBaseFocused]}>
-        <View style={[styles.houseRoof, focused && styles.houseRoofFocused]} />
-      </View>
-    </View>
-  )
-}
+type IoniconName = React.ComponentProps<typeof Ionicons>['name']
 
-function ListIcon({ focused }: { focused: boolean }) {
-  const color = focused ? Colors.primary : Colors.textMuted
+function TabIcon({ focused, name }: { focused: boolean; name: IoniconName }) {
   return (
-    <View style={styles.iconWrap}>
-      {[0, 1, 2].map((i) => (
-        <View
-          key={i}
-          style={[
-            styles.listLine,
-            { backgroundColor: color, width: i === 0 ? 18 : i === 1 ? 14 : 10 },
-          ]}
-        />
-      ))}
-    </View>
-  )
-}
-
-function ChartIcon({ focused }: { focused: boolean }) {
-  const color = focused ? Colors.primary : Colors.textMuted
-  return (
-    <View style={styles.iconWrap}>
-      <View style={styles.chartBars}>
-        {[8, 14, 10, 16].map((h, i) => (
-          <View key={i} style={[styles.chartBar, { height: h, backgroundColor: color }]} />
-        ))}
-      </View>
-    </View>
-  )
-}
-
-function GearIcon({ focused }: { focused: boolean }) {
-  const color = focused ? Colors.primary : Colors.textMuted
-  return (
-    <View style={styles.iconWrap}>
-      <View style={[styles.gearOuter, { borderColor: color }]}>
-        <View style={[styles.gearInner, { backgroundColor: color }]} />
-      </View>
+    <View style={[styles.tabIconWrap, focused && styles.tabIconWrapActive]}>
+      <Ionicons
+        name={name}
+        size={22}
+        color={focused ? Colors.white : Colors.textSecondary}
+      />
     </View>
   )
 }
@@ -59,9 +23,7 @@ function GearIcon({ focused }: { focused: boolean }) {
 function RecordIcon() {
   return (
     <View style={styles.recordButton}>
-      <View style={styles.micBody}>
-        <View style={styles.micBase} />
-      </View>
+      <Ionicons name="mic" size={26} color={Colors.white} />
     </View>
   )
 }
@@ -85,14 +47,18 @@ export default function TabsLayout() {
         name="index"
         options={{
           title: t('tabs.home', locale),
-          tabBarIcon: ({ focused }) => <HomeIcon focused={focused} />,
+          tabBarIcon: ({ focused }) => (
+            <TabIcon focused={focused} name={focused ? 'home' : 'home-outline'} />
+          ),
         }}
       />
       <Tabs.Screen
         name="expenses"
         options={{
           title: t('tabs.expenses', locale),
-          tabBarIcon: ({ focused }) => <ListIcon focused={focused} />,
+          tabBarIcon: ({ focused }) => (
+            <TabIcon focused={focused} name={focused ? 'list' : 'list-outline'} />
+          ),
         }}
       />
       <Tabs.Screen
@@ -107,14 +73,18 @@ export default function TabsLayout() {
         name="insights"
         options={{
           title: t('tabs.insights', locale),
-          tabBarIcon: ({ focused }) => <ChartIcon focused={focused} />,
+          tabBarIcon: ({ focused }) => (
+            <TabIcon focused={focused} name={focused ? 'stats-chart' : 'stats-chart-outline'} />
+          ),
         }}
       />
       <Tabs.Screen
         name="settings"
         options={{
           title: t('tabs.settings', locale),
-          tabBarIcon: ({ focused }) => <GearIcon focused={focused} />,
+          tabBarIcon: ({ focused }) => (
+            <TabIcon focused={focused} name={focused ? 'settings' : 'settings-outline'} />
+          ),
         }}
       />
     </Tabs>
@@ -123,112 +93,51 @@ export default function TabsLayout() {
 
 const styles = StyleSheet.create({
   tabBar: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    bottom: 14,
+    height: 68,
+    borderRadius: 34,
     backgroundColor: Colors.tabBar,
-    borderTopColor: Colors.tabBarBorder,
-    borderTopWidth: 1,
-    height: 84,
-    paddingBottom: 24,
-    paddingTop: 8,
+    borderTopWidth: 0,
+    paddingBottom: 10,
+    paddingHorizontal: 9,
+    marginHorizontal: 21,
+    paddingTop: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    elevation: 12,
   },
   tabLabel: {
-    fontSize: 11,
-    fontFamily: Typography.fontFamily.sans,
+    fontSize: 10,
+    fontFamily: Typography.fontFamily.sansSemiBold,
+    marginTop: 2,
   },
-  iconWrap: {
-    width: 28,
-    height: 22,
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-  },
-
-  // House icon
-  houseBase: {
-    width: 16,
-    height: 10,
-    backgroundColor: Colors.textMuted,
-    borderRadius: 2,
-    alignItems: 'center',
-  },
-  houseBaseFocused: { backgroundColor: Colors.primary },
-  houseRoof: {
-    position: 'absolute',
-    top: -7,
-    width: 0,
-    height: 0,
-    borderLeftWidth: 10,
-    borderRightWidth: 10,
-    borderBottomWidth: 8,
-    borderLeftColor: 'transparent',
-    borderRightColor: 'transparent',
-    borderBottomColor: Colors.textMuted,
-  },
-  houseRoofFocused: { borderBottomColor: Colors.primary },
-
-  // List icon
-  listLine: {
-    height: 2,
-    borderRadius: 1,
-    marginBottom: 3,
-  },
-
-  // Chart icon
-  chartBars: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 3,
-    height: 18,
-  },
-  chartBar: {
-    width: 4,
-    borderRadius: 2,
-  },
-
-  // Gear icon
-  gearOuter: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    borderWidth: 3,
+  tabIconWrap: {
+    width: 44,
+    height: 32,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  gearInner: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+  tabIconWrapActive: {
+    backgroundColor: Colors.primary,
   },
-
-  // Record (mic) button
   recordButton: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     backgroundColor: Colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
-    shadowColor: Colors.primary,
+    marginTop: -8,
+    shadowColor: '#F97316',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.4,
     shadowRadius: 8,
     elevation: 8,
-  },
-  micBody: {
-    width: 10,
-    height: 14,
-    borderRadius: 5,
-    borderWidth: 2.5,
-    borderColor: Colors.white,
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    marginBottom: 2,
-  },
-  micBase: {
-    width: 16,
-    height: 2,
-    backgroundColor: Colors.white,
-    borderRadius: 1,
-    position: 'absolute',
-    bottom: -6,
   },
 })

@@ -73,9 +73,9 @@ export function useTransactions(userId: string | undefined) {
 
   async function createTransaction(
     fields: Pick<Transaction, 'amount' | 'direction' | 'currency_code' | 'merchant' | 'note' | 'category_id' | 'payment_method'> &
-      Partial<Pick<Transaction, 'source' | 'raw_transcript' | 'ai_confidence'>>,
-  ): Promise<{ error: string | null }> {
-    if (!userId) return { error: 'Not authenticated' }
+      Partial<Pick<Transaction, 'source' | 'raw_transcript' | 'ai_confidence' | 'is_recurring' | 'recurring_rule_id' | 'merchant_domain'>>,
+  ): Promise<{ id: string | null; error: string | null }> {
+    if (!userId) return { id: null, error: 'Not authenticated' }
 
     const now = new Date().toISOString()
     const clientId = Crypto.randomUUID()
@@ -87,14 +87,15 @@ export function useTransactions(userId: string | undefined) {
       currency_code: fields.currency_code,
       category_id: fields.category_id,
       merchant: fields.merchant,
+      merchant_domain: fields.merchant_domain ?? null,
       note: fields.note,
       payment_method: fields.payment_method,
       transacted_at: now,
       source: fields.source ?? 'manual',
       raw_transcript: fields.raw_transcript ?? null,
       ai_confidence: fields.ai_confidence ?? null,
-      is_recurring: false,
-      recurring_rule_id: null,
+      is_recurring: fields.is_recurring ?? false,
+      recurring_rule_id: fields.recurring_rule_id ?? null,
       client_id: clientId,
       client_created_at: now,
       version: 1,
@@ -114,7 +115,7 @@ export function useTransactions(userId: string | undefined) {
     await enqueue('create', txn.id, txn)
     syncManager.drainQueue()
 
-    return { error: null }
+    return { id: clientId, error: null }
   }
 
   async function deleteTransaction(id: string): Promise<{ error: string | null }> {

@@ -6,6 +6,8 @@ import {
   StyleSheet,
   ActivityIndicator,
   SectionList,
+  ScrollView,
+  Pressable,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
@@ -45,30 +47,80 @@ function groupByDate(transactions: Transaction[], locale: Locale) {
 export default function ExpensesScreen() {
   const { user } = useAuth()
   const { transactions, loading } = useTransactions(user?.id)
-  const { categoryMap } = useCategories(user?.id)
+  const { categories, categoryMap } = useCategories(user?.id)
   const { profile } = useProfile(user?.id)
   const [search, setSearch] = useState('')
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null)
+  const [view, setView] = useState<'expenses' | 'income'>('expenses')
   const router = useRouter()
 
   const locale = (profile?.locale ?? 'en') as Locale
   const currency = profile?.currency_code ?? 'USD'
 
-  const filtered = useMemo(() => {
-    if (!search.trim()) return transactions
-    const q = search.toLowerCase()
-    return transactions.filter(
-      (txn) =>
-        (txn.merchant ?? '').toLowerCase().includes(q) ||
-        (txn.note ?? '').toLowerCase().includes(q),
+  // Only show categories that have at least one transaction
+  const usedCategories = useMemo(() => {
+    const usedIds = new Set(
+      transactions
+        .filter((tx) => tx.direction === 'debit')
+        .map((tx) => tx.category_id)
+        .filter(Boolean),
     )
-  }, [transactions, search])
+    return categories.filter((c) => usedIds.has(c.id))
+  }, [transactions, categories])
+
+  const filtered = useMemo(() => {
+    let result = transactions.filter((tx) =>
+      view === 'expenses' ? tx.direction === 'debit' : tx.direction === 'credit',
+    )
+
+    if (search.trim()) {
+      const q = search.toLowerCase()
+      result = result.filter(
+        (txn) =>
+          (txn.merchant ?? '').toLowerCase().includes(q) ||
+          (txn.note ?? '').toLowerCase().includes(q) ||
+          (txn.category_id ? categoryMap[txn.category_id]?.name ?? '' : '').toLowerCase().includes(q),
+      )
+    }
+
+    if (selectedCategoryId) {
+      result = result.filter((txn) => txn.category_id === selectedCategoryId)
+    }
+
+    return result
+  }, [transactions, search, selectedCategoryId, categoryMap, view])
 
   const sections = useMemo(() => groupByDate(filtered, locale), [filtered, locale])
+
+  function toggleCategory(id: string) {
+    setSelectedCategoryId((prev) => (prev === id ? null : id))
+  }
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
         <Text style={styles.title}>{t('transactions.title', locale)}</Text>
+
+        {/* Expenses / Income toggle (styled like the Voice / Manual toggle) */}
+        <View style={styles.segment}>
+          <Pressable
+            style={[styles.segmentTab, view === 'expenses' && styles.segmentTabActive]}
+            onPress={() => { setView('expenses'); setSelectedCategoryId(null) }}
+          >
+            <Text style={[styles.segmentLabel, view === 'expenses' && styles.segmentLabelActive]}>
+              {t('home.expenses', locale)}
+            </Text>
+          </Pressable>
+          <Pressable
+            style={[styles.segmentTab, view === 'income' && styles.segmentTabActive]}
+            onPress={() => { setView('income'); setSelectedCategoryId(null) }}
+          >
+            <Text style={[styles.segmentLabel, view === 'income' && styles.segmentLabelActive]}>
+              {t('home.income', locale)}
+            </Text>
+          </Pressable>
+        </View>
+
         <TextInput
           style={styles.search}
           value={search}
@@ -77,20 +129,56 @@ export default function ExpensesScreen() {
           placeholderTextColor={Colors.textMuted}
           clearButtonMode="while-editing"
         />
+
+        {/* Category filter pills — only relevant on expenses view */}
+        {view === 'expenses' && usedCategories.length > 0 && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.pillRow}
+          >
+            <Pressable
+              style={[
+                styles.pill,
+                !selectedCategoryId && styles.pillActive,
+              ]}
+              onPress={() => setSelectedCategoryId(null)}
+            >
+              <Text style={[styles.pillLabel, !selectedCategoryId && styles.pillLabelActive]}>
+                All
+              </Text>
+            </Pressable>
+            {usedCategories.map((cat) => {
+              const active = selectedCategoryId === cat.id
+              return (
+                <Pressable
+                  key={cat.id}
+                  style={[
+                    styles.pill,
+                    active && styles.pillActive,
+                  ]}
+                  onPress={() => toggleCategory(cat.id)}
+                >
+                  <View style={[styles.pillDot, { backgroundColor: cat.color ?? Colors.primary }]} />
+                  <Text style={[styles.pillLabel, active && styles.pillLabelActive]}>
+                    {cat.name}
+                  </Text>
+                </Pressable>
+              )
+            })}
+          </ScrollView>
+        )}
       </View>
 
       {loading ? (
         <ActivityIndicator color={Colors.primary} style={{ marginTop: Spacing['2xl'] }} />
       ) : sections.length === 0 ? (
         <View style={styles.emptyState}>
-          <Text style={styles.emptyIcon}>{search ? '🔍' : '💸'}</Text>
+          <Text style={styles.emptyIcon}>{search || selectedCategoryId ? '🔍' : '💸'}</Text>
           <Text style={styles.emptyTitle}>
-            {search ? t('common.error', locale) : t('transactions.empty', locale)}
-          </Text>
-          <Text style={styles.emptySubtitle}>
-            {search
-              ? t('common.retry', locale)
-              : t('voice.subtitle', locale)}
+            {search || selectedCategoryId
+              ? t('transactions.empty_search', locale)
+              : t('transactions.empty', locale)}
           </Text>
         </View>
       ) : (
@@ -102,17 +190,29 @@ export default function ExpensesScreen() {
           renderSectionHeader={({ section: { title } }) => (
             <Text style={styles.dateHeader}>{title}</Text>
           )}
-          renderItem={({ item, index }) => (
-            <View>
-              {index > 0 && <View style={styles.divider} />}
-              <TransactionRow
-                transaction={item}
-                categoryName={item.category_id ? categoryMap[item.category_id]?.name : null}
-                currency={currency}
-                onPress={() => router.push(`/transaction/${item.id}`)}
-              />
-            </View>
-          )}
+          renderItem={({ item, index, section }) => {
+            const isFirst = index === 0
+            const isLast = index === section.data.length - 1
+            return (
+              <View
+                style={[
+                  styles.txnCard,
+                  isFirst && styles.txnCardFirst,
+                  isLast && styles.txnCardLast,
+                  !isLast && styles.txnCardMiddle,
+                ]}
+              >
+                {index > 0 && <View style={styles.divider} />}
+                <TransactionRow
+                  transaction={item}
+                  categoryName={item.category_id ? categoryMap[item.category_id]?.name : null}
+                  currency={currency}
+                  locale={locale}
+                  onPress={() => router.push(`/transaction/${item.id}`)}
+                />
+              </View>
+            )
+          }}
           renderSectionFooter={() => <View style={styles.sectionGap} />}
           showsVerticalScrollIndicator={false}
         />
@@ -129,9 +229,34 @@ const styles = StyleSheet.create({
     fontSize: Typography.size['2xl'],
     color: Colors.text,
   },
+  segment: {
+    flexDirection: 'row',
+    backgroundColor: Colors.card,
+    borderRadius: Radius.full ?? 999,
+    padding: 4,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    alignSelf: 'flex-start',
+  },
+  segmentTab: {
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: 8,
+    borderRadius: Radius.full ?? 999,
+  },
+  segmentTabActive: {
+    backgroundColor: Colors.primary,
+  },
+  segmentLabel: {
+    fontFamily: Typography.fontFamily.sansSemiBold,
+    fontSize: Typography.size.sm,
+    color: Colors.textSecondary,
+  },
+  segmentLabelActive: {
+    color: Colors.white,
+  },
   search: {
     backgroundColor: Colors.card,
-    borderRadius: Radius.md,
+    borderRadius: Radius.full ?? 999,
     paddingHorizontal: Spacing.base,
     paddingVertical: Spacing.md,
     fontFamily: Typography.fontFamily.sans,
@@ -140,7 +265,39 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
   },
-  listContent: { paddingHorizontal: Spacing.base, paddingBottom: Spacing['3xl'] },
+  pillRow: {
+    gap: Spacing.sm,
+    paddingBottom: 2,
+  },
+  pill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 8,
+    borderRadius: Radius.full ?? 999,
+    backgroundColor: Colors.card,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  pillActive: {
+    backgroundColor: Colors.text,
+    borderColor: Colors.text,
+  },
+  pillDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  pillLabel: {
+    fontFamily: Typography.fontFamily.sansSemiBold,
+    fontSize: Typography.size.sm,
+    color: Colors.textSecondary,
+  },
+  pillLabelActive: {
+    color: Colors.white,
+  },
+  listContent: { paddingHorizontal: Spacing.base, paddingBottom: 120 },
   dateHeader: {
     fontFamily: Typography.fontFamily.sansSemiBold,
     fontSize: Typography.size.sm,
@@ -148,12 +305,29 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.xs,
     marginTop: Spacing.sm,
   },
+  txnCard: {
+    backgroundColor: Colors.card,
+  },
+  txnCardFirst: {
+    borderTopLeftRadius: Radius.lg,
+    borderTopRightRadius: Radius.lg,
+  },
+  txnCardLast: {
+    borderBottomLeftRadius: Radius.lg,
+    borderBottomRightRadius: Radius.lg,
+    shadowColor: Colors.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  txnCardMiddle: {},
   divider: {
     height: 1,
     backgroundColor: Colors.border,
     marginLeft: 44 + Spacing.md + Spacing.base,
   },
-  sectionGap: { height: Spacing.sm },
+  sectionGap: { height: Spacing.md },
   emptyState: {
     flex: 1,
     alignItems: 'center',
@@ -166,11 +340,5 @@ const styles = StyleSheet.create({
     fontFamily: Typography.fontFamily.sansBold,
     fontSize: Typography.size.md,
     color: Colors.text,
-  },
-  emptySubtitle: {
-    fontFamily: Typography.fontFamily.sans,
-    fontSize: Typography.size.sm,
-    color: Colors.textSecondary,
-    textAlign: 'center',
   },
 })

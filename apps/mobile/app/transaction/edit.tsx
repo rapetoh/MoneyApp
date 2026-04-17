@@ -20,14 +20,15 @@ import { useTransactions } from '../../src/hooks/useTransactions'
 import { getTransactionById } from '../../src/services/sync/transactionStore'
 import { CategoryPicker } from '../../src/components/CategoryPicker'
 import { Colors, Typography, Spacing, Radius } from '../../src/theme'
-import type { Transaction, TransactionDirection, PaymentMethod } from '@voice-expense/shared'
+import { t } from '@voice-expense/shared'
+import type { Transaction, TransactionDirection, PaymentMethod, Locale } from '@voice-expense/shared'
 
-const PAYMENT_METHODS: { value: PaymentMethod; label: string }[] = [
-  { value: 'cash', label: 'Cash' },
-  { value: 'credit_card', label: 'Credit Card' },
-  { value: 'debit_card', label: 'Debit Card' },
-  { value: 'digital_wallet', label: 'Digital Wallet' },
-  { value: 'bank_transfer', label: 'Bank Transfer' },
+const PAYMENT_METHODS: { value: PaymentMethod; key: string }[] = [
+  { value: 'cash', key: 'payment.cash' },
+  { value: 'credit_card', key: 'payment.credit_card' },
+  { value: 'debit_card', key: 'payment.debit_card' },
+  { value: 'digital_wallet', key: 'payment.digital_wallet' },
+  { value: 'bank_transfer', key: 'payment.bank_transfer' },
 ]
 
 export default function EditTransactionScreen() {
@@ -36,6 +37,7 @@ export default function EditTransactionScreen() {
   const { profile } = useProfile(user?.id)
   const { categories, createCategory } = useCategories(user?.id)
   const { editTransaction } = useTransactions(user?.id)
+  const locale = (profile?.locale ?? 'en') as Locale
   const currency = profile?.currency_code ?? 'USD'
   const router = useRouter()
 
@@ -69,7 +71,7 @@ export default function EditTransactionScreen() {
   async function handleSave() {
     const parsedAmount = parseFloat(amount.replace(',', '.'))
     if (isNaN(parsedAmount) || parsedAmount <= 0) {
-      Alert.alert('Invalid amount', 'Enter a valid amount greater than 0')
+      Alert.alert(t('voice.invalid_amount', locale), t('voice.invalid_amount_msg', locale))
       return
     }
     if (!txn) return
@@ -86,7 +88,7 @@ export default function EditTransactionScreen() {
 
     setSaving(false)
     if (error) {
-      Alert.alert('Error', error)
+      Alert.alert(t('common.error', locale), error)
     } else {
       router.back()
     }
@@ -118,7 +120,7 @@ export default function EditTransactionScreen() {
               onPress={() => setDirection('debit')}
             >
               <Text style={[styles.directionLabel, direction === 'debit' && styles.directionLabelActive]}>
-                Expense
+                {t('voice.expense', locale)}
               </Text>
             </Pressable>
             <Pressable
@@ -126,7 +128,7 @@ export default function EditTransactionScreen() {
               onPress={() => setDirection('credit')}
             >
               <Text style={[styles.directionLabel, direction === 'credit' && styles.directionLabelActiveIncome]}>
-                Income
+                {t('voice.income_label', locale)}
               </Text>
             </Pressable>
           </View>
@@ -147,39 +149,40 @@ export default function EditTransactionScreen() {
 
           <View style={styles.fields}>
             <View style={styles.field}>
-              <Text style={styles.label}>Merchant / Source</Text>
+              <Text style={styles.label}>{t('voice.merchant_source', locale)}</Text>
               <TextInput
                 style={styles.input}
                 value={merchant}
                 onChangeText={setMerchant}
-                placeholder="e.g. Starbucks"
+                placeholder={t('voice.merchant_placeholder', locale)}
                 placeholderTextColor={Colors.textMuted}
               />
             </View>
 
             <View style={styles.field}>
-              <Text style={styles.label}>Category</Text>
+              <Text style={styles.label}>{t('voice.category', locale)}</Text>
               <CategoryPicker
                 categories={categories}
                 selectedId={categoryId}
                 onSelect={setCategoryId}
                 onCreateCategory={createCategory}
+                locale={locale}
               />
             </View>
 
             <View style={styles.field}>
-              <Text style={styles.label}>Note (optional)</Text>
+              <Text style={styles.label}>{t('voice.note', locale)}</Text>
               <TextInput
                 style={styles.input}
                 value={note}
                 onChangeText={setNote}
-                placeholder="Add a note..."
+                placeholder={t('voice.note_placeholder', locale)}
                 placeholderTextColor={Colors.textMuted}
               />
             </View>
 
             <View style={styles.field}>
-              <Text style={styles.label}>Payment Method</Text>
+              <Text style={styles.label}>{t('voice.payment_method', locale)}</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                 <View style={styles.chipRow}>
                   {PAYMENT_METHODS.map((m) => (
@@ -189,7 +192,7 @@ export default function EditTransactionScreen() {
                       onPress={() => setPaymentMethod(m.value)}
                     >
                       <Text style={[styles.chipLabel, paymentMethod === m.value && styles.chipLabelActive]}>
-                        {m.label}
+                        {t(m.key, locale)}
                       </Text>
                     </Pressable>
                   ))}
@@ -206,7 +209,7 @@ export default function EditTransactionScreen() {
             {saving ? (
               <ActivityIndicator color={Colors.white} />
             ) : (
-              <Text style={styles.saveButtonText}>Save Changes</Text>
+              <Text style={styles.saveButtonText}>{t('voice.save_changes', locale)}</Text>
             )}
           </Pressable>
         </ScrollView>

@@ -5,6 +5,7 @@ export * from './types/budget'
 export * from './types/profile'
 export * from './types/sync'
 export * from './types/ai'
+export * from './types/recurring'
 
 // Utils
 export * from './utils/currency'

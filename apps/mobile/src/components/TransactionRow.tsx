@@ -1,7 +1,8 @@
 import React from 'react'
 import { View, Text, Pressable, StyleSheet } from 'react-native'
 import type { Transaction } from '@voice-expense/shared'
-import { formatCurrency } from '@voice-expense/shared'
+import { formatCurrency, t } from '@voice-expense/shared'
+import type { Locale } from '@voice-expense/shared'
 import { MerchantAvatar } from './MerchantAvatar'
 import { Colors, Typography, Spacing } from '../theme'
 
@@ -9,6 +10,7 @@ interface Props {
   transaction: Transaction
   categoryName?: string | null
   currency: string   // always the profile currency — ensures all rows are consistent
+  locale?: Locale
   onPress?: () => void
 }
 
@@ -17,17 +19,17 @@ function formatTime(isoString: string): string {
   return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
 
-export function TransactionRow({ transaction, categoryName, currency, onPress }: Props) {
+export function TransactionRow({ transaction, categoryName, currency, locale = 'en', onPress }: Props) {
   const isCredit = transaction.direction === 'credit'
   const amountColor = isCredit ? Colors.income : Colors.text
   const amountPrefix = isCredit ? '+' : '-'
 
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.row, pressed && styles.pressed]}>
-      <MerchantAvatar merchant={transaction.merchant} size={44} />
+      <MerchantAvatar merchant={transaction.merchant} merchantDomain={transaction.merchant_domain} size={44} />
       <View style={styles.info}>
         <Text style={styles.merchant} numberOfLines={1}>
-          {transaction.merchant ?? 'Unknown'}
+          {transaction.merchant ?? t('transactions.unknown', locale)}
         </Text>
         {categoryName && (
           <Text style={styles.category} numberOfLines={1}>

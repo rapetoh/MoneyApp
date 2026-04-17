@@ -53,6 +53,13 @@ module.exports = {
       ],
       // Android-only: adds MoneyNotificationListenerService to AndroidManifest.xml
       ['./modules/notification-listener/plugin', {}],
+      [
+        '@react-native-google-signin/google-signin',
+        {
+          // Reversed iOS client ID — required for Google Sign-In URL scheme on iOS
+          iosUrlScheme: 'com.googleusercontent.apps.1092158800862-pe2oj85tpofl4ccr2pdgd2luobt2gojq',
+        },
+      ],
     ],
     experiments: {
       typedRoutes: true,

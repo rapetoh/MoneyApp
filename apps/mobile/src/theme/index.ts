@@ -1,5 +1,5 @@
 export { Colors } from './colors'
-export { Typography } from './typography'
+export { Typography, Text } from './typography'
 
 export const Spacing = {
   xs: 4,

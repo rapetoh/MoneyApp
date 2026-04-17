@@ -14,6 +14,7 @@ function rowToTransaction(row: Record<string, unknown>): Transaction {
     currency_code: row.currency_code as string,
     category_id: (row.category_id as string) ?? null,
     merchant: (row.merchant as string) ?? null,
+    merchant_domain: (row.merchant_domain as string) ?? null,
     note: (row.note as string) ?? null,
     payment_method: row.payment_method as Transaction['payment_method'],
     transacted_at: row.transacted_at as string,
@@ -46,16 +47,17 @@ export async function upsertTransaction(txn: Transaction): Promise<void> {
   const db = await getDb()
   await db.runAsync(
     `INSERT INTO transactions (
-      id, user_id, amount, direction, currency_code, category_id, merchant, note,
+      id, user_id, amount, direction, currency_code, category_id, merchant, merchant_domain, note,
       payment_method, transacted_at, source, raw_transcript, ai_confidence,
       is_recurring, recurring_rule_id, client_id, client_created_at, version,
       is_deleted, deleted_at, synced_at, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(id) DO UPDATE SET
       amount = excluded.amount,
       direction = excluded.direction,
       category_id = excluded.category_id,
       merchant = excluded.merchant,
+      merchant_domain = excluded.merchant_domain,
       note = excluded.note,
       payment_method = excluded.payment_method,
       transacted_at = excluded.transacted_at,
@@ -73,6 +75,7 @@ export async function upsertTransaction(txn: Transaction): Promise<void> {
       txn.currency_code,
       txn.category_id ?? null,
       txn.merchant ?? null,
+      txn.merchant_domain ?? null,
       txn.note ?? null,
       txn.payment_method,
       txn.transacted_at,

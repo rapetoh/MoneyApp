@@ -21,6 +21,7 @@ async function initSchema(db: SQLite.SQLiteDatabase): Promise<void> {
       currency_code TEXT NOT NULL DEFAULT 'USD',
       category_id TEXT,
       merchant TEXT,
+      merchant_domain TEXT,
       note TEXT,
       payment_method TEXT NOT NULL DEFAULT 'cash',
       transacted_at TEXT NOT NULL,
@@ -56,4 +57,15 @@ async function initSchema(db: SQLite.SQLiteDatabase): Promise<void> {
 
     CREATE INDEX IF NOT EXISTS idx_queue_entity ON sync_queue (entity_id);
   `)
+
+  // Migrations for existing databases
+  await migrateSchema(db)
+}
+
+async function migrateSchema(db: SQLite.SQLiteDatabase): Promise<void> {
+  const tableInfo = await db.getAllAsync<{ name: string }>('PRAGMA table_info(transactions)')
+  const hasColumn = tableInfo.some((col) => col.name === 'merchant_domain')
+  if (!hasColumn) {
+    await db.execAsync('ALTER TABLE transactions ADD COLUMN merchant_domain TEXT')
+  }
 }

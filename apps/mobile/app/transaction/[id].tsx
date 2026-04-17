@@ -11,8 +11,8 @@ import { syncManager } from '../../src/services/sync/SyncManager'
 import { DataEvents } from '../../src/events/dataEvents'
 import { MerchantAvatar } from '../../src/components/MerchantAvatar'
 import { Colors, Typography, Spacing, Radius } from '../../src/theme'
-import { formatCurrency } from '@voice-expense/shared'
-import type { Transaction } from '@voice-expense/shared'
+import { formatCurrency, t } from '@voice-expense/shared'
+import type { Transaction, Locale } from '@voice-expense/shared'
 
 function DetailRow({ label, value }: { label: string; value: string | null }) {
   if (!value) return null
@@ -30,6 +30,7 @@ export default function TransactionDetailScreen() {
   const { user } = useAuth()
   const { profile } = useProfile(user?.id)
   const { categoryMap } = useCategories(user?.id)
+  const locale = (profile?.locale ?? 'en') as Locale
   const currency = profile?.currency_code ?? 'USD'
   const [txn, setTxn] = useState<Transaction | null>(null)
   const [loading, setLoading] = useState(true)
@@ -53,10 +54,10 @@ export default function TransactionDetailScreen() {
 
   async function handleDelete() {
     if (!txn) return
-    Alert.alert('Delete transaction', 'This cannot be undone.', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('detail.delete_title', locale), t('detail.delete_msg', locale), [
+      { text: t('common.cancel', locale), style: 'cancel' },
       {
-        text: 'Delete',
+        text: t('detail.delete', locale),
         style: 'destructive',
         onPress: async () => {
           await softDeleteTransaction(txn.id)
@@ -86,7 +87,7 @@ export default function TransactionDetailScreen() {
   if (!txn) {
     return (
       <View style={styles.centered}>
-        <Text style={styles.errorText}>Transaction not found</Text>
+        <Text style={styles.errorText}>{t('detail.not_found', locale)}</Text>
       </View>
     )
   }
@@ -102,14 +103,14 @@ export default function TransactionDetailScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         {/* Header */}
         <View style={styles.hero}>
-          <MerchantAvatar merchant={txn.merchant} size={72} />
-          <Text style={styles.merchantName}>{txn.merchant ?? 'Unknown'}</Text>
+          <MerchantAvatar merchant={txn.merchant} merchantDomain={txn.merchant_domain} size={72} />
+          <Text style={styles.merchantName}>{txn.merchant ?? t('transactions.unknown', locale)}</Text>
           <Text style={[styles.amount, { color: amountColor }]}>
             {isCredit ? '+' : '-'}
             {formatCurrency(txn.amount, currency)}
           </Text>
           <Text style={styles.date}>
-            {new Date(txn.transacted_at).toLocaleDateString('en', {
+            {new Date(txn.transacted_at).toLocaleDateString(locale, {
               weekday: 'long',
               year: 'numeric',
               month: 'long',
@@ -122,15 +123,15 @@ export default function TransactionDetailScreen() {
 
         {/* Details */}
         <View style={styles.detailsCard}>
-          <DetailRow label="Category" value={categoryName} />
+          <DetailRow label={t('detail.category', locale)} value={categoryName} />
           <DetailRow
-            label="Payment Method"
+            label={t('detail.payment', locale)}
             value={txn.payment_method?.replace('_', ' ') ?? null}
           />
-          <DetailRow label="Source" value={txn.source} />
-          <DetailRow label="Note" value={txn.note} />
+          <DetailRow label={t('detail.source', locale)} value={txn.source} />
+          <DetailRow label={t('detail.note', locale)} value={txn.note} />
           {txn.raw_transcript && (
-            <DetailRow label="Voice Transcript" value={txn.raw_transcript} />
+            <DetailRow label={t('detail.transcript', locale)} value={txn.raw_transcript} />
           )}
         </View>
 
@@ -140,10 +141,10 @@ export default function TransactionDetailScreen() {
             style={styles.editButton}
             onPress={() => router.push({ pathname: '/transaction/edit', params: { id: txn.id } })}
           >
-            <Text style={styles.editButtonText}>Edit</Text>
+            <Text style={styles.editButtonText}>{t('detail.edit', locale)}</Text>
           </Pressable>
           <Pressable style={styles.deleteButton} onPress={handleDelete}>
-            <Text style={styles.deleteButtonText}>Delete</Text>
+            <Text style={styles.deleteButtonText}>{t('detail.delete', locale)}</Text>
           </Pressable>
         </View>
       </ScrollView>

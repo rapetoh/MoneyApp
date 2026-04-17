@@ -13,8 +13,11 @@ import {
 import { Link } from 'expo-router'
 import { signUpWithEmail } from '../../src/hooks/useAuth'
 import { Colors, Typography, Spacing, Radius } from '../../src/theme'
+import { t } from '@voice-expense/shared'
+import type { Locale } from '@voice-expense/shared'
 
 export default function SignUpScreen() {
+  const locale: Locale = 'en'
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -23,14 +26,14 @@ export default function SignUpScreen() {
   async function handleSignUp() {
     if (!email || !password) return
     if (password.length < 6) {
-      Alert.alert('Password too short', 'Password must be at least 6 characters.')
+      Alert.alert(t('auth.password_short', locale), t('auth.password_min', locale))
       return
     }
     setLoading(true)
     const { error } = await signUpWithEmail(email.trim(), password)
     setLoading(false)
     if (error) {
-      Alert.alert('Sign up failed', error.message)
+      Alert.alert(t('auth.sign_up_failed', locale), error.message)
     } else {
       setDone(true)
     }
@@ -41,12 +44,12 @@ export default function SignUpScreen() {
       <View style={styles.container}>
         <View style={styles.successInner}>
           <Text style={styles.successIcon}>✉️</Text>
-          <Text style={styles.title}>Check your email</Text>
+          <Text style={styles.title}>{t('auth.check_email', locale)}</Text>
           <Text style={styles.subtitle}>
-            We sent a confirmation link to {email}. Click it to activate your account.
+            {t('auth.confirmation_sent', locale)}
           </Text>
           <Link href="/(auth)/sign-in" style={styles.backLink}>
-            <Text style={styles.link}>Back to Sign In</Text>
+            <Text style={styles.link}>{t('auth.back_to_sign_in', locale)}</Text>
           </Link>
         </View>
       </View>
@@ -61,13 +64,13 @@ export default function SignUpScreen() {
       <View style={styles.inner}>
         <View style={styles.header}>
           <Text style={styles.logo}>🎙</Text>
-          <Text style={styles.title}>Create account</Text>
-          <Text style={styles.subtitle}>Track expenses with your voice</Text>
+          <Text style={styles.title}>{t('auth.create_account', locale)}</Text>
+          <Text style={styles.subtitle}>{t('auth.track_voice', locale)}</Text>
         </View>
 
         <View style={styles.form}>
           <View style={styles.field}>
-            <Text style={styles.label}>Email</Text>
+            <Text style={styles.label}>{t('auth.email', locale)}</Text>
             <TextInput
               style={styles.input}
               value={email}
@@ -81,12 +84,12 @@ export default function SignUpScreen() {
           </View>
 
           <View style={styles.field}>
-            <Text style={styles.label}>Password</Text>
+            <Text style={styles.label}>{t('auth.password', locale)}</Text>
             <TextInput
               style={styles.input}
               value={password}
               onChangeText={setPassword}
-              placeholder="At least 6 characters"
+              placeholder={t('auth.password_placeholder', locale)}
               placeholderTextColor={Colors.textMuted}
               secureTextEntry
               autoComplete="new-password"
@@ -101,15 +104,15 @@ export default function SignUpScreen() {
             {loading ? (
               <ActivityIndicator color={Colors.white} />
             ) : (
-              <Text style={styles.buttonText}>Create Account</Text>
+              <Text style={styles.buttonText}>{t('auth.create_account_btn', locale)}</Text>
             )}
           </Pressable>
         </View>
 
         <View style={styles.footer}>
-          <Text style={styles.footerText}>Already have an account? </Text>
+          <Text style={styles.footerText}>{t('auth.has_account', locale)} </Text>
           <Link href="/(auth)/sign-in">
-            <Text style={styles.link}>Sign in</Text>
+            <Text style={styles.link}>{t('auth.sign_in_link', locale)}</Text>
           </Link>
         </View>
       </View>

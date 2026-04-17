@@ -1,30 +1,44 @@
 import { ScrollView, View, Text, StyleSheet, ActivityIndicator } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { Ionicons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
 import { useAuth } from '../../src/hooks/useAuth'
 import { useTransactions, useMonthSummary } from '../../src/hooks/useTransactions'
 import { useCategories } from '../../src/hooks/useCategories'
 import { useProfile } from '../../src/hooks/useProfile'
 import { useActiveBudget, usePeriodSpend } from '../../src/hooks/useBudget'
+import { useRecurringRules, computeUpcomingRecurring } from '../../src/hooks/useRecurringRules'
 import { SafeToSpend } from '../../src/components/SafeToSpend'
 import { TransactionRow } from '../../src/components/TransactionRow'
 import { Colors, Typography, Spacing, Radius } from '../../src/theme'
 import { formatCurrency, t } from '@voice-expense/shared'
+import type { Locale } from '@voice-expense/shared'
 
 function SummaryCard({
   label,
   amount,
   currency,
   color,
+  icon,
+  iconBg,
+  iconColor,
 }: {
   label: string
   amount: number
   currency: string
   color: string
+  icon: React.ComponentProps<typeof Ionicons>['name']
+  iconBg: string
+  iconColor: string
 }) {
   return (
     <View style={styles.summaryCard}>
-      <Text style={styles.summaryLabel}>{label}</Text>
+      <View style={styles.summaryTop}>
+        <View style={[styles.summaryIcon, { backgroundColor: iconBg }]}>
+          <Ionicons name={icon} size={16} color={iconColor} />
+        </View>
+        <Text style={styles.summaryLabel}>{label}</Text>
+      </View>
       <Text style={[styles.summaryAmount, { color }]}>{formatCurrency(amount, currency)}</Text>
     </View>
   )
@@ -38,9 +52,10 @@ export default function HomeScreen() {
   const { profile } = useProfile(user?.id)
   const { budget } = useActiveBudget(user?.id)
   const periodSpend = usePeriodSpend(budget, transactions)
+  const { rules: recurringRules } = useRecurringRules(user?.id)
   const router = useRouter()
 
-  const locale = profile?.locale ?? 'en'
+  const locale = (profile?.locale ?? 'en') as Locale
   const displayName = profile?.display_name ?? user?.email?.split('@')[0] ?? 'there'
   const currency = profile?.currency_code ?? 'USD'
   const recentTransactions = transactions.slice(0, 5)
@@ -54,9 +69,9 @@ export default function HomeScreen() {
       >
         {/* Greeting */}
         <View style={styles.greeting}>
-          <Text style={styles.greetingText}>Hey, {displayName}</Text>
+          <Text style={styles.greetingText}>{t('home.greeting', locale)} {displayName}</Text>
           <Text style={styles.greetingDate}>
-            {new Date().toLocaleDateString('en', { weekday: 'long', month: 'long', day: 'numeric' })}
+            {new Date().toLocaleDateString(locale, { weekday: 'long', month: 'long', day: 'numeric' })}
           </Text>
         </View>
 
@@ -64,9 +79,10 @@ export default function HomeScreen() {
         <SafeToSpend
           monthlyBudget={budget?.amount ?? null}
           totalSpent={periodSpend}
-          upcomingRecurring={0}
+          upcomingRecurring={computeUpcomingRecurring(recurringRules, budget?.period)}
           currency={currency}
           period={budget?.period}
+          locale={locale}
         />
 
         {/* Income / Expenses Summary */}
@@ -76,12 +92,18 @@ export default function HomeScreen() {
             amount={totalIncome}
             currency={currency}
             color={Colors.income}
+            icon="arrow-up"
+            iconBg={Colors.incomeLight}
+            iconColor={Colors.income}
           />
           <SummaryCard
             label={t('home.expenses', locale)}
             amount={totalExpenses}
             currency={currency}
             color={Colors.expense}
+            icon="arrow-down"
+            iconBg={Colors.expenseLight}
+            iconColor={Colors.expense}
           />
         </View>
 
@@ -99,8 +121,8 @@ export default function HomeScreen() {
           ) : recentTransactions.length === 0 ? (
             <View style={styles.emptyState}>
               <Text style={styles.emptyIcon}>💸</Text>
-              <Text style={styles.emptyTitle}>No transactions yet</Text>
-              <Text style={styles.emptySubtitle}>Tap the mic to log your first expense</Text>
+              <Text style={styles.emptyTitle}>{t('transactions.empty', locale)}</Text>
+              <Text style={styles.emptySubtitle}>{t('home.first_expense', locale)}</Text>
             </View>
           ) : (
             <View style={styles.transactionList}>
@@ -111,6 +133,7 @@ export default function HomeScreen() {
                     transaction={txn}
                     categoryName={txn.category_id ? categoryMap[txn.category_id]?.name : null}
                     currency={currency}
+                    locale={locale}
                     onPress={() => router.push(`/transaction/${txn.id}`)}
                   />
                 </View>
@@ -134,7 +157,7 @@ const styles = StyleSheet.create({
   content: {
     padding: Spacing.base,
     gap: Spacing.base,
-    paddingBottom: Spacing['3xl'],
+    paddingBottom: 120,
   },
   greeting: {
     gap: Spacing.xs,
@@ -159,12 +182,24 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.card,
     borderRadius: Radius.lg,
     padding: Spacing.base,
-    gap: Spacing.xs,
+    gap: Spacing.sm,
     shadowColor: Colors.shadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 1,
     shadowRadius: 4,
     elevation: 2,
+  },
+  summaryTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  summaryIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   summaryLabel: {
     fontFamily: Typography.fontFamily.sans,
