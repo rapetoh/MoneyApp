@@ -7,6 +7,7 @@ import { useProfile } from '../src/hooks/useProfile'
 import { syncManager } from '../src/services/sync/SyncManager'
 import { useShortcutHandler } from '../src/hooks/useShortcutHandler'
 import { seedDefaultCategories } from '../src/services/seedCategories'
+import { runRecurringCatchUp } from '../src/services/recurringCatchUp'
 import { t } from '@voice-expense/shared'
 import type { Locale } from '@voice-expense/shared'
 
@@ -40,9 +41,12 @@ export default function RootLayout() {
       router.replace('/(tabs)')
     }
 
-    // Seed default categories for new users (no-op if categories already exist)
     if (session?.user?.id) {
+      // Seed default categories for new users (no-op if categories already exist)
       seedDefaultCategories(session.user.id)
+
+      // Generate any missed recurring transactions since last app open
+      runRecurringCatchUp(session.user.id)
     }
   }, [session, loading, segments, router])
 
