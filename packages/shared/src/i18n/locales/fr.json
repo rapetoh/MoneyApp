@@ -193,6 +193,8 @@
   "history.weekday_labels": "D,L,M,M,J,V,S",
   "history.in_progress": "En cours",
   "history.browse_all": "Parcourir toutes les transactions",
+  "history.prev_month": "Mois précédent",
+  "history.next_month": "Mois suivant",
   "history.empty": "Rien enregistré pour l'instant. Enregistrez votre première dépense pour démarrer la carte.",
   "more.recurring": "Transactions récurrentes",
   "more.ask": "Ask Murmur",

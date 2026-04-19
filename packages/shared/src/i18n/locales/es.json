@@ -193,6 +193,8 @@
   "history.weekday_labels": "D,L,M,X,J,V,S",
   "history.in_progress": "En curso",
   "history.browse_all": "Ver todas las transacciones",
+  "history.prev_month": "Mes anterior",
+  "history.next_month": "Mes siguiente",
   "history.empty": "Aún no has registrado nada. Registra tu primer gasto para empezar el mapa.",
   "more.recurring": "Transacciones recurrentes",
   "more.ask": "Ask Murmur",

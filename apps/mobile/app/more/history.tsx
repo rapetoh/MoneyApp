@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Stack, useRouter } from 'expo-router'
@@ -61,8 +61,17 @@ export default function HistoryScreen() {
   const locale = (profile?.locale ?? 'en') as Locale
 
   const now = new Date()
-  const year = now.getFullYear()
-  const month = now.getMonth()
+  // Heatmap month is user-navigable via prev/next chevrons on the card.
+  // Defaults to the current month. The H1 year at the top of the page tracks
+  // this value so flipping back to, say, March 2024 also flips the big year
+  // number — the whole page reads as "the year that contains the month
+  // you're looking at" instead of a hard-coded current year.
+  const [heatmapMonth, setHeatmapMonth] = useState<Date>(
+    new Date(now.getFullYear(), now.getMonth(), 1),
+  )
+  const year = heatmapMonth.getFullYear()
+  const month = heatmapMonth.getMonth()
+  const isCurrentMonth = year === now.getFullYear() && month === now.getMonth()
 
   const monthTotals = useMemo(() => totalsByMonth(transactions), [transactions])
 
@@ -87,12 +96,23 @@ export default function HistoryScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [monthTotals])
 
-  const currentMonthDaily = useMemo(
+  const heatmapDaily = useMemo(
     () => dailyTotals(transactions, year, month),
     [transactions, year, month],
   )
-  const currentMonthTotal = monthTotals[monthParam(now)] ?? 0
-  const maxDaily = Math.max(...currentMonthDaily, 1)
+  const heatmapTotal = monthTotals[monthParam(heatmapMonth)] ?? 0
+  const maxDaily = Math.max(...heatmapDaily, 1)
+
+  // Next month is disabled when the heatmap is already on the current month —
+  // we never show a future month (there's nothing to heatmap).
+  const canGoNext = !isCurrentMonth
+  function goPrevMonth() {
+    setHeatmapMonth((m) => new Date(m.getFullYear(), m.getMonth() - 1, 1))
+  }
+  function goNextMonth() {
+    if (!canGoNext) return
+    setHeatmapMonth((m) => new Date(m.getFullYear(), m.getMonth() + 1, 1))
+  }
 
   // Grid cells for the heatmap: leading empty squares for the weekday the
   // month starts on, then day cells up through the last day of the month.
@@ -101,7 +121,7 @@ export default function HistoryScreen() {
   const gridCells: ({ day: number; amount: number } | null)[] = []
   for (let i = 0; i < firstWeekday; i++) gridCells.push(null)
   for (let d = 1; d <= daysInMonth; d++) {
-    gridCells.push({ day: d, amount: currentMonthDaily[d] ?? 0 })
+    gridCells.push({ day: d, amount: heatmapDaily[d] ?? 0 })
   }
 
   const weekdayLabels = t('history.weekday_labels', locale).split(',')
@@ -119,22 +139,21 @@ export default function HistoryScreen() {
       <Stack.Screen options={{ headerShown: false }} />
       <SafeAreaView style={styles.safe} edges={['top', 'bottom', 'left', 'right']}>
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-          {/* Back pill + breadcrumb + search icon (browse all) */}
+          {/* Back pill + search icon (browse all). The label next to the
+              back pill was dropped — the H1 year below identifies the page,
+              and "More" read awkwardly when the user came from Today. */}
           <View style={styles.topRow}>
-            <View style={styles.topLeft}>
-              <Pressable
-                onPress={() => router.back()}
-                style={({ pressed }) => [styles.backPill, pressed && styles.backPillPressed]}
-                hitSlop={8}
-              >
-                <Ionicons
-                  name="chevron-back"
-                  size={20}
-                  color={Colors.ink2 ?? Colors.textSecondary}
-                />
-              </Pressable>
-              <Text style={styles.breadcrumb}>{t('more.title', locale)}</Text>
-            </View>
+            <Pressable
+              onPress={() => router.back()}
+              style={({ pressed }) => [styles.backPill, pressed && styles.backPillPressed]}
+              hitSlop={8}
+            >
+              <Ionicons
+                name="chevron-back"
+                size={20}
+                color={Colors.ink2 ?? Colors.textSecondary}
+              />
+            </Pressable>
             <Pressable
               onPress={goToSearch}
               style={({ pressed }) => [styles.searchPill, pressed && styles.backPillPressed]}
@@ -149,20 +168,59 @@ export default function HistoryScreen() {
             </Pressable>
           </View>
 
-          {/* Title block */}
+          {/* Title block — the year tracks the selected heatmap month so the
+              whole page reads coherently when flipping back. */}
           <View style={styles.intro}>
             <Text style={styles.eyebrow}>{t('history.heading_eyebrow', locale)}</Text>
             <Text style={styles.headline}>{year}</Text>
           </View>
 
-          {/* Current-month heatmap card */}
+          {/* Heatmap card — user-navigable month via prev/next chevrons. */}
           <View style={styles.heatmapWrap}>
             <View style={styles.heatmapCard}>
               <View style={styles.heatmapHeader}>
-                <Text style={styles.heatmapMonth}>
-                  {now.toLocaleDateString(locale, { month: 'long' })}
-                </Text>
-                <Money value={currentMonthTotal} size={16} serif={false} sansWeight="700" />
+                <View style={styles.heatmapNav}>
+                  <Pressable
+                    onPress={goPrevMonth}
+                    style={({ pressed }) => [styles.navBtn, pressed && styles.navBtnPressed]}
+                    hitSlop={8}
+                    accessibilityLabel={t('history.prev_month', locale)}
+                  >
+                    <Ionicons
+                      name="chevron-back"
+                      size={18}
+                      color={Colors.ink2 ?? Colors.textSecondary}
+                    />
+                  </Pressable>
+                  <Text style={styles.heatmapMonth}>
+                    {heatmapMonth.toLocaleDateString(locale, {
+                      month: 'long',
+                      year: heatmapMonth.getFullYear() === now.getFullYear() ? undefined : 'numeric',
+                    })}
+                  </Text>
+                  <Pressable
+                    onPress={goNextMonth}
+                    disabled={!canGoNext}
+                    style={({ pressed }) => [
+                      styles.navBtn,
+                      !canGoNext && styles.navBtnDisabled,
+                      pressed && canGoNext && styles.navBtnPressed,
+                    ]}
+                    hitSlop={8}
+                    accessibilityLabel={t('history.next_month', locale)}
+                  >
+                    <Ionicons
+                      name="chevron-forward"
+                      size={18}
+                      color={
+                        canGoNext
+                          ? Colors.ink2 ?? Colors.textSecondary
+                          : Colors.ink4 ?? Colors.textMuted
+                      }
+                    />
+                  </Pressable>
+                </View>
+                <Money value={heatmapTotal} size={16} serif={false} sansWeight="700" />
               </View>
 
               <View style={styles.weekdayRow}>
@@ -176,7 +234,7 @@ export default function HistoryScreen() {
               <View style={styles.grid}>
                 {gridCells.map((cell, i) => {
                   if (!cell) return <View key={`x${i}`} style={styles.cellEmpty} />
-                  const isToday = cell.day === now.getDate()
+                  const isToday = isCurrentMonth && cell.day === now.getDate()
                   const intensity =
                     cell.amount > 0 ? 0.2 + Math.min(cell.amount / maxDaily, 1) * 0.7 : 0
                   const bg =
@@ -282,7 +340,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  topLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   backPill: {
     width: 36,
     height: 36,
@@ -294,12 +351,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   backPillPressed: { opacity: 0.6 },
-  breadcrumb: {
-    fontFamily: Typography.fontFamily.sansSemiBold,
-    fontSize: 15,
-    fontWeight: '600',
-    color: Colors.ink3 ?? Colors.textSecondary,
-  },
   searchPill: {
     width: 36,
     height: 36,
@@ -343,11 +394,26 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 14,
   },
+  heatmapNav: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  navBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  navBtnPressed: { opacity: 0.5 },
+  navBtnDisabled: { opacity: 0.35 },
   heatmapMonth: {
     fontSize: 15,
     fontWeight: '700',
     color: Colors.ink ?? Colors.text,
     fontFamily: Typography.fontFamily.sansBold,
+    marginHorizontal: 4,
   },
   weekdayRow: {
     flexDirection: 'row',

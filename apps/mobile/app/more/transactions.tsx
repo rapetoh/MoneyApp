@@ -10,13 +10,14 @@ import {
   Pressable,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { useRouter, useLocalSearchParams } from 'expo-router'
+import { Stack, useRouter, useLocalSearchParams } from 'expo-router'
+import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '../../src/hooks/useAuth'
 import { useTransactions } from '../../src/hooks/useTransactions'
 import { useCategories } from '../../src/hooks/useCategories'
 import { useProfile } from '../../src/hooks/useProfile'
 import { TransactionRow } from '../../src/components/TransactionRow'
-import { Colors, Typography, Spacing, Radius } from '../../src/theme'
+import { Colors, Typography, Spacing, Radius, Hairline } from '../../src/theme'
 import { t, type Locale } from '@voice-expense/shared'
 import type { Transaction } from '@voice-expense/shared'
 
@@ -125,8 +126,41 @@ export default function TransactionsScreen() {
     setSelectedCategoryId((prev) => (prev === id ? null : id))
   }
 
+  // Page title — "April 2026" when the list is scoped to a month, otherwise
+  // the unfiltered "Transactions" label. Matches the H1 rhythm of the other
+  // Phase D screens.
+  const pageTitle = monthFilter
+    ? monthFilter.label.toLocaleDateString(locale, {
+        month: 'long',
+        year: 'numeric',
+      })
+    : t('more.transactions', locale)
+
   return (
-    <SafeAreaView style={styles.safe} edges={['bottom', 'left', 'right']}>
+    <>
+      {/* Native Stack header is hidden — we render our own back pill + page
+          title to match the Phase D pattern and fix the flaky tap target on
+          the native iOS back button. */}
+      <Stack.Screen options={{ headerShown: false }} />
+      <SafeAreaView style={styles.safe} edges={['top', 'bottom', 'left', 'right']}>
+        <View style={styles.topRow}>
+          <Pressable
+            onPress={() => router.back()}
+            style={({ pressed }) => [styles.backPill, pressed && styles.backPillPressed]}
+            hitSlop={8}
+          >
+            <Ionicons
+              name="chevron-back"
+              size={20}
+              color={Colors.ink2 ?? Colors.textSecondary}
+            />
+          </Pressable>
+          <Text style={styles.pageTitle} numberOfLines={1}>
+            {pageTitle}
+          </Text>
+          <View style={styles.topRightSpacer} />
+        </View>
+
       <View style={styles.header}>
         {/* Expenses / Income toggle (styled like the Voice / Manual toggle) */}
         <View style={styles.segment}>
@@ -244,12 +278,44 @@ export default function TransactionsScreen() {
           showsVerticalScrollIndicator={false}
         />
       )}
-    </SafeAreaView>
+      </SafeAreaView>
+    </>
   )
 }
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
+  topRow: {
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  backPill: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: Colors.surface ?? '#FFFFFF',
+    borderWidth: Hairline.width,
+    borderColor: Hairline.color,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  backPillPressed: { opacity: 0.6 },
+  pageTitle: {
+    flex: 1,
+    textAlign: 'center',
+    fontFamily: Typography.fontFamily.sansSemiBold,
+    fontSize: 15,
+    fontWeight: '600',
+    color: Colors.ink ?? Colors.text,
+    letterSpacing: -0.2,
+  },
+  // Matches the back-pill footprint so the centered title stays optically centered.
+  topRightSpacer: { width: 36, height: 36 },
   header: { padding: Spacing.base, gap: Spacing.md },
   title: {
     fontFamily: Typography.fontFamily.sansBold,

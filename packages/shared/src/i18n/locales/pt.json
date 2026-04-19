@@ -193,6 +193,8 @@
   "history.weekday_labels": "D,S,T,Q,Q,S,S",
   "history.in_progress": "Em andamento",
   "history.browse_all": "Ver todas as transações",
+  "history.prev_month": "Mês anterior",
+  "history.next_month": "Próximo mês",
   "history.empty": "Nada registrado ainda. Registre sua primeira despesa para começar o mapa.",
   "more.recurring": "Transações recorrentes",
   "more.ask": "Ask Murmur",

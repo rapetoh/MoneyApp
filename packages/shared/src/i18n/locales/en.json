@@ -193,6 +193,8 @@
   "history.weekday_labels": "S,M,T,W,T,F,S",
   "history.in_progress": "In progress",
   "history.browse_all": "Browse all transactions",
+  "history.prev_month": "Previous month",
+  "history.next_month": "Next month",
   "history.empty": "Nothing logged yet. Record your first expense to start the heatmap.",
   "more.recurring": "Recurring",
   "more.ask": "Ask Murmur",

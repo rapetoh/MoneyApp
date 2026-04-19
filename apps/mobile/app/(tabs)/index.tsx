@@ -156,18 +156,34 @@ export default function TodayScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header — APRIL / Today + search button */}
+        {/* Header — APRIL / Today + Ask Murmur entry + History entry. Two
+            sibling icon pills on the right so Ask is a primary surface
+            instead of being buried two taps deep under More. */}
         <View style={styles.header}>
           <View>
             <Text style={styles.monthTag}>{monthLabel}</Text>
             <Text style={styles.title}>{t('transactions.today', locale)}</Text>
           </View>
-          <Pressable
-            style={({ pressed }) => [styles.searchBtn, pressed && styles.searchBtnPressed]}
-            onPress={() => router.push('/more/history')}
-          >
-            <Ionicons name="search-outline" size={18} color={Colors.ink2 ?? Colors.textSecondary} />
-          </Pressable>
+          <View style={styles.headerActions}>
+            <Pressable
+              style={({ pressed }) => [styles.headerIconBtn, pressed && styles.headerIconBtnPressed]}
+              onPress={() => router.push('/more/ask')}
+              accessibilityLabel={t('ask.title', locale)}
+            >
+              <Ionicons
+                name="sparkles"
+                size={18}
+                color={Colors.accent ?? Colors.primary}
+              />
+            </Pressable>
+            <Pressable
+              style={({ pressed }) => [styles.headerIconBtn, pressed && styles.headerIconBtnPressed]}
+              onPress={() => router.push('/more/history')}
+              accessibilityLabel={t('more.history', locale)}
+            >
+              <Ionicons name="time-outline" size={18} color={Colors.ink2 ?? Colors.textSecondary} />
+            </Pressable>
+          </View>
         </View>
 
         {/* Budget one-liner */}
@@ -280,7 +296,13 @@ const styles = StyleSheet.create({
     color: Colors.ink ?? Colors.text,
     marginTop: 2,
   },
-  searchBtn: {
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 4,
+  },
+  headerIconBtn: {
     width: 36,
     height: 36,
     borderRadius: 18,
@@ -289,9 +311,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 0.5,
     borderColor: Colors.line ?? 'rgba(0,0,0,0.06)',
-    marginTop: 4,
   },
-  searchBtnPressed: { opacity: 0.6 },
+  headerIconBtnPressed: { opacity: 0.6 },
 
   // Budget line
   budgetLine: {
