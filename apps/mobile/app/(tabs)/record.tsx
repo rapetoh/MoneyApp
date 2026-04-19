@@ -9,6 +9,7 @@ import {
   Alert,
   ActivityIndicator,
   KeyboardAvoidingView,
+  Modal,
   Platform,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
@@ -429,143 +430,94 @@ export default function RecordScreen() {
           </View>
         </View>
       ) : (
-        /* ── MANUAL TAB — S_Keypad layout from mobile-screens-3.jsx ── */
+        /* ── MANUAL TAB — S_Keypad layout, fits in one viewport ── */
         <KeyboardAvoidingView
-          style={{ flex: 1 }}
+          style={styles.manualContainer}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
-          <ScrollView
-            contentContainerStyle={styles.manualContent}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-          >
-            {/* Direction segmented control. Kept — S_Keypad only shows a
-                one-way expense flow but we support both (non-regression). */}
-            <View style={styles.directionRow}>
-              <Pressable
-                style={[styles.directionBtn, direction === 'debit' && styles.directionBtnActive]}
-                onPress={() => setDirection('debit')}
-              >
-                <Text style={[styles.directionLabel, direction === 'debit' && styles.directionLabelActive]}>
-                  {t('voice.expense', userLocale as any)}
-                </Text>
-              </Pressable>
-              <Pressable
-                style={[styles.directionBtn, direction === 'credit' && styles.directionBtnActiveIncome]}
-                onPress={() => setDirection('credit')}
-              >
-                <Text style={[styles.directionLabel, direction === 'credit' && styles.directionLabelActiveIncome]}>
-                  {t('voice.income_label', userLocale as any)}
-                </Text>
-              </Pressable>
-            </View>
-
-            {/* Hero amount — 80px serif, driven by the on-screen keypad */}
-            <View style={styles.amountHero}>
-              <Text style={styles.amountHeroText} numberOfLines={1} adjustsFontSizeToFit>
-                {amount === ''
-                  ? <Text style={styles.amountHeroPlaceholder}>0</Text>
-                  : amount}
-              </Text>
-              <Text style={styles.amountHeroCurrency}>{userCurrency}</Text>
-            </View>
-
-            {/* Quick fields — merchant (single line) + category chip trigger */}
-            <View style={styles.quickFields}>
-              <TextInput
-                style={styles.quickInput}
-                value={merchant}
-                onChangeText={setMerchant}
-                placeholder={t('voice.merchant_source', userLocale as any)}
-                placeholderTextColor={Colors.textMuted}
-              />
-              <View style={styles.quickCategoryWrap}>
-                <CategoryPicker
-                  categories={categories}
-                  selectedId={categoryId}
-                  onSelect={setCategoryId}
-                  onCreateCategory={createCategory}
-                  locale={userLocale}
-                />
-              </View>
-            </View>
-
-            {/* 3x4 keypad — 1-9, ., 0, ⌫ */}
-            <View style={styles.keypad}>
-              {[['1','2','3'],['4','5','6'],['7','8','9'],['.','0','⌫']].map((row, r) => (
-                <View key={r} style={styles.keypadRow}>
-                  {row.map((k) => (
-                    <Pressable
-                      key={k}
-                      onPress={() => handleKeypadPress(k)}
-                      style={({ pressed }) => [styles.keypadKey, pressed && styles.keypadKeyPressed]}
-                    >
-                      <Text style={styles.keypadKeyText}>{k}</Text>
-                    </Pressable>
-                  ))}
-                </View>
-              ))}
-            </View>
-
-            {/* More options expander — note, payment method, recurring */}
+          {/* Direction segmented control. Kept — S_Keypad only shows a
+              one-way expense flow but we support both (non-regression). */}
+          <View style={styles.directionRow}>
             <Pressable
-              onPress={() => setMoreOptionsOpen((v) => !v)}
-              style={({ pressed }) => [styles.moreOptionsToggle, pressed && { opacity: 0.6 }]}
+              style={[styles.directionBtn, direction === 'debit' && styles.directionBtnActive]}
+              onPress={() => setDirection('debit')}
+            >
+              <Text style={[styles.directionLabel, direction === 'debit' && styles.directionLabelActive]}>
+                {t('voice.expense', userLocale as any)}
+              </Text>
+            </Pressable>
+            <Pressable
+              style={[styles.directionBtn, direction === 'credit' && styles.directionBtnActiveIncome]}
+              onPress={() => setDirection('credit')}
+            >
+              <Text style={[styles.directionLabel, direction === 'credit' && styles.directionLabelActiveIncome]}>
+                {t('voice.income_label', userLocale as any)}
+              </Text>
+            </Pressable>
+          </View>
+
+          {/* Hero amount + currency. flex:1 so the keypad sticks to the bottom
+              and this block absorbs whatever vertical slack remains. */}
+          <View style={styles.amountHero}>
+            <Text style={styles.amountHeroText} numberOfLines={1} adjustsFontSizeToFit>
+              {amount === ''
+                ? <Text style={styles.amountHeroPlaceholder}>0</Text>
+                : amount}
+            </Text>
+            <Text style={styles.amountHeroCurrency}>{userCurrency}</Text>
+          </View>
+
+          {/* Quick fields — merchant + category, compact */}
+          <View style={styles.quickFields}>
+            <TextInput
+              style={styles.quickInput}
+              value={merchant}
+              onChangeText={setMerchant}
+              placeholder={t('voice.merchant_source', userLocale as any)}
+              placeholderTextColor={Colors.textMuted}
+            />
+            <CategoryPicker
+              categories={categories}
+              selectedId={categoryId}
+              onSelect={setCategoryId}
+              onCreateCategory={createCategory}
+              locale={userLocale}
+            />
+          </View>
+
+          {/* 3x4 keypad — 1-9, ., 0, ⌫ */}
+          <View style={styles.keypad}>
+            {[['1','2','3'],['4','5','6'],['7','8','9'],['.','0','⌫']].map((row, r) => (
+              <View key={r} style={styles.keypadRow}>
+                {row.map((k) => (
+                  <Pressable
+                    key={k}
+                    onPress={() => handleKeypadPress(k)}
+                    style={({ pressed }) => [styles.keypadKey, pressed && styles.keypadKeyPressed]}
+                  >
+                    <Text style={styles.keypadKeyText}>{k}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            ))}
+          </View>
+
+          {/* Footer row: "More options" (opens a modal sheet) + Add CTA */}
+          <View style={styles.footerRow}>
+            <Pressable
+              onPress={() => setMoreOptionsOpen(true)}
+              style={({ pressed }) => [styles.moreOptionsButton, pressed && { opacity: 0.6 }]}
               hitSlop={8}
             >
-              <Text style={styles.moreOptionsLabel}>
-                {t('voice.more_options', userLocale as any)}
-              </Text>
               <Ionicons
-                name={moreOptionsOpen ? 'chevron-up' : 'chevron-down'}
+                name="options-outline"
                 size={16}
                 color={Colors.ink3 ?? Colors.textSecondary}
               />
+              <Text style={styles.moreOptionsLabel}>
+                {t('voice.more_options', userLocale as any)}
+              </Text>
             </Pressable>
-
-            {moreOptionsOpen && (
-              <View style={styles.moreOptionsPanel}>
-                <View style={styles.field}>
-                  <Text style={styles.label}>{t('voice.note', userLocale as any)}</Text>
-                  <TextInput
-                    style={styles.input}
-                    value={note}
-                    onChangeText={setNote}
-                    placeholder={t('voice.note_placeholder', userLocale as any)}
-                    placeholderTextColor={Colors.textMuted}
-                  />
-                </View>
-
-                <View style={styles.field}>
-                  <Text style={styles.label}>{t('voice.payment_method', userLocale as any)}</Text>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                    <View style={styles.chipRow}>
-                      {PAYMENT_METHODS.map((m) => (
-                        <Pressable
-                          key={m.value}
-                          style={[styles.chip, paymentMethod === m.value && styles.chipActive]}
-                          onPress={() => setPaymentMethod(m.value)}
-                        >
-                          <Text style={[styles.chipLabel, paymentMethod === m.value && styles.chipLabelActive]}>
-                            {t(m.key, userLocale as any)}
-                          </Text>
-                        </Pressable>
-                      ))}
-                    </View>
-                  </ScrollView>
-                </View>
-
-                <RecurringToggle
-                  isRecurring={manualIsRecurring}
-                  frequency={manualRecurringFreq}
-                  onToggle={setManualIsRecurring}
-                  onFrequencyChange={setManualRecurringFreq}
-                  locale={userLocale}
-                />
-              </View>
-            )}
-
-            {/* Dark ink CTA — "Add expense" / "Add income" per direction */}
             <Pressable
               style={({ pressed }) => [
                 styles.addButton,
@@ -585,7 +537,76 @@ export default function RecordScreen() {
                 </Text>
               )}
             </Pressable>
-          </ScrollView>
+          </View>
+
+          {/* Bottom-sheet modal for advanced fields — kept out of the primary
+              entry surface so the keypad never scrolls off screen. */}
+          <Modal
+            visible={moreOptionsOpen}
+            animationType="slide"
+            transparent
+            onRequestClose={() => setMoreOptionsOpen(false)}
+          >
+            <Pressable
+              style={styles.moreOptionsBackdrop}
+              onPress={() => setMoreOptionsOpen(false)}
+            >
+              <Pressable style={styles.moreOptionsSheet} onPress={(e) => e.stopPropagation()}>
+                <View style={styles.moreOptionsHeader}>
+                  <Text style={styles.moreOptionsTitle}>
+                    {t('voice.more_options', userLocale as any)}
+                  </Text>
+                  <Pressable onPress={() => setMoreOptionsOpen(false)} hitSlop={10}>
+                    <Text style={styles.moreOptionsDone}>{t('common.done', userLocale as any)}</Text>
+                  </Pressable>
+                </View>
+
+                <ScrollView
+                  contentContainerStyle={styles.moreOptionsContent}
+                  showsVerticalScrollIndicator={false}
+                  keyboardShouldPersistTaps="handled"
+                >
+                  <View style={styles.field}>
+                    <Text style={styles.label}>{t('voice.note', userLocale as any)}</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={note}
+                      onChangeText={setNote}
+                      placeholder={t('voice.note_placeholder', userLocale as any)}
+                      placeholderTextColor={Colors.textMuted}
+                    />
+                  </View>
+
+                  <View style={styles.field}>
+                    <Text style={styles.label}>{t('voice.payment_method', userLocale as any)}</Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                      <View style={styles.chipRow}>
+                        {PAYMENT_METHODS.map((m) => (
+                          <Pressable
+                            key={m.value}
+                            style={[styles.chip, paymentMethod === m.value && styles.chipActive]}
+                            onPress={() => setPaymentMethod(m.value)}
+                          >
+                            <Text style={[styles.chipLabel, paymentMethod === m.value && styles.chipLabelActive]}>
+                              {t(m.key, userLocale as any)}
+                            </Text>
+                          </Pressable>
+                        ))}
+                      </View>
+                    </ScrollView>
+                  </View>
+
+                  <RecurringToggle
+                    isRecurring={manualIsRecurring}
+                    frequency={manualRecurringFreq}
+                    onToggle={setManualIsRecurring}
+                    onFrequencyChange={setManualRecurringFreq}
+                    locale={userLocale}
+                  />
+                </ScrollView>
+              </Pressable>
+            </Pressable>
+          </Modal>
         </KeyboardAvoidingView>
       )}
 
@@ -757,8 +778,17 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
 
-  // Manual tab
-  manualContent: { padding: Spacing.base, gap: Spacing.base, paddingBottom: 120 },
+  // Manual tab — flex layout, no scroll. Content is sized to fit in one
+  // viewport above the tab bar. Bottom padding reserves room for the
+  // translucent tab bar + FAB cluster (~110pt) so the Add button never
+  // sits under the bar.
+  manualContainer: {
+    flex: 1,
+    paddingHorizontal: Spacing.base,
+    paddingTop: Spacing.sm,
+    paddingBottom: 110,
+    gap: Spacing.sm,
+  },
   directionRow: {
     flexDirection: 'row',
     backgroundColor: Colors.card,
@@ -777,18 +807,21 @@ const styles = StyleSheet.create({
   },
   directionLabelActive: { color: Colors.white },
   directionLabelActiveIncome: { color: Colors.white },
-  // S_Keypad hero: 80px serif amount centered, currency code tucked underneath.
+  // Amount hero — flex:1 so it absorbs slack between the direction toggle
+  // and the keypad. adjustsFontSizeToFit handles long entries without
+  // pushing anything off screen.
   amountHero: {
+    flex: 1,
     alignItems: 'center',
-    paddingTop: Spacing.base,
-    paddingBottom: Spacing.sm,
+    justifyContent: 'center',
+    minHeight: 60,
   },
   amountHeroText: {
     fontFamily: Typography.fontFamily.serif,
-    fontSize: 80,
+    fontSize: 64,
     fontWeight: '500',
-    letterSpacing: -1.5,
-    lineHeight: 88,
+    letterSpacing: -1.2,
+    lineHeight: 70,
     color: Colors.ink ?? Colors.text,
   },
   amountHeroPlaceholder: {
@@ -797,7 +830,7 @@ const styles = StyleSheet.create({
   },
   amountHeroCurrency: {
     fontFamily: Typography.fontFamily.sansSemiBold,
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
     letterSpacing: 0.6,
     textTransform: 'uppercase',
@@ -805,41 +838,36 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 
-  // Merchant input + category chip trigger row
+  // Merchant input + category picker trigger, stacked compact
   quickFields: {
-    gap: Spacing.sm,
+    gap: Spacing.xs,
   },
   quickInput: {
     backgroundColor: Colors.surface ?? Colors.card,
-    borderRadius: 16,
+    borderRadius: 14,
     paddingHorizontal: Spacing.base,
-    paddingVertical: 14,
+    paddingVertical: 10,
     fontFamily: Typography.fontFamily.sans,
     fontSize: 14,
     color: Colors.ink ?? Colors.text,
     borderWidth: Hairline.width,
     borderColor: Hairline.color,
   },
-  quickCategoryWrap: {
-    // CategoryPicker supplies its own trigger; this wrapper just aligns it
-    // visually with the merchant row above.
-  },
 
-  // 3×4 on-screen keypad (1-9, ., 0, ⌫) — replaces the native decimal-pad
-  // so the amount entry matches S_Keypad's visual rhythm.
+  // 3×4 on-screen keypad — compacted so the whole Manual surface fits in
+  // one viewport (48pt keys, 6pt gaps). Replaces the native decimal-pad.
   keypad: {
-    gap: Spacing.sm,
-    paddingTop: Spacing.sm,
+    gap: 6,
   },
   keypadRow: {
     flexDirection: 'row',
-    gap: Spacing.sm,
+    gap: 6,
   },
   keypadKey: {
     flex: 1,
-    height: 56,
+    height: 48,
     backgroundColor: Colors.surface ?? Colors.card,
-    borderRadius: 14,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: Hairline.width,
@@ -848,19 +876,28 @@ const styles = StyleSheet.create({
   keypadKeyPressed: { opacity: 0.55 },
   keypadKeyText: {
     fontFamily: Typography.fontFamily.serif,
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: '500',
     color: Colors.ink ?? Colors.text,
   },
 
-  // "More options" chevron that reveals note / payment / recurring
-  moreOptionsToggle: {
+  // Footer row: "More options" (left, opens bottom-sheet) + Add CTA (right)
+  footerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: Spacing.sm,
+    gap: Spacing.sm,
     marginTop: Spacing.xs,
+  },
+  moreOptionsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 14,
+    borderRadius: 24,
+    backgroundColor: Colors.surface ?? Colors.card,
+    borderWidth: Hairline.width,
+    borderColor: Hairline.color,
   },
   moreOptionsLabel: {
     fontFamily: Typography.fontFamily.sansSemiBold,
@@ -873,20 +910,60 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.xs,
   },
 
-  // Dark ink "Add expense" / "Add income" CTA — matches the S_Keypad button
+  // Bottom-sheet modal for advanced fields — keeps them out of the
+  // primary entry surface so the keypad never scrolls off screen.
+  moreOptionsBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'flex-end',
+  },
+  moreOptionsSheet: {
+    backgroundColor: Colors.background,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingTop: 8,
+    paddingBottom: 32,
+    maxHeight: '70%',
+  },
+  moreOptionsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: Spacing.base,
+    paddingVertical: 12,
+    borderBottomWidth: Hairline.width,
+    borderBottomColor: Hairline.color,
+  },
+  moreOptionsTitle: {
+    fontFamily: Typography.fontFamily.sansBold,
+    fontSize: 16,
+    fontWeight: '700',
+    color: Colors.ink ?? Colors.text,
+  },
+  moreOptionsDone: {
+    fontFamily: Typography.fontFamily.sansSemiBold,
+    fontSize: 15,
+    color: Colors.accent ?? Colors.primary,
+  },
+  moreOptionsContent: {
+    padding: Spacing.base,
+    gap: Spacing.base,
+  },
+
+  // Dark ink "Add expense" / "Add income" CTA — fills remaining width next
+  // to the More options pill on the footer row.
   addButton: {
+    flex: 1,
     backgroundColor: Colors.ink ?? '#1B1915',
-    borderRadius: 28,
-    paddingVertical: Spacing.base,
+    borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
-    height: 56,
-    marginTop: Spacing.sm,
+    height: 48,
   },
   addButtonDisabled: { opacity: 0.4 },
   addButtonText: {
     fontFamily: Typography.fontFamily.sansSemiBold,
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
     color: '#FFFFFF',
     letterSpacing: -0.2,
