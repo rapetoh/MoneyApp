@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { ScrollView, View, Text, StyleSheet, ActivityIndicator, Pressable } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
@@ -12,6 +12,7 @@ import { useRecurringRules, computeUpcomingRecurring } from '../../src/hooks/use
 import { TransactionRow } from '../../src/components/TransactionRow'
 import { Money, MoneyLabel } from '../../src/components/Money'
 import { MiniBars } from '../../src/components/MiniBars'
+import { DayOneFirstLog } from '../../src/components/DayOneFirstLog'
 import { Colors, Typography, Spacing, Radius } from '../../src/theme'
 import { t } from '@voice-expense/shared'
 import type { Locale, Transaction } from '@voice-expense/shared'
@@ -149,6 +150,25 @@ export default function TodayScreen() {
     [recurringRules, budget?.period],
   )
   const leftThisPeriod = budget?.amount != null ? Math.max(0, budget.amount - periodSpend - upcomingRecurring) : null
+
+  // Day-1 coach surface: show until the user has logged anything, unless they
+  // tap Skip this session. Persistence is intentionally not wired — if the
+  // user quits without logging, the hint reappears next launch, which is the
+  // right behavior (the goal is "get them over the first-log hump").
+  const [daySkipped, setDaySkipped] = useState(false)
+  const showDayOne = !loading && transactions.length === 0 && !daySkipped
+
+  if (showDayOne) {
+    return (
+      <SafeAreaView style={styles.safe} edges={['top']}>
+        <DayOneFirstLog
+          locale={locale}
+          onSkip={() => setDaySkipped(true)}
+          onTypeInstead={() => router.push('/(tabs)/record')}
+        />
+      </SafeAreaView>
+    )
+  }
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
