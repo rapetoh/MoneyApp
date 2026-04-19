@@ -16,8 +16,8 @@ tracked in the user's personal plan file (`~/.claude/plans/breezy-painting-zephy
 | Phase | Scope | Status |
 |---|---|---|
 | A | Brand + visual refresh (rename → Murmur, sage palette, serif amounts, refreshed shadows, tab bar polish) | **Complete (Apr 18, 2026 — commit 845d8fb)** |
-| B | IA reshuffle (Today / Insights / FAB / Budgets / More) | **In progress (Apr 18, 2026)** |
-| C | Capture flow polish (amount-as-hero, adjust chips, rose [unclear] tag, undo snackbar) | Not started |
+| B | IA reshuffle (Today / Insights / FAB / Budgets / More) | **Complete (Apr 18, 2026 — commits e79ccef + 6be5a86)** |
+| C | Capture flow polish (amount-as-hero, adjust chips, rose [unclear] tag, undo snackbar) | **In progress (Apr 18, 2026)** |
 | D | New screens (Day-1 guided, Budgets tab, Privacy Center, Paywall, History heatmap) | Not started |
 | E | Ask Murmur (grounded Q&A replacing the chat-style AI Advisor from v1.0) | Not started |
 | F | Lazy identity + auth reshuffle (no sign-in at launch) | Not started |
@@ -914,5 +914,33 @@ Each pushes as a card on top of the tab bar; the bar hides on push, matches the 
 - Privacy Center full implementation — Phase D.
 - Ask Murmur full implementation — Phase E.
 - Settings screen visual refresh — picked up naturally when Settings is next touched.
+
+### Phase C — Capture flow polish (in progress April 18, 2026)
+
+Design reference: [DESIGN.md](./DESIGN.md) §3 Motion + §5 Confirm + §5 Today.
+
+**New components:**
+- [apps/mobile/src/components/AmountAdjustChips.tsx](../apps/mobile/src/components/AmountAdjustChips.tsx) — pill row of `−$1 +$1 +$5 +$10` buttons beneath the amount input. Tap applies the delta, rounds to 2 decimals, clamps at 0. Wrong amount is the #1 voice-parse error; a one-tap fix beats reopening the keyboard.
+- [apps/mobile/src/components/UndoSnackbar.tsx](../apps/mobile/src/components/UndoSnackbar.tsx) — dark pill floating above the tab bar with a 4-second linear progress bar (per DESIGN.md §3 Motion). `onUndo` fires on tap, `onDismiss` fires after the countdown. The pill renders its own safe-area offset against the raised tab bar (bottom: 14 + 68 + spacing).
+- [apps/mobile/src/hooks/useUndo.tsx](../apps/mobile/src/hooks/useUndo.tsx) — React context + `<UndoProvider>` + `useUndo()` hook. Only one snackbar can be shown at a time; a new `showUndo` replaces any currently-queued pending undo (matches iOS behavior — only one safety-net affordance at a time, the previous action commits silently).
+
+**Wiring:**
+- [apps/mobile/app/_layout.tsx](../apps/mobile/app/_layout.tsx) root return wrapped with `<UndoProvider>` so any screen can call `useUndo()`. Also fixed a stale `#F5F0EB` StatusBar background leftover from before Phase A's palette swap — now `#FBFAF7`.
+- [apps/mobile/src/components/VoiceConfirmModal.tsx](../apps/mobile/src/components/VoiceConfirmModal.tsx) amount card upgraded: accent border (1.5px sage) + soft sage glow shadow + `Radius.card` (28) corners, per DESIGN.md §5 "Confirm — The amount card is bordered in accent + soft glow". Adjust chips row (`−$1 +$1 +$5 +$10`) added under the amount input inside the card.
+- [apps/mobile/app/transaction/[id].tsx](../apps/mobile/app/transaction/[id].tsx) delete flow rewritten. The prior `Alert.alert("Delete transaction? This cannot be undone.")` is gone — the Undo snackbar IS the confirmation and the copy was actively lying (it CAN be undone now). On delete: snapshot the row, soft-delete, navigate back, show `Deleted · {merchant} {amount}` snackbar for 4s. On undo: re-upsert the snapshot with `is_deleted=false` + bumped `version` + enqueue the update, so it wins against the in-flight delete on the server. Existing 30-day soft-delete recovery window is preserved; undo is the faster-path surface.
+
+**i18n — 8 new keys added** across en/fr/es/pt for `common.undo` and `detail.deleted`:
+- en: Undo / Deleted
+- fr: Annuler l'action / Supprimé
+- es: Deshacer / Eliminado
+- pt: Desfazer / Excluído
+
+The existing `detail.delete_msg` ("This cannot be undone.") is now unused at the call site but left in locale files for historical reasons; safe to remove in a future cleanup.
+
+**Explicitly deferred from Phase C (tracked as follow-ups):**
+- **Listening screen amount-as-hero** (92px serif). Requires `useVoice.ts` to expose interim parsed data during speech recognition, which it currently does not — the amount is only available after Supabase/AI parse completes. Either plumb interim extraction through the local parser on interim transcripts, or defer until Phase D when the capture flow gets its full redesign pass.
+- **Low-confidence rose `[unclear]` tag on the transcript.** Needs token-level confidence from the AI response (currently only overall `confidence` is returned). Requires a prompt + response-schema change in `packages/ai/src/prompt.ts` and `packages/ai/src/parser.ts`. Out of scope for a capture-polish phase; picked up alongside the listening hero work.
+- **Bottom-sheet category picker.** The current inline horizontal chip scroller works fine; the bottom-sheet upgrade is pure polish and can ride with Phase D's broader capture redesign.
+- **Undo for save (voice/manual create) and edit.** Harder than undo-for-delete because save-undo needs to also roll back the recurring rule that `record.tsx` creates in a separate transaction, and edit-undo needs to capture the pre-edit snapshot at the start of the edit flow. Infrastructure (`useUndo`) is in place; wiring these is a pure additive task for Phase D or later.
 
 *End of Plan*

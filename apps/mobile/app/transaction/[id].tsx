@@ -1,11 +1,16 @@
 import { useEffect, useState, useCallback } from 'react'
-import { View, Text, Pressable, StyleSheet, Alert, ActivityIndicator, ScrollView } from 'react-native'
+import { View, Text, Pressable, StyleSheet, ActivityIndicator, ScrollView } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useAuth } from '../../src/hooks/useAuth'
 import { useProfile } from '../../src/hooks/useProfile'
 import { useCategories } from '../../src/hooks/useCategories'
-import { getTransactionById, softDeleteTransaction } from '../../src/services/sync/transactionStore'
+import { useUndo } from '../../src/hooks/useUndo'
+import {
+  getTransactionById,
+  softDeleteTransaction,
+  upsertTransaction,
+} from '../../src/services/sync/transactionStore'
 import { enqueue } from '../../src/services/sync/syncQueue'
 import { syncManager } from '../../src/services/sync/SyncManager'
 import { DataEvents } from '../../src/events/dataEvents'
@@ -34,6 +39,7 @@ export default function TransactionDetailScreen() {
   const currency = profile?.currency_code ?? 'USD'
   const [txn, setTxn] = useState<Transaction | null>(null)
   const [loading, setLoading] = useState(true)
+  const { showUndo } = useUndo()
 
   const loadTxn = useCallback(async () => {
     if (!id) return
@@ -54,26 +60,46 @@ export default function TransactionDetailScreen() {
 
   async function handleDelete() {
     if (!txn) return
-    Alert.alert(t('detail.delete_title', locale), t('detail.delete_msg', locale), [
-      { text: t('common.cancel', locale), style: 'cancel' },
-      {
-        text: t('detail.delete', locale),
-        style: 'destructive',
-        onPress: async () => {
-          await softDeleteTransaction(txn.id)
-          await enqueue('delete', txn.id, {
-            id: txn.id,
-            user_id: txn.user_id,
-            is_deleted: true,
-            deleted_at: new Date().toISOString(),
-            version: (txn.version ?? 1) + 1,
-          })
-          syncManager.drainQueue()
-          DataEvents.emitTransactions(txn.user_id)
-          router.back()
-        },
+    // Snapshot the row so Undo can restore it precisely (version bump, flags, etc).
+    const snapshot = txn
+    const merchantLabel = snapshot.merchant ?? t('transactions.unknown', locale)
+    const formatted = formatCurrency(snapshot.amount, currency)
+
+    // Soft-delete immediately. Design §3 Motion: "Everything non-destructive
+    // should have an Undo snackbar." The snackbar IS the confirmation — the
+    // prior "This cannot be undone" alert contradicted the new behavior.
+    const deletedVersion = (snapshot.version ?? 1) + 1
+    await softDeleteTransaction(snapshot.id)
+    await enqueue('delete', snapshot.id, {
+      id: snapshot.id,
+      user_id: snapshot.user_id,
+      is_deleted: true,
+      deleted_at: new Date().toISOString(),
+      version: deletedVersion,
+    })
+    syncManager.drainQueue()
+    DataEvents.emitTransactions(snapshot.user_id)
+    router.back()
+
+    showUndo({
+      message: `${t('detail.deleted', locale)} · ${merchantLabel} ${formatted}`,
+      undoLabel: t('common.undo', locale),
+      undo: async () => {
+        // Restore: re-upsert the snapshot with is_deleted=false and a fresh
+        // version bump so it supersedes the deletion on remote.
+        const restored: Transaction = {
+          ...snapshot,
+          is_deleted: false,
+          deleted_at: null,
+          version: deletedVersion + 1,
+          updated_at: new Date().toISOString(),
+        }
+        await upsertTransaction(restored)
+        await enqueue('update', restored.id, restored)
+        syncManager.drainQueue()
+        DataEvents.emitTransactions(restored.user_id)
       },
-    ])
+    })
   }
 
   if (loading) {

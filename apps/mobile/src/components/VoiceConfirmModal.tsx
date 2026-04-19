@@ -14,6 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { RecurringToggle } from './RecurringToggle'
+import { AmountAdjustChips } from './AmountAdjustChips'
 import { Colors, Typography, Spacing, Radius } from '../theme'
 import { merchantColor, t } from '@voice-expense/shared'
 import type { ParsedExpense, Locale, Category } from '@voice-expense/shared'
@@ -195,6 +196,7 @@ export function VoiceConfirmModal({
                       autoFocus={!parsedExpense?.amount}
                     />
                   </View>
+                  <AmountAdjustChips value={amount} onChange={setAmount} />
                 </View>
 
                 {/* Merchant */}
@@ -373,13 +375,20 @@ const styles = StyleSheet.create({
     fontSize: Typography.size.sm,
     color: '#7A5C00',
   },
+  // "Bordered in accent + soft glow and labeled 'Amount · tap to edit'" per DESIGN.md §5 Confirm.
+  // Wrong amount is the #1 voice-parse error; this card's emphasis draws the eye to it.
   amountCard: {
     backgroundColor: Colors.card,
-    borderRadius: Radius.lg,
+    borderRadius: Radius.card,
     padding: Spacing.sm,
-    borderWidth: 1,
-    borderColor: Colors.border,
+    borderWidth: 1.5,
+    borderColor: Colors.primary,
     gap: Spacing.sm,
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.18,
+    shadowRadius: 14,
+    elevation: 4,
   },
   directionRow: {
     flexDirection: 'row',

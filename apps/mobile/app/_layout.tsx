@@ -8,6 +8,7 @@ import { syncManager } from '../src/services/sync/SyncManager'
 import { useShortcutHandler } from '../src/hooks/useShortcutHandler'
 import { seedDefaultCategories } from '../src/services/seedCategories'
 import { runRecurringCatchUp } from '../src/services/recurringCatchUp'
+import { UndoProvider } from '../src/hooks/useUndo'
 import { t } from '@voice-expense/shared'
 import type { Locale } from '@voice-expense/shared'
 
@@ -53,8 +54,8 @@ export default function RootLayout() {
   if (loading) return null
 
   return (
-    <>
-      <StatusBar style="dark" backgroundColor="#F5F0EB" />
+    <UndoProvider>
+      <StatusBar style="dark" backgroundColor="#FBFAF7" />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(tabs)" />
@@ -140,6 +141,6 @@ export default function RootLayout() {
           }}
         />
       </Stack>
-    </>
+    </UndoProvider>
   )
 }
