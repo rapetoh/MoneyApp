@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '../../src/hooks/useAuth'
 import { useProfile } from '../../src/hooks/useProfile'
-import { Colors, Typography, Spacing, Radius, Text as TextStyles, Hairline } from '../../src/theme'
+import { Colors, Typography, Spacing, Radius, Hairline } from '../../src/theme'
 import { t, type Locale } from '@voice-expense/shared'
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name']
@@ -137,17 +137,24 @@ const styles = StyleSheet.create({
     paddingBottom: 120,
   },
   title: {
-    ...TextStyles.displaySerif,
+    fontFamily: Typography.fontFamily.serif,
+    fontSize: 34,
+    fontWeight: '700',
+    letterSpacing: -0.8,
+    color: Colors.ink ?? Colors.text,
     marginBottom: Spacing.xs,
+    paddingHorizontal: 6,
+    paddingTop: 6,
   },
   sectionWrap: { gap: Spacing.sm },
   sectionTitle: {
-    fontFamily: Typography.fontFamily.sansSemiBold,
-    fontSize: Typography.size.xs,
+    fontFamily: Typography.fontFamily.sansBold,
+    fontSize: 11,
+    fontWeight: '700',
     color: Colors.ink3 ?? Colors.textSecondary,
     textTransform: 'uppercase',
     letterSpacing: 0.6,
-    marginLeft: Spacing.sm,
+    marginLeft: Spacing.md,
   },
   sectionCard: {
     backgroundColor: Colors.surface ?? Colors.card,
@@ -174,16 +181,20 @@ const styles = StyleSheet.create({
     backgroundColor: Hairline.color,
     marginLeft: Spacing.base + 22 + Spacing.md,
   },
+  // Matches the Beta chip style on the Ask entry screen so Plus-gating
+  // reads consistently across surfaces.
   plusPill: {
     backgroundColor: Colors.accentSoft ?? Colors.primaryLight,
-    paddingHorizontal: Spacing.sm,
+    paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: Radius.full,
   },
   plusPillText: {
-    fontFamily: Typography.fontFamily.sansSemiBold,
-    fontSize: Typography.size.xs,
-    color: Colors.primary,
-    letterSpacing: 0.3,
+    fontFamily: Typography.fontFamily.sansBold,
+    fontSize: 10,
+    fontWeight: '700',
+    color: Colors.accent ?? Colors.primary,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
   },
 })
