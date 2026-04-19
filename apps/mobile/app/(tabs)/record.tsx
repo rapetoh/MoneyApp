@@ -26,7 +26,7 @@ import { VoiceWaveform } from '../../src/components/VoiceWaveform'
 import { VoiceConfirmModal, type ConfirmedExpense } from '../../src/components/VoiceConfirmModal'
 import { ListeningView } from '../../src/components/ListeningView'
 import { RecurringToggle } from '../../src/components/RecurringToggle'
-import { Colors, Typography, Text as TextStyles, Spacing, Radius } from '../../src/theme'
+import { Colors, Typography, Text as TextStyles, Spacing, Radius, Hairline } from '../../src/theme'
 import { parseScan } from '@voice-expense/ai'
 import { supabase } from '../../src/lib/supabase'
 import { getApiUrl } from '../../src/hooks/useApiUrl'
@@ -106,7 +106,9 @@ export default function RecordScreen() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.shortcut_amount])
 
-  // Manual entry state
+  // Manual entry state. `amount` is a string so the keypad can append
+  // characters directly without parsing-round-trip jitter; handleManualSave
+  // converts at save time via parseFloat.
   const [amount, setAmount] = useState('')
   const [merchant, setMerchant] = useState('')
   const [note, setNote] = useState('')
@@ -116,6 +118,34 @@ export default function RecordScreen() {
   const [manualIsRecurring, setManualIsRecurring] = useState(false)
   const [manualRecurringFreq, setManualRecurringFreq] = useState<RecurringFrequency>('monthly')
   const [manualSaving, setManualSaving] = useState(false)
+  const [moreOptionsOpen, setMoreOptionsOpen] = useState(false)
+
+  // On-screen keypad key handler — matches S_Keypad from
+  // docs/money-app/project/mobile-screens-3.jsx.
+  function handleKeypadPress(key: string) {
+    if (key === '⌫') {
+      setAmount((prev) => prev.slice(0, -1))
+      return
+    }
+    if (key === '.') {
+      // Only one decimal separator allowed; ignore otherwise.
+      if (amount.includes('.')) return
+      // Leading "." becomes "0." for readability.
+      setAmount((prev) => (prev === '' ? '0.' : prev + '.'))
+      return
+    }
+    // Digit. Block:
+    //  - leading zeros (so "05" doesn't happen — "5" is correct)
+    //  - more than 2 decimal places
+    //  - absurdly long entries (caps at 10 chars incl. the decimal point)
+    setAmount((prev) => {
+      if (prev.length >= 10) return prev
+      if (prev === '0' && key !== '.') return key
+      const decIdx = prev.indexOf('.')
+      if (decIdx >= 0 && prev.length - decIdx - 1 >= 2) return prev
+      return prev + key
+    })
+  }
 
   // Show confirm modal when voice parsing finishes
   const handleMicPress = async () => {
@@ -399,7 +429,7 @@ export default function RecordScreen() {
           </View>
         </View>
       ) : (
-        /* ── MANUAL TAB ── */
+        /* ── MANUAL TAB — S_Keypad layout from mobile-screens-3.jsx ── */
         <KeyboardAvoidingView
           style={{ flex: 1 }}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -409,6 +439,8 @@ export default function RecordScreen() {
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
           >
+            {/* Direction segmented control. Kept — S_Keypad only shows a
+                one-way expense flow but we support both (non-regression). */}
             <View style={styles.directionRow}>
               <Pressable
                 style={[styles.directionBtn, direction === 'debit' && styles.directionBtnActive]}
@@ -428,33 +460,26 @@ export default function RecordScreen() {
               </Pressable>
             </View>
 
-            <View style={styles.amountContainer}>
-              <Text style={styles.currencySymbol}>{userCurrency}</Text>
-              <TextInput
-                style={styles.amountInput}
-                value={amount}
-                onChangeText={setAmount}
-                placeholder="0.00"
-                placeholderTextColor={Colors.textMuted}
-                keyboardType="decimal-pad"
-                autoFocus
-              />
+            {/* Hero amount — 80px serif, driven by the on-screen keypad */}
+            <View style={styles.amountHero}>
+              <Text style={styles.amountHeroText} numberOfLines={1} adjustsFontSizeToFit>
+                {amount === ''
+                  ? <Text style={styles.amountHeroPlaceholder}>0</Text>
+                  : amount}
+              </Text>
+              <Text style={styles.amountHeroCurrency}>{userCurrency}</Text>
             </View>
 
-            <View style={styles.fields}>
-              <View style={styles.field}>
-                <Text style={styles.label}>{t('voice.merchant_source', userLocale as any)}</Text>
-                <TextInput
-                  style={styles.input}
-                  value={merchant}
-                  onChangeText={setMerchant}
-                  placeholder={t('voice.merchant_placeholder', userLocale as any)}
-                  placeholderTextColor={Colors.textMuted}
-                />
-              </View>
-
-              <View style={styles.field}>
-                <Text style={styles.label}>{t('voice.category', userLocale as any)}</Text>
+            {/* Quick fields — merchant (single line) + category chip trigger */}
+            <View style={styles.quickFields}>
+              <TextInput
+                style={styles.quickInput}
+                value={merchant}
+                onChangeText={setMerchant}
+                placeholder={t('voice.merchant_source', userLocale as any)}
+                placeholderTextColor={Colors.textMuted}
+              />
+              <View style={styles.quickCategoryWrap}>
                 <CategoryPicker
                   categories={categories}
                   selectedId={categoryId}
@@ -463,55 +488,101 @@ export default function RecordScreen() {
                   locale={userLocale}
                 />
               </View>
-
-              <View style={styles.field}>
-                <Text style={styles.label}>{t('voice.note', userLocale as any)}</Text>
-                <TextInput
-                  style={styles.input}
-                  value={note}
-                  onChangeText={setNote}
-                  placeholder={t('voice.note_placeholder', userLocale as any)}
-                  placeholderTextColor={Colors.textMuted}
-                />
-              </View>
-
-              <View style={styles.field}>
-                <Text style={styles.label}>{t('voice.payment_method', userLocale as any)}</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                  <View style={styles.chipRow}>
-                    {PAYMENT_METHODS.map((m) => (
-                      <Pressable
-                        key={m.value}
-                        style={[styles.chip, paymentMethod === m.value && styles.chipActive]}
-                        onPress={() => setPaymentMethod(m.value)}
-                      >
-                        <Text style={[styles.chipLabel, paymentMethod === m.value && styles.chipLabelActive]}>
-                          {t(m.key, userLocale as any)}
-                        </Text>
-                      </Pressable>
-                    ))}
-                  </View>
-                </ScrollView>
-              </View>
-
-              <RecurringToggle
-                isRecurring={manualIsRecurring}
-                frequency={manualRecurringFreq}
-                onToggle={setManualIsRecurring}
-                onFrequencyChange={setManualRecurringFreq}
-                locale={userLocale}
-              />
             </View>
 
+            {/* 3x4 keypad — 1-9, ., 0, ⌫ */}
+            <View style={styles.keypad}>
+              {[['1','2','3'],['4','5','6'],['7','8','9'],['.','0','⌫']].map((row, r) => (
+                <View key={r} style={styles.keypadRow}>
+                  {row.map((k) => (
+                    <Pressable
+                      key={k}
+                      onPress={() => handleKeypadPress(k)}
+                      style={({ pressed }) => [styles.keypadKey, pressed && styles.keypadKeyPressed]}
+                    >
+                      <Text style={styles.keypadKeyText}>{k}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              ))}
+            </View>
+
+            {/* More options expander — note, payment method, recurring */}
             <Pressable
-              style={[styles.saveButton, manualSaving && styles.saveButtonDisabled]}
+              onPress={() => setMoreOptionsOpen((v) => !v)}
+              style={({ pressed }) => [styles.moreOptionsToggle, pressed && { opacity: 0.6 }]}
+              hitSlop={8}
+            >
+              <Text style={styles.moreOptionsLabel}>
+                {t('voice.more_options', userLocale as any)}
+              </Text>
+              <Ionicons
+                name={moreOptionsOpen ? 'chevron-up' : 'chevron-down'}
+                size={16}
+                color={Colors.ink3 ?? Colors.textSecondary}
+              />
+            </Pressable>
+
+            {moreOptionsOpen && (
+              <View style={styles.moreOptionsPanel}>
+                <View style={styles.field}>
+                  <Text style={styles.label}>{t('voice.note', userLocale as any)}</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={note}
+                    onChangeText={setNote}
+                    placeholder={t('voice.note_placeholder', userLocale as any)}
+                    placeholderTextColor={Colors.textMuted}
+                  />
+                </View>
+
+                <View style={styles.field}>
+                  <Text style={styles.label}>{t('voice.payment_method', userLocale as any)}</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                    <View style={styles.chipRow}>
+                      {PAYMENT_METHODS.map((m) => (
+                        <Pressable
+                          key={m.value}
+                          style={[styles.chip, paymentMethod === m.value && styles.chipActive]}
+                          onPress={() => setPaymentMethod(m.value)}
+                        >
+                          <Text style={[styles.chipLabel, paymentMethod === m.value && styles.chipLabelActive]}>
+                            {t(m.key, userLocale as any)}
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  </ScrollView>
+                </View>
+
+                <RecurringToggle
+                  isRecurring={manualIsRecurring}
+                  frequency={manualRecurringFreq}
+                  onToggle={setManualIsRecurring}
+                  onFrequencyChange={setManualRecurringFreq}
+                  locale={userLocale}
+                />
+              </View>
+            )}
+
+            {/* Dark ink CTA — "Add expense" / "Add income" per direction */}
+            <Pressable
+              style={({ pressed }) => [
+                styles.addButton,
+                (manualSaving || amount === '') && styles.addButtonDisabled,
+                pressed && { opacity: 0.85 },
+              ]}
               onPress={handleManualSave}
-              disabled={manualSaving}
+              disabled={manualSaving || amount === ''}
             >
               {manualSaving ? (
                 <ActivityIndicator color={Colors.white} />
               ) : (
-                <Text style={styles.saveButtonText}>{t('common.save', userLocale as any)}</Text>
+                <Text style={styles.addButtonText}>
+                  {direction === 'debit'
+                    ? t('voice.add_expense', userLocale as any)
+                    : t('voice.add_income', userLocale as any)}
+                </Text>
               )}
             </Pressable>
           </ScrollView>
@@ -706,30 +777,121 @@ const styles = StyleSheet.create({
   },
   directionLabelActive: { color: Colors.white },
   directionLabelActiveIncome: { color: Colors.white },
-  amountContainer: {
+  // S_Keypad hero: 80px serif amount centered, currency code tucked underneath.
+  amountHero: {
+    alignItems: 'center',
+    paddingTop: Spacing.base,
+    paddingBottom: Spacing.sm,
+  },
+  amountHeroText: {
+    fontFamily: Typography.fontFamily.serif,
+    fontSize: 80,
+    fontWeight: '500',
+    letterSpacing: -1.5,
+    lineHeight: 88,
+    color: Colors.ink ?? Colors.text,
+  },
+  amountHeroPlaceholder: {
+    color: Colors.ink3 ?? Colors.textSecondary,
+    opacity: 0.55,
+  },
+  amountHeroCurrency: {
+    fontFamily: Typography.fontFamily.sansSemiBold,
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+    color: Colors.ink3 ?? Colors.textSecondary,
+    marginTop: 2,
+  },
+
+  // Merchant input + category chip trigger row
+  quickFields: {
+    gap: Spacing.sm,
+  },
+  quickInput: {
+    backgroundColor: Colors.surface ?? Colors.card,
+    borderRadius: 16,
+    paddingHorizontal: Spacing.base,
+    paddingVertical: 14,
+    fontFamily: Typography.fontFamily.sans,
+    fontSize: 14,
+    color: Colors.ink ?? Colors.text,
+    borderWidth: Hairline.width,
+    borderColor: Hairline.color,
+  },
+  quickCategoryWrap: {
+    // CategoryPicker supplies its own trigger; this wrapper just aligns it
+    // visually with the merchant row above.
+  },
+
+  // 3×4 on-screen keypad (1-9, ., 0, ⌫) — replaces the native decimal-pad
+  // so the amount entry matches S_Keypad's visual rhythm.
+  keypad: {
+    gap: Spacing.sm,
+    paddingTop: Spacing.sm,
+  },
+  keypadRow: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+  },
+  keypadKey: {
+    flex: 1,
+    height: 56,
+    backgroundColor: Colors.surface ?? Colors.card,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: Hairline.width,
+    borderColor: Hairline.color,
+  },
+  keypadKeyPressed: { opacity: 0.55 },
+  keypadKeyText: {
+    fontFamily: Typography.fontFamily.serif,
+    fontSize: 28,
+    fontWeight: '500',
+    color: Colors.ink ?? Colors.text,
+  },
+
+  // "More options" chevron that reveals note / payment / recurring
+  moreOptionsToggle: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.xs,
-    backgroundColor: Colors.card,
-    borderRadius: Radius.lg,
-    padding: Spacing.xl,
-    borderWidth: 1,
-    borderColor: Colors.border,
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: Spacing.sm,
+    marginTop: Spacing.xs,
   },
-  currencySymbol: {
-    fontFamily: Typography.fontFamily.serif,
-    fontSize: Typography.size['2xl'],
+  moreOptionsLabel: {
+    fontFamily: Typography.fontFamily.sansSemiBold,
+    fontSize: 13,
     fontWeight: '600',
-    color: Colors.textSecondary,
+    color: Colors.ink3 ?? Colors.textSecondary,
   },
-  amountInput: {
-    flex: 1,
-    fontFamily: Typography.fontFamily.serif,
-    fontSize: Typography.size['4xl'],
+  moreOptionsPanel: {
+    gap: Spacing.base,
+    paddingTop: Spacing.xs,
+  },
+
+  // Dark ink "Add expense" / "Add income" CTA — matches the S_Keypad button
+  addButton: {
+    backgroundColor: Colors.ink ?? '#1B1915',
+    borderRadius: 28,
+    paddingVertical: Spacing.base,
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 56,
+    marginTop: Spacing.sm,
+  },
+  addButtonDisabled: { opacity: 0.4 },
+  addButtonText: {
+    fontFamily: Typography.fontFamily.sansSemiBold,
+    fontSize: 16,
     fontWeight: '600',
-    letterSpacing: -0.6,
-    color: Colors.text,
+    color: '#FFFFFF',
+    letterSpacing: -0.2,
   },
+
   fields: { gap: Spacing.base },
   field: { gap: Spacing.xs },
   label: {
@@ -764,17 +926,4 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
   },
   chipLabelActive: { color: Colors.primary, fontFamily: Typography.fontFamily.sansSemiBold },
-  saveButton: {
-    backgroundColor: Colors.primary,
-    borderRadius: Radius.md,
-    paddingVertical: Spacing.base,
-    alignItems: 'center',
-    marginTop: Spacing.sm,
-  },
-  saveButtonDisabled: { opacity: 0.6 },
-  saveButtonText: {
-    fontFamily: Typography.fontFamily.sansBold,
-    fontSize: Typography.size.base,
-    color: Colors.white,
-  },
 })
