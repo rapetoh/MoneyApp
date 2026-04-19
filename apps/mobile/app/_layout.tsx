@@ -140,6 +140,14 @@ export default function RootLayout() {
             presentation: 'card',
           }}
         />
+        <Stack.Screen
+          name="more/paywall"
+          options={{
+            // Paywall owns its own dark chrome (close button lives in the screen).
+            headerShown: false,
+            presentation: 'modal',
+          }}
+        />
       </Stack>
     </UndoProvider>
   )

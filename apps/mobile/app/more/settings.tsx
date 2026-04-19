@@ -12,16 +12,17 @@ import {
   AppState,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
 import * as Linking from 'expo-linking'
 import { useAuth, signOut } from '../../src/hooks/useAuth'
 import { useProfile } from '../../src/hooks/useProfile'
+import { useTransactions } from '../../src/hooks/useTransactions'
 import { useActiveBudget } from '../../src/hooks/useBudget'
 import { useNotificationListener } from '../../src/hooks/useNotificationListener'
-import { Colors, Typography, Spacing, Radius } from '../../src/theme'
+import { useApiUrl } from '../../src/hooks/useApiUrl'
+import { SetGroup, SetRow } from '../../src/components/SettingsList'
+import { Colors, Typography, Radius, Hairline } from '../../src/theme'
 import { t, type Locale } from '@voice-expense/shared'
 import type { BudgetPeriod } from '@voice-expense/shared'
-import { useApiUrl } from '../../src/hooks/useApiUrl'
 import { useRouter } from 'expo-router'
 
 const LOCALES: { value: Locale; label: string }[] = [
@@ -30,45 +31,29 @@ const LOCALES: { value: Locale; label: string }[] = [
   { value: 'es', label: 'Español' },
   { value: 'pt', label: 'Português' },
 ]
-
 const CURRENCIES = ['USD', 'EUR', 'GBP', 'CAD', 'CHF', 'JPY', 'AUD', 'XAF', 'NGN', 'GHS']
-
 const BUDGET_PERIODS: { value: BudgetPeriod; key: string }[] = [
   { value: 'weekly', key: 'settings.period_weekly' },
   { value: 'biweekly', key: 'settings.period_biweekly' },
   { value: 'monthly', key: 'settings.period_monthly' },
 ]
 
-function SettingsRow({
-  label,
-  value,
-  onPress,
-}: {
-  label: string
-  value?: string
-  onPress?: () => void
-}) {
-  return (
-    <Pressable onPress={onPress} style={styles.row} disabled={!onPress}>
-      <Text style={styles.rowLabel}>{label}</Text>
-      {value ? <Text style={styles.rowValue}>{value}</Text> : null}
-      {onPress && <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} style={styles.rowChevron} />}
-    </Pressable>
-  )
-}
-
-function SettingsSection({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>{title}</Text>
-      <View style={styles.sectionCard}>{children}</View>
-    </View>
-  )
-}
-
+/**
+ * Settings screen. Matches `S_Settings` in
+ * docs/money-app/project/mobile-screens-4.jsx:
+ *
+ *   - Profile card at top: avatar tile + name + "Free plan · N expenses" +
+ *     "Upgrade" sage pill.
+ *   - Groups as SetGroup cards using shared SetRow primitives.
+ *
+ * Preserves every functional row and modal from the prior Settings
+ * implementation — wires them into the new visual chrome rather than
+ * removing features.
+ */
 export default function SettingsScreen() {
   const { user } = useAuth()
   const { profile, updateProfile } = useProfile(user?.id)
+  const { transactions } = useTransactions(user?.id)
   const { budget, setBudget } = useActiveBudget(user?.id)
   const router = useRouter()
 
@@ -87,11 +72,15 @@ export default function SettingsScreen() {
   const currency = profile?.currency_code ?? 'USD'
   const localeName = LOCALES.find((l) => l.value === locale)?.label ?? 'English'
 
-  const periodKey = BUDGET_PERIODS.find((p) => p.value === (budget?.period ?? 'monthly'))?.key ?? 'settings.period_monthly'
+  const periodKey =
+    BUDGET_PERIODS.find((p) => p.value === (budget?.period ?? 'monthly'))?.key ??
+    'settings.period_monthly'
   const periodLabel = t(periodKey, locale)
-  const budgetDisplay = budget
-    ? `${currency} ${budget.amount.toFixed(0)} / ${periodLabel}`
-    : '—'
+  const budgetDisplay = budget ? `${currency} ${budget.amount.toFixed(0)} / ${periodLabel}` : '—'
+
+  const txnCount = transactions.filter((x) => !x.is_deleted).length
+  const displayName = profile?.display_name ?? user?.email?.split('@')[0] ?? '—'
+  const initial = (profile?.display_name ?? user?.email ?? '?').charAt(0).toUpperCase()
 
   async function handleSignOut() {
     Alert.alert(t('auth.sign_out', locale), t('settings.confirm_sign_out', locale), [
@@ -125,7 +114,6 @@ export default function SettingsScreen() {
     setNameInput('')
   }
 
-  // Android notification listener — no-op on iOS
   const { permissionGranted, recheckPermission, requestPermission } = useNotificationListener(
     () => {},
   )
@@ -146,129 +134,142 @@ export default function SettingsScreen() {
         sub.remove()
       }
     })
-  }, [permissionGranted, requestPermission, recheckPermission])
+  }, [permissionGranted, requestPermission, recheckPermission, locale])
 
   const SHORTCUT_INSTALL_URL = 'https://www.icloud.com/shortcuts/placeholder'
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom', 'left', 'right']}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Profile card */}
-        <View style={styles.profileCard}>
-          <View style={styles.avatarCircle}>
-            <Text style={styles.avatarInitial}>
-              {(profile?.display_name ?? user?.email ?? '?').charAt(0).toUpperCase()}
-            </Text>
-          </View>
-          <View style={styles.profileInfo}>
-            <Text style={styles.profileName} numberOfLines={1}>
-              {profile?.display_name ?? user?.email?.split('@')[0] ?? '—'}
-            </Text>
-            <Text style={styles.profileEmail} numberOfLines={1}>
-              {user?.email ?? ''}
-            </Text>
+        {/* Profile card — matches S_Settings avatar + Upgrade pill */}
+        <View style={styles.profileWrap}>
+          <View style={styles.profileCard}>
+            <View style={styles.avatar}>
+              <Text style={styles.avatarInitial}>{initial}</Text>
+            </View>
+            <View style={styles.profileInfo}>
+              <Text style={styles.profileName} numberOfLines={1}>{displayName}</Text>
+              <Text style={styles.profilePlan} numberOfLines={1}>
+                {t('settings.plan_free', locale)} · {txnCount} {t('settings.expenses_count', locale)}
+              </Text>
+            </View>
+            <Pressable
+              style={({ pressed }) => [styles.upgradePill, pressed && styles.upgradePillPressed]}
+              onPress={() => router.push('/more/paywall')}
+            >
+              <Text style={styles.upgradePillText}>{t('settings.upgrade', locale)}</Text>
+            </Pressable>
           </View>
         </View>
 
         {/* Account */}
-        <SettingsSection title={t('settings.account', locale)}>
-          <SettingsRow label={t('auth.email', locale)} value={user?.email ?? '—'} />
-          <View style={styles.divider} />
-          <SettingsRow
+        <SetGroup label={t('settings.account', locale)}>
+          <SetRow label={t('auth.email', locale)} detail={user?.email ?? '—'} chevron={false} />
+          <SetRow
             label={t('settings.display_name', locale)}
-            value={profile?.display_name ?? '—'}
+            detail={profile?.display_name ?? '—'}
             onPress={() => {
               setNameInput(profile?.display_name ?? '')
               setNameModal(true)
             }}
+            last
           />
-        </SettingsSection>
+        </SetGroup>
+
+        {/* Voice & capture */}
+        <SetGroup label={t('settings.voice_capture', locale)}>
+          <SetRow
+            label={t('settings.voice_engine', locale)}
+            detail={t('settings.voice_engine_on_device', locale)}
+            chevron={false}
+          />
+          <SetRow
+            label={t('settings.language', locale)}
+            detail={localeName}
+            onPress={() => setLocaleModal(true)}
+            last
+          />
+        </SetGroup>
 
         {/* Preferences */}
-        <SettingsSection title={t('settings.preferences', locale)}>
-          <SettingsRow
+        <SetGroup label={t('settings.preferences', locale)}>
+          <SetRow
             label={t('settings.income', locale)}
-            value={budgetDisplay}
+            detail={budgetDisplay}
             onPress={openBudgetModal}
           />
-          <View style={styles.divider} />
-          <SettingsRow
-            label={t('settings.language', locale)}
-            value={localeName}
-            onPress={() => setLocaleModal(true)}
-          />
-          <View style={styles.divider} />
-          <SettingsRow
+          <SetRow
             label={t('settings.currency', locale)}
-            value={currency}
+            detail={currency}
             onPress={() => setCurrencyModal(true)}
           />
-          <View style={styles.divider} />
-          <SettingsRow
+          <SetRow
             label={t('settings.recurring', locale)}
             onPress={() => router.push('/recurring')}
+            last
           />
-        </SettingsSection>
+        </SetGroup>
 
-        {/* Automations */}
-        <SettingsSection title={t('settings.automations', locale)}>
-          {Platform.OS === 'ios' && (
-            <SettingsRow
+        {/* Automations (platform-specific) */}
+        <SetGroup label={t('settings.automations', locale)}>
+          {Platform.OS === 'ios' ? (
+            <SetRow
               label={t('settings.apple_pay_shortcut', locale)}
-              value={t('settings.set_up', locale)}
+              detail={t('settings.set_up', locale)}
               onPress={() => Linking.openURL(SHORTCUT_INSTALL_URL)}
+              last
+            />
+          ) : (
+            <SetRow
+              label={t('settings.payment_notifications', locale)}
+              toggle
+              value={permissionGranted}
+              onToggle={handleNotificationToggle}
+              last
             />
           )}
-          {Platform.OS === 'android' && (
-            <>
-              <View style={styles.automationRow}>
-                <View style={styles.automationTextGroup}>
-                  <Text style={styles.rowLabel}>{t('settings.payment_notifications', locale)}</Text>
-                  <Text style={styles.automationHint}>
-                    {t('settings.payment_notifications_hint', locale)}
-                  </Text>
-                </View>
-                <Pressable
-                  style={[styles.toggle, permissionGranted && styles.toggleOn]}
-                  onPress={handleNotificationToggle}
-                  hitSlop={8}
-                >
-                  <View style={[styles.toggleThumb, permissionGranted && styles.toggleThumbOn]} />
-                </Pressable>
-              </View>
-              {!permissionGranted && (
-                <Text style={styles.automationDisclaimer}>
-                  {t('settings.notification_disclaimer_android', locale)}
-                </Text>
-              )}
-            </>
-          )}
-          {Platform.OS === 'ios' && (
-            <Text style={styles.automationDisclaimer}>
-              {t('settings.shortcut_disclaimer_ios', locale)}
-            </Text>
-          )}
-        </SettingsSection>
+        </SetGroup>
+
+        {/* Privacy */}
+        <SetGroup label={t('settings.privacy', locale)}>
+          <SetRow
+            label={t('more.privacy', locale)}
+            detail={t('settings.review', locale)}
+            onPress={() => router.push('/more/privacy')}
+            last
+          />
+        </SetGroup>
 
         {/* Developer */}
-        <SettingsSection title={t('settings.developer', locale)}>
-          <SettingsRow
+        <SetGroup label={t('settings.developer', locale)}>
+          <SetRow
             label={t('settings.ai_server_url', locale)}
-            value={apiUrl}
-            onPress={() => { setApiUrlInput(apiUrl); setApiUrlModal(true) }}
+            detail={apiUrl}
+            onPress={() => {
+              setApiUrlInput(apiUrl)
+              setApiUrlModal(true)
+            }}
+            last
           />
-        </SettingsSection>
+        </SetGroup>
 
         {/* About */}
-        <SettingsSection title={t('settings.about', locale)}>
-          <SettingsRow label={t('settings.version', locale)} value="1.0.0" />
-        </SettingsSection>
+        <SetGroup label={t('settings.about', locale)}>
+          <SetRow
+            label={t('more.help', locale)}
+            onPress={() => router.push('/more/help')}
+          />
+          <SetRow label={t('settings.version', locale)} detail="1.0.0" chevron={false} last />
+        </SetGroup>
 
         {/* Sign out */}
-        <Pressable style={styles.signOutButton} onPress={handleSignOut}>
+        <Pressable style={styles.signOutBtn} onPress={handleSignOut}>
           <Text style={styles.signOutText}>{t('auth.sign_out', locale)}</Text>
         </Pressable>
       </ScrollView>
+
+      {/* — Modals below are unchanged in behavior; only their chrome uses the same
+            ink-accent visual language as before. */}
 
       {/* Budget modal */}
       <Modal visible={budgetModal} animationType="slide" presentationStyle="pageSheet">
@@ -283,9 +284,7 @@ export default function SettingsScreen() {
             </Pressable>
           </View>
           <ScrollView contentContainerStyle={styles.modalBody}>
-            <Text style={styles.modalHint}>
-              {t('settings.budget_hint', locale)}
-            </Text>
+            <Text style={styles.modalHint}>{t('settings.budget_hint', locale)}</Text>
             <View style={styles.amountRow}>
               <Text style={styles.currencySymbol}>{currency}</Text>
               <TextInput
@@ -293,7 +292,7 @@ export default function SettingsScreen() {
                 value={budgetInput}
                 onChangeText={setBudgetInput}
                 placeholder="0"
-                placeholderTextColor={Colors.textMuted}
+                placeholderTextColor={Colors.ink4 ?? Colors.textMuted}
                 keyboardType="decimal-pad"
                 autoFocus
               />
@@ -302,15 +301,10 @@ export default function SettingsScreen() {
             <View style={styles.periodList}>
               {BUDGET_PERIODS.map((p, i) => (
                 <View key={p.value}>
-                  {i > 0 && <View style={styles.divider} />}
-                  <Pressable
-                    style={styles.periodRow}
-                    onPress={() => setBudgetPeriod(p.value)}
-                  >
+                  {i > 0 && <View style={styles.rowDivider} />}
+                  <Pressable style={styles.periodRow} onPress={() => setBudgetPeriod(p.value)}>
                     <Text style={styles.periodLabel}>{t(p.key, locale)}</Text>
-                    {budgetPeriod === p.value && (
-                      <Text style={styles.periodCheck}>✓</Text>
-                    )}
+                    {budgetPeriod === p.value && <Text style={styles.periodCheck}>✓</Text>}
                   </Pressable>
                 </View>
               ))}
@@ -331,7 +325,7 @@ export default function SettingsScreen() {
           </View>
           {CURRENCIES.map((c, i) => (
             <View key={c}>
-              {i > 0 && <View style={styles.divider} />}
+              {i > 0 && <View style={styles.rowDivider} />}
               <Pressable
                 style={styles.localeRow}
                 onPress={async () => {
@@ -359,7 +353,7 @@ export default function SettingsScreen() {
           </View>
           {LOCALES.map((l, i) => (
             <View key={l.value}>
-              {i > 0 && <View style={styles.divider} />}
+              {i > 0 && <View style={styles.rowDivider} />}
               <Pressable
                 style={styles.localeRow}
                 onPress={async () => {
@@ -368,9 +362,7 @@ export default function SettingsScreen() {
                 }}
               >
                 <Text style={styles.localeLabel}>{l.label}</Text>
-                {profile?.locale === l.value && (
-                  <Text style={styles.localeCheck}>✓</Text>
-                )}
+                {profile?.locale === l.value && <Text style={styles.localeCheck}>✓</Text>}
               </Pressable>
             </View>
           ))}
@@ -385,28 +377,44 @@ export default function SettingsScreen() {
               <Text style={styles.modalCancel}>{t('common.cancel', locale)}</Text>
             </Pressable>
             <Text style={styles.modalTitle}>{t('settings.ai_server_url', locale)}</Text>
-            <Pressable onPress={async () => { await setApiUrl(apiUrlInput); setApiUrlModal(false) }}>
+            <Pressable
+              onPress={async () => {
+                await setApiUrl(apiUrlInput)
+                setApiUrlModal(false)
+              }}
+            >
               <Text style={styles.modalDone}>{t('common.save', locale)}</Text>
             </Pressable>
           </View>
           <View style={styles.modalBody}>
-            <Text style={styles.modalHint}>
-              {t('settings.ai_url_hint', locale)}
-            </Text>
+            <Text style={styles.modalHint}>{t('settings.ai_url_hint', locale)}</Text>
             <TextInput
               style={styles.nameInput}
               value={apiUrlInput}
               onChangeText={setApiUrlInput}
               placeholder={defaultUrl}
-              placeholderTextColor={Colors.textMuted}
+              placeholderTextColor={Colors.ink4 ?? Colors.textMuted}
               autoCapitalize="none"
               autoCorrect={false}
               keyboardType="url"
               returnKeyType="done"
-              onSubmitEditing={async () => { await setApiUrl(apiUrlInput); setApiUrlModal(false) }}
+              onSubmitEditing={async () => {
+                await setApiUrl(apiUrlInput)
+                setApiUrlModal(false)
+              }}
             />
-            <Pressable onPress={async () => { await resetApiUrl(); setApiUrlModal(false) }}>
-              <Text style={[styles.modalCancel, { color: Colors.primary, textAlign: 'center', marginTop: Spacing.sm }]}>
+            <Pressable
+              onPress={async () => {
+                await resetApiUrl()
+                setApiUrlModal(false)
+              }}
+            >
+              <Text
+                style={[
+                  styles.modalCancel,
+                  { color: Colors.accent ?? Colors.primary, textAlign: 'center', marginTop: 8 },
+                ]}
+              >
                 {t('settings.reset_default', locale)}
               </Text>
             </Pressable>
@@ -432,7 +440,7 @@ export default function SettingsScreen() {
               value={nameInput}
               onChangeText={setNameInput}
               placeholder={t('settings.your_name', locale)}
-              placeholderTextColor={Colors.textMuted}
+              placeholderTextColor={Colors.ink4 ?? Colors.textMuted}
               autoFocus
               returnKeyType="done"
               onSubmitEditing={handleSaveName}
@@ -446,151 +454,206 @@ export default function SettingsScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
-  content: { padding: Spacing.base, gap: Spacing.base, paddingBottom: 120 },
-  title: { fontFamily: Typography.fontFamily.sansBold, fontSize: Typography.size['2xl'], color: Colors.text },
-  section: { gap: Spacing.xs },
-  sectionTitle: {
-    fontFamily: Typography.fontFamily.sansSemiBold,
-    fontSize: Typography.size.xs,
-    color: Colors.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    paddingLeft: Spacing.xs,
+  content: {
+    paddingTop: 4,
+    paddingBottom: 40,
   },
-  sectionCard: { backgroundColor: Colors.card, borderRadius: Radius.lg, overflow: 'hidden', borderWidth: 1, borderColor: Colors.border },
-  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: Spacing.md, paddingHorizontal: Spacing.base },
-  rowLabel: { fontFamily: Typography.fontFamily.sans, fontSize: Typography.size.base, color: Colors.text, flex: 1 },
-  rowValue: { fontFamily: Typography.fontFamily.sans, fontSize: Typography.size.base, color: Colors.textSecondary },
-  rowChevron: { marginLeft: Spacing.sm },
+
+  // Profile card
+  profileWrap: {
+    paddingHorizontal: 16,
+    paddingBottom: 20,
+  },
   profileCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.md,
-    backgroundColor: Colors.card,
-    borderRadius: Radius.lg,
-    padding: Spacing.base,
-    shadowColor: Colors.shadow,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 1,
-    shadowRadius: 4,
-    elevation: 2,
+    gap: 14,
+    backgroundColor: Colors.surface ?? Colors.card,
+    borderRadius: 22,
+    padding: 16,
   },
-  avatarCircle: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: Colors.primaryLight,
+  avatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#F3E7DC', // peach-soft per mockup's category tile for the profile avatar
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarInitial: {
     fontFamily: Typography.fontFamily.sansBold,
-    fontSize: 24,
-    color: Colors.primary,
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#7A4A22',
   },
   profileInfo: { flex: 1, gap: 2 },
   profileName: {
     fontFamily: Typography.fontFamily.sansBold,
-    fontSize: Typography.size.md,
-    color: Colors.text,
+    fontSize: 16,
+    fontWeight: '700',
+    color: Colors.ink ?? Colors.text,
   },
-  profileEmail: {
+  profilePlan: {
     fontFamily: Typography.fontFamily.sans,
-    fontSize: Typography.size.sm,
-    color: Colors.textSecondary,
+    fontSize: 12,
+    color: Colors.ink3 ?? Colors.textSecondary,
   },
-  divider: { height: 1, backgroundColor: Colors.border, marginLeft: Spacing.base },
-  signOutButton: {
-    backgroundColor: Colors.card,
-    borderRadius: Radius.md,
-    paddingVertical: Spacing.base,
+  upgradePill: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: Colors.accent ?? Colors.primary,
+  },
+  upgradePillPressed: { opacity: 0.8 },
+  upgradePillText: {
+    fontFamily: Typography.fontFamily.sansBold,
+    fontSize: 12,
+    fontWeight: '700',
+    color: Colors.white,
+    letterSpacing: 0.2,
+  },
+
+  // Sign-out
+  signOutBtn: {
+    marginHorizontal: 16,
+    marginTop: 8,
+    paddingVertical: 16,
+    borderRadius: 22,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: Colors.destructive,
-    marginTop: Spacing.sm,
+    backgroundColor: Colors.surface ?? Colors.card,
+    borderWidth: 0.5,
+    borderColor: Colors.destructive ?? '#A94646',
   },
-  signOutText: { fontFamily: Typography.fontFamily.sansSemiBold, fontSize: Typography.size.base, color: Colors.destructive },
+  signOutText: {
+    fontFamily: Typography.fontFamily.sansSemiBold,
+    fontSize: 15,
+    fontWeight: '600',
+    color: Colors.destructive ?? '#A94646',
+  },
+
+  // Modals (kept visually close to prior impl but with ink accent tokens)
   modal: { flex: 1, backgroundColor: Colors.background },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: Spacing.base,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    padding: 16,
+    borderBottomWidth: Hairline.width,
+    borderBottomColor: Hairline.color,
   },
-  modalTitle: { fontFamily: Typography.fontFamily.sansBold, fontSize: Typography.size.md, color: Colors.text },
-  modalCancel: { fontFamily: Typography.fontFamily.sans, fontSize: Typography.size.base, color: Colors.textSecondary, width: 60 },
-  modalDone: { fontFamily: Typography.fontFamily.sansSemiBold, fontSize: Typography.size.base, color: Colors.primary, textAlign: 'right', width: 60 },
-  modalBody: { padding: Spacing.base, gap: Spacing.base },
-  modalHint: { fontFamily: Typography.fontFamily.sans, fontSize: Typography.size.sm, color: Colors.textSecondary, lineHeight: 20 },
+  modalTitle: {
+    fontFamily: Typography.fontFamily.sansBold,
+    fontSize: 17,
+    fontWeight: '700',
+    color: Colors.ink ?? Colors.text,
+  },
+  modalCancel: {
+    fontFamily: Typography.fontFamily.sans,
+    fontSize: 15,
+    color: Colors.ink3 ?? Colors.textSecondary,
+    width: 60,
+  },
+  modalDone: {
+    fontFamily: Typography.fontFamily.sansSemiBold,
+    fontSize: 15,
+    fontWeight: '600',
+    color: Colors.accent ?? Colors.primary,
+    textAlign: 'right',
+    width: 60,
+  },
+  modalBody: { padding: 16, gap: 16 },
+  modalHint: {
+    fontFamily: Typography.fontFamily.sans,
+    fontSize: 13,
+    color: Colors.ink3 ?? Colors.textSecondary,
+    lineHeight: 20,
+  },
   modalSectionLabel: {
     fontFamily: Typography.fontFamily.sansSemiBold,
-    fontSize: Typography.size.xs,
-    color: Colors.textSecondary,
+    fontSize: 11,
+    fontWeight: '700',
+    color: Colors.ink3 ?? Colors.textSecondary,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
-    marginTop: Spacing.sm,
+    marginTop: 8,
   },
-  amountRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, backgroundColor: Colors.card, borderRadius: Radius.lg, padding: Spacing.xl, borderWidth: 1, borderColor: Colors.border },
-  currencySymbol: { fontFamily: Typography.fontFamily.serif, fontSize: Typography.size.xl, fontWeight: '600', color: Colors.textSecondary },
-  amountInput: { flex: 1, fontFamily: Typography.fontFamily.serif, fontSize: Typography.size['4xl'], fontWeight: '600', letterSpacing: -0.6, color: Colors.text },
-  periodList: { backgroundColor: Colors.card, borderRadius: Radius.lg, overflow: 'hidden', borderWidth: 1, borderColor: Colors.border },
-  periodRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.base, paddingVertical: Spacing.md },
-  periodLabel: { fontFamily: Typography.fontFamily.sans, fontSize: Typography.size.base, color: Colors.text },
-  periodCheck: { color: Colors.primary, fontFamily: Typography.fontFamily.sansBold, fontSize: Typography.size.base },
-  nameInput: {
-    backgroundColor: Colors.card,
-    borderRadius: Radius.md,
-    paddingHorizontal: Spacing.base,
-    paddingVertical: Spacing.md,
-    fontFamily: Typography.fontFamily.sans,
-    fontSize: Typography.size.base,
-    color: Colors.text,
-    borderWidth: 1,
-    borderColor: Colors.border,
+  amountRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: Colors.surface ?? Colors.card,
+    borderRadius: 18,
+    padding: 20,
+    borderWidth: 0.5,
+    borderColor: Colors.line ?? Colors.border,
   },
-  localeRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.base, paddingVertical: Spacing.md, backgroundColor: Colors.card },
-  localeLabel: { fontFamily: Typography.fontFamily.sans, fontSize: Typography.size.base, color: Colors.text },
-  localeCheck: { color: Colors.primary, fontFamily: Typography.fontFamily.sansBold, fontSize: Typography.size.base },
-
-  // Automations section
-  automationRow: {
+  currencySymbol: {
+    fontFamily: Typography.fontFamily.serif,
+    fontSize: 22,
+    fontWeight: '600',
+    color: Colors.ink3 ?? Colors.textSecondary,
+  },
+  amountInput: {
+    flex: 1,
+    fontFamily: Typography.fontFamily.serif,
+    fontSize: 38,
+    fontWeight: '600',
+    letterSpacing: -0.6,
+    color: Colors.ink ?? Colors.text,
+  },
+  periodList: {
+    backgroundColor: Colors.surface ?? Colors.card,
+    borderRadius: Radius.card,
+    overflow: 'hidden',
+  },
+  periodRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.base,
+    paddingHorizontal: 18,
+    paddingVertical: 14,
   },
-  automationTextGroup: { flex: 1, gap: 2 },
-  automationHint: {
+  periodLabel: {
     fontFamily: Typography.fontFamily.sans,
-    fontSize: Typography.size.xs,
-    color: Colors.textMuted,
+    fontSize: 15,
+    color: Colors.ink ?? Colors.text,
   },
-  automationDisclaimer: {
+  periodCheck: {
+    color: Colors.accent ?? Colors.primary,
+    fontFamily: Typography.fontFamily.sansBold,
+    fontSize: 16,
+  },
+  rowDivider: {
+    height: Hairline.width,
+    backgroundColor: Hairline.color,
+  },
+  nameInput: {
+    backgroundColor: Colors.surface ?? Colors.card,
+    borderRadius: Radius.lg,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     fontFamily: Typography.fontFamily.sans,
-    fontSize: Typography.size.xs,
-    color: Colors.textMuted,
-    lineHeight: 18,
-    paddingHorizontal: Spacing.base,
-    paddingBottom: Spacing.md,
+    fontSize: 15,
+    color: Colors.ink ?? Colors.text,
+    borderWidth: 0.5,
+    borderColor: Colors.line ?? Colors.border,
   },
-  toggle: {
-    width: 48,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: Colors.border,
-    padding: 3,
-    justifyContent: 'center',
+  localeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    backgroundColor: Colors.surface ?? Colors.card,
   },
-  toggleOn: { backgroundColor: Colors.primary },
-  toggleThumb: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: Colors.white,
-    alignSelf: 'flex-start',
+  localeLabel: {
+    fontFamily: Typography.fontFamily.sans,
+    fontSize: 15,
+    color: Colors.ink ?? Colors.text,
   },
-  toggleThumbOn: { alignSelf: 'flex-end' },
+  localeCheck: {
+    color: Colors.accent ?? Colors.primary,
+    fontFamily: Typography.fontFamily.sansBold,
+    fontSize: 16,
+  },
 })
