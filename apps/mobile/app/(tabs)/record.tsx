@@ -24,6 +24,7 @@ import { useRecurringRules } from '../../src/hooks/useRecurringRules'
 import { CategoryPicker } from '../../src/components/CategoryPicker'
 import { VoiceWaveform } from '../../src/components/VoiceWaveform'
 import { VoiceConfirmModal, type ConfirmedExpense } from '../../src/components/VoiceConfirmModal'
+import { ListeningView } from '../../src/components/ListeningView'
 import { RecurringToggle } from '../../src/components/RecurringToggle'
 import { Colors, Typography, Text as TextStyles, Spacing, Radius } from '../../src/theme'
 import { parseScan } from '@voice-expense/ai'
@@ -274,6 +275,21 @@ export default function RecordScreen() {
 
   const isListening = voice.state === 'listening'
   const isProcessing = voice.state === 'processing'
+
+  // Full-screen listening/processing takeover — matches S_Listening in
+  // docs/money-app/project/mobile-screens-1.jsx.
+  if (isListening || isProcessing) {
+    return (
+      <ListeningView
+        transcript={voice.interimTranscript || voice.transcript}
+        detectedChips={[]}
+        active={isListening}
+        onCancel={() => { voice.reset(); router.push('/(tabs)') }}
+        onStop={() => voice.stopListening()}
+        locale={userLocale}
+      />
+    )
+  }
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
