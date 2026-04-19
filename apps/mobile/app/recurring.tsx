@@ -165,8 +165,9 @@ const styles = StyleSheet.create({
     color: Colors.textMuted,
   },
   ruleAmount: {
-    fontFamily: Typography.fontFamily.mono,
-    fontSize: Typography.size.xs,
+    fontFamily: Typography.fontFamily.serif,
+    fontSize: Typography.size.sm,
+    fontWeight: '600',
     color: Colors.textSecondary,
   },
   ruleNext: {

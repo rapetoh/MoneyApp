@@ -1,5 +1,5 @@
 # External Services & Pricing
-## Voice Expense Tracker
+## Murmur (formerly "Voice Expense Tracker")
 
 Everything we depend on outside our own code. Reviewed before Phase 0.
 

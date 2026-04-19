@@ -207,8 +207,10 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
   },
   summaryAmount: {
-    fontFamily: Typography.fontFamily.monoBold,
-    fontSize: Typography.size.lg,
+    fontFamily: Typography.fontFamily.serif,
+    fontSize: Typography.size.xl,
+    fontWeight: '600',
+    letterSpacing: -0.2,
   },
   section: {
     gap: Spacing.md,

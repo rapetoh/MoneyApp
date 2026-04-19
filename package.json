@@ -1,5 +1,5 @@
 {
-  "name": "voice-expense-tracker",
+  "name": "murmur",
   "private": true,
   "workspaces": [
     "apps/*",

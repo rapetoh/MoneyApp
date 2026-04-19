@@ -1,9 +1,17 @@
 # Product Requirements Document
-## Voice Expense Tracker
+## Murmur (formerly "Voice Expense Tracker" / "Money App")
 
-**Version**: 1.0  
-**Date**: April 2026  
-**Status**: Approved
+**Version**: 1.1
+**Date**: April 18, 2026
+**Status**: Approved — redesign in progress per [DESIGN.md](./DESIGN.md)
+
+> **Murmur redesign — active since April 18, 2026.** The product thesis, visual
+> language, information architecture, and monetization model have been refined
+> via a Claude Design session. The authoritative design spec lives in
+> [DESIGN.md](./DESIGN.md). The implementation plan lives in the user's personal
+> plan file (`~/.claude/plans/breezy-painting-zephyr.md`). This PRD is being
+> updated incrementally as each phase lands — sections marked **[Murmur]** have
+> been reconciled with the new design.
 
 ---
 
@@ -320,12 +328,27 @@ Privacy is a core selling point, not a checkbox.
 
 ---
 
-## 8. Auth
+## 8. Auth **[Murmur — lazy identity, April 18, 2026]**
 
-- Apple Sign-In (iOS)
-- Google Sign-In (iOS + Android + Web)
-- Email + password
-- Supabase Auth handles all sessions and tokens
+- **No sign-in wall at first launch.** The app works fully offline against a
+  local `device_user_id`. Users can log expenses, see insights, set budgets,
+  and use every free mobile feature without creating an account.
+- **Sign-in is triggered on-demand** when the user takes an action that needs
+  server-backed identity:
+  1. Pair a Mac desktop (Plus only)
+  2. Restore on a new phone (after device loss / reinstall)
+  3. Explicit "create account" in Settings
+- **Providers supported** (all preserved from v1.0):
+  - Sign in with Apple (iOS + macOS)
+  - Sign in with Google (iOS + Android + Web)
+  - Email + password
+- On first sign-in, all local-only transactions reconcile from the anonymous
+  `device_user_id` to the new Supabase `auth.users.id`.
+- Supabase Auth handles all sessions and tokens (unchanged from v1.0).
+
+**What changed from v1.0**: added the lazy-identity model and the
+"no sign-in at launch" principle. Provider list is unchanged — Apple, Google,
+and email/password all remain supported.
 
 ---
 
@@ -356,16 +379,25 @@ These are explicitly not in v1:
 
 ---
 
-## 11. Monetization (to be finalized before Phase 9)
+## 11. Monetization **[Murmur — finalized April 18, 2026]**
 
-**Recommended model**: Feature-gated freemium
+**Model**: Mobile-free-forever + paid Plus tier.
 
 | Tier | Price | Features |
 |------|-------|---------|
-| Free | $0 | Unlimited voice logging, 90-day history, basic summaries, manual entry |
-| Pro | ~$3.99/month or $29.99/year | Desktop analytics, AI Advisor, forecasting, budgets, export, widgets, full history, multi-device sync |
+| Free (mobile) | $0 | Everything the mobile app does: voice/manual/scan logging, full history, budgets, basic insights, recurring (manual), multi-device sync, merchant logos, home-screen widgets. No feature locked behind a paywall on mobile. |
+| Murmur Plus | $3.99/month or $29.99/year (~35% off yearly) | **Ask Murmur** (grounded AI Q&A), **automatic recurring detection** (free tier adds recurring manually), **data export** (CSV, PDF, JSON), **macOS desktop companion app** |
 
-Rationale: Free tier is genuinely useful and builds habit. Pro is unlocked by the desktop companion and Advisor — our differentiators. Pricing is above MonAi's $15/year to cover AI API costs at scale.
+**No trial. No auto-renew-after-trial trap.** See [DESIGN.md](./DESIGN.md) §10
+for the rationale — we are deliberately positioning against MonAi's auto-trial
+pattern. Yearly plan is featured; monthly exists for users who want to sample
+the desktop app for one billing cycle.
+
+**What changed from v1.0 of this PRD**: previously the Pro tier gated desktop
+analytics, AI Advisor, forecasting, budgets, export, widgets, full history, and
+multi-device sync. The Murmur redesign moves budgets, widgets, full history,
+and multi-device sync into the free mobile tier — the paid gate is now a tight
+bundle of **AI + automation + desktop**, the three genuinely premium surfaces.
 
 ---
 

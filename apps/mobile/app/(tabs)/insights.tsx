@@ -278,8 +278,10 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
   },
   metricValue: {
-    fontFamily: Typography.fontFamily.monoBold,
-    fontSize: Typography.size.lg,
+    fontFamily: Typography.fontFamily.serif,
+    fontSize: Typography.size.xl,
+    fontWeight: '600',
+    letterSpacing: -0.2,
     color: Colors.text,
   },
   metricDivider: { width: 1, height: 40, backgroundColor: Colors.border },
@@ -294,8 +296,9 @@ const styles = StyleSheet.create({
     color: Colors.text,
   },
   categoryAmount: {
-    fontFamily: Typography.fontFamily.monoBold,
-    fontSize: Typography.size.sm,
+    fontFamily: Typography.fontFamily.serif,
+    fontSize: Typography.size.base,
+    fontWeight: '600',
     color: Colors.text,
   },
   barTrack: {

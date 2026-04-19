@@ -1,9 +1,45 @@
 # Technical Plan
-## Voice Expense Tracker
+## Murmur (formerly "Voice Expense Tracker" / "Money App")
 
-**Version**: 1.4  
-**Date**: April 14, 2026  
-**Status**: In Progress — Phases 0–4 code complete; device testing in progress
+**Version**: 1.5
+**Date**: April 18, 2026
+**Status**: In Progress — Phases 0–4 code complete; device testing in progress. **Murmur redesign** Phase A (brand + visual refresh) in progress April 18, 2026.
+
+---
+
+## Murmur redesign (active)
+
+The product is undergoing a top-to-bottom redesign driven by
+[DESIGN.md](./DESIGN.md). The implementation is split into phases A–J,
+tracked in the user's personal plan file (`~/.claude/plans/breezy-painting-zephyr.md`):
+
+| Phase | Scope | Status |
+|---|---|---|
+| A | Brand + visual refresh (rename → Murmur, sage palette, serif amounts, refreshed shadows, tab bar polish) | **In progress (Apr 18, 2026)** |
+| B | IA reshuffle (Today / Insights / FAB / Budgets / More) | Not started |
+| C | Capture flow polish (amount-as-hero, adjust chips, rose [unclear] tag, undo snackbar) | Not started |
+| D | New screens (Day-1 guided, Budgets tab, Privacy Center, Paywall, History heatmap) | Not started |
+| E | Ask Murmur (grounded Q&A replacing the chat-style AI Advisor from v1.0) | Not started |
+| F | Lazy identity + auth reshuffle (no sign-in at launch) | Not started |
+| G | Native surfaces v1 (iOS + Android home-screen widgets, Apple Pay lockscreen notification) | Not started |
+| H | Retention mechanics (Day-2 dunning, Day-3 Insights unlock) | Not started |
+| I | Desktop companion (Electron-wrap apps/web + QR pairing) | Not started |
+| J | Docs update (ongoing, every phase) | Continuous |
+
+**Locked decisions (April 18, 2026)**:
+- **Monetization**: mobile free forever; Murmur Plus $3.99/mo or $29.99/yr unlocks Ask Murmur + auto recurring + export + desktop.
+- **Storage**: Supabase-first; no CloudKit rewrite. Privacy story via on-device voice + transcript-only sync + explicit controls.
+- **Auth**: all 3 providers preserved (Apple + Google + email); lazy identity — no sign-in wall at launch.
+- **Platforms**: iOS + Android, iOS-style design on both; lockscreen widget deferred to v1.1.
+- **Desktop**: Electron-wrap `apps/web` rather than native SwiftUI.
+
+**Non-regressions** (features the redesign must NOT remove):
+- Merchant logos (full Google Favicon V2 pipeline + colored-initial fallback)
+- Receipt + paycheck scan
+- 4-locale i18n (en, fr, es, pt)
+- Offline-first writes via SQLite + sync queue
+- 30-day soft-delete recovery window
+- On-device voice processing
 
 ---
 
@@ -522,7 +558,30 @@ ios: {
 }
 ```
 
-### Google Sign-In — Native OIDC Nonce Flow (April 2026)
+### Google Sign-In — OAuth PKCE Redirect (April 18, 2026 — during Murmur Phase A)
+
+**Why we rewrote it (again):** The prior fix (see "Native OIDC Nonce Flow" below) depended on passing a `nonce` parameter to `@react-native-google-signin/google-signin`'s `signIn()`. Confirmed by reading the library source (`node_modules/@react-native-google-signin/google-signin/src/signIn/GoogleSignin.ts` + `ios/RNGoogleSignin.mm`): **neither v14.0.2 (what we had) nor v16.1.2 (the current latest) supports a nonce parameter.** The native iOS bridge calls `GIDSignIn.signInWithPresentingViewController:hint:additionalScopes:completion:` — no nonce slot. GIDSignIn auto-generates a random nonce inside the id_token that the app has no API to read. Meanwhile, Supabase's `signInWithIdToken` requires the raw nonce to verify the hash. The two are architecturally incompatible — the "Nonces mismatch" / "Passed nonce and nonce in id_token should either both exist or not" errors are unavoidable with this library + method combination.
+
+**New flow (Supabase's officially recommended React Native pattern):**
+
+1. `signInWithOAuth({ provider: 'google', redirectTo, skipBrowserRedirect: true })` — returns an OAuth authorize URL on `<project>.supabase.co`.
+2. `WebBrowser.openAuthSessionAsync(url, redirectTo)` — opens an ASWebAuthenticationSession sheet. User signs in with Google there. Google → Supabase → deep-link redirect back to our app.
+3. `supabase.auth.exchangeCodeForSession(code)` — exchanges the authorization code for a session (PKCE flow, matches our Supabase client config `flowType: 'pkce'`).
+
+**Files:**
+- [apps/mobile/src/services/googleAuth.ts](../apps/mobile/src/services/googleAuth.ts) — entirely rewritten. No longer imports `@react-native-google-signin/google-signin`. Uses `expo-auth-session`, `expo-web-browser`, and `supabase.auth.signInWithOAuth`.
+
+**Supabase dashboard requirements** (Authentication → URL Configuration):
+- Redirect URLs list must contain `voiceexpense://auth/callback`. Our code produces that exact URI via `AuthSession.makeRedirectUri({ scheme: 'voiceexpense', path: 'auth/callback' })`.
+- Site URL (currently `http://localhost:3000`) does **not** matter for this flow because we pass explicit `redirectTo`; should still eventually be updated to the Vercel URL so email-template flows don't leak local links.
+
+**Native library status:** `@react-native-google-signin/google-signin` is still listed in `package.json` + `app.config.js` plugins. It's inert at runtime because the JS no longer imports or calls it, but the native Pod remains linked. Removing it is a safe follow-up cleanup; deferred out of Phase A scope (needs prebuild + fresh EAS build).
+
+**Do not re-attempt** the native `@react-native-google-signin/google-signin` + `signInWithIdToken` approach on this library in the future. The nonce incompatibility is structural and has been re-proven across multiple fix attempts. Use the OAuth redirect flow.
+
+---
+
+### Google Sign-In — Native OIDC Nonce Flow (April 2026) — **SUPERSEDED on April 18, 2026** (see above)
 After multiple failed attempts with crypto polyfills, Google Sign-In was rewritten to use `@react-native-google-signin/google-signin` natively. The PKCE polyfill approach was abandoned entirely.
 
 **How it works (`apps/mobile/src/services/googleAuth.ts`)**:
@@ -736,12 +795,14 @@ Dependencies: `expo-linear-gradient` (installed), `@expo/vector-icons` (already 
 
 ---
 
-## Open Decisions (resolve before Phase 9)
+## Open Decisions — resolved April 18, 2026 (Murmur redesign)
 
-- [ ] **App name** — candidates: Aria (top pick), Voco, Spoke, Dime, Sotto, Noted
-- [ ] **Monetization model** — recommended: feature-gated freemium
-- [ ] **Free tier scope** — recommended: unlimited logging, 90-day history
-- [ ] **Pricing** — recommended: $3.99/month or $29.99/year
+- [x] **App name** — **Murmur**
+- [x] **Monetization model** — **Mobile free forever; Murmur Plus gates Ask Murmur + auto-recurring + export + desktop**
+- [x] **Free tier scope** — **Full mobile app, no feature limits, unlimited history**
+- [x] **Pricing** — **$3.99/month or $29.99/year (~35% off yearly)**; no trial
+
+See [DESIGN.md](./DESIGN.md) and this file's "Murmur redesign" section above.
 
 ---
 
@@ -759,5 +820,62 @@ Dependencies: `expo-linear-gradient` (installed), `@expo/vector-icons` (already 
 | Phase 5 — Desktop Dashboard | 🔲 Not started | Next.js app scaffold exists on Vercel; dashboard routes not yet built |
 | Phase 6 — Forecasting + Recurring | ⏳ Partial | Mobile recurring CRUD + Edge Function `generate-recurring` complete (April 12). Migration 005 must be pushed to Supabase. EWMA forecast engine + desktop recurring management not yet built. |
 | Phase 7–9 | 🔲 Not started | Planned |
+
+## Murmur redesign phases (April 2026)
+
+See the dedicated section at top of this file for phase A–J status.
+
+### Phase A — Brand + visual refresh (in progress April 18, 2026)
+
+Changes applied:
+- **Rename** `Voice Expense Tracker` → `Murmur` in: `apps/mobile/app.config.js` (display name, permission strings, splash/adaptive-icon background), root `package.json` name field, all 4 locale `app.name` entries (`en/fr/es/pt`), and iOS/Android splash + adaptive-icon backgrounds now use design canvas `#FBFAF7`.
+- **Palette swap** in [`apps/mobile/src/theme/colors.ts`](../apps/mobile/src/theme/colors.ts):
+  - Primary/accent: orange `#F97316` → **sage `#3F5A3E`** (with accentSoft `#E8EDE3`).
+  - Background: `#F5F0EB` → **`#FBFAF7`** (warm off-white from design §3).
+  - New ink scale: `ink` `#1B1915`, `ink2` `#3A3630`, `ink3` `#6C675E`, `ink4` `#9C9589`.
+  - New surface/surface2 (`#FFFFFF` / `#F5F2EB`), canonical hairline `rgba(40,36,28,0.08)`.
+  - Income recolored to sage-tinted `#4A7C59`; destructive to warm rose `#B44A3F`.
+  - Category pastel tints added (peach/sage/lavender/butter/rose/olive) per design §3.
+  - Deterministic merchant-avatar fallback palette rebuilt as harmonious pastels (preserves the merchant-logo feature — see non-regressions).
+  - New `unclear` / `unclearSoft` tokens reserved for the rose `[unclear]` tag coming in Phase C.
+  - **Semantic aliases preserved**: `primary`, `background`, `text`, `textSecondary`, `textMuted`, `border`, `card` — existing components pick up the new palette with zero call-site changes.
+- **Typography** in [`apps/mobile/src/theme/typography.ts`](../apps/mobile/src/theme/typography.ts):
+  - New **serif** family: `New York` on iOS / `serif` on Android (system-provided — no font asset to load).
+  - New `amountHero` (92px, letter-spacing -1.6) preset reserved for Phase C listening screen.
+  - New `amountLarge` (48px, serif) and `displaySerif` (34px, serif) presets.
+  - Display `amount` preset upgraded from mono → **serif 20px semibold** — all row-level amount renderings pick this up.
+  - Mono family retained but narrowed to `amountChip` (13px) for small numeric chips only.
+  - New size tokens: `4xl` (48), `hero` (92); tighter `lineHeight.tight` (1.05).
+- **Card radii** in [`apps/mobile/src/theme/index.ts`](../apps/mobile/src/theme/index.ts):
+  - Added `Radius.card` (28) and `Radius.cardLarge` (34) per design §3 shape language.
+  - Existing `sm/md/lg/xl` retained for row-scale corners (`xl` bumped 20 → 22).
+  - Added `Hairline` export (`{ width: 1, color: 'rgba(40,36,28,0.08)' }`) as canonical divider token.
+- **Display amount upgrade to serif** across all shipped amount sites:
+  - `SafeToSpend.tsx` (hero amount → serif 48px; breakdown → serif; shadow recolored from orange to neutral ink; card radius → 28).
+  - `TransactionRow.tsx` (row amount → serif 17px semibold).
+  - `VoiceConfirmModal.tsx` (amount input → serif `3xl` semibold; currency symbol → serif xl).
+  - `record.tsx` manual tab (amount input → serif `4xl` semibold; currency symbol serif).
+  - `transaction/[id].tsx` (detail hero → serif `4xl`).
+  - `transaction/edit.tsx` (edit amount input → serif `4xl`).
+  - `recurring.tsx` (rule amount → serif sm semibold).
+  - `(tabs)/insights.tsx` (metric + category amounts → serif).
+  - `(tabs)/settings.tsx` (budget input → serif `4xl`).
+  - `(tabs)/index.tsx` (summary card amounts → serif xl).
+- **Tab bar & FAB** in [`apps/mobile/app/(tabs)/_layout.tsx`](../apps/mobile/app/(tabs)/_layout.tsx):
+  - Mic FAB: 52 → 56×56, `marginTop: -8` → `-10` (raised above the pill, matching design §4).
+  - FAB shadow color: orange `#F97316` → sage (`Colors.primary`).
+  - Tab bar pill geometry (radius 34, floating bottom:14, shadow) retained — already close to design.
+- **Orange shadow cleanup**: removed all literal `#F97316` shadow colors across [`SafeToSpend.tsx`](../apps/mobile/src/components/SafeToSpend.tsx), [`_layout.tsx`](../apps/mobile/app/(tabs)/_layout.tsx), and [`record.tsx`](../apps/mobile/app/(tabs)/record.tsx). Red `#EF4444` mic-active shadow replaced with `Colors.destructive`.
+- **Doc renamed**: `docs/Claude Code Design.md` → [`docs/DESIGN.md`](./DESIGN.md).
+- **Web/desktop theme aligned**: [`apps/web/src/lib/theme.ts`](../apps/web/src/lib/theme.ts) palette swapped to sage + ink + accentSoft; [`apps/web/src/app/globals.css`](../apps/web/src/app/globals.css) body bg → `#F4F1EA` (bgDesk), text → `#1B1915`, scrollbar thumb → line token; [`apps/web/src/app/layout.tsx`](../apps/web/src/app/layout.tsx) `<title>` → "Murmur". Serif font token added (`'New York', 'Georgia'`) in web theme — ready for Phase I desktop amount upgrade.
+- **Brand cleanup**: [`.env.example`](../.env.example) header → Murmur; [`docs/EXTERNAL_SERVICES.md`](./EXTERNAL_SERVICES.md) title → Murmur.
+- **Typecheck hygiene** (pre-existing errors unrelated to Phase A, cleaned up so CI stays green):
+  - [`modules/notification-listener/src/index.ts`](../apps/mobile/modules/notification-listener/src/index.ts) + [`useNotificationListener.ts`](../apps/mobile/src/hooks/useNotificationListener.ts): replaced stale `import { Subscription } from 'expo-modules-core'` with a local `type Subscription = { remove: () => void }`; typed the `addListener('onPaymentNotification', ...)` call through an explicit cast since the EventEmitter generic tightened in recent Expo SDKs. Added the missing `is_recurring_suggestion` + `recurring_frequency_suggestion` fields to the ParsedExpense literal.
+  - [`transactionStore.ts`](../apps/mobile/src/services/sync/transactionStore.ts): replaced the undefined `SQLite.SQLiteBindValue[]` cast with a proper `import type { SQLiteBindValue } from 'expo-sqlite'`.
+
+**Notes for review:**
+- Internal package names (`@voice-expense/mobile`, `@voice-expense/shared`, etc.) and the app slug (`voice-expense-tracker`), scheme (`voiceexpense`), and bundle identifier (`com.voiceexpense.app`) were deliberately **not** renamed. They're not user-visible and renaming them would require EAS reconfiguration, Supabase OAuth client updates, and deep-link handler changes — unrelated to the Phase A visual refresh.
+- `fontFamily.mono` retained and still loaded via expo-font; reserved for the `amountChip` preset.
+- Shape language only applied to the SafeToSpend hero card (representative). Other cards will bump to `Radius.card` naturally as their screens are redesigned in Phase D.
 
 *End of Plan*

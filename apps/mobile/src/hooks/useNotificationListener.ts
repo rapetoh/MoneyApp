@@ -1,7 +1,12 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Platform } from 'react-native'
-import { NativeModulesProxy, EventEmitter, type Subscription } from 'expo-modules-core'
+import { NativeModulesProxy, EventEmitter } from 'expo-modules-core'
 import type { ParsedExpense } from '@voice-expense/shared'
+
+// Local Subscription shape — expo-modules-core stopped exporting this type in
+// recent SDKs. The only field we use is .remove(), so a minimal local type is
+// safer than chasing the moving upstream name.
+type Subscription = { remove: () => void }
 
 /**
  * Android-only native module bindings — null on iOS so Metro can bundle without error.
@@ -37,7 +42,9 @@ function addPaymentNotificationListener(
   listener: (payload: NotificationPayload) => void,
 ): Subscription {
   if (!emitter) return { remove: () => {} } as Subscription
-  return emitter.addListener('onPaymentNotification', listener)
+  return (emitter as unknown as {
+    addListener: (name: string, fn: (payload: NotificationPayload) => void) => Subscription
+  }).addListener('onPaymentNotification', listener)
 }
 
 export interface UseNotificationListenerReturn {
@@ -89,6 +96,8 @@ export function useNotificationListener(
         confidence: 0.9,
         needs_clarification: !payload.merchant,
         clarifying_question: !payload.merchant ? 'What was this payment for?' : null,
+        is_recurring_suggestion: false,
+        recurring_frequency_suggestion: null,
       }
 
       onPayment(parsed)

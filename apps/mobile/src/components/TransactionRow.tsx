@@ -79,8 +79,10 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   amount: {
-    fontFamily: Typography.fontFamily.mono,
-    fontSize: Typography.size.base,
+    fontFamily: Typography.fontFamily.serif,
+    fontSize: Typography.size.md,
+    fontWeight: '600',
+    letterSpacing: -0.2,
   },
   time: {
     fontFamily: Typography.fontFamily.sans,

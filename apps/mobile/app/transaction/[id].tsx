@@ -185,8 +185,10 @@ const styles = StyleSheet.create({
     marginTop: Spacing.sm,
   },
   amount: {
-    fontFamily: Typography.fontFamily.monoBold,
-    fontSize: Typography.size['3xl'],
+    fontFamily: Typography.fontFamily.serif,
+    fontSize: Typography.size['4xl'],
+    fontWeight: '600',
+    letterSpacing: -0.8,
     color: Colors.text,
   },
   date: {

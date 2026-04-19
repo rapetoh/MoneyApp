@@ -1,6 +1,6 @@
 module.exports = {
   expo: {
-    name: 'Voice Expense Tracker',
+    name: 'Murmur',
     slug: 'voice-expense-tracker',
     scheme: 'voiceexpense',
     version: '1.0.0',
@@ -11,7 +11,7 @@ module.exports = {
     splash: {
       image: './assets/splash-icon.png',
       resizeMode: 'contain',
-      backgroundColor: '#F5F0EB',
+      backgroundColor: '#FBFAF7',
     },
     ios: {
       supportsTablet: false,
@@ -26,14 +26,14 @@ module.exports = {
     android: {
       adaptiveIcon: {
         foregroundImage: './assets/adaptive-icon.png',
-        backgroundColor: '#F5F0EB',
+        backgroundColor: '#FBFAF7',
       },
       package: 'com.voiceexpense.app',
     },
     plugins: [
       'expo-router',
       'expo-secure-store',
-      ['expo-splash-screen', { backgroundColor: '#F5F0EB' }],
+      ['expo-splash-screen', { backgroundColor: '#FBFAF7' }],
       'expo-localization',
       'expo-apple-authentication',
       'expo-web-browser',
@@ -41,14 +41,14 @@ module.exports = {
       [
         'expo-speech-recognition',
         {
-          microphonePermission: 'Allow Voice Expense Tracker to use the microphone to record expenses.',
-          speechRecognitionPermission: 'Allow Voice Expense Tracker to recognize your speech to log expenses.',
+          microphonePermission: 'Allow Murmur to use the microphone to record expenses.',
+          speechRecognitionPermission: 'Allow Murmur to recognize your speech to log expenses.',
         },
       ],
       [
         'expo-image-picker',
         {
-          cameraPermission: 'Allow Voice Expense Tracker to use the camera to scan receipts and paychecks.',
+          cameraPermission: 'Allow Murmur to use the camera to scan receipts and paychecks.',
         },
       ],
       // Android-only: adds MoneyNotificationListenerService to AndroidManifest.xml

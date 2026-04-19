@@ -85,13 +85,13 @@ export function SafeToSpend({ monthlyBudget, totalSpent, upcomingRecurring, curr
 const styles = StyleSheet.create({
   card: {
     backgroundColor: Colors.primary,
-    borderRadius: Radius.xl,
+    borderRadius: Radius.card,
     padding: Spacing.xl,
     gap: Spacing.sm,
-    shadowColor: '#F97316',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+    shadowColor: '#1B1915',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
     elevation: 6,
   },
   label: {
@@ -100,12 +100,14 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.8)',
   },
   amount: {
-    fontFamily: Typography.fontFamily.monoBold,
-    fontSize: Typography.size['3xl'],
+    fontFamily: Typography.fontFamily.serif,
+    fontSize: Typography.size['4xl'],
+    fontWeight: '600',
+    letterSpacing: -0.6,
     color: Colors.white,
   },
   overBudget: {
-    fontSize: Typography.size['2xl'],
+    fontSize: Typography.size['3xl'],
   },
   warningRow: {
     backgroundColor: 'rgba(0,0,0,0.15)',
@@ -133,8 +135,9 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.7)',
   },
   breakdownValue: {
-    fontFamily: Typography.fontFamily.mono,
-    fontSize: Typography.size.sm,
+    fontFamily: Typography.fontFamily.serif,
+    fontSize: Typography.size.base,
+    fontWeight: '600',
     color: 'rgba(255,255,255,0.9)',
   },
   hint: {

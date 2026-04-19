@@ -2,6 +2,7 @@
  * All reads and writes for transactions go through here.
  * This is the single source of truth — SQLite locally, Supabase via SyncManager.
  */
+import type { SQLiteBindValue } from 'expo-sqlite'
 import { getDb } from './localDb'
 import type { Transaction } from '@voice-expense/shared'
 
@@ -122,7 +123,7 @@ export async function updateTransactionFields(
 
   await db.runAsync(
     `UPDATE transactions SET ${sets.join(', ')} WHERE id = ?`,
-    values as SQLite.SQLiteBindValue[],
+    values as SQLiteBindValue[],
   )
 }
 

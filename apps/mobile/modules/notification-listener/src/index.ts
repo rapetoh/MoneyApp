@@ -1,5 +1,9 @@
-import { NativeModulesProxy, EventEmitter, type Subscription } from 'expo-modules-core'
+import { NativeModulesProxy, EventEmitter } from 'expo-modules-core'
 import { Platform } from 'react-native'
+
+// expo-modules-core typed its Subscription export away in recent SDKs; define
+// the shape locally since the .remove() method is the only contract we depend on.
+type Subscription = { remove: () => void }
 
 export interface NotificationPayload {
   /** Android package name of the source app (e.g. "com.chase.sig.android") */
@@ -46,5 +50,7 @@ export function addPaymentNotificationListener(
     // No-op on iOS — return a dummy subscription
     return { remove: () => {} } as Subscription
   }
-  return emitter.addListener('onPaymentNotification', listener)
+  return (emitter as unknown as {
+    addListener: (name: string, fn: (payload: NotificationPayload) => void) => Subscription
+  }).addListener('onPaymentNotification', listener)
 }
