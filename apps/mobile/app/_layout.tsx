@@ -105,6 +105,15 @@ export default function RootLayout() {
           }}
         />
         <Stack.Screen
+          name="more/transactions"
+          options={{
+            headerShown: true,
+            headerTitle: t('more.transactions', locale),
+            headerBackTitle: t('common.back', locale),
+            presentation: 'card',
+          }}
+        />
+        <Stack.Screen
           name="more/settings"
           options={{
             headerShown: true,

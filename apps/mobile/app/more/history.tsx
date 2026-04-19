@@ -1,342 +1,452 @@
-import { useState, useMemo } from 'react'
-import {
-  View,
-  Text,
-  TextInput,
-  StyleSheet,
-  ActivityIndicator,
-  SectionList,
-  ScrollView,
-  Pressable,
-} from 'react-native'
+import { useMemo } from 'react'
+import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { useRouter } from 'expo-router'
+import { Stack, useRouter } from 'expo-router'
+import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '../../src/hooks/useAuth'
-import { useTransactions } from '../../src/hooks/useTransactions'
-import { useCategories } from '../../src/hooks/useCategories'
 import { useProfile } from '../../src/hooks/useProfile'
-import { TransactionRow } from '../../src/components/TransactionRow'
-import { Colors, Typography, Spacing, Radius } from '../../src/theme'
+import { useTransactions } from '../../src/hooks/useTransactions'
+import { Money } from '../../src/components/Money'
+import { Colors, Typography, Hairline } from '../../src/theme'
 import { t, type Locale } from '@voice-expense/shared'
 import type { Transaction } from '@voice-expense/shared'
 
-function groupByDate(transactions: Transaction[], locale: Locale) {
-  const groups: Record<string, Transaction[]> = {}
-  for (const txn of transactions) {
-    const date = new Date(txn.transacted_at)
-    const today = new Date()
-    const yesterday = new Date(today)
-    yesterday.setDate(yesterday.getDate() - 1)
-
-    let label: string
-    if (date.toDateString() === today.toDateString()) {
-      label = t('transactions.today', locale)
-    } else if (date.toDateString() === yesterday.toDateString()) {
-      label = t('transactions.yesterday', locale)
-    } else {
-      label = date.toLocaleDateString(locale, { weekday: 'long', month: 'long', day: 'numeric' })
-    }
-
-    if (!groups[label]) groups[label] = []
-    groups[label].push(txn)
-  }
-
-  return Object.entries(groups).map(([title, data]) => ({ title, data }))
+function monthParam(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
 }
 
-export default function ExpensesScreen() {
+// Collapse the transaction list into a { YYYY-MM → total debits } map.
+// Used for both the calendar heatmap (day-level) and the Months list.
+function totalsByMonth(txns: Transaction[]): Record<string, number> {
+  const out: Record<string, number> = {}
+  for (const tx of txns) {
+    if (tx.is_deleted || tx.direction !== 'debit') continue
+    const d = new Date(tx.transacted_at)
+    const key = monthParam(d)
+    out[key] = (out[key] ?? 0) + tx.amount
+  }
+  return out
+}
+
+// Daily debits for a specific month (0-indexed month). `dayOf[n]` = total
+// spent on day n (1..daysInMonth). Day 0 is unused; keeps the index honest.
+function dailyTotals(txns: Transaction[], year: number, month: number): number[] {
+  const daysInMonth = new Date(year, month + 1, 0).getDate()
+  const dayOf: number[] = new Array(daysInMonth + 1).fill(0)
+  for (const tx of txns) {
+    if (tx.is_deleted || tx.direction !== 'debit') continue
+    const d = new Date(tx.transacted_at)
+    if (d.getFullYear() !== year || d.getMonth() !== month) continue
+    dayOf[d.getDate()] += tx.amount
+  }
+  return dayOf
+}
+
+/**
+ * History — year-at-a-glance + month drill-down.
+ *
+ * Matches S_History in docs/money-app/project/mobile-screens-4.jsx. The
+ * current-month calendar heatmap gives the user a quick read on their recent
+ * pace; the Months list is a reverse-chronological ledger of monthly totals.
+ * Tapping a month row navigates to the transaction list scoped to that
+ * month (more/transactions?month=YYYY-MM), so search + category filter are
+ * one tap away when the user wants to dig in.
+ */
+export default function HistoryScreen() {
   const { user } = useAuth()
-  const { transactions, loading } = useTransactions(user?.id)
-  const { categories, categoryMap } = useCategories(user?.id)
   const { profile } = useProfile(user?.id)
-  const [search, setSearch] = useState('')
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null)
-  const [view, setView] = useState<'expenses' | 'income'>('expenses')
+  const { transactions } = useTransactions(user?.id)
   const router = useRouter()
 
   const locale = (profile?.locale ?? 'en') as Locale
-  const currency = profile?.currency_code ?? 'USD'
 
-  // Only show categories that have at least one transaction
-  const usedCategories = useMemo(() => {
-    const usedIds = new Set(
-      transactions
-        .filter((tx) => tx.direction === 'debit')
-        .map((tx) => tx.category_id)
-        .filter(Boolean),
-    )
-    return categories.filter((c) => usedIds.has(c.id))
-  }, [transactions, categories])
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = now.getMonth()
 
-  const filtered = useMemo(() => {
-    let result = transactions.filter((tx) =>
-      view === 'expenses' ? tx.direction === 'debit' : tx.direction === 'credit',
-    )
+  const monthTotals = useMemo(() => totalsByMonth(transactions), [transactions])
 
-    if (search.trim()) {
-      const q = search.toLowerCase()
-      result = result.filter(
-        (txn) =>
-          (txn.merchant ?? '').toLowerCase().includes(q) ||
-          (txn.note ?? '').toLowerCase().includes(q) ||
-          (txn.category_id ? categoryMap[txn.category_id]?.name ?? '' : '').toLowerCase().includes(q),
-      )
-    }
+  // Build the Months list: every month that has spend, most recent first.
+  // Current month is always included so it can carry the "In progress" tag
+  // even when zero has been logged yet.
+  const months = useMemo(() => {
+    const keys = new Set(Object.keys(monthTotals))
+    const currentKey = monthParam(now)
+    keys.add(currentKey)
+    return Array.from(keys)
+      .map((k) => {
+        const [y, m] = k.split('-').map(Number)
+        return {
+          key: k,
+          date: new Date(y, m - 1, 1),
+          total: monthTotals[k] ?? 0,
+          current: k === currentKey,
+        }
+      })
+      .sort((a, b) => b.date.getTime() - a.date.getTime())
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [monthTotals])
 
-    if (selectedCategoryId) {
-      result = result.filter((txn) => txn.category_id === selectedCategoryId)
-    }
+  const currentMonthDaily = useMemo(
+    () => dailyTotals(transactions, year, month),
+    [transactions, year, month],
+  )
+  const currentMonthTotal = monthTotals[monthParam(now)] ?? 0
+  const maxDaily = Math.max(...currentMonthDaily, 1)
 
-    return result
-  }, [transactions, search, selectedCategoryId, categoryMap, view])
+  // Grid cells for the heatmap: leading empty squares for the weekday the
+  // month starts on, then day cells up through the last day of the month.
+  const firstWeekday = new Date(year, month, 1).getDay() // 0 = Sunday
+  const daysInMonth = new Date(year, month + 1, 0).getDate()
+  const gridCells: ({ day: number; amount: number } | null)[] = []
+  for (let i = 0; i < firstWeekday; i++) gridCells.push(null)
+  for (let d = 1; d <= daysInMonth; d++) {
+    gridCells.push({ day: d, amount: currentMonthDaily[d] ?? 0 })
+  }
 
-  const sections = useMemo(() => groupByDate(filtered, locale), [filtered, locale])
+  const weekdayLabels = t('history.weekday_labels', locale).split(',')
 
-  function toggleCategory(id: string) {
-    setSelectedCategoryId((prev) => (prev === id ? null : id))
+  function goToMonth(key: string) {
+    router.push({ pathname: '/more/transactions', params: { month: key } })
+  }
+
+  function goToSearch() {
+    router.push('/more/transactions')
   }
 
   return (
-    <SafeAreaView style={styles.safe} edges={['bottom', 'left', 'right']}>
-      <View style={styles.header}>
-        {/* Expenses / Income toggle (styled like the Voice / Manual toggle) */}
-        <View style={styles.segment}>
-          <Pressable
-            style={[styles.segmentTab, view === 'expenses' && styles.segmentTabActive]}
-            onPress={() => { setView('expenses'); setSelectedCategoryId(null) }}
-          >
-            <Text style={[styles.segmentLabel, view === 'expenses' && styles.segmentLabelActive]}>
-              {t('home.expenses', locale)}
-            </Text>
-          </Pressable>
-          <Pressable
-            style={[styles.segmentTab, view === 'income' && styles.segmentTabActive]}
-            onPress={() => { setView('income'); setSelectedCategoryId(null) }}
-          >
-            <Text style={[styles.segmentLabel, view === 'income' && styles.segmentLabelActive]}>
-              {t('home.income', locale)}
-            </Text>
-          </Pressable>
-        </View>
-
-        <TextInput
-          style={styles.search}
-          value={search}
-          onChangeText={setSearch}
-          placeholder={t('transactions.search', locale)}
-          placeholderTextColor={Colors.textMuted}
-          clearButtonMode="while-editing"
-        />
-
-        {/* Category filter pills — only relevant on expenses view */}
-        {view === 'expenses' && usedCategories.length > 0 && (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.pillRow}
-          >
-            <Pressable
-              style={[
-                styles.pill,
-                !selectedCategoryId && styles.pillActive,
-              ]}
-              onPress={() => setSelectedCategoryId(null)}
-            >
-              <Text style={[styles.pillLabel, !selectedCategoryId && styles.pillLabelActive]}>
-                All
-              </Text>
-            </Pressable>
-            {usedCategories.map((cat) => {
-              const active = selectedCategoryId === cat.id
-              return (
-                <Pressable
-                  key={cat.id}
-                  style={[
-                    styles.pill,
-                    active && styles.pillActive,
-                  ]}
-                  onPress={() => toggleCategory(cat.id)}
-                >
-                  <View style={[styles.pillDot, { backgroundColor: cat.color ?? Colors.primary }]} />
-                  <Text style={[styles.pillLabel, active && styles.pillLabelActive]}>
-                    {cat.name}
-                  </Text>
-                </Pressable>
-              )
-            })}
-          </ScrollView>
-        )}
-      </View>
-
-      {loading ? (
-        <ActivityIndicator color={Colors.primary} style={{ marginTop: Spacing['2xl'] }} />
-      ) : sections.length === 0 ? (
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyIcon}>{search || selectedCategoryId ? '🔍' : '💸'}</Text>
-          <Text style={styles.emptyTitle}>
-            {search || selectedCategoryId
-              ? t('transactions.empty_search', locale)
-              : t('transactions.empty', locale)}
-          </Text>
-        </View>
-      ) : (
-        <SectionList
-          sections={sections}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.listContent}
-          stickySectionHeadersEnabled={false}
-          renderSectionHeader={({ section: { title } }) => (
-            <Text style={styles.dateHeader}>{title}</Text>
-          )}
-          renderItem={({ item, index, section }) => {
-            const isFirst = index === 0
-            const isLast = index === section.data.length - 1
-            return (
-              <View
-                style={[
-                  styles.txnCard,
-                  isFirst && styles.txnCardFirst,
-                  isLast && styles.txnCardLast,
-                  !isLast && styles.txnCardMiddle,
-                ]}
+    <>
+      <Stack.Screen options={{ headerShown: false }} />
+      <SafeAreaView style={styles.safe} edges={['top', 'bottom', 'left', 'right']}>
+        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+          {/* Back pill + breadcrumb + search icon (browse all) */}
+          <View style={styles.topRow}>
+            <View style={styles.topLeft}>
+              <Pressable
+                onPress={() => router.back()}
+                style={({ pressed }) => [styles.backPill, pressed && styles.backPillPressed]}
+                hitSlop={8}
               >
-                {index > 0 && <View style={styles.divider} />}
-                <TransactionRow
-                  transaction={item}
-                  categoryName={item.category_id ? categoryMap[item.category_id]?.name : null}
-                  currency={currency}
-                  locale={locale}
-                  onPress={() => router.push(`/transaction/${item.id}`)}
+                <Ionicons
+                  name="chevron-back"
+                  size={20}
+                  color={Colors.ink2 ?? Colors.textSecondary}
                 />
+              </Pressable>
+              <Text style={styles.breadcrumb}>{t('more.title', locale)}</Text>
+            </View>
+            <Pressable
+              onPress={goToSearch}
+              style={({ pressed }) => [styles.searchPill, pressed && styles.backPillPressed]}
+              hitSlop={8}
+              accessibilityLabel={t('history.browse_all', locale)}
+            >
+              <Ionicons
+                name="search"
+                size={18}
+                color={Colors.ink2 ?? Colors.textSecondary}
+              />
+            </Pressable>
+          </View>
+
+          {/* Title block */}
+          <View style={styles.intro}>
+            <Text style={styles.eyebrow}>{t('history.heading_eyebrow', locale)}</Text>
+            <Text style={styles.headline}>{year}</Text>
+          </View>
+
+          {/* Current-month heatmap card */}
+          <View style={styles.heatmapWrap}>
+            <View style={styles.heatmapCard}>
+              <View style={styles.heatmapHeader}>
+                <Text style={styles.heatmapMonth}>
+                  {now.toLocaleDateString(locale, { month: 'long' })}
+                </Text>
+                <Money value={currentMonthTotal} size={16} serif={false} sansWeight="700" />
               </View>
-            )
-          }}
-          renderSectionFooter={() => <View style={styles.sectionGap} />}
-          showsVerticalScrollIndicator={false}
-        />
-      )}
-    </SafeAreaView>
+
+              <View style={styles.weekdayRow}>
+                {weekdayLabels.map((label, i) => (
+                  <View key={i} style={styles.weekdayCell}>
+                    <Text style={styles.weekdayText}>{label}</Text>
+                  </View>
+                ))}
+              </View>
+
+              <View style={styles.grid}>
+                {gridCells.map((cell, i) => {
+                  if (!cell) return <View key={`x${i}`} style={styles.cellEmpty} />
+                  const isToday = cell.day === now.getDate()
+                  const intensity =
+                    cell.amount > 0 ? 0.2 + Math.min(cell.amount / maxDaily, 1) * 0.7 : 0
+                  const bg =
+                    cell.amount > 0
+                      ? `rgba(63,90,62,${intensity.toFixed(2)})`
+                      : Colors.surface2 ?? '#F5F2EB'
+                  const textLight = cell.amount > 0 && intensity > 0.5
+                  return (
+                    <View
+                      key={`d${cell.day}`}
+                      style={[
+                        styles.cell,
+                        { backgroundColor: bg },
+                        isToday && styles.cellToday,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.cellText,
+                          {
+                            color: textLight
+                              ? '#FFFFFF'
+                              : Colors.ink3 ?? Colors.textSecondary,
+                          },
+                        ]}
+                      >
+                        {cell.day}
+                      </Text>
+                    </View>
+                  )
+                })}
+              </View>
+            </View>
+          </View>
+
+          {/* Months list */}
+          <View style={styles.monthsWrap}>
+            <Text style={styles.sectionLabel}>{t('history.months', locale)}</Text>
+            {months.length === 0 ? (
+              <View style={styles.emptyCard}>
+                <Text style={styles.emptyText}>{t('history.empty', locale)}</Text>
+              </View>
+            ) : (
+              <View style={styles.monthsCard}>
+                {months.map((m, i) => {
+                  const isLast = i === months.length - 1
+                  return (
+                    <Pressable
+                      key={m.key}
+                      onPress={() => goToMonth(m.key)}
+                      style={({ pressed }) => [
+                        styles.monthRow,
+                        !isLast && styles.monthRowDivider,
+                        pressed && styles.monthRowPressed,
+                      ]}
+                    >
+                      <View style={styles.monthRowLeft}>
+                        <Text style={styles.monthName}>
+                          {m.date.toLocaleDateString(locale, {
+                            month: 'long',
+                            year: m.date.getFullYear() === year ? undefined : 'numeric',
+                          })}
+                        </Text>
+                        {m.current && (
+                          <Text style={styles.monthInProgress}>
+                            {t('history.in_progress', locale)}
+                          </Text>
+                        )}
+                      </View>
+                      <View style={styles.monthRowRight}>
+                        <Money value={m.total} size={14} serif={false} sansWeight="600" />
+                        <Ionicons
+                          name="chevron-forward"
+                          size={16}
+                          color={Colors.ink4 ?? Colors.textMuted}
+                        />
+                      </View>
+                    </Pressable>
+                  )
+                })}
+              </View>
+            )}
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    </>
   )
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Styles — trace S_History in docs/money-app/project/mobile-screens-4.jsx
+// ─────────────────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
-  header: { padding: Spacing.base, gap: Spacing.md },
-  title: {
-    fontFamily: Typography.fontFamily.sansBold,
-    fontSize: Typography.size['2xl'],
-    color: Colors.text,
-  },
-  segment: {
-    flexDirection: 'row',
-    backgroundColor: Colors.card,
-    borderRadius: Radius.full ?? 999,
-    padding: 4,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    alignSelf: 'flex-start',
-  },
-  segmentTab: {
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: 8,
-    borderRadius: Radius.full ?? 999,
-  },
-  segmentTabActive: {
-    backgroundColor: Colors.primary,
-  },
-  segmentLabel: {
-    fontFamily: Typography.fontFamily.sansSemiBold,
-    fontSize: Typography.size.sm,
-    color: Colors.textSecondary,
-  },
-  segmentLabelActive: {
-    color: Colors.white,
-  },
-  search: {
-    backgroundColor: Colors.card,
-    borderRadius: Radius.full ?? 999,
-    paddingHorizontal: Spacing.base,
-    paddingVertical: Spacing.md,
-    fontFamily: Typography.fontFamily.sans,
-    fontSize: Typography.size.base,
-    color: Colors.text,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  pillRow: {
-    gap: Spacing.sm,
-    paddingBottom: 2,
-  },
-  pill: {
+  content: { paddingBottom: 40 },
+
+  topRow: {
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 8,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: 8,
-    borderRadius: Radius.full ?? 999,
-    backgroundColor: Colors.card,
-    borderWidth: 1,
-    borderColor: Colors.border,
+    justifyContent: 'space-between',
   },
-  pillActive: {
-    backgroundColor: Colors.text,
-    borderColor: Colors.text,
-  },
-  pillDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  pillLabel: {
-    fontFamily: Typography.fontFamily.sansSemiBold,
-    fontSize: Typography.size.sm,
-    color: Colors.textSecondary,
-  },
-  pillLabelActive: {
-    color: Colors.white,
-  },
-  listContent: { paddingHorizontal: Spacing.base, paddingBottom: 120 },
-  dateHeader: {
-    fontFamily: Typography.fontFamily.sansSemiBold,
-    fontSize: Typography.size.sm,
-    color: Colors.textSecondary,
-    marginBottom: Spacing.xs,
-    marginTop: Spacing.sm,
-  },
-  txnCard: {
-    backgroundColor: Colors.card,
-  },
-  txnCardFirst: {
-    borderTopLeftRadius: Radius.lg,
-    borderTopRightRadius: Radius.lg,
-  },
-  txnCardLast: {
-    borderBottomLeftRadius: Radius.lg,
-    borderBottomRightRadius: Radius.lg,
-    shadowColor: Colors.shadow,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  txnCardMiddle: {},
-  divider: {
-    height: 1,
-    backgroundColor: Colors.border,
-    marginLeft: 44 + Spacing.md + Spacing.base,
-  },
-  sectionGap: { height: Spacing.md },
-  emptyState: {
-    flex: 1,
+  topLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  backPill: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: Colors.surface ?? '#FFFFFF',
+    borderWidth: Hairline.width,
+    borderColor: Hairline.color,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: Spacing.sm,
-    paddingHorizontal: Spacing['2xl'],
   },
-  emptyIcon: { fontSize: 40 },
-  emptyTitle: {
+  backPillPressed: { opacity: 0.6 },
+  breadcrumb: {
+    fontFamily: Typography.fontFamily.sansSemiBold,
+    fontSize: 15,
+    fontWeight: '600',
+    color: Colors.ink3 ?? Colors.textSecondary,
+  },
+  searchPill: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: Colors.surface ?? '#FFFFFF',
+    borderWidth: Hairline.width,
+    borderColor: Hairline.color,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  intro: { paddingHorizontal: 22, paddingTop: 14, paddingBottom: 8 },
+  eyebrow: {
+    color: Colors.ink4 ?? Colors.textMuted,
+    fontSize: 13,
+    fontWeight: '600',
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
+    fontFamily: Typography.fontFamily.sansSemiBold,
+  },
+  headline: {
+    fontFamily: Typography.fontFamily.serif,
+    fontSize: 34,
+    fontWeight: '700',
+    letterSpacing: -0.8,
+    color: Colors.ink ?? Colors.text,
+    marginTop: 4,
+  },
+
+  // Heatmap
+  heatmapWrap: { paddingHorizontal: 20, paddingTop: 12 },
+  heatmapCard: {
+    backgroundColor: Colors.surface ?? '#FFFFFF',
+    borderRadius: 22,
+    paddingHorizontal: 18,
+    paddingVertical: 18,
+  },
+  heatmapHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+  },
+  heatmapMonth: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: Colors.ink ?? Colors.text,
     fontFamily: Typography.fontFamily.sansBold,
-    fontSize: Typography.size.md,
-    color: Colors.text,
+  },
+  weekdayRow: {
+    flexDirection: 'row',
+    marginBottom: 6,
+    gap: 6,
+  },
+  weekdayCell: { flex: 1, alignItems: 'center' },
+  weekdayText: {
+    fontSize: 10,
+    color: Colors.ink4 ?? Colors.textMuted,
+    fontWeight: '700',
+    fontFamily: Typography.fontFamily.sansBold,
+  },
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  // Cells use a fixed percent width so 7 per row + 6px gaps line up. The
+  // `(100 - 6 gaps × ~1.4%)/7` approximation resolves to ~13.1%; we use
+  // `flex-basis` via width to keep the calculation local.
+  cell: {
+    width: '13.1%',
+    aspectRatio: 1,
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cellEmpty: {
+    width: '13.1%',
+    aspectRatio: 1,
+  },
+  cellToday: {
+    borderWidth: 1.5,
+    borderColor: Colors.ink ?? Colors.text,
+  },
+  cellText: {
+    fontSize: 10,
+    fontWeight: '600',
+    fontFamily: Typography.fontFamily.sansSemiBold,
+  },
+
+  // Months list
+  monthsWrap: { paddingHorizontal: 16, paddingTop: 20 },
+  sectionLabel: {
+    paddingHorizontal: 8,
+    paddingBottom: 8,
+    color: Colors.ink3 ?? Colors.textSecondary,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+    fontFamily: Typography.fontFamily.sansBold,
+  },
+  monthsCard: {
+    backgroundColor: Colors.surface ?? '#FFFFFF',
+    borderRadius: 22,
+    overflow: 'hidden',
+  },
+  monthRow: {
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  monthRowDivider: {
+    borderBottomWidth: Hairline.width,
+    borderBottomColor: Hairline.color,
+  },
+  monthRowPressed: { backgroundColor: 'rgba(40,36,28,0.04)' },
+  monthRowLeft: { flexShrink: 1 },
+  monthName: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: Colors.ink ?? Colors.text,
+    fontFamily: Typography.fontFamily.sansSemiBold,
+  },
+  monthInProgress: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: Colors.accent ?? Colors.primary,
+    marginTop: 1,
+    letterSpacing: 0.3,
+    fontFamily: Typography.fontFamily.sansBold,
+  },
+  monthRowRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+
+  emptyCard: {
+    backgroundColor: Colors.surface ?? '#FFFFFF',
+    borderRadius: 22,
+    paddingVertical: 32,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+  },
+  emptyText: {
+    fontSize: 14,
+    color: Colors.ink3 ?? Colors.textSecondary,
+    textAlign: 'center',
+    fontFamily: Typography.fontFamily.sans,
   },
 })
