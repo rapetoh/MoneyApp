@@ -13,13 +13,12 @@ export default function AskMurmurScreen() {
   const locale = (profile?.locale ?? 'en') as Locale
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <SafeAreaView style={styles.safe} edges={['bottom', 'left', 'right']}>
       <View style={styles.content}>
         <View style={styles.logoBlock}>
           <View style={styles.logoSquare}>
             <Text style={styles.logoGlyph}>✦</Text>
           </View>
-          <Text style={styles.title}>{t('ask.title', locale)}</Text>
           <Text style={styles.tagline}>{t('ask.tagline', locale)}</Text>
         </View>
 

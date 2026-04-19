@@ -97,10 +97,8 @@ export default function ExpensesScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <SafeAreaView style={styles.safe} edges={['bottom', 'left', 'right']}>
       <View style={styles.header}>
-        <Text style={styles.title}>{t('transactions.title', locale)}</Text>
-
         {/* Expenses / Income toggle (styled like the Voice / Manual toggle) */}
         <View style={styles.segment}>
           <Pressable

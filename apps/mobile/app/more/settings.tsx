@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback } from 'react'
 import {
   View,
   Text,
@@ -151,10 +151,8 @@ export default function SettingsScreen() {
   const SHORTCUT_INSTALL_URL = 'https://www.icloud.com/shortcuts/placeholder'
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <SafeAreaView style={styles.safe} edges={['bottom', 'left', 'right']}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <Text style={styles.title}>{t('settings.title', locale)}</Text>
-
         {/* Profile card */}
         <View style={styles.profileCard}>
           <View style={styles.avatarCircle}>

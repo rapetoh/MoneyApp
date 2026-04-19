@@ -14,9 +14,8 @@ export default function HelpScreen() {
   const locale = (profile?.locale ?? 'en') as Locale
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <SafeAreaView style={styles.safe} edges={['bottom', 'left', 'right']}>
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.title}>{t('help.title', locale)}</Text>
         <Text style={styles.body}>{t('help.body', locale)}</Text>
 
         <View style={styles.card}>

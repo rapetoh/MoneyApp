@@ -14,9 +14,8 @@ export default function PrivacyScreen() {
   const locale = (profile?.locale ?? 'en') as Locale
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <SafeAreaView style={styles.safe} edges={['bottom', 'left', 'right']}>
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.title}>{t('privacy.title', locale)}</Text>
         <Text style={styles.tagline}>{t('privacy.tagline', locale)}</Text>
 
         <View style={styles.card}>
