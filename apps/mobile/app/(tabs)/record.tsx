@@ -782,12 +782,16 @@ const styles = StyleSheet.create({
   // viewport above the tab bar. Bottom padding reserves room for the
   // translucent tab bar + FAB cluster (~110pt) so the Add button never
   // sits under the bar.
+  // Tight vertical budget on iPhone: the (tabs) layout uses an absolute
+  // tab bar (height 68, bottom 14) that overlaps content, and the record
+  // FAB overshoots above it — so we reserve ~96pt at the bottom and keep
+  // inter-row gaps small so everything fits above the bar in one viewport.
   manualContainer: {
     flex: 1,
     paddingHorizontal: Spacing.base,
-    paddingTop: Spacing.sm,
-    paddingBottom: 110,
-    gap: Spacing.sm,
+    paddingTop: 4,
+    paddingBottom: 96,
+    gap: 4,
   },
   directionRow: {
     flexDirection: 'row',
@@ -797,7 +801,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
   },
-  directionBtn: { flex: 1, paddingVertical: Spacing.sm, alignItems: 'center', borderRadius: Radius.sm },
+  directionBtn: { flex: 1, paddingVertical: 6, alignItems: 'center', borderRadius: Radius.sm },
   directionBtnActive: { backgroundColor: Colors.expense },
   directionBtnActiveIncome: { backgroundColor: Colors.income },
   directionLabel: {
@@ -844,9 +848,9 @@ const styles = StyleSheet.create({
   },
   quickInput: {
     backgroundColor: Colors.surface ?? Colors.card,
-    borderRadius: 14,
-    paddingHorizontal: Spacing.base,
-    paddingVertical: 10,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
     fontFamily: Typography.fontFamily.sans,
     fontSize: 14,
     color: Colors.ink ?? Colors.text,
@@ -857,15 +861,15 @@ const styles = StyleSheet.create({
   // 3×4 on-screen keypad — compacted so the whole Manual surface fits in
   // one viewport (48pt keys, 6pt gaps). Replaces the native decimal-pad.
   keypad: {
-    gap: 6,
+    gap: 5,
   },
   keypadRow: {
     flexDirection: 'row',
-    gap: 6,
+    gap: 5,
   },
   keypadKey: {
     flex: 1,
-    height: 48,
+    height: 44,
     backgroundColor: Colors.surface ?? Colors.card,
     borderRadius: 12,
     alignItems: 'center',
@@ -876,7 +880,7 @@ const styles = StyleSheet.create({
   keypadKeyPressed: { opacity: 0.55 },
   keypadKeyText: {
     fontFamily: Typography.fontFamily.serif,
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: '500',
     color: Colors.ink ?? Colors.text,
   },
@@ -892,9 +896,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 14,
-    borderRadius: 24,
+    paddingHorizontal: 14,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: Colors.surface ?? Colors.card,
     borderWidth: Hairline.width,
     borderColor: Hairline.color,
@@ -955,10 +959,10 @@ const styles = StyleSheet.create({
   addButton: {
     flex: 1,
     backgroundColor: Colors.ink ?? '#1B1915',
-    borderRadius: 24,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
-    height: 48,
+    height: 44,
   },
   addButtonDisabled: { opacity: 0.4 },
   addButtonText: {
