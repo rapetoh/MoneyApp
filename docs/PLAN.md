@@ -943,4 +943,63 @@ The existing `detail.delete_msg` ("This cannot be undone.") is now unused at the
 - **Bottom-sheet category picker.** The current inline horizontal chip scroller works fine; the bottom-sheet upgrade is pure polish and can ride with Phase D's broader capture redesign.
 - **Undo for save (voice/manual create) and edit.** Harder than undo-for-delete because save-undo needs to also roll back the recurring rule that `record.tsx` creates in a separate transaction, and edit-undo needs to capture the pre-edit snapshot at the start of the edit flow. Infrastructure (`useUndo`) is in place; wiring these is a pure additive task for Phase D or later.
 
+### Phase D — Claude Design visual match (closed April 19, 2026)
+
+Design reference: [docs/money-app/project/](./money-app/project/) — the screen bundle from Claude Design. Twelve commits, screen-by-screen, each tracing one `S_*` component from the `mobile-screens-*.jsx` files.
+
+**Shipped (all 4 locales — en/fr/es/pt):**
+
+| Screen | Commit | Notes |
+|---|---|---|
+| Translucent tab bar + icon symbols | `39f0c0a` | Solid translucent color — real backdrop blur deferred (see native deps below) |
+| `S_Today` | `536f332` | 34px serif "Today" + APRIL eyebrow + SafeToSpend + MiniBars + TxRow list |
+| `S_Detail` | `68bfa3c` | 92px serif hero + merchant avatar + breakdown + soft-delete flow preserved |
+| `S_Budgets` | `c9d2176` | Ring hero rendered as filled disc + halo (arc version pending `react-native-svg`) |
+| `S_Privacy` | `588728f` | Back pill + serif headline + SetGroup / PrivacyRow |
+| `S_Settings` + `S_Paywall` | `c0af54f` | Paywall radial glow is an RN View approximation |
+| fixup 1 | `86db0bf` | Merchant logo, dots menu, + button, privacy toggles |
+| fixup 2 | `a518768` | Budget quick-edit, ? fallback, play glyph |
+| `S_Listening` (component) | `b58df3d` | Standalone, inert |
+| `S_Listening` (wired) | `c8b3673` | Early-return in [apps/mobile/app/(tabs)/record.tsx](../apps/mobile/app/(tabs)/record.tsx) when `useVoice.state` is `listening` or `processing` |
+| `S_Recurring` | `8df6ed8` | Subscriptions dashboard; tap a row → iOS action sheet (pause/resume + delete preserved) |
+| `S_Insights` | `8872d3f` | Hero + delta pill + 14-bar trend + categories + dark forecast card |
+| `S_AskEntry` | `e5a4e46` | Plus-gated entry UI; submit routes to `/more/paywall`. `S_AskResult` NOT built — depends on Phase E backend |
+| `S_History` | `08ae365` | Year-at-a-glance; split into `more/history.tsx` (calendar + months) + `more/transactions.tsx` (search/filter list, moved via `git mv`) |
+| fixup: Today icons + History picker + Transactions header | `46ff0a7` | User feedback pass — see commit body |
+| `S_DayOne` (coach) | `45eafe0` | First-log guidance; renders when `transactions.length === 0`. Mic-FAB glow + "tap & hold" callout skipped (see below) |
+| More drawer polish | `be310c0` | Title/eyebrow/Plus-pill aligned to Phase D rhythm |
+
+**Explicitly not built (out of Phase D scope, tracked):**
+
+- **`S_AskResult`** — the grounded-reasoner chat bubble screen. Needs the Phase E backend to produce real numbers from the user's transactions; a hard-coded demo would misrepresent the product. Entry screen (`S_AskEntry`) is wired to the paywall so Ask is still reachable and marketed.
+- **`S_Income`** (step 3 of 3 onboarding) + the broader welcome/permissions onboarding. Phase D only shipped `S_DayOne` as a coach-on-Today. A proper onboarding flow is its own project.
+
+**Native-dep deferrals — one rebuild decision:**
+
+Three visuals currently ship as pure-React-Native approximations because a real implementation needs a native dep (and a rebuild). Grouped so they can be batched into one cycle:
+
+1. **`react-native-svg`** — buys us:
+   - **BudgetRing arc** ([src/components/BudgetRing.tsx](../apps/mobile/src/components/BudgetRing.tsx)): mockup draws a stroked progress arc (`<circle>` + `<path>` with stroke-dasharray). Today we render a filled disc + `accentSoft` halo + percent label. Reads fine, but the arc is the signature visual on the Budgets tab.
+   - **Insights trend area** ([app/(tabs)/insights.tsx:135](../apps/mobile/app/(tabs)/insights.tsx)): mockup shows a smooth `<path>` with a sage gradient fill under the curve. Today we render 14 RN `<View>` bars. Readable, but the smooth curve is prettier and more "finance app" than a bar chart.
+   - **Listening BigWaveform**: no work — the mockup itself draws this as a `<rect>` array, so the current RN `<View>` bars already match.
+
+2. **`expo-blur`** — buys us:
+   - **Tab bar backdrop blur** ([app/(tabs)/_layout.tsx:99-101](../apps/mobile/app/(tabs)/_layout.tsx)): currently a semi-transparent solid color. Real iOS-style frosted glass needs `BlurView`. Noticeable on Today when scrolling content under the bar.
+
+3. **`expo-linear-gradient`** — already installed, not currently used. Would let us:
+   - Replace the Paywall radial halo approximation with a real radial (though CSS radial gradients aren't in RN — would need a stack of concentric views or an image). Current approximation is acceptable.
+   - Improve forecast card surface ramps on the Insights ink card.
+
+**Recommendation:** ship Phase D as-is and **batch native deps with the next planned rebuild**. Likely next rebuild is triggered by either (a) adding IAP for Plus (requires `react-native-iap` or `react-native-purchases`), (b) the Expo SDK bump currently pending on `expo-speech-recognition@^3.1.2`, or (c) Phase E's Ask Murmur backend integration. When one of those lands, add `react-native-svg` + `expo-blur` in the same cycle, then:
+
+- Replace `BudgetRing`'s disc with an SVG arc (15 min — stroke a circle with `strokeDasharray` at `2πr * pct`).
+- Replace Insights' `trendRow` with an SVG `<Path>` + `<LinearGradient>` for the fill (30 min — compute points from `trend[]`, use a Catmull-Rom smoothing pass).
+- Wrap the tab bar background in `BlurView` with `tint="light"` + `intensity={80}` (5 min).
+
+All three changes are pure substitutions — no downstream code touches them.
+
+**Deliberately skipped (documented, not re-opened):**
+
+- **DayOne mic-FAB glow + "Tap & hold to speak" callout** ([apps/mobile/src/components/DayOneFirstLog.tsx](../apps/mobile/src/components/DayOneFirstLog.tsx)): brittle absolute positioning relative to the tab bar + FAB that varies across device sizes. The coach's core job (headline + example phrasings + type-instead fallback) ships without them.
+
 *End of Plan*
