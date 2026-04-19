@@ -48,7 +48,7 @@ export default function TabsLayout() {
         options={{
           title: t('tabs.today', locale),
           tabBarIcon: ({ focused }) => (
-            <TabIcon focused={focused} name={focused ? 'home' : 'home-outline'} />
+            <TabIcon focused={focused} name={focused ? 'menu' : 'menu-outline'} />
           ),
         }}
       />
@@ -74,7 +74,7 @@ export default function TabsLayout() {
         options={{
           title: t('tabs.budgets', locale),
           tabBarIcon: ({ focused }) => (
-            <TabIcon focused={focused} name={focused ? 'pie-chart' : 'pie-chart-outline'} />
+            <TabIcon focused={focused} name={focused ? 'time' : 'time-outline'} />
           ),
         }}
       />
@@ -95,6 +95,10 @@ export default function TabsLayout() {
 }
 
 const styles = StyleSheet.create({
+  // Same geometry as before the Claude-Design rework — sage active pill on
+  // icons, sage FAB — only the background becomes translucent so the content
+  // behind the bar shows through. Real backdrop blur needs expo-blur + a
+  // native rebuild; ask the user before adding that.
   tabBar: {
     position: 'absolute',
     left: 16,
@@ -102,7 +106,7 @@ const styles = StyleSheet.create({
     bottom: 14,
     height: 68,
     borderRadius: 34,
-    backgroundColor: Colors.tabBar,
+    backgroundColor: 'rgba(255,255,255,0.85)',
     borderTopWidth: 0,
     paddingBottom: 10,
     paddingHorizontal: 9,
