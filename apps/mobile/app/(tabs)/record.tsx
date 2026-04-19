@@ -435,30 +435,29 @@ export default function RecordScreen() {
           style={styles.manualContainer}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
-          {/* Direction segmented control. Kept — S_Keypad only shows a
-              one-way expense flow but we support both (non-regression). */}
-          <View style={styles.directionRow}>
-            <Pressable
-              style={[styles.directionBtn, direction === 'debit' && styles.directionBtnActive]}
-              onPress={() => setDirection('debit')}
-            >
-              <Text style={[styles.directionLabel, direction === 'debit' && styles.directionLabelActive]}>
-                {t('voice.expense', userLocale as any)}
-              </Text>
-            </Pressable>
-            <Pressable
-              style={[styles.directionBtn, direction === 'credit' && styles.directionBtnActiveIncome]}
-              onPress={() => setDirection('credit')}
-            >
-              <Text style={[styles.directionLabel, direction === 'credit' && styles.directionLabelActiveIncome]}>
-                {t('voice.income_label', userLocale as any)}
-              </Text>
-            </Pressable>
-          </View>
+          {/* Amount card — direction toggle + amount hero live in the same
+              surface so they read as one unit and the primary entry surface
+              doesn't bloat vertically. */}
+          <View style={styles.amountCard}>
+            <View style={styles.directionRow}>
+              <Pressable
+                style={[styles.directionBtn, direction === 'debit' && styles.directionBtnActive]}
+                onPress={() => setDirection('debit')}
+              >
+                <Text style={[styles.directionLabel, direction === 'debit' && styles.directionLabelActive]}>
+                  {t('voice.expense', userLocale as any)}
+                </Text>
+              </Pressable>
+              <Pressable
+                style={[styles.directionBtn, direction === 'credit' && styles.directionBtnActiveIncome]}
+                onPress={() => setDirection('credit')}
+              >
+                <Text style={[styles.directionLabel, direction === 'credit' && styles.directionLabelActiveIncome]}>
+                  {t('voice.income_label', userLocale as any)}
+                </Text>
+              </Pressable>
+            </View>
 
-          {/* Hero amount + currency. flex:1 so the keypad sticks to the bottom
-              and this block absorbs whatever vertical slack remains. */}
-          <View style={styles.amountHero}>
             <Text style={styles.amountHeroText} numberOfLines={1} adjustsFontSizeToFit>
               {amount === ''
                 ? <Text style={styles.amountHeroPlaceholder}>0</Text>
@@ -782,26 +781,33 @@ const styles = StyleSheet.create({
   // viewport above the tab bar. Bottom padding reserves room for the
   // translucent tab bar + FAB cluster (~110pt) so the Add button never
   // sits under the bar.
-  // Tight vertical budget on iPhone: the (tabs) layout uses an absolute
-  // tab bar (height 68, bottom 14) that overlaps content, and the record
-  // FAB overshoots above it — so we reserve ~96pt at the bottom and keep
-  // inter-row gaps small so everything fits above the bar in one viewport.
+  // Manual layout: fixed heights everywhere, no flex:1 mystery spaces.
+  // The (tabs) layout uses an absolute tab bar (height 68, bottom 14,
+  // plus FAB protrusion and shadow ~20pt above). 120pt paddingBottom
+  // keeps the Add CTA comfortably above it on every device.
   manualContainer: {
     flex: 1,
     paddingHorizontal: Spacing.base,
     paddingTop: 4,
-    paddingBottom: 96,
-    gap: 4,
+    paddingBottom: 120,
+    gap: 8,
+    justifyContent: 'flex-end',
   },
+  // Direction toggle — lives inside the amount card, transparent background
+  // so the card's own surface carries the visual weight.
   directionRow: {
     flexDirection: 'row',
-    backgroundColor: Colors.card,
-    borderRadius: Radius.md,
-    padding: 4,
-    borderWidth: 1,
-    borderColor: Colors.border,
+    backgroundColor: 'rgba(0,0,0,0.04)',
+    borderRadius: Radius.full ?? 999,
+    padding: 3,
+    alignSelf: 'center',
   },
-  directionBtn: { flex: 1, paddingVertical: 6, alignItems: 'center', borderRadius: Radius.sm },
+  directionBtn: {
+    paddingVertical: 5,
+    paddingHorizontal: 18,
+    alignItems: 'center',
+    borderRadius: Radius.full ?? 999,
+  },
   directionBtnActive: { backgroundColor: Colors.expense },
   directionBtnActiveIncome: { backgroundColor: Colors.income },
   directionLabel: {
@@ -811,22 +817,27 @@ const styles = StyleSheet.create({
   },
   directionLabelActive: { color: Colors.white },
   directionLabelActiveIncome: { color: Colors.white },
-  // Amount hero — flex:1 so it absorbs slack between the direction toggle
-  // and the keypad. adjustsFontSizeToFit handles long entries without
-  // pushing anything off screen.
-  amountHero: {
-    flex: 1,
+  // Amount card — direction toggle + big serif amount in a single surface.
+  // Fixed height so the content below (merchant, category, keypad, footer)
+  // sits in predictable positions regardless of screen size.
+  amountCard: {
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 60,
+    paddingVertical: 14,
+    gap: 8,
+    backgroundColor: Colors.surface ?? Colors.card,
+    borderRadius: 20,
+    borderWidth: Hairline.width,
+    borderColor: Hairline.color,
   },
   amountHeroText: {
     fontFamily: Typography.fontFamily.serif,
-    fontSize: 64,
+    fontSize: 56,
     fontWeight: '500',
-    letterSpacing: -1.2,
-    lineHeight: 70,
+    letterSpacing: -1,
+    lineHeight: 60,
     color: Colors.ink ?? Colors.text,
+    textAlign: 'center',
   },
   amountHeroPlaceholder: {
     color: Colors.ink3 ?? Colors.textSecondary,
