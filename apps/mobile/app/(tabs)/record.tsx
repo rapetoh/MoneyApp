@@ -122,24 +122,15 @@ export default function RecordScreen() {
   // On-screen keypad key handler — matches S_Keypad from
   // docs/money-app/project/mobile-screens-3.jsx.
   function handleKeypadPress(key: string) {
-    if (key === '⌫') {
-      setAmount((prev) => prev.slice(0, -1))
-      return
-    }
-    if (key === '.') {
-      // Only one decimal separator allowed; ignore otherwise.
-      if (amount.includes('.')) return
-      // Leading "." becomes "0." for readability.
-      setAmount((prev) => (prev === '' ? '0.' : prev + '.'))
-      return
-    }
-    // Digit. Block:
-    //  - leading zeros (so "05" doesn't happen — "5" is correct)
-    //  - more than 2 decimal places
-    //  - absurdly long entries (caps at 10 chars incl. the decimal point)
     setAmount((prev) => {
+      if (key === '⌫') return prev.slice(0, -1)
+      if (key === '.') {
+        if (prev.includes('.')) return prev
+        return prev === '' ? '0.' : prev + '.'
+      }
+      // Digit
       if (prev.length >= 10) return prev
-      if (prev === '0' && key !== '.') return key
+      if (prev === '0') return key // replace leading zero
       const decIdx = prev.indexOf('.')
       if (decIdx >= 0 && prev.length - decIdx - 1 >= 2) return prev
       return prev + key
@@ -455,11 +446,15 @@ export default function RecordScreen() {
               </Pressable>
             </View>
 
-            <Text style={styles.amountHeroText} numberOfLines={1} adjustsFontSizeToFit>
-              {amount === ''
-                ? <Text style={styles.amountHeroPlaceholder}>0</Text>
-                : amount}
-            </Text>
+            {amount === '' ? (
+              <Text style={[styles.amountHeroText, styles.amountHeroPlaceholder]} numberOfLines={1}>
+                0
+              </Text>
+            ) : (
+              <Text style={styles.amountHeroText} numberOfLines={1} ellipsizeMode="clip">
+                {amount}
+              </Text>
+            )}
             <Text style={styles.amountHeroCurrency}>{userCurrency}</Text>
           </View>
 
@@ -521,11 +516,11 @@ export default function RecordScreen() {
             <Pressable
               style={({ pressed }) => [
                 styles.addButton,
-                (manualSaving || amount === '') && styles.addButtonDisabled,
+                (manualSaving || !(parseFloat(amount) > 0)) && styles.addButtonDisabled,
                 pressed && { opacity: 0.85 },
               ]}
               onPress={handleManualSave}
-              disabled={manualSaving || amount === ''}
+              disabled={manualSaving || !(parseFloat(amount) > 0)}
             >
               {manualSaving ? (
                 <ActivityIndicator color={Colors.white} />
@@ -840,11 +835,13 @@ const styles = StyleSheet.create({
   amountHeroText: {
     fontFamily: Typography.fontFamily.serif,
     fontSize: 56,
-    fontWeight: '500',
-    letterSpacing: -1,
-    lineHeight: 60,
+    fontWeight: '600',
+    letterSpacing: -0.5,
+    lineHeight: 64,
     color: Colors.ink ?? Colors.text,
     textAlign: 'center',
+    // Tabular-nums keeps digits the same width so "11" doesn't jump as you type.
+    fontVariant: ['tabular-nums'],
   },
   amountHeroPlaceholder: {
     color: Colors.ink3 ?? Colors.textSecondary,
