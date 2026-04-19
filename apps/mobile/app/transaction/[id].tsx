@@ -220,17 +220,12 @@ export default function TransactionDetailScreen() {
       <Stack.Screen options={{ headerShown: false }} />
       <SafeAreaView style={styles.safe} edges={['top', 'bottom', 'left', 'right']}>
         <ScrollView contentContainerStyle={styles.content}>
-          {/* Top pills: back + menu dots (dots is a no-op placeholder for a future context menu) */}
+          {/* Top bar: back pill only. The mockup's right-side dots menu was a
+              no-op placeholder — removed per user feedback. Actions (Edit,
+              Delete) live in the button row below the fields. */}
           <View style={styles.topRow}>
             <HeaderPill onPress={() => router.back()}>
               <Ionicons name="chevron-back" size={20} color={Colors.ink2 ?? Colors.textSecondary} />
-            </HeaderPill>
-            <HeaderPill>
-              <Ionicons
-                name="ellipsis-horizontal"
-                size={18}
-                color={Colors.ink2 ?? Colors.textSecondary}
-              />
             </HeaderPill>
           </View>
 

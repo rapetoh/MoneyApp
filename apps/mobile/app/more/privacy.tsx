@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Stack, useRouter } from 'expo-router'
@@ -7,8 +6,6 @@ import { useAuth } from '../../src/hooks/useAuth'
 import { useProfile } from '../../src/hooks/useProfile'
 import { Colors, Typography, Hairline } from '../../src/theme'
 import { t, type Locale } from '@voice-expense/shared'
-
-type IoniconName = React.ComponentProps<typeof Ionicons>['name']
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Sub-components — match SetGroup / SetRow / PrivacyRow in
@@ -114,13 +111,6 @@ export default function PrivacyScreen() {
   const locale = (profile?.locale ?? 'en') as Locale
   const router = useRouter()
 
-  // Local state for the toggle rows. These are visual-only for now — none of
-  // them correspond to existing persisted settings. Wiring them to real
-  // preferences is a separate task (see Phase D extension / Settings pass).
-  const [voiceOnDevice, setVoiceOnDevice] = useState(true)
-  const [shareAnalytics, setShareAnalytics] = useState(false)
-  const [deleteVoice24h, setDeleteVoice24h] = useState(true)
-
   return (
     <>
       {/* Hide the native Stack header — the mockup has a chevron-pill + breadcrumb label */}
@@ -168,25 +158,29 @@ export default function PrivacyScreen() {
             />
           </SetGroup>
 
-          {/* Controls */}
-          <SetGroup label={t('privacy.group_controls', locale)}>
+          {/* Guarantees (not user-controllable). The mockup shows three toggles
+              here, but each is a permanent product decision in our build:
+              voice processing is always on-device (speech-recognition never
+              leaves the phone), we don't collect any analytics, and we don't
+              store audio at all — only transcripts. Showing them as toggles
+              implied the user could disable behaviors we've already locked
+              down, so we render them as static read-only rows with a detail
+              label describing the guarantee. */}
+          <SetGroup label={t('privacy.group_guarantees', locale)}>
             <SetRow
               label={t('privacy.ctrl_voice_on_device', locale)}
-              toggle
-              value={voiceOnDevice}
-              onToggle={setVoiceOnDevice}
+              detail={t('privacy.status_always', locale)}
+              chevron={false}
             />
             <SetRow
               label={t('privacy.ctrl_share_analytics', locale)}
-              toggle
-              value={shareAnalytics}
-              onToggle={setShareAnalytics}
+              detail={t('privacy.status_never', locale)}
+              chevron={false}
             />
             <SetRow
               label={t('privacy.ctrl_delete_voice_24h', locale)}
-              toggle
-              value={deleteVoice24h}
-              onToggle={setDeleteVoice24h}
+              detail={t('privacy.status_not_stored', locale)}
+              chevron={false}
               last
             />
           </SetGroup>

@@ -1,7 +1,6 @@
 import { useMemo } from 'react'
 import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Ionicons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
 import { useAuth } from '../../src/hooks/useAuth'
 import { useProfile } from '../../src/hooks/useProfile'
@@ -10,7 +9,7 @@ import { useActiveBudget, usePeriodSpend } from '../../src/hooks/useBudget'
 import { useRecurringRules, computeUpcomingRecurring } from '../../src/hooks/useRecurringRules'
 import { Money } from '../../src/components/Money'
 import { BudgetRing } from '../../src/components/BudgetRing'
-import { Colors, Typography, Hairline } from '../../src/theme'
+import { Colors, Typography } from '../../src/theme'
 import { t } from '@voice-expense/shared'
 import type { Locale } from '@voice-expense/shared'
 
@@ -65,7 +64,6 @@ export default function BudgetsScreen() {
   const router = useRouter()
 
   const locale = (profile?.locale ?? 'en') as Locale
-  const currency = profile?.currency_code ?? 'USD'
 
   const monthLabel = useMemo(
     () => new Date().toLocaleDateString(locale, { month: 'long' }).toUpperCase(),
@@ -86,7 +84,10 @@ export default function BudgetsScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Header row */}
+        {/* Header row. The mockup has a "+" pill here for adding a budget;
+            we remove it until per-category budget creation exists as a real
+            flow — routing it to Settings was confusing. Returns when the
+            category-budget-editor sheet lands (tracked as follow-up). */}
         <View style={styles.header}>
           <View>
             <Text style={styles.monthTag}>
@@ -94,12 +95,6 @@ export default function BudgetsScreen() {
             </Text>
             <Text style={styles.title}>{t('budgets.title', locale)}</Text>
           </View>
-          <Pressable
-            style={({ pressed }) => [styles.plusBtn, pressed && styles.plusBtnPressed]}
-            onPress={() => router.push('/more/settings')}
-          >
-            <Ionicons name="add" size={20} color={Colors.ink2 ?? Colors.textSecondary} />
-          </Pressable>
         </View>
 
         {/* Hero ring card — only when a budget is set */}
@@ -192,19 +187,6 @@ const styles = StyleSheet.create({
     color: Colors.ink ?? Colors.text,
     marginTop: 2,
   },
-  plusBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: Colors.surface ?? '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 0.5,
-    borderColor: Colors.line ?? 'rgba(0,0,0,0.06)',
-    marginTop: 20,
-  },
-  plusBtnPressed: { opacity: 0.6 },
-
   // Hero card
   heroCard: {
     marginHorizontal: 20,

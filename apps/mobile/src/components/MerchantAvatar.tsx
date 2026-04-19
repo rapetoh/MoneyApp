@@ -1,5 +1,5 @@
-import React, { useState } from 'react'
-import { View, Text, Image, StyleSheet } from 'react-native'
+import React, { useEffect, useState } from 'react'
+import { View, Text, Image, StyleSheet, type ImageStyle } from 'react-native'
 import { merchantColor } from '@voice-expense/shared'
 import { Typography } from '../theme'
 
@@ -8,10 +8,15 @@ interface Props {
   /** Optional domain hint from AI (e.g. "netflix.com") — used instead of guessing */
   merchantDomain?: string | null
   size?: number
+  /**
+   * Shape to render the logo with. Default circle. Pass a number to override
+   * the radius directly (e.g. `radius={12}` for rounded-square tiles per
+   * DESIGN.md's TxRow spec).
+   */
+  radius?: number
 }
 
 // Well-known merchants whose domain can't be derived by stripping spaces.
-// Keys are lowercase with all non-alpha stripped.
 const KNOWN_DOMAINS: Record<string, string> = {
   netflix: 'netflix.com',
   spotify: 'spotify.com',
@@ -78,32 +83,51 @@ const KNOWN_DOMAINS: Record<string, string> = {
   panera: 'panerabread.com',
 }
 
-// Derive a best-guess domain from a merchant name.
 function guessDomain(name: string): string {
   const normalized = name.toLowerCase().replace(/[^a-z0-9]/g, '')
   return KNOWN_DOMAINS[normalized] ?? (normalized + '.com')
 }
 
-export function MerchantAvatar({ merchant, merchantDomain, size = 44 }: Props) {
+export function MerchantAvatar({ merchant, merchantDomain, size = 44, radius }: Props) {
   const [logoFailed, setLogoFailed] = useState(false)
+
+  // Reset the failed flag whenever the merchant or its domain changes. Without
+  // this, a single transient error (e.g. first-paint race, flaky network on
+  // cold app start) permanently locks the avatar into the letter fallback
+  // even after the image would load fine on retry. Chick-fil-A specifically
+  // regressed after Phase D because the failure state persisted across
+  // re-renders of the same row.
+  useEffect(() => {
+    setLogoFailed(false)
+  }, [merchant, merchantDomain])
 
   const name = merchant ?? '?'
   const initial = name[0]?.toUpperCase() ?? '?'
   const bgColor = merchantColor(name)
 
-  // Prefer explicit domain from AI, fall back to our guess
   const domain = merchantDomain ?? (name !== '?' ? guessDomain(name) : null)
   const logoUrl = domain && !logoFailed
     ? `https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=http://${domain}&size=128`
     : null
 
+  const borderRadius = radius ?? size / 2
+
   if (logoUrl) {
+    // `cover` (not `contain`) fills the full frame so the logo reads at small
+    // sizes; favicons are square so no cropping occurs in practice, and it
+    // prevents the "tiny logo floating in empty circle" look at 40px.
+    const imageStyle: ImageStyle = {
+      width: size,
+      height: size,
+      borderRadius,
+      backgroundColor: '#FFFFFF',
+    }
     return (
       <Image
         source={{ uri: logoUrl }}
-        style={[styles.logo, { width: size, height: size, borderRadius: size / 2 }]}
+        style={imageStyle}
         onError={() => setLogoFailed(true)}
-        resizeMode="contain"
+        resizeMode="cover"
       />
     )
   }
@@ -112,7 +136,7 @@ export function MerchantAvatar({ merchant, merchantDomain, size = 44 }: Props) {
     <View
       style={[
         styles.avatar,
-        { width: size, height: size, borderRadius: size / 2, backgroundColor: bgColor },
+        { width: size, height: size, borderRadius, backgroundColor: bgColor },
       ]}
     >
       <Text style={[styles.initial, { fontSize: size * 0.38 }]}>{initial}</Text>
@@ -121,9 +145,6 @@ export function MerchantAvatar({ merchant, merchantDomain, size = 44 }: Props) {
 }
 
 const styles = StyleSheet.create({
-  logo: {
-    backgroundColor: 'transparent',
-  },
   avatar: {
     alignItems: 'center',
     justifyContent: 'center',
