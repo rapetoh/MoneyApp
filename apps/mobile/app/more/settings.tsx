@@ -20,6 +20,7 @@ import { useActiveBudget } from '../../src/hooks/useBudget'
 import { useNotificationListener } from '../../src/hooks/useNotificationListener'
 import { useApiUrl } from '../../src/hooks/useApiUrl'
 import { SetGroup, SetRow } from '../../src/components/SettingsList'
+import { BudgetEditorModal } from '../../src/components/BudgetEditorModal'
 import { Colors, Typography, Radius, Hairline } from '../../src/theme'
 import { t, type Locale } from '@voice-expense/shared'
 import type { BudgetPeriod } from '@voice-expense/shared'
@@ -58,8 +59,6 @@ export default function SettingsScreen() {
   const router = useRouter()
 
   const [budgetModal, setBudgetModal] = useState(false)
-  const [budgetInput, setBudgetInput] = useState('')
-  const [budgetPeriod, setBudgetPeriod] = useState<BudgetPeriod>('monthly')
   const [localeModal, setLocaleModal] = useState(false)
   const [currencyModal, setCurrencyModal] = useState(false)
   const [nameModal, setNameModal] = useState(false)
@@ -87,24 +86,6 @@ export default function SettingsScreen() {
       { text: t('common.cancel', locale), style: 'cancel' },
       { text: t('auth.sign_out', locale), style: 'destructive', onPress: () => signOut() },
     ])
-  }
-
-  function openBudgetModal() {
-    setBudgetInput(budget ? String(budget.amount) : '')
-    setBudgetPeriod(budget?.period ?? 'monthly')
-    setBudgetModal(true)
-  }
-
-  async function handleSaveBudget() {
-    const amount = parseFloat(budgetInput.replace(',', '.'))
-    if (isNaN(amount) || amount <= 0) {
-      Alert.alert(t('common.error', locale), t('settings.invalid_budget', locale))
-      return
-    }
-    const ok = await setBudget(amount, budgetPeriod, currency)
-    if (!ok) Alert.alert(t('common.error', locale), t('settings.budget_save_error', locale))
-    setBudgetModal(false)
-    setBudgetInput('')
   }
 
   async function handleSaveName() {
@@ -196,7 +177,7 @@ export default function SettingsScreen() {
           <SetRow
             label={t('settings.income', locale)}
             detail={budgetDisplay}
-            onPress={openBudgetModal}
+            onPress={() => setBudgetModal(true)}
           />
           <SetRow
             label={t('settings.currency', locale)}
@@ -271,47 +252,16 @@ export default function SettingsScreen() {
       {/* — Modals below are unchanged in behavior; only their chrome uses the same
             ink-accent visual language as before. */}
 
-      {/* Budget modal */}
-      <Modal visible={budgetModal} animationType="slide" presentationStyle="pageSheet">
-        <View style={styles.modal}>
-          <View style={styles.modalHeader}>
-            <Pressable onPress={() => setBudgetModal(false)}>
-              <Text style={styles.modalCancel}>{t('common.cancel', locale)}</Text>
-            </Pressable>
-            <Text style={styles.modalTitle}>{t('settings.income', locale)}</Text>
-            <Pressable onPress={handleSaveBudget}>
-              <Text style={styles.modalDone}>{t('common.save', locale)}</Text>
-            </Pressable>
-          </View>
-          <ScrollView contentContainerStyle={styles.modalBody}>
-            <Text style={styles.modalHint}>{t('settings.budget_hint', locale)}</Text>
-            <View style={styles.amountRow}>
-              <Text style={styles.currencySymbol}>{currency}</Text>
-              <TextInput
-                style={styles.amountInput}
-                value={budgetInput}
-                onChangeText={setBudgetInput}
-                placeholder="0"
-                placeholderTextColor={Colors.ink4 ?? Colors.textMuted}
-                keyboardType="decimal-pad"
-                autoFocus
-              />
-            </View>
-            <Text style={styles.modalSectionLabel}>{t('settings.budget_period', locale)}</Text>
-            <View style={styles.periodList}>
-              {BUDGET_PERIODS.map((p, i) => (
-                <View key={p.value}>
-                  {i > 0 && <View style={styles.rowDivider} />}
-                  <Pressable style={styles.periodRow} onPress={() => setBudgetPeriod(p.value)}>
-                    <Text style={styles.periodLabel}>{t(p.key, locale)}</Text>
-                    {budgetPeriod === p.value && <Text style={styles.periodCheck}>✓</Text>}
-                  </Pressable>
-                </View>
-              ))}
-            </View>
-          </ScrollView>
-        </View>
-      </Modal>
+      {/* Budget modal (shared with the Budgets tab) */}
+      <BudgetEditorModal
+        visible={budgetModal}
+        initialAmount={budget?.amount ?? null}
+        initialPeriod={budget?.period ?? null}
+        currency={currency}
+        locale={locale}
+        onSave={async (amount, period) => setBudget(amount, period, currency)}
+        onClose={() => setBudgetModal(false)}
+      />
 
       {/* Currency modal */}
       <Modal visible={currencyModal} animationType="slide" presentationStyle="pageSheet">

@@ -235,6 +235,9 @@ export default function TransactionDetailScreen() {
               merchant={txn.merchant}
               merchantDomain={txn.merchant_domain}
               size={64}
+              radius={18}
+              categoryName={categoryName}
+              categoryColor={category?.color}
             />
             <Text style={styles.merchantName}>{txn.merchant ?? t('transactions.unknown', locale)}</Text>
             <View style={styles.heroAmount}>
@@ -279,12 +282,21 @@ export default function TransactionDetailScreen() {
             />
           </View>
 
-          {/* Transcript playback card — sage-tinted. We don't store audio, so no
-               play button here; the sparkle glyph signals "AI-parsed text". */}
+          {/* Transcript playback card — sage-tinted. The sage circle uses a
+               play triangle glyph to match the S_Detail mockup (user-flagged
+               regression — I had used a sparkle). The icon is purely visual
+               for now because we don't store audio; tapping it doesn't play
+               anything yet. If we ever add 24h local-audio retention, this is
+               where real playback would wire in. */}
           {txn.raw_transcript && (
             <View style={styles.transcriptCard}>
               <View style={styles.transcriptIcon}>
-                <Ionicons name="sparkles" size={14} color={Colors.white} />
+                <Ionicons
+                  name="play"
+                  size={14}
+                  color={Colors.white}
+                  style={styles.playGlyph}
+                />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.transcriptQuote} numberOfLines={4}>
@@ -447,6 +459,11 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.accent ?? Colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  // Ionicons' play triangle points slightly past the optical center of its
+  // box; nudge right so it reads centered inside the sage circle.
+  playGlyph: {
+    marginLeft: 2,
   },
   transcriptQuote: {
     fontFamily: Typography.fontFamily.sans,

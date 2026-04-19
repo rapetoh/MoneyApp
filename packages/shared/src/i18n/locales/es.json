@@ -185,6 +185,7 @@
   "budgets.no_budget_title": "Aún no hay presupuesto",
   "budgets.no_budget_body": "Establece un presupuesto mensual para que el anillo te diga si estás ajustado, excedido, o al ritmo.",
   "budgets.set_budget_cta": "Establecer presupuesto",
+  "budgets.edit_budget": "Modificar presupuesto",
   "budgets.by_category": "Por categoría",
   "budgets.by_category_coming_soon": "Los presupuestos por categoría llegan en la próxima versión.",
   "privacy.title": "Tu dinero, tuyo.",

@@ -1,7 +1,7 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { useRouter } from 'expo-router'
+import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '../../src/hooks/useAuth'
 import { useProfile } from '../../src/hooks/useProfile'
 import { useTransactions } from '../../src/hooks/useTransactions'
@@ -9,6 +9,7 @@ import { useActiveBudget, usePeriodSpend } from '../../src/hooks/useBudget'
 import { useRecurringRules, computeUpcomingRecurring } from '../../src/hooks/useRecurringRules'
 import { Money } from '../../src/components/Money'
 import { BudgetRing } from '../../src/components/BudgetRing'
+import { BudgetEditorModal } from '../../src/components/BudgetEditorModal'
 import { Colors, Typography } from '../../src/theme'
 import { t } from '@voice-expense/shared'
 import type { Locale } from '@voice-expense/shared'
@@ -58,12 +59,13 @@ export default function BudgetsScreen() {
   const { user } = useAuth()
   const { profile } = useProfile(user?.id)
   const { transactions } = useTransactions(user?.id)
-  const { budget } = useActiveBudget(user?.id)
+  const { budget, setBudget } = useActiveBudget(user?.id)
   const { rules: recurringRules } = useRecurringRules(user?.id)
   const periodSpend = usePeriodSpend(budget, transactions)
-  const router = useRouter()
+  const [budgetModalVisible, setBudgetModalVisible] = useState(false)
 
   const locale = (profile?.locale ?? 'en') as Locale
+  const currency = profile?.currency_code ?? 'USD'
 
   const monthLabel = useMemo(
     () => new Date().toLocaleDateString(locale, { month: 'long' }).toUpperCase(),
@@ -84,10 +86,11 @@ export default function BudgetsScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Header row. The mockup has a "+" pill here for adding a budget;
-            we remove it until per-category budget creation exists as a real
-            flow — routing it to Settings was confusing. Returns when the
-            category-budget-editor sheet lands (tracked as follow-up). */}
+        {/* Header row. The "+" pill opens the shared BudgetEditorModal so the
+            user can set or modify the global monthly budget from this tab
+            directly (user feedback — previously it jumped to Settings, which
+            was confusing). When per-category budgets land this button will
+            become "Add category budget" instead. */}
         <View style={styles.header}>
           <View>
             <Text style={styles.monthTag}>
@@ -95,6 +98,18 @@ export default function BudgetsScreen() {
             </Text>
             <Text style={styles.title}>{t('budgets.title', locale)}</Text>
           </View>
+          <Pressable
+            style={({ pressed }) => [styles.headerBtn, pressed && styles.headerBtnPressed]}
+            onPress={() => setBudgetModalVisible(true)}
+            hitSlop={8}
+            accessibilityLabel={t('budgets.edit_budget', locale)}
+          >
+            <Ionicons
+              name={budget ? 'create-outline' : 'add'}
+              size={18}
+              color={Colors.ink2 ?? Colors.textSecondary}
+            />
+          </Pressable>
         </View>
 
         {/* Hero ring card — only when a budget is set */}
@@ -140,7 +155,7 @@ export default function BudgetsScreen() {
             <Text style={styles.emptyHeroBody}>{t('budgets.no_budget_body', locale)}</Text>
             <Pressable
               style={({ pressed }) => [styles.ctaBtn, pressed && styles.ctaBtnPressed]}
-              onPress={() => router.push('/more/settings')}
+              onPress={() => setBudgetModalVisible(true)}
             >
               <Text style={styles.ctaBtnText}>{t('budgets.set_budget_cta', locale)}</Text>
             </Pressable>
@@ -155,6 +170,16 @@ export default function BudgetsScreen() {
           </Text>
         </View>
       </ScrollView>
+
+      <BudgetEditorModal
+        visible={budgetModalVisible}
+        initialAmount={budget?.amount ?? null}
+        initialPeriod={budget?.period ?? null}
+        currency={currency}
+        locale={locale}
+        onSave={async (amount, period) => setBudget(amount, period, currency)}
+        onClose={() => setBudgetModalVisible(false)}
+      />
     </SafeAreaView>
   )
 }
@@ -187,6 +212,20 @@ const styles = StyleSheet.create({
     color: Colors.ink ?? Colors.text,
     marginTop: 2,
   },
+  // Header edit button
+  headerBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: Colors.surface ?? '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 0.5,
+    borderColor: Colors.line ?? 'rgba(0,0,0,0.06)',
+    marginTop: 20,
+  },
+  headerBtnPressed: { opacity: 0.6 },
+
   // Hero card
   heroCard: {
     marginHorizontal: 20,

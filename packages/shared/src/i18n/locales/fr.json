@@ -185,6 +185,7 @@
   "budgets.no_budget_title": "Aucun budget défini",
   "budgets.no_budget_body": "Définissez un budget mensuel pour que l'anneau vous indique si vous êtes serré, dépassé, ou dans le rythme.",
   "budgets.set_budget_cta": "Définir un budget",
+  "budgets.edit_budget": "Modifier le budget",
   "budgets.by_category": "Par catégorie",
   "budgets.by_category_coming_soon": "Les budgets par catégorie arrivent dans la prochaine version.",
   "privacy.title": "Votre argent, à vous.",

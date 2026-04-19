@@ -185,6 +185,7 @@
   "budgets.no_budget_title": "No budget set yet",
   "budgets.no_budget_body": "Set a monthly budget so the ring can tell you when you're tight, over, or on pace.",
   "budgets.set_budget_cta": "Set a budget",
+  "budgets.edit_budget": "Edit budget",
   "budgets.by_category": "By category",
   "budgets.by_category_coming_soon": "Per-category budgets arrive in the next release.",
   "privacy.title": "Your money, yours.",

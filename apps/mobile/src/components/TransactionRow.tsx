@@ -63,6 +63,8 @@ export function TransactionRow({
           merchantDomain={transaction.merchant_domain}
           size={40}
           radius={12}
+          categoryName={categoryName}
+          categoryColor={categoryColor}
         />
         <View style={styles.info}>
           <View style={styles.topLine}>
