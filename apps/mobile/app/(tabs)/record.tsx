@@ -8,9 +8,7 @@ import {
   StyleSheet,
   Alert,
   ActivityIndicator,
-  KeyboardAvoidingView,
   Modal,
-  Platform,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
@@ -430,14 +428,13 @@ export default function RecordScreen() {
           </View>
         </View>
       ) : (
-        /* ── MANUAL TAB — S_Keypad layout, fits in one viewport ── */
-        <KeyboardAvoidingView
-          style={styles.manualContainer}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        >
-          {/* Amount card — direction toggle + amount hero live in the same
-              surface so they read as one unit and the primary entry surface
-              doesn't bloat vertically. */}
+        /* ── MANUAL TAB — S_Keypad layout, pinned to bottom.
+            No KeyboardAvoidingView; merchant's native keyboard covers the
+            keypad area (not the merchant input itself), which is fine. */
+        <View style={styles.manualContainer}>
+          {/* Top cluster — anchored to top of container via space-between */}
+          <View style={styles.topCluster}>
+          {/* Amount card — direction toggle + amount hero in one surface */}
           <View style={styles.amountCard}>
             <View style={styles.directionRow}>
               <Pressable
@@ -483,7 +480,11 @@ export default function RecordScreen() {
               locale={userLocale}
             />
           </View>
+          </View>
 
+          {/* Bottom cluster — keypad + Add CTA, anchored to bottom of
+              container by space-between on the parent. */}
+          <View style={styles.bottomCluster}>
           {/* 3x4 keypad — 1-9, ., 0, ⌫ */}
           <View style={styles.keypad}>
             {[['1','2','3'],['4','5','6'],['7','8','9'],['.','0','⌫']].map((row, r) => (
@@ -536,6 +537,7 @@ export default function RecordScreen() {
                 </Text>
               )}
             </Pressable>
+          </View>
           </View>
 
           {/* Bottom-sheet modal for advanced fields — kept out of the primary
@@ -606,7 +608,7 @@ export default function RecordScreen() {
               </Pressable>
             </Pressable>
           </Modal>
-        </KeyboardAvoidingView>
+        </View>
       )}
 
       {/* Voice confirm modal — shared for voice + scan */}
@@ -781,17 +783,22 @@ const styles = StyleSheet.create({
   // viewport above the tab bar. Bottom padding reserves room for the
   // translucent tab bar + FAB cluster (~110pt) so the Add button never
   // sits under the bar.
-  // Manual layout: fixed heights everywhere, no flex:1 mystery spaces.
-  // The (tabs) layout uses an absolute tab bar (height 68, bottom 14,
-  // plus FAB protrusion and shadow ~20pt above). 120pt paddingBottom
-  // keeps the Add CTA comfortably above it on every device.
+  // Manual layout: two clusters, one anchored to top and one to bottom
+  // via space-between. Fixed 120pt paddingBottom clears the absolute tab
+  // bar (height 68, bottom 14) + the record FAB's protrusion/shadow on
+  // every supported iPhone.
   manualContainer: {
     flex: 1,
     paddingHorizontal: Spacing.base,
     paddingTop: 4,
     paddingBottom: 120,
+    justifyContent: 'space-between',
+  },
+  topCluster: {
     gap: 8,
-    justifyContent: 'flex-end',
+  },
+  bottomCluster: {
+    gap: 8,
   },
   // Direction toggle — lives inside the amount card, transparent background
   // so the card's own surface carries the visual weight.
