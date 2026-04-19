@@ -94,6 +94,51 @@ export default function RootLayout() {
             presentation: 'card',
           }}
         />
+        <Stack.Screen
+          name="more/history"
+          options={{
+            headerShown: true,
+            headerTitle: t('more.history', locale),
+            headerBackTitle: t('common.back', locale),
+            presentation: 'card',
+          }}
+        />
+        <Stack.Screen
+          name="more/settings"
+          options={{
+            headerShown: true,
+            headerTitle: t('settings.title', locale),
+            headerBackTitle: t('common.back', locale),
+            presentation: 'card',
+          }}
+        />
+        <Stack.Screen
+          name="more/privacy"
+          options={{
+            headerShown: true,
+            headerTitle: t('more.privacy', locale),
+            headerBackTitle: t('common.back', locale),
+            presentation: 'card',
+          }}
+        />
+        <Stack.Screen
+          name="more/ask"
+          options={{
+            headerShown: true,
+            headerTitle: t('more.ask', locale),
+            headerBackTitle: t('common.back', locale),
+            presentation: 'card',
+          }}
+        />
+        <Stack.Screen
+          name="more/help"
+          options={{
+            headerShown: true,
+            headerTitle: t('more.help', locale),
+            headerBackTitle: t('common.back', locale),
+            presentation: 'card',
+          }}
+        />
       </Stack>
     </>
   )

@@ -15,8 +15,8 @@ tracked in the user's personal plan file (`~/.claude/plans/breezy-painting-zephy
 
 | Phase | Scope | Status |
 |---|---|---|
-| A | Brand + visual refresh (rename → Murmur, sage palette, serif amounts, refreshed shadows, tab bar polish) | **In progress (Apr 18, 2026)** |
-| B | IA reshuffle (Today / Insights / FAB / Budgets / More) | Not started |
+| A | Brand + visual refresh (rename → Murmur, sage palette, serif amounts, refreshed shadows, tab bar polish) | **Complete (Apr 18, 2026 — commit 845d8fb)** |
+| B | IA reshuffle (Today / Insights / FAB / Budgets / More) | **In progress (Apr 18, 2026)** |
 | C | Capture flow polish (amount-as-hero, adjust chips, rose [unclear] tag, undo snackbar) | Not started |
 | D | New screens (Day-1 guided, Budgets tab, Privacy Center, Paywall, History heatmap) | Not started |
 | E | Ask Murmur (grounded Q&A replacing the chat-style AI Advisor from v1.0) | Not started |
@@ -877,5 +877,42 @@ Changes applied:
 - Internal package names (`@voice-expense/mobile`, `@voice-expense/shared`, etc.) and the app slug (`voice-expense-tracker`), scheme (`voiceexpense`), and bundle identifier (`com.voiceexpense.app`) were deliberately **not** renamed. They're not user-visible and renaming them would require EAS reconfiguration, Supabase OAuth client updates, and deep-link handler changes — unrelated to the Phase A visual refresh.
 - `fontFamily.mono` retained and still loaded via expo-font; reserved for the `amountChip` preset.
 - Shape language only applied to the SafeToSpend hero card (representative). Other cards will bump to `Radius.card` naturally as their screens are redesigned in Phase D.
+
+### Phase B — IA reshuffle (in progress April 18, 2026)
+
+Design reference: [DESIGN.md](./DESIGN.md) §4 "Information architecture".
+
+**Tab bar** — restructured in [apps/mobile/app/(tabs)/_layout.tsx](../apps/mobile/app/(tabs)/_layout.tsx):
+
+| Before (Phase A) | After (Phase B) |
+|---|---|
+| Home → Expenses → [Record FAB] → Insights → Settings | **Today → Insights → [Record FAB] → Budgets → More** |
+
+- `Home` tab renamed to **Today** (file stays at `(tabs)/index.tsx`; the real "Today" redesign — serif headline, budget header line, weekly bar — lands in Phase D).
+- `Expenses` tab **demoted** to `More → History` (file moved: `(tabs)/expenses.tsx` → `more/history.tsx`, git rename preserves history).
+- `Settings` tab **demoted** to `More → Settings` (file moved: `(tabs)/settings.tsx` → `more/settings.tsx`).
+- **Budgets** promoted to a top-level tab with a new stub screen at [`(tabs)/budgets.tsx`](../apps/mobile/app/(tabs)/budgets.tsx). Ring hero + per-category bars land in Phase D.
+- **More** tab added at [`(tabs)/more.tsx`](../apps/mobile/app/(tabs)/more.tsx) — a sectioned list drawer: *Activity* (History, Recurring), *Intelligence* (Ask Murmur — Plus-gated pill visible), *Account* (Settings, Privacy Center, Help). Uses the new `Hairline` + `Radius.card` tokens.
+
+**New Stack screens registered** in [apps/mobile/app/_layout.tsx](../apps/mobile/app/_layout.tsx):
+- `more/history` (moved from tabs)
+- `more/settings` (moved from tabs)
+- `more/privacy` (new stub — full Privacy Center in Phase D)
+- `more/ask` (new stub — Ask Murmur entry in Phase E)
+- `more/help` (new stub — contact + version)
+
+Each pushes as a card on top of the tab bar; the bar hides on push, matches the existing `recurring` / `transaction/[id]` pattern.
+
+**i18n** — 34 new keys added across en/fr/es/pt for: new tab labels (today/budgets/more), More section (title + 3 section headers + 6 row labels), and the 3 new stub screens (budgets/privacy/ask/help). The old `tabs.home` / `tabs.expenses` / `tabs.settings` keys are retained (not removed) so any stray reference keeps working through the transition.
+
+**Cross-references updated:**
+- [apps/mobile/app/(tabs)/index.tsx](../apps/mobile/app/(tabs)/index.tsx) — "View all" link `/(tabs)/expenses` → `/more/history`.
+
+**Not yet done in Phase B (by design):**
+- Today screen redesign (serif headline, budget header line, weekly bar chart) — Phase D.
+- Budgets tab full implementation — Phase D.
+- Privacy Center full implementation — Phase D.
+- Ask Murmur full implementation — Phase E.
+- Settings screen visual refresh — picked up naturally when Settings is next touched.
 
 *End of Plan*

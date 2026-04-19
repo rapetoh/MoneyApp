@@ -111,7 +111,7 @@ export default function HomeScreen() {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>{t('home.recent_activity', locale)}</Text>
-            <Text style={styles.viewAll} onPress={() => router.push('/(tabs)/expenses')}>
+            <Text style={styles.viewAll} onPress={() => router.push('/more/history')}>
               {t('home.view_all', locale)}
             </Text>
           </View>

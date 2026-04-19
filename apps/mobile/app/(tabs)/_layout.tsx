@@ -46,27 +46,10 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: t('tabs.home', locale),
+          title: t('tabs.today', locale),
           tabBarIcon: ({ focused }) => (
             <TabIcon focused={focused} name={focused ? 'home' : 'home-outline'} />
           ),
-        }}
-      />
-      <Tabs.Screen
-        name="expenses"
-        options={{
-          title: t('tabs.expenses', locale),
-          tabBarIcon: ({ focused }) => (
-            <TabIcon focused={focused} name={focused ? 'list' : 'list-outline'} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="record"
-        options={{
-          title: '',
-          tabBarIcon: () => <RecordIcon />,
-          tabBarLabel: () => null,
         }}
       />
       <Tabs.Screen
@@ -79,11 +62,31 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="settings"
+        name="record"
         options={{
-          title: t('tabs.settings', locale),
+          title: '',
+          tabBarIcon: () => <RecordIcon />,
+          tabBarLabel: () => null,
+        }}
+      />
+      <Tabs.Screen
+        name="budgets"
+        options={{
+          title: t('tabs.budgets', locale),
           tabBarIcon: ({ focused }) => (
-            <TabIcon focused={focused} name={focused ? 'settings' : 'settings-outline'} />
+            <TabIcon focused={focused} name={focused ? 'pie-chart' : 'pie-chart-outline'} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="more"
+        options={{
+          title: t('tabs.more', locale),
+          tabBarIcon: ({ focused }) => (
+            <TabIcon
+              focused={focused}
+              name={focused ? 'ellipsis-horizontal' : 'ellipsis-horizontal-outline'}
+            />
           ),
         }}
       />
