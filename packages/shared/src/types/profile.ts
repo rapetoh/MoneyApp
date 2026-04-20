@@ -9,6 +9,10 @@ export interface Profile {
   voice_language: string // BCP-47 e.g. 'en-US', 'fr-FR'
   timezone: string
   monthly_income: number | null
+  /** Employer / income source — used by MerchantAvatar to fetch a logo. */
+  monthly_income_source: string | null
+  /** Null until the user finishes (or skips) the onboarding flow. */
+  onboarding_completed_at: string | null
   created_at: string
   updated_at: string
 }

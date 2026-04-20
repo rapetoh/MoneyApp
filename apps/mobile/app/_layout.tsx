@@ -35,11 +35,20 @@ export default function RootLayout() {
     SplashScreen.hideAsync()
 
     const inAuthGroup = segments[0] === '(auth)'
+    const inOnboardingGroup = segments[0] === '(onboarding)'
 
     if (!session && !inAuthGroup) {
       router.replace('/(auth)/sign-in')
     } else if (session && inAuthGroup) {
-      router.replace('/(tabs)')
+      // Authed user stuck in auth group — route based on onboarding state.
+      if (profile && profile.onboarding_completed_at == null) {
+        router.replace('/(onboarding)/welcome')
+      } else {
+        router.replace('/(tabs)')
+      }
+    } else if (session && !inAuthGroup && !inOnboardingGroup && profile && profile.onboarding_completed_at == null) {
+      // Authed user who hasn't finished onboarding — push into the flow.
+      router.replace('/(onboarding)/welcome')
     }
 
     if (session?.user?.id) {
@@ -49,7 +58,7 @@ export default function RootLayout() {
       // Generate any missed recurring transactions since last app open
       runRecurringCatchUp(session.user.id)
     }
-  }, [session, loading, segments, router])
+  }, [session, loading, segments, router, profile])
 
   if (loading) return null
 
@@ -58,6 +67,7 @@ export default function RootLayout() {
       <StatusBar style="dark" backgroundColor="#FBFAF7" />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(auth)" />
+        <Stack.Screen name="(onboarding)" />
         <Stack.Screen name="(tabs)" />
         <Stack.Screen
           name="transaction/[id]"
