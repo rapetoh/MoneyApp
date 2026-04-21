@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { Stack, useRouter, useSegments } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import * as SplashScreen from 'expo-splash-screen'
@@ -29,27 +29,56 @@ export default function RootLayout() {
     return () => syncManager.stop()
   }, [])
 
+  // Track the previous segment group so we can skip the onboarding bounce
+  // for one render cycle after the user finishes the flow. updateProfile +
+  // DataEvents.emitProfile is synchronous at the emitter but each listener's
+  // refetch is async and not awaited — so when income.tsx navigates to
+  // /(tabs), this layout's `profile` state hasn't updated yet, and without
+  // this guard the routing gate would re-push to /(onboarding)/welcome and
+  // then only settle once the refetch resolves.
+  const prevSegmentRef = useRef<string | undefined>(undefined)
+
   useEffect(() => {
     if (loading) return
 
     SplashScreen.hideAsync()
 
-    const inAuthGroup = segments[0] === '(auth)'
-    const inOnboardingGroup = segments[0] === '(onboarding)'
+    const segmentGroup = segments[0]
+    const prevSegmentGroup = prevSegmentRef.current
+    const inAuthGroup = segmentGroup === '(auth)'
+    const inOnboardingGroup = segmentGroup === '(onboarding)'
+    const justLeftOnboarding =
+      prevSegmentGroup === '(onboarding)' && !inOnboardingGroup
 
     if (!session && !inAuthGroup) {
       router.replace('/(auth)/sign-in')
     } else if (session && inAuthGroup) {
-      // Authed user stuck in auth group — route based on onboarding state.
-      if (profile && profile.onboarding_completed_at == null) {
+      // Authed user stuck in auth group — wait for profile to load before
+      // deciding whether to route to onboarding or tabs. Without this
+      // wait, a new sign-up briefly lands on /(tabs) before flipping to
+      // onboarding once the profile fetch resolves.
+      if (!profile) {
+        // hold on /(auth) for a moment; the effect re-runs once profile arrives
+      } else if (profile.onboarding_completed_at == null) {
         router.replace('/(onboarding)/welcome')
       } else {
         router.replace('/(tabs)')
       }
-    } else if (session && !inAuthGroup && !inOnboardingGroup && profile && profile.onboarding_completed_at == null) {
+    } else if (
+      session &&
+      !inAuthGroup &&
+      !inOnboardingGroup &&
+      !justLeftOnboarding &&
+      profile &&
+      profile.onboarding_completed_at == null
+    ) {
       // Authed user who hasn't finished onboarding — push into the flow.
+      // Skipped when the user has just exited /(onboarding) to /(tabs) so
+      // the stale profile doesn't bounce them back.
       router.replace('/(onboarding)/welcome')
     }
+
+    prevSegmentRef.current = segmentGroup
 
     if (session?.user?.id) {
       // Seed default categories for new users (no-op if categories already exist)
