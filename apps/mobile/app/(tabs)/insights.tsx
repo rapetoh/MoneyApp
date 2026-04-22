@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react'
 import { View, Text, StyleSheet, ScrollView, Pressable, Modal } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
+import Svg, { Path, Defs, LinearGradient, Stop } from 'react-native-svg'
 import { useAuth } from '../../src/hooks/useAuth'
 import { useProfile } from '../../src/hooks/useProfile'
 import { useTransactions } from '../../src/hooks/useTransactions'
@@ -13,6 +14,68 @@ import type { Transaction } from '@voice-expense/shared'
 
 function monthKey(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth()).padStart(2, '0')}`
+}
+
+/**
+ * Tiny spend trend as a smooth SVG path with sage gradient fill.
+ * Matches the shape in S_Insights's hero card.
+ *
+ * Catmull-Rom → cubic-bezier smoothing: each segment uses control points
+ * derived from the previous and next data points, so the curve passes
+ * through every sample without overshoot.
+ */
+function TrendSpark({ points, max }: { points: number[]; max: number }) {
+  const VB_W = 300
+  const VB_H = 60
+  const PAD_Y = 4
+
+  if (points.length < 2) {
+    return <View style={{ height: VB_H, marginTop: 14 }} />
+  }
+
+  const n = points.length
+  const coords = points.map((v, i) => ({
+    x: (i / (n - 1)) * VB_W,
+    y: VB_H - PAD_Y - (v / Math.max(max, 1)) * (VB_H - PAD_Y * 2),
+  }))
+
+  // Catmull-Rom to cubic bezier. Each segment's control points are offset
+  // from the endpoint by 1/6 of the vector between the two neighbors.
+  let linePath = `M${coords[0].x.toFixed(2)},${coords[0].y.toFixed(2)}`
+  for (let i = 0; i < n - 1; i++) {
+    const p0 = coords[i - 1] ?? coords[i]
+    const p1 = coords[i]
+    const p2 = coords[i + 1]
+    const p3 = coords[i + 2] ?? p2
+    const cp1x = p1.x + (p2.x - p0.x) / 6
+    const cp1y = p1.y + (p2.y - p0.y) / 6
+    const cp2x = p2.x - (p3.x - p1.x) / 6
+    const cp2y = p2.y - (p3.y - p1.y) / 6
+    linePath += ` C${cp1x.toFixed(2)},${cp1y.toFixed(2)} ${cp2x.toFixed(2)},${cp2y.toFixed(2)} ${p2.x.toFixed(2)},${p2.y.toFixed(2)}`
+  }
+  // Close the path down to the baseline for the gradient fill.
+  const fillPath = `${linePath} L${VB_W},${VB_H} L0,${VB_H} Z`
+
+  const accent = Colors.accent ?? Colors.primary
+
+  return (
+    <Svg
+      width="100%"
+      height={VB_H}
+      viewBox={`0 0 ${VB_W} ${VB_H}`}
+      preserveAspectRatio="none"
+      style={{ marginTop: 14 }}
+    >
+      <Defs>
+        <LinearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0%" stopColor={accent} stopOpacity={0.22} />
+          <Stop offset="100%" stopColor={accent} stopOpacity={0} />
+        </LinearGradient>
+      </Defs>
+      <Path d={fillPath} fill="url(#trendFill)" />
+      <Path d={linePath} fill="none" stroke={accent} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  )
 }
 
 // Sum debits for a date range from the full local transaction list.
@@ -217,27 +280,7 @@ export default function InsightsScreen() {
                 </View>
               )}
             </View>
-            <View style={styles.trendRow}>
-              {trend.map((v, i) => {
-                const h = Math.max(3, (v / trendMax) * 56)
-                const isLast = i === trend.length - 1
-                return (
-                  <View
-                    key={i}
-                    style={[
-                      styles.trendBar,
-                      {
-                        height: h,
-                        backgroundColor: isLast
-                          ? Colors.accent ?? Colors.primary
-                          : Colors.accentSoft ?? Colors.primaryLight,
-                        opacity: isLast ? 1 : 0.9,
-                      },
-                    ]}
-                  />
-                )
-              })}
-            </View>
+            <TrendSpark points={trend} max={trendMax} />
           </View>
         </View>
 
@@ -412,18 +455,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     fontFamily: Typography.fontFamily.sansBold,
-  },
-  trendRow: {
-    marginTop: 14,
-    height: 60,
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 4,
-  },
-  trendBar: {
-    flex: 1,
-    borderRadius: 3,
-    minHeight: 3,
   },
 
   // Categories

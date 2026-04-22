@@ -974,29 +974,29 @@ Design reference: [docs/money-app/project/](./money-app/project/) — the screen
 - **`S_AskResult`** — the grounded-reasoner chat bubble screen. Needs the Phase E backend to produce real numbers from the user's transactions; a hard-coded demo would misrepresent the product. Entry screen (`S_AskEntry`) is wired to the paywall so Ask is still reachable and marketed.
 - **`S_Income`** (step 3 of 3 onboarding) + the broader welcome/permissions onboarding. Phase D only shipped `S_DayOne` as a coach-on-Today. A proper onboarding flow is its own project.
 
-**Native-dep deferrals — one rebuild decision:**
+**Native-dep batch — ✅ landed April 21, 2026** (commit pending below):
 
-Three visuals currently ship as pure-React-Native approximations because a real implementation needs a native dep (and a rebuild). Grouped so they can be batched into one cycle:
+Three visuals that previously shipped as pure-React-Native approximations because they needed a native dep. All batched into one rebuild cycle. **Requires a native rebuild** (`npx expo prebuild --clean` or a fresh dev-client build) before these render correctly on-device.
 
-1. **`react-native-svg`** — buys us:
-   - **BudgetRing arc** ([src/components/BudgetRing.tsx](../apps/mobile/src/components/BudgetRing.tsx)): mockup draws a stroked progress arc (`<circle>` + `<path>` with stroke-dasharray). Today we render a filled disc + `accentSoft` halo + percent label. Reads fine, but the arc is the signature visual on the Budgets tab.
-   - **Insights trend area** ([app/(tabs)/insights.tsx:135](../apps/mobile/app/(tabs)/insights.tsx)): mockup shows a smooth `<path>` with a sage gradient fill under the curve. Today we render 14 RN `<View>` bars. Readable, but the smooth curve is prettier and more "finance app" than a bar chart.
-   - **Listening BigWaveform**: no work — the mockup itself draws this as a `<rect>` array, so the current RN `<View>` bars already match.
+1. **`react-native-svg@15.12.1`** — installed via `npx expo install` so the SDK 54 peer versions stay aligned.
+   - **BudgetRing arc** ([src/components/BudgetRing.tsx](../apps/mobile/src/components/BudgetRing.tsx)): now renders a real stroked circle with a progress arc via `strokeDasharray = circumference × pct`. Arc starts at 12 o'clock (group rotated -90°) and uses round linecap. Color ramps sage → amber (>92%) → rose (over). The filled-disc approximation is gone.
+   - **Insights trend area** ([app/(tabs)/insights.tsx](../apps/mobile/app/(tabs)/insights.tsx)): extracted to an inline `TrendSpark` component. 14 daily-spend points are smoothed through a Catmull-Rom → cubic-bezier conversion (control points offset 1/6 of the neighbor-to-neighbor vector) and rendered as two paths: a sage-gradient fill closed to the baseline, and a 2px stroke on top. Uses `viewBox="0 0 300 60"` + `preserveAspectRatio="none"` so the path stretches to the card width.
+   - **Listening BigWaveform**: unchanged. The mockup draws it as a `<rect>` array; the current RN `<View>` bars already match.
 
-2. **`expo-blur`** — buys us:
-   - **Tab bar backdrop blur** ([app/(tabs)/_layout.tsx:99-101](../apps/mobile/app/(tabs)/_layout.tsx)): currently a semi-transparent solid color. Real iOS-style frosted glass needs `BlurView`. Noticeable on Today when scrolling content under the bar.
+2. **`expo-blur@~15.0.8`** — installed via `npx expo install`.
+   - **Tab bar backdrop blur** ([app/(tabs)/_layout.tsx](../apps/mobile/app/(tabs)/_layout.tsx)): replaced the static `rgba(255,255,255,0.85)` fill with a real `BlurView` (`intensity={80}`, `tint="light"`) supplied via `tabBarBackground`. The bar's own `backgroundColor` is now `transparent`; a new `tabBarBlur` style pins the blur to the pill's rounded footprint via `absoluteFillObject` + matching `borderRadius: 34`. Real frosted-glass on iOS; falls back to a solid translucent layer on platforms without backdrop filters.
 
-3. **`expo-linear-gradient`** — already installed, not currently used. Would let us:
-   - Replace the Paywall radial halo approximation with a real radial (though CSS radial gradients aren't in RN — would need a stack of concentric views or an image). Current approximation is acceptable.
-   - Improve forecast card surface ramps on the Insights ink card.
+3. **`expo-linear-gradient`** — still installed, still unused. Available for the Paywall radial halo upgrade if we decide to push that further; the Insights gradient uses the SVG `LinearGradient` variant instead (cleaner since it lives inside the same SVG surface).
 
-**Recommendation:** ship Phase D as-is and **batch native deps with the next planned rebuild**. Likely next rebuild is triggered by either (a) adding IAP for Plus (requires `react-native-iap` or `react-native-purchases`), (b) the Expo SDK bump currently pending on `expo-speech-recognition@^3.1.2`, or (c) Phase E's Ask Murmur backend integration. When one of those lands, add `react-native-svg` + `expo-blur` in the same cycle, then:
+**Rebuild step (to actually see the above on-device):**
 
-- Replace `BudgetRing`'s disc with an SVG arc (15 min — stroke a circle with `strokeDasharray` at `2πr * pct`).
-- Replace Insights' `trendRow` with an SVG `<Path>` + `<LinearGradient>` for the fill (30 min — compute points from `trend[]`, use a Catmull-Rom smoothing pass).
-- Wrap the tab bar background in `BlurView` with `tint="light"` + `intensity={80}` (5 min).
+```sh
+# from apps/mobile/
+npx expo prebuild --clean         # or: eas build --profile development
+npx expo run:ios                  # rebuild the iOS binary
+```
 
-All three changes are pure substitutions — no downstream code touches them.
+Without the rebuild, the three new native dependencies aren't linked and the components will either throw on mount (SVG imports) or fall back to empty (BlurView renders nothing).
 
 **Deliberately skipped (documented, not re-opened):**
 

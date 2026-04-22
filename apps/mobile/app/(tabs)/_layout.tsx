@@ -1,5 +1,6 @@
 import { Tabs } from 'expo-router'
 import { View, StyleSheet } from 'react-native'
+import { BlurView } from 'expo-blur'
 import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '../../src/hooks/useAuth'
 import { useProfile } from '../../src/hooks/useProfile'
@@ -38,6 +39,17 @@ export default function TabsLayout() {
       screenOptions={{
         headerShown: false,
         tabBarStyle: styles.tabBar,
+        // Real iOS-style frosted glass via expo-blur. The bar's own
+        // backgroundColor is set to transparent in styles.tabBar so the
+        // blur + subtle tint show through. Falls back to a translucent
+        // white on platforms that don't support backdrop blur.
+        tabBarBackground: () => (
+          <BlurView
+            intensity={80}
+            tint="light"
+            style={styles.tabBarBlur}
+          />
+        ),
         tabBarActiveTintColor: Colors.primary,
         tabBarInactiveTintColor: Colors.textSecondary,
         tabBarLabelStyle: styles.tabLabel,
@@ -95,10 +107,8 @@ export default function TabsLayout() {
 }
 
 const styles = StyleSheet.create({
-  // Same geometry as before the Claude-Design rework — sage active pill on
-  // icons, sage FAB — only the background becomes translucent so the content
-  // behind the bar shows through. Real backdrop blur needs expo-blur + a
-  // native rebuild; ask the user before adding that.
+  // Floating pill tab bar. Geometry unchanged since the Claude-Design rework.
+  // Real backdrop blur is provided by the BlurView in tabBarBackground above.
   tabBar: {
     position: 'absolute',
     left: 16,
@@ -106,17 +116,27 @@ const styles = StyleSheet.create({
     bottom: 14,
     height: 68,
     borderRadius: 34,
-    backgroundColor: 'rgba(255,255,255,0.85)',
+    // Transparent so the BlurView behind shows through. A subtle warm
+    // tint is added via the blur tint="light" — no hex fill needed here.
+    backgroundColor: 'transparent',
     borderTopWidth: 0,
     paddingBottom: 10,
     paddingHorizontal: 9,
     marginHorizontal: 21,
     paddingTop: 10,
+    overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.12,
     shadowRadius: 16,
     elevation: 12,
+  },
+  // BlurView fills the tab bar's own footprint; absoluteFill inside the
+  // pill-shaped parent + borderRadius on the bar clips it to the pill.
+  tabBarBlur: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 34,
+    overflow: 'hidden',
   },
   tabLabel: {
     fontSize: 10,

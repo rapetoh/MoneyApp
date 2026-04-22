@@ -1,4 +1,5 @@
 import { View, Text, StyleSheet } from 'react-native'
+import Svg, { Circle } from 'react-native-svg'
 import { Colors, Typography } from '../theme'
 
 interface Props {
@@ -9,52 +10,57 @@ interface Props {
 }
 
 /**
- * Approximates the `BudgetRing` from docs/money-app/project/mobile-screens-5.jsx.
+ * Matches `BudgetRing` in docs/money-app/project/mobile-screens-5.jsx: a stroked
+ * track circle with a progress arc drawn on top via stroke-dasharray. The arc
+ * color flips from sage → tight-amber → destructive as usage climbs.
  *
- * The mockup draws a stroked circle with a progress arc via SVG. We don't have
- * `react-native-svg` installed yet, so this renders a simpler filled disc with
- * an `accentSoft` halo + big percent label + "used" caption. The arc-stroke
- * version lands when react-native-svg is added (documented in the Phase D
- * commit message and todo list).
- *
- * Visually the output still reads as a budget usage indicator and lives in the
- * same real estate, so replacing it later is a localized swap.
+ * Reads as "X%" + "used" in the center. Over-limit still shows 100% on the
+ * arc (dasharray clamped at circumference) but switches the color to rose so
+ * the semantic is clear at a glance.
  */
 export function BudgetRing({ spent, limit, size = 110 }: Props) {
   const pct = limit > 0 ? Math.min(spent / limit, 1) : 0
   const pctLabel = Math.round(pct * 100)
   const over = limit > 0 && spent > limit
 
-  const discColor = over
+  const arcColor = over
     ? Colors.destructive ?? '#A94646'
     : pct > 0.92
     ? '#C08A3A' // tight-amber — matches the BudgetRow "Tight" chip
     : Colors.accent ?? Colors.primary
 
+  // Stroke math — the arc is drawn on a centered circle whose radius accounts
+  // for the stroke width so the arc sits flush inside the box.
+  const strokeWidth = 10
+  const radius = (size - strokeWidth) / 2
+  const circumference = 2 * Math.PI * radius
+  const arcLength = circumference * pct
+
   return (
     <View style={[styles.wrap, { width: size, height: size }]}>
-      <View
-        style={[
-          styles.outer,
-          {
-            width: size,
-            height: size,
-            borderRadius: size / 2,
-            backgroundColor: Colors.surface2 ?? 'rgba(40,36,28,0.06)',
-          },
-        ]}
-      />
-      <View
-        style={[
-          styles.inner,
-          {
-            width: size - 18,
-            height: size - 18,
-            borderRadius: (size - 18) / 2,
-            backgroundColor: (discColor + '1A') as string, // ~10% alpha halo
-          },
-        ]}
-      />
+      {/* Rotate -90° so the arc starts at 12 o'clock instead of 3 o'clock. */}
+      <Svg width={size} height={size} style={{ transform: [{ rotate: '-90deg' }] }}>
+        {/* Track */}
+        <Circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          stroke={Colors.surface2 ?? 'rgba(40,36,28,0.08)'}
+          strokeWidth={strokeWidth}
+          fill="none"
+        />
+        {/* Progress arc — dasharray clips the stroke to pct × circumference */}
+        <Circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          stroke={arcColor}
+          strokeWidth={strokeWidth}
+          strokeLinecap="round"
+          strokeDasharray={`${arcLength} ${circumference}`}
+          fill="none"
+        />
+      </Svg>
       <View style={styles.center}>
         <Text style={[styles.pct, { color: Colors.ink ?? Colors.text }]}>{pctLabel}%</Text>
         <Text style={styles.caption}>used</Text>
@@ -69,13 +75,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  outer: {
-    position: 'absolute',
-  },
-  inner: {
-    position: 'absolute',
-  },
   center: {
+    ...StyleSheet.absoluteFillObject,
     alignItems: 'center',
     justifyContent: 'center',
   },
