@@ -1002,4 +1002,55 @@ All three changes are pure substitutions — no downstream code touches them.
 
 - **DayOne mic-FAB glow + "Tap & hold to speak" callout** ([apps/mobile/src/components/DayOneFirstLog.tsx](../apps/mobile/src/components/DayOneFirstLog.tsx)): brittle absolute positioning relative to the tab bar + FAB that varies across device sizes. The coach's core job (headline + example phrasings + type-instead fallback) ships without them.
 
+### Post-Phase-D additions (April 20–21, 2026)
+
+Smaller packages of work landed after Phase D close-out, tracked here so nothing falls out of the record.
+
+**Manual-entry rebuild → matches S_Keypad** (`5ae41e4` + `fe79d12` + `b646bce` + `8c65fcc` + `9a8316a`):
+- Replaced the form-style Manual tab with an on-screen 3×4 keypad, 56px serif amount hero, and an amount card that hosts the Expense/Income toggle.
+- "More options" moved to a bottom-sheet Modal so advanced fields (note, payment method, recurring) don't push the primary surface off screen.
+- Fit-in-one-viewport pass: direction toggle inside amount card, `justifyContent: 'space-between'` on the container pins topCluster + bottomCluster to their edges, `paddingBottom: 120` clears the translucent tab bar + FAB overshoot.
+- Fixed three real bugs caught during self-review: nested `<Text>` + `adjustsFontSizeToFit` rendering typed digits as a thin line (swapped for plain conditional, tabular-nums); stale closure on the `.` key (single `setAmount((prev) => …)` now covers all branches); Add CTA gated on `parseFloat(amount) > 0` (was `!== ''`, so "0" and "0." falsely enabled it).
+
+**Today header** (`46ff0a7`):
+- Swapped `search-outline` → `time-outline` for the History entry (icon no longer lies).
+- Added `sparkles` sibling icon routing to `/more/ask` so the Plus-gated Ask feature isn't buried two taps deep under More.
+- History screen: dropped the "More" breadcrumb text (H1 year now carries the page identity), added prev/next chevrons to the heatmap card so any month is navigable, H1 year syncs with the selected month.
+- Transactions screen: custom back-pill header + dynamic title ("April 2026" when scoped, "Transactions" otherwise); native Stack header hidden to fix the flaky tap target.
+
+**Onboarding flow → Welcome + Permissions + Income** (`5717ec7` + `c2c7878` + `89190fb` + `2613c29`):
+- New route group at [apps/mobile/app/(onboarding)/](../apps/mobile/app/(onboarding)/). Three screens tracing `S_Onboard` / `S_Permissions` / `S_Income`. Header hidden, gesture-back disabled.
+- Welcome: sage "M" logo tile, serif "Speak it. Spend clearly.", three value props (on-device voice / no bank linking / clarity on desktop), dark ink "Get started" CTA.
+- Permissions: step 2/3 progress, mic permission card driven by `ExpoSpeechRecognitionModule.requestPermissionsAsync()` with idle/granted/denied states and a Try Again path. Shortcuts/Apple-Pay + Face ID cards from the mockup are omitted for now — neither is wired yet and showing them as Allow buttons that do nothing would lie.
+- Income: step 3/3, amount input (native decimal-pad, 56px serif display), optional Source field (employer name; `MerchantAvatar` picks up the logo via domain guess), $2.5k/$4k/$6k/$10k quick-pick presets, sage privacy note, Continue/Skip + Back nav. Both Skip and Continue persist `onboarding_completed_at`; the difference is whether amount + source get written or left null.
+- Schema: [supabase/migrations/006_onboarding_fields.sql](../supabase/migrations/006_onboarding_fields.sql) adds `profile.monthly_income_source` (text) + `profile.onboarding_completed_at` (timestamptz). Existing profiles backfill to `created_at` so they don't replay.
+- Routing gate in [_layout.tsx](../apps/mobile/app/_layout.tsx): `ready` flag that gates splash hide on both auth *and* profile loading (prevents a flash of `/(tabs)` before `/(onboarding)/welcome` on fresh sign-up). `prevSegmentRef` suppresses the onboarding-bounce for one render cycle after the user exits `/(onboarding)` (prevents flicker back to welcome after finishing).
+- Settings → new "Monthly Income" row with new [IncomeEditorModal](../apps/mobile/src/components/IncomeEditorModal.tsx) so the user can view/edit what they entered during onboarding. Also caught a long-standing mislabel: the i18n key `settings.income` was actually storing "Monthly Budget" in all 4 locales and was used by both the Budget row and the `BudgetEditorModal` title — renamed to `settings.budget`, freed `settings.monthly_income` / `settings.income_amount` / `settings.income_source_helper` for the real income feature.
+- i18n: 22 new keys per locale (en/fr/es/pt) — full sentence translations, no shims.
+
+**Day-1 coach "Or type instead" routing** (`2613c29`):
+- First attempt (`89190fb`) passed `?tab=manual` and used `useState` to read it. That only ran on first mount — subsequent navigations stuck in whatever state the Record tab was last left in. Classic sticky-state bug on a persistent tab.
+- Real fix: `useFocusEffect` from `expo-router` re-runs on every focus event (FAB tap, Type-instead, deep link). Reads `params.tab` and sets `activeTab` accordingly. `_nonce=Date.now()` appended to the Type-instead navigation so repeat taps are treated as distinct navigations (expo-router dedupes identical pathname+params).
+
+**Tested vs. untested** (as of this doc update):
+
+Verified live in simulator by the user:
+- Welcome screen visuals
+- Income screen visuals (amount + source)
+- Day-1 coach screen
+- Voice tab of Record
+- Onboarding flow runs and reaches tabs
+
+NOT yet verified (typecheck green, static analysis only):
+- Fresh sign-up cold path — no splash flash, lands straight on Welcome
+- Finish-onboarding bounce fix — `prevSegmentRef` guard against the race where the profile refetch loses to `router.replace('/(tabs)')`
+- IncomeEditorModal in Settings — tap-to-edit, save, clear flows
+- FAB vs. Type-instead tab-sync — `useFocusEffect` + nonce. Expected: FAB always lands on Voice, Type-instead always lands on Manual, no matter the order or repeat count.
+- Manual tab keypad end-to-end — amount display, `.` key, backspace, save
+- Permissions screen — mic Allow prompt actually fires on iOS (depends on `Info.plist` having `NSMicrophoneUsageDescription`)
+
+**Deferred (logged, not worked on):**
+- **Income frequency picker** (weekly / biweekly / monthly / yearly). Valid UX suggestion from user. Requires a new `monthly_income_frequency` column + UI picker + re-label of header/presets + monthly-equivalent normalizer in every downstream that reads `monthly_income` (Insights forecast, Ask Murmur). Tracked for a future phase.
+- **Day-1 coach + Record mic redundancy**. Reviewed; kept as-is. The coach is a static teaching surface on Today for zero-transaction users; the mic on Record is the action. Removing either breaks the new-user flow.
+
 *End of Plan*
