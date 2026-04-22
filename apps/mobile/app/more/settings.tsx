@@ -21,6 +21,7 @@ import { useNotificationListener } from '../../src/hooks/useNotificationListener
 import { useApiUrl } from '../../src/hooks/useApiUrl'
 import { SetGroup, SetRow } from '../../src/components/SettingsList'
 import { BudgetEditorModal } from '../../src/components/BudgetEditorModal'
+import { IncomeEditorModal } from '../../src/components/IncomeEditorModal'
 import { Colors, Typography, Radius, Hairline } from '../../src/theme'
 import { t, type Locale } from '@voice-expense/shared'
 import type { BudgetPeriod } from '@voice-expense/shared'
@@ -59,6 +60,7 @@ export default function SettingsScreen() {
   const router = useRouter()
 
   const [budgetModal, setBudgetModal] = useState(false)
+  const [incomeModal, setIncomeModal] = useState(false)
   const [localeModal, setLocaleModal] = useState(false)
   const [currencyModal, setCurrencyModal] = useState(false)
   const [nameModal, setNameModal] = useState(false)
@@ -76,6 +78,18 @@ export default function SettingsScreen() {
     'settings.period_monthly'
   const periodLabel = t(periodKey, locale)
   const budgetDisplay = budget ? `${currency} ${budget.amount.toFixed(0)} / ${periodLabel}` : '—'
+
+  // Income row detail: "$7,000 · Microsoft" or "$7,000" if no source, or "—"
+  // if the user skipped income entry during onboarding.
+  const incomeAmountFmt =
+    profile?.monthly_income != null
+      ? `${currency} ${profile.monthly_income.toLocaleString('en-US', { maximumFractionDigits: 0 })}`
+      : null
+  const incomeDisplay = incomeAmountFmt
+    ? profile?.monthly_income_source
+      ? `${incomeAmountFmt} · ${profile.monthly_income_source}`
+      : incomeAmountFmt
+    : '—'
 
   const txnCount = transactions.filter((x) => !x.is_deleted).length
   const displayName = profile?.display_name ?? user?.email?.split('@')[0] ?? '—'
@@ -175,9 +189,14 @@ export default function SettingsScreen() {
         {/* Preferences */}
         <SetGroup label={t('settings.preferences', locale)}>
           <SetRow
-            label={t('settings.income', locale)}
+            label={t('settings.budget', locale)}
             detail={budgetDisplay}
             onPress={() => setBudgetModal(true)}
+          />
+          <SetRow
+            label={t('settings.monthly_income', locale)}
+            detail={incomeDisplay}
+            onPress={() => setIncomeModal(true)}
           />
           <SetRow
             label={t('settings.currency', locale)}
@@ -261,6 +280,19 @@ export default function SettingsScreen() {
         locale={locale}
         onSave={async (amount, period) => setBudget(amount, period, currency)}
         onClose={() => setBudgetModal(false)}
+      />
+
+      {/* Monthly income modal — edits profile.monthly_income + _source */}
+      <IncomeEditorModal
+        visible={incomeModal}
+        initialAmount={profile?.monthly_income ?? null}
+        initialSource={profile?.monthly_income_source ?? null}
+        currency={currency}
+        locale={locale}
+        onSave={async (amount, source) =>
+          updateProfile({ monthly_income: amount, monthly_income_source: source })
+        }
+        onClose={() => setIncomeModal(false)}
       />
 
       {/* Currency modal */}

@@ -16,10 +16,20 @@ SplashScreen.preventAutoHideAsync()
 
 export default function RootLayout() {
   const { session, loading } = useAuth()
-  const { profile } = useProfile(session?.user?.id)
+  const { profile, loading: profileLoading } = useProfile(session?.user?.id)
   const segments = useSegments()
   const router = useRouter()
   const locale = (profile?.locale ?? 'en') as Locale
+
+  // Splash stays up until we have enough data to route. That means:
+  // - auth has finished loading, AND
+  // - if there's a session, profile has also loaded (so we know whether
+  //   to send the user to onboarding or straight to /(tabs)).
+  // Without this check, the Stack renders its default child (usually
+  // /(tabs)) for one frame between auth resolving and profile arriving,
+  // producing a visible flash of the Today screen before onboarding
+  // kicks in.
+  const ready = !loading && (!session || !profileLoading)
 
   // Handles voiceexpense://shortcut?amount=XX&merchant=... deep links from iOS Shortcuts
   useShortcutHandler()
@@ -39,7 +49,7 @@ export default function RootLayout() {
   const prevSegmentRef = useRef<string | undefined>(undefined)
 
   useEffect(() => {
-    if (loading) return
+    if (!ready) return
 
     SplashScreen.hideAsync()
 
@@ -87,9 +97,9 @@ export default function RootLayout() {
       // Generate any missed recurring transactions since last app open
       runRecurringCatchUp(session.user.id)
     }
-  }, [session, loading, segments, router, profile])
+  }, [session, loading, segments, router, profile, ready])
 
-  if (loading) return null
+  if (!ready) return null
 
   return (
     <UndoProvider>

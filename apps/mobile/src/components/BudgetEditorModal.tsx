@@ -80,7 +80,7 @@ export function BudgetEditorModal({
           <Pressable onPress={onClose} hitSlop={8}>
             <Text style={styles.modalCancel}>{t('common.cancel', locale)}</Text>
           </Pressable>
-          <Text style={styles.modalTitle}>{t('settings.income', locale)}</Text>
+          <Text style={styles.modalTitle}>{t('settings.budget', locale)}</Text>
           <Pressable onPress={handleSave} disabled={saving} hitSlop={8}>
             <Text style={[styles.modalDone, saving && styles.modalDoneDisabled]}>
               {t('common.save', locale)}

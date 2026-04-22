@@ -164,7 +164,7 @@ export default function TodayScreen() {
         <DayOneFirstLog
           locale={locale}
           onSkip={() => setDaySkipped(true)}
-          onTypeInstead={() => router.push('/(tabs)/record')}
+          onTypeInstead={() => router.push({ pathname: '/(tabs)/record', params: { tab: 'manual' } })}
         />
       </SafeAreaView>
     )

@@ -73,10 +73,16 @@ export default function RecordScreen() {
     shortcut_merchant?: string
     shortcut_currency?: string
     shortcut_payment_method?: string
+    /** Optional initial tab — "manual" lands the user on the keypad
+        directly (used by the Day-1 coach's "Or type instead" link). */
+    tab?: string
   }>()
 
-  // UI state
-  const [activeTab, setActiveTab] = useState<Tab>('voice')
+  // UI state. Initial tab respects the ?tab=manual deep-link param so the
+  // Day-1 coach's "type instead" lands users on the keypad, not on Voice.
+  const [activeTab, setActiveTab] = useState<Tab>(
+    params.tab === 'manual' ? 'manual' : 'voice',
+  )
   const [confirmModalVisible, setConfirmModalVisible] = useState(false)
   const [confirmSaving, setConfirmSaving] = useState(false)
   const [scanLoading, setScanLoading] = useState(false)
