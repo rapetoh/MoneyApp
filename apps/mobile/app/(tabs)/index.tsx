@@ -164,7 +164,15 @@ export default function TodayScreen() {
         <DayOneFirstLog
           locale={locale}
           onSkip={() => setDaySkipped(true)}
-          onTypeInstead={() => router.push({ pathname: '/(tabs)/record', params: { tab: 'manual' } })}
+          onTypeInstead={() =>
+            router.push({
+              pathname: '/(tabs)/record',
+              // _nonce forces uniqueness on repeat taps so Record's
+              // useFocusEffect re-syncs to Manual each time instead of
+              // being deduped by expo-router.
+              params: { tab: 'manual', _nonce: Date.now().toString() },
+            })
+          }
         />
       </SafeAreaView>
     )

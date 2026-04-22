@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import {
   View,
   Text,
@@ -13,7 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
-import { useRouter, useLocalSearchParams } from 'expo-router'
+import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router'
 import { useAuth } from '../../src/hooks/useAuth'
 import { useCategories } from '../../src/hooks/useCategories'
 import { useTransactions } from '../../src/hooks/useTransactions'
@@ -76,12 +76,31 @@ export default function RecordScreen() {
     /** Optional initial tab — "manual" lands the user on the keypad
         directly (used by the Day-1 coach's "Or type instead" link). */
     tab?: string
+    /** Uniqueness token bumped on every Type-instead tap. Without it,
+        a repeat tap with identical pathname+params is deduped by
+        expo-router and the useFocusEffect below doesn't re-fire. */
+    _nonce?: string
   }>()
 
-  // UI state. Initial tab respects the ?tab=manual deep-link param so the
-  // Day-1 coach's "type instead" lands users on the keypad, not on Voice.
-  const [activeTab, setActiveTab] = useState<Tab>(
-    params.tab === 'manual' ? 'manual' : 'voice',
+  // UI state. The initial tab defaults to Voice; useFocusEffect below
+  // overrides it based on the `?tab` param on every focus event.
+  const [activeTab, setActiveTab] = useState<Tab>('voice')
+
+  // Sync the tab with the route's ?tab param every time this screen gains
+  // focus. The Record tab stays mounted across navigations, so a plain
+  // useState initializer only runs once — meaning "tap Type instead" on
+  // later visits would have no effect, and Voice/Manual would drift into
+  // whatever state the user last left it in. useFocusEffect re-runs on
+  // every focus (tab bar FAB, Type-instead, deep link), which is the
+  // right granularity for this sync.
+  //
+  //   - tab=manual → switch to Manual (used by Day-1 coach's "type instead")
+  //   - any other value or missing → reset to Voice (the FAB's default)
+  useFocusEffect(
+    useCallback(() => {
+      setActiveTab(params.tab === 'manual' ? 'manual' : 'voice')
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [params.tab, params._nonce]),
   )
   const [confirmModalVisible, setConfirmModalVisible] = useState(false)
   const [confirmSaving, setConfirmSaving] = useState(false)
