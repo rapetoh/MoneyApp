@@ -130,8 +130,16 @@ export function useRecurringRules(userId: string | undefined) {
       .select()
       .single()
 
-    if (!error) await fetch()
-    return error ? null : (data as RecurringRule)
+    if (error) {
+      // Previously silent — the onboarding income step relied on this
+      // returning a rule and had no visibility when it didn't. A warn
+      // makes the failure loud enough to notice in dev without breaking
+      // production.
+      console.warn('[useRecurringRules] createRule failed:', error)
+      return null
+    }
+    await fetch()
+    return data as RecurringRule
   }
 
   async function toggleRule(id: string, isActive: boolean) {
@@ -144,10 +152,25 @@ export function useRecurringRules(userId: string | undefined) {
     await fetch()
   }
 
-  async function updateRule(id: string, changes: Partial<Pick<RecurringRule, 'frequency' | 'amount' | 'name' | 'ends_at'>>) {
+  async function updateRule(
+    id: string,
+    changes: Partial<
+      Pick<
+        RecurringRule,
+        | 'frequency'
+        | 'amount'
+        | 'name'
+        | 'ends_at'
+        | 'category_id'
+        | 'direction'
+        | 'payment_method'
+        | 'note'
+      >
+    >,
+  ) {
     await supabase.from('recurring_rules').update(changes).eq('id', id)
     await fetch()
   }
 
-  return { rules, loading, createRule, toggleRule, deleteRule, updateRule }
+  return { rules, loading, createRule, toggleRule, deleteRule, updateRule, refetch: fetch }
 }

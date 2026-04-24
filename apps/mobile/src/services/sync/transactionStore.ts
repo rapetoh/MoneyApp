@@ -108,7 +108,7 @@ export async function softDeleteTransaction(id: string): Promise<void> {
 
 export async function updateTransactionFields(
   id: string,
-  fields: Partial<Pick<Transaction, 'amount' | 'merchant' | 'note' | 'category_id' | 'payment_method' | 'direction'>>,
+  fields: Partial<Pick<Transaction, 'amount' | 'merchant' | 'note' | 'category_id' | 'payment_method' | 'direction' | 'is_recurring'>>,
 ): Promise<void> {
   const db = await getDb()
   const now = new Date().toISOString()
@@ -117,7 +117,9 @@ export async function updateTransactionFields(
 
   for (const [key, val] of Object.entries(fields)) {
     sets.push(`${key} = ?`)
-    values.push(val ?? null)
+    // SQLite binds booleans as 0/1; scalars and null pass through unchanged.
+    const coerced = typeof val === 'boolean' ? (val ? 1 : 0) : val ?? null
+    values.push(coerced)
   }
   values.push(id)
 

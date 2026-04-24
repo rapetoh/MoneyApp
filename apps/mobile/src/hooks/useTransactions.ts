@@ -142,7 +142,7 @@ export function useTransactions(userId: string | undefined) {
 
   async function editTransaction(
     id: string,
-    fields: Partial<Pick<Transaction, 'amount' | 'merchant' | 'note' | 'category_id' | 'payment_method' | 'direction'>>,
+    fields: Partial<Pick<Transaction, 'amount' | 'merchant' | 'note' | 'category_id' | 'payment_method' | 'direction' | 'is_recurring'>>,
   ): Promise<{ error: string | null }> {
     if (!userId) return { error: 'Not authenticated' }
 

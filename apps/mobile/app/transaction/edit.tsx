@@ -17,11 +17,13 @@ import { useAuth } from '../../src/hooks/useAuth'
 import { useProfile } from '../../src/hooks/useProfile'
 import { useCategories } from '../../src/hooks/useCategories'
 import { useTransactions } from '../../src/hooks/useTransactions'
+import { useRecurringRules } from '../../src/hooks/useRecurringRules'
 import { getTransactionById } from '../../src/services/sync/transactionStore'
 import { CategoryPicker } from '../../src/components/CategoryPicker'
+import { RecurringToggle } from '../../src/components/RecurringToggle'
 import { Colors, Typography, Spacing, Radius } from '../../src/theme'
 import { t } from '@voice-expense/shared'
-import type { Transaction, TransactionDirection, PaymentMethod, Locale } from '@voice-expense/shared'
+import type { Transaction, TransactionDirection, PaymentMethod, Locale, RecurringFrequency } from '@voice-expense/shared'
 
 const PAYMENT_METHODS: { value: PaymentMethod; key: string }[] = [
   { value: 'cash', key: 'payment.cash' },
@@ -37,6 +39,7 @@ export default function EditTransactionScreen() {
   const { profile } = useProfile(user?.id)
   const { categories, createCategory } = useCategories(user?.id)
   const { editTransaction } = useTransactions(user?.id)
+  const { rules, createRule, deleteRule, updateRule } = useRecurringRules(user?.id)
   const locale = (profile?.locale ?? 'en') as Locale
   const currency = profile?.currency_code ?? 'USD'
   const router = useRouter()
@@ -51,6 +54,12 @@ export default function EditTransactionScreen() {
   const [categoryId, setCategoryId] = useState<string | null>(null)
   const [direction, setDirection] = useState<TransactionDirection>('debit')
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash')
+  // Recurring state — initial values come from the transaction + any
+  // existing rule linked via template_txn_id. If the transaction is flagged
+  // recurring but no rule is found, we still show the toggle as ON so the
+  // user can see the truth (the txn says recurring) and fix it on save.
+  const [isRecurring, setIsRecurring] = useState(false)
+  const [frequency, setFrequency] = useState<RecurringFrequency>('monthly')
 
   useEffect(() => {
     if (!id) return
@@ -63,9 +72,15 @@ export default function EditTransactionScreen() {
         setCategoryId(data.category_id)
         setDirection(data.direction)
         setPaymentMethod(data.payment_method ?? 'cash')
+        setIsRecurring(data.is_recurring ?? false)
+        // Prefill frequency from the matching rule if one exists.
+        const linkedRule = rules.find((r) => r.template_txn_id === data.id)
+        if (linkedRule) setFrequency(linkedRule.frequency)
       }
       setLoading(false)
     })
+    // rules intentionally not in deps: we only want the initial value.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
 
   async function handleSave() {
@@ -84,7 +99,47 @@ export default function EditTransactionScreen() {
       note: note.trim() || null,
       category_id: categoryId,
       payment_method: paymentMethod,
+      is_recurring: isRecurring,
     })
+
+    // Reconcile the recurring_rules row based on how the toggle changed.
+    // Four cases, all keyed off whether we already had a rule for this txn:
+    //   off → off : no-op
+    //   on  → on  : update the rule to match the new values (amount, freq…)
+    //   off → on  : create a new rule linked to this txn
+    //   on  → off : delete the existing rule
+    // Rule match is by template_txn_id. Legacy transactions with
+    // is_recurring=true but no rule (the "ghost" case that caused the
+    // Recurring screen to look empty) will get a rule created on save.
+    const existingRule = rules.find((r) => r.template_txn_id === txn.id)
+    const was = !!existingRule
+    const now = isRecurring
+
+    if (!error && !was && now) {
+      await createRule({
+        name: merchant.trim() || null,
+        amount: parsedAmount,
+        currency_code: txn.currency_code,
+        category_id: categoryId,
+        direction,
+        payment_method: paymentMethod,
+        note: note.trim() || null,
+        frequency,
+        template_txn_id: txn.id,
+      })
+    } else if (!error && was && !now) {
+      await deleteRule(existingRule!.id)
+    } else if (!error && was && now) {
+      await updateRule(existingRule!.id, {
+        name: merchant.trim() || null,
+        amount: parsedAmount,
+        category_id: categoryId,
+        direction,
+        payment_method: paymentMethod,
+        note: note.trim() || null,
+        frequency,
+      })
+    }
 
     setSaving(false)
     if (error) {
@@ -199,6 +254,17 @@ export default function EditTransactionScreen() {
                 </View>
               </ScrollView>
             </View>
+
+            {/* Recurring — every saved field should be editable (was missing
+                here which meant users couldn't toggle recurring on an
+                existing transaction and couldn't tell if it was flagged). */}
+            <RecurringToggle
+              isRecurring={isRecurring}
+              frequency={frequency}
+              onToggle={setIsRecurring}
+              onFrequencyChange={setFrequency}
+              locale={locale}
+            />
           </View>
 
           <Pressable

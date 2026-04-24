@@ -1091,4 +1091,26 @@ New component: `src/components/HistoryHeatmap.tsx` — reusable section containi
 
 i18n: 2 new keys per locale (`insights.history`, `voice.no_transcript`).
 
+### Post-rebuild follow-up, round 3 (April 23, 2026)
+
+Two legitimate gaps flagged by the user after further testing:
+
+1. **Recurring screen was empty despite transactions being flagged as recurring.** Two causes:
+   - `useRecurringRules` fetches once on mount, but `/recurring` stays on the navigation stack between visits — a rule created elsewhere (onboarding's income, transaction edit, etc.) wouldn't show up until the app was reloaded. Fix: added a `refetch` return to the hook + wired a `useFocusEffect` in `recurring.tsx` so the rules list always refreshes on screen focus.
+   - `createRule` silently returned `null` on error. Callers (onboarding income, record's manual save) didn't check the return value, so a failed insert produced a "ghost" transaction: flagged as recurring but with no corresponding rule. Fix: `console.warn` the error in `createRule` so dev sees it, and callers are free to surface it upstream if they want.
+
+2. **Transaction edit didn't expose `is_recurring` or frequency.** Real gap — edit.tsx handled direction, amount, merchant, note, category, payment method, but not recurring. You couldn't toggle recurring on/off, couldn't change frequency, couldn't even see the current state. Fix: added a `RecurringToggle` to the edit screen, wired a full 4-case rule-CRUD path on save:
+   - off → off: no-op.
+   - on → on: update the existing rule (by `template_txn_id` match) with the new values.
+   - off → on: create a new rule linked to the transaction.
+   - on → off: delete the existing rule.
+   
+   Legacy transactions flagged recurring with no rule (the "ghost" case from issue 1) get a rule created on save, which backfills the Recurring screen automatically for that user.
+
+Type widening to support the above:
+- `editTransaction` + `updateTransactionFields` + `updateRule` signatures widened to accept the fields the edit flow needs (`is_recurring` on transactions; `category_id`, `direction`, `payment_method`, `note` on rules).
+- `updateTransactionFields` also adds a boolean-to-0/1 coercion for SQLite binding, since JS booleans don't bind directly.
+
+No new i18n keys.
+
 *End of Plan*

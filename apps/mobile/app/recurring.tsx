@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import {
   View,
   Text,
@@ -9,7 +9,7 @@ import {
   ActivityIndicator,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Stack, useRouter } from 'expo-router'
+import { Stack, useRouter, useFocusEffect } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '../src/hooks/useAuth'
 import { useProfile } from '../src/hooks/useProfile'
@@ -64,7 +64,18 @@ export default function RecurringScreen() {
   const { user } = useAuth()
   const { profile } = useProfile(user?.id)
   const { categories } = useCategories(user?.id)
-  const { rules, loading, toggleRule, deleteRule } = useRecurringRules(user?.id)
+  const { rules, loading, toggleRule, deleteRule, refetch } = useRecurringRules(user?.id)
+
+  // useRecurringRules fetches once on mount, but this screen stays in the
+  // navigation stack between visits — so a rule created elsewhere (e.g. by
+  // onboarding's income step or the transaction edit screen) wouldn't show
+  // up here unless we refetch. Focus event covers FAB tap + tab switch +
+  // deep links + navigate-back from a child screen.
+  useFocusEffect(
+    useCallback(() => {
+      refetch()
+    }, [refetch]),
+  )
   const router = useRouter()
   const [toggling, setToggling] = useState<string | null>(null)
 
