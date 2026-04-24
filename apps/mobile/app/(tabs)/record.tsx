@@ -395,7 +395,11 @@ export default function RecordScreen() {
           )}
 
           {voice.state === 'error' && (
-            <Text style={styles.errorText}>{voice.errorMessage ?? t('common.error', userLocale)}</Text>
+            <Text style={styles.errorText}>
+              {voice.errorMessage === 'no-transcript'
+                ? t('voice.no_transcript', userLocale as any)
+                : voice.errorMessage ?? t('common.error', userLocale)}
+            </Text>
           )}
 
           <Pressable

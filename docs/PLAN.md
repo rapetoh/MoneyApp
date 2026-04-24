@@ -1080,4 +1080,15 @@ User feedback after the first on-device run of the native-dep rebuild surfaced s
 - Fresh sign-up no longer shows Today flash before Welcome
 - Mic flow on a real device (simulator can't validate)
 
+### Post-rebuild follow-up, round 2 (April 23, 2026)
+
+Two user-surfaced issues after the first round of fixes:
+
+1. **"Where's the heatmap?"** — round 1 rerouted the Today clock icon away from `/more/history` but left the heatmap dangling on its own route. Moved the heatmap + months-list into Insights as a new "HISTORY" section below the Forecast card. Deleted `/more/history.tsx` entirely + the `more/history` Stack.Screen registration + the `more.history` entry in the More drawer (replaced with a "Transactions" row pointing to `/more/transactions`, icon swapped to `list-outline`). One surface for the data story, no split-brain.
+2. **Mic flicker was silent.** `useVoice`'s `'end'` handler was flipping state to `'idle'` when no transcript arrived — the common simulator failure mode where `AudioToolbox` abandons the I/O cycle. Now both the `'end'`-with-no-transcript path and the `'no-speech'` error path set state to `'error'` with a `'no-transcript'` sentinel. Record screen translates it to a localized "We didn't catch anything — tap the mic to try again" message instead of a silent return to idle. Still can't fully validate on simulator, but the user now gets feedback instead of wondering what happened.
+
+New component: `src/components/HistoryHeatmap.tsx` — reusable section containing the prev/next heatmap card + months list. No routing or page chrome of its own; the host screen owns those.
+
+i18n: 2 new keys per locale (`insights.history`, `voice.no_transcript`).
+
 *End of Plan*

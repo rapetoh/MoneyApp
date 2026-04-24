@@ -32,10 +32,14 @@ export default function MoreScreen() {
       title: t('more.section_activity', locale),
       rows: [
         {
-          key: 'history',
-          label: t('more.history', locale),
-          icon: 'time-outline',
-          onPress: () => router.push('/more/history'),
+          // Was "History" → /more/history (heatmap screen). That screen is
+          // gone — the heatmap now lives inline on the Insights tab. This
+          // drawer row is the second entry point to the transaction list
+          // (the other being Today's clock icon).
+          key: 'transactions',
+          label: t('more.transactions', locale),
+          icon: 'list-outline',
+          onPress: () => router.push('/more/transactions'),
         },
         {
           key: 'recurring',

@@ -8,6 +8,7 @@ import { useProfile } from '../../src/hooks/useProfile'
 import { useTransactions } from '../../src/hooks/useTransactions'
 import { useCategories } from '../../src/hooks/useCategories'
 import { Money } from '../../src/components/Money'
+import { HistoryHeatmap } from '../../src/components/HistoryHeatmap'
 import { Colors, Typography, Hairline } from '../../src/theme'
 import { formatCurrency, t, type Locale } from '@voice-expense/shared'
 import type { Transaction } from '@voice-expense/shared'
@@ -407,6 +408,15 @@ export default function InsightsScreen() {
             </View>
           </View>
         )}
+
+        {/* History section — year-at-a-glance heatmap + months list. Moved
+            here from the dedicated /more/history route so the whole data-
+            visualization story lives on one surface. Tapping a month row
+            drills into /more/transactions scoped to that month. */}
+        <View style={styles.historyWrap}>
+          <Text style={styles.historySectionLabel}>{t('insights.history', locale)}</Text>
+          <HistoryHeatmap transactions={transactions} locale={locale} />
+        </View>
       </ScrollView>
 
       {/* Month picker sheet */}
@@ -574,6 +584,17 @@ const styles = StyleSheet.create({
 
   // Forecast
   forecastWrap: { paddingHorizontal: 20, paddingTop: 18 },
+  historyWrap: { paddingTop: 28 },
+  historySectionLabel: {
+    paddingHorizontal: 28,
+    paddingBottom: 4,
+    color: Colors.ink3 ?? Colors.textSecondary,
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+    fontFamily: Typography.fontFamily.sansBold,
+  },
   forecastCard: {
     backgroundColor: Colors.ink ?? '#1B1915',
     borderRadius: 22,

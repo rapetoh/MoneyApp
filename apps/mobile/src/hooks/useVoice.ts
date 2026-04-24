@@ -69,14 +69,25 @@ export function useVoice(
       setTranscript(final)
       setInterimTranscript('')
       runParse(final)
-    } else {
-      setState('idle')
+      return
     }
+    // No transcript — either the user never spoke (common on real devices
+    // when the mic button is tapped accidentally) OR the simulator mic
+    // pipeline silently failed (AudioToolbox "Abandoning I/O cycle" in
+    // logs). Either way, surface a visible hint instead of snapping back
+    // to idle, which used to look like "the mic flickered and nothing
+    // happened."
+    setErrorMessage('no-transcript')
+    setState('error')
   })
 
   useSpeechRecognitionEvent('error', (event) => {
+    // 'no-speech' on real devices = user opened the mic and didn't say
+    // anything. Still worth surfacing so the user knows why nothing
+    // happened; we classify it alongside the silent-end case above.
     if (event.error === 'no-speech') {
-      setState('idle')
+      setErrorMessage('no-transcript')
+      setState('error')
       return
     }
     setErrorMessage(`Speech recognition error: ${event.error}`)
