@@ -13,7 +13,7 @@ import { TransactionRow } from '../../src/components/TransactionRow'
 import { Money, MoneyLabel } from '../../src/components/Money'
 import { MiniBars } from '../../src/components/MiniBars'
 import { DayOneFirstLog } from '../../src/components/DayOneFirstLog'
-import { Colors, Typography, Spacing, Radius } from '../../src/theme'
+import { Colors, Typography, Spacing } from '../../src/theme'
 import { t } from '@voice-expense/shared'
 import type { Locale, Transaction } from '@voice-expense/shared'
 
@@ -209,7 +209,7 @@ export default function TodayScreen() {
               onPress={() => router.push('/more/transactions')}
               accessibilityLabel={t('more.transactions', locale)}
             >
-              <Ionicons name="time-outline" size={18} color={Colors.ink2 ?? Colors.textSecondary} />
+              <Ionicons name="list-outline" size={18} color={Colors.ink2 ?? Colors.textSecondary} />
             </Pressable>
           </View>
         </View>
