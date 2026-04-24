@@ -116,27 +116,33 @@ const styles = StyleSheet.create({
     bottom: 14,
     height: 68,
     borderRadius: 34,
-    // Transparent so the BlurView behind shows through. A subtle warm
-    // tint is added via the blur tint="light" — no hex fill needed here.
+    // Transparent so the BlurView behind shows through. NOTE: no
+    // overflow:hidden here — it would clip the record FAB (which
+    // extends above the bar) and kill the drop shadow.
     backgroundColor: 'transparent',
     borderTopWidth: 0,
     paddingBottom: 10,
     paddingHorizontal: 9,
     marginHorizontal: 21,
     paddingTop: 10,
-    overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.12,
     shadowRadius: 16,
     elevation: 12,
   },
-  // BlurView fills the tab bar's own footprint; absoluteFill inside the
-  // pill-shaped parent + borderRadius on the bar clips it to the pill.
+  // BlurView lives behind the tab content and is clipped to the pill
+  // shape itself (borderRadius + overflow:hidden on this layer only,
+  // so it doesn't affect the FAB or the shadow). The white tint +
+  // subtle hairline give the pill a visible edge even when backdrop
+  // blur is faint (e.g. on a flat green background).
   tabBarBlur: {
     ...StyleSheet.absoluteFillObject,
     borderRadius: 34,
     overflow: 'hidden',
+    backgroundColor: 'rgba(255,255,255,0.55)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(40,36,28,0.08)',
   },
   tabLabel: {
     fontSize: 10,

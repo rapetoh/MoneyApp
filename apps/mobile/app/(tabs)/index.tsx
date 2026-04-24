@@ -206,8 +206,8 @@ export default function TodayScreen() {
             </Pressable>
             <Pressable
               style={({ pressed }) => [styles.headerIconBtn, pressed && styles.headerIconBtnPressed]}
-              onPress={() => router.push('/more/history')}
-              accessibilityLabel={t('more.history', locale)}
+              onPress={() => router.push('/more/transactions')}
+              accessibilityLabel={t('more.transactions', locale)}
             >
               <Ionicons name="time-outline" size={18} color={Colors.ink2 ?? Colors.textSecondary} />
             </Pressable>

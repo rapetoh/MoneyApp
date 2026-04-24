@@ -5,6 +5,8 @@ import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '../../src/hooks/useAuth'
 import { useProfile } from '../../src/hooks/useProfile'
+import { useRecurringRules } from '../../src/hooks/useRecurringRules'
+import { useTransactions } from '../../src/hooks/useTransactions'
 import { Colors, Typography, Hairline } from '../../src/theme'
 import { t, type Locale } from '@voice-expense/shared'
 
@@ -26,6 +28,8 @@ const PRESETS = [
 export default function IncomeScreen() {
   const { user } = useAuth()
   const { profile, updateProfile } = useProfile(user?.id)
+  const { createRule } = useRecurringRules(user?.id)
+  const { createTransaction } = useTransactions(user?.id)
   const locale = (profile?.locale ?? 'en') as Locale
   const currency = profile?.currency_code ?? 'USD'
   const router = useRouter()
@@ -35,14 +39,51 @@ export default function IncomeScreen() {
   const [saving, setSaving] = useState(false)
 
   const amountNum = parseFloat(amount) || 0
+  const canContinue = amountNum > 0
 
   async function finishOnboarding(withIncome: boolean) {
     setSaving(true)
+    const useIncome = withIncome && amountNum > 0
+
     await updateProfile({
-      monthly_income: withIncome && amountNum > 0 ? amountNum : null,
-      monthly_income_source: withIncome && source.trim() ? source.trim() : null,
+      monthly_income: useIncome ? amountNum : null,
+      monthly_income_source: useIncome && source.trim() ? source.trim() : null,
       onboarding_completed_at: new Date().toISOString(),
     })
+
+    // When the user provides an income, wire it into the app's transaction
+    // graph so it behaves like real income everywhere (History's Income
+    // tab, Insights totals, recurring catch-up):
+    //   1. A recurring credit rule for future months.
+    //   2. An immediate credit transaction for the current month so the
+    //      user sees their income reflected right away.
+    // Skipped entirely when useIncome is false (no row written).
+    if (useIncome) {
+      const sourceName = source.trim() || t('onboarding.income.default_name', locale)
+
+      await createTransaction({
+        amount: amountNum,
+        direction: 'credit',
+        currency_code: currency,
+        merchant: sourceName,
+        note: t('onboarding.income.txn_note', locale),
+        category_id: null,
+        payment_method: 'bank_transfer',
+        is_recurring: true,
+      })
+
+      await createRule({
+        name: sourceName,
+        amount: amountNum,
+        currency_code: currency,
+        category_id: null,
+        direction: 'credit',
+        payment_method: 'bank_transfer',
+        note: t('onboarding.income.txn_note', locale),
+        frequency: 'monthly',
+      })
+    }
+
     setSaving(false)
     router.replace('/(tabs)')
   }
@@ -152,14 +193,17 @@ export default function IncomeScreen() {
 
         <View style={{ flex: 1 }} />
 
+        {/* Continue is gated on a positive amount. The Skip button in the
+            top-right handles the "no income" intent explicitly, so Continue
+            only makes sense when there's actually something to save. */}
         <Pressable
           style={({ pressed }) => [
             styles.cta,
-            saving && styles.ctaDisabled,
-            pressed && styles.ctaPressed,
+            (saving || !canContinue) && styles.ctaDisabled,
+            pressed && canContinue && !saving && styles.ctaPressed,
           ]}
           onPress={() => finishOnboarding(true)}
-          disabled={saving}
+          disabled={saving || !canContinue}
         >
           {saving ? (
             <ActivityIndicator color="#FFFFFF" />

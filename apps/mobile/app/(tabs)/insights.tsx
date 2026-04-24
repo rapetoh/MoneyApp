@@ -18,19 +18,33 @@ function monthKey(d: Date) {
 
 /**
  * Tiny spend trend as a smooth SVG path with sage gradient fill.
- * Matches the shape in S_Insights's hero card.
+ * Matches the shape in S_Insights's hero card, with explicit date
+ * labels at the ends + a caption so the curve is actually informative
+ * ("pretty line with no axis" was a valid user complaint).
  *
  * Catmull-Rom → cubic-bezier smoothing: each segment uses control points
  * derived from the previous and next data points, so the curve passes
  * through every sample without overshoot.
  */
-function TrendSpark({ points, max }: { points: number[]; max: number }) {
+function TrendSpark({
+  points,
+  max,
+  startLabel,
+  endLabel,
+  captionLabel,
+}: {
+  points: number[]
+  max: number
+  startLabel: string
+  endLabel: string
+  captionLabel: string
+}) {
   const VB_W = 300
   const VB_H = 60
   const PAD_Y = 4
 
   if (points.length < 2) {
-    return <View style={{ height: VB_H, marginTop: 14 }} />
+    return <View style={{ height: VB_H + 36, marginTop: 14 }} />
   }
 
   const n = points.length
@@ -59,24 +73,54 @@ function TrendSpark({ points, max }: { points: number[]; max: number }) {
   const accent = Colors.accent ?? Colors.primary
 
   return (
-    <Svg
-      width="100%"
-      height={VB_H}
-      viewBox={`0 0 ${VB_W} ${VB_H}`}
-      preserveAspectRatio="none"
-      style={{ marginTop: 14 }}
-    >
-      <Defs>
-        <LinearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
-          <Stop offset="0%" stopColor={accent} stopOpacity={0.22} />
-          <Stop offset="100%" stopColor={accent} stopOpacity={0} />
-        </LinearGradient>
-      </Defs>
-      <Path d={fillPath} fill="url(#trendFill)" />
-      <Path d={linePath} fill="none" stroke={accent} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-    </Svg>
+    <View style={{ marginTop: 14 }}>
+      <Svg
+        width="100%"
+        height={VB_H}
+        viewBox={`0 0 ${VB_W} ${VB_H}`}
+        preserveAspectRatio="none"
+      >
+        <Defs>
+          <LinearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0%" stopColor={accent} stopOpacity={0.22} />
+            <Stop offset="100%" stopColor={accent} stopOpacity={0} />
+          </LinearGradient>
+        </Defs>
+        <Path d={fillPath} fill="url(#trendFill)" />
+        <Path d={linePath} fill="none" stroke={accent} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+      </Svg>
+      <View style={trendAxisStyles.row}>
+        <Text style={trendAxisStyles.tick}>{startLabel}</Text>
+        <Text style={trendAxisStyles.caption}>{captionLabel}</Text>
+        <Text style={trendAxisStyles.tick}>{endLabel}</Text>
+      </View>
+    </View>
   )
 }
+
+const trendAxisStyles = StyleSheet.create({
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 6,
+  },
+  tick: {
+    fontFamily: Typography.fontFamily.sansSemiBold,
+    fontSize: 10,
+    color: Colors.ink3 ?? Colors.textSecondary,
+    fontWeight: '600',
+    letterSpacing: 0.3,
+  },
+  caption: {
+    fontFamily: Typography.fontFamily.sansBold,
+    fontSize: 10,
+    color: Colors.ink4 ?? Colors.textMuted,
+    fontWeight: '700',
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+  },
+})
 
 // Sum debits for a date range from the full local transaction list.
 function sumDebits(txns: Transaction[], start: Date, end: Date): number {
@@ -280,7 +324,17 @@ export default function InsightsScreen() {
                 </View>
               )}
             </View>
-            <TrendSpark points={trend} max={trendMax} />
+            <TrendSpark
+              points={trend}
+              max={trendMax}
+              startLabel={
+                // First point is `trend.length - 1` days before rangeEnd.
+                new Date(rangeEnd.getTime() - (trend.length - 1) * 86400000)
+                  .toLocaleDateString(locale, { month: 'short', day: 'numeric' })
+              }
+              endLabel={rangeEnd.toLocaleDateString(locale, { month: 'short', day: 'numeric' })}
+              captionLabel={`${t('insights.last_n_days_prefix', locale)} ${trend.length} ${t('insights.last_n_days_suffix', locale)}`}
+            />
           </View>
         </View>
 
