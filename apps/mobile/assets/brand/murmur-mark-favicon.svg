@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="192" height="192">
+  <!--
+    Favicon. At ≤24px the inner pulse is dropped (brand sheet §01); 192px is
+    the favicon target so we keep the silhouette + center dot only.
+  -->
+  <rect width="192" height="192" fill="#FBFAF7"/>
+  <g transform="translate(36 36) scale(0.75)">
+    <path d="M80 18 C 122 18, 142 50, 142 86 C 142 118, 116 142, 80 142
+             C 70 142, 60 140, 52 136 L 30 142 L 38 122
+             C 24 110, 18 96, 18 86 C 18 50, 38 18, 80 18 Z"
+          fill="#1B1915"/>
+    <circle cx="80" cy="80" r="6" fill="#FBFAF7"/>
+  </g>
+</svg>

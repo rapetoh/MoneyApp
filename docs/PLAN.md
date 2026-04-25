@@ -1267,4 +1267,36 @@ onboarding flow shrinks from 3 steps (Welcome → Permissions → Income) to 2
 - Step progress text reads "Step 1 of 2" / "Step 2 of 2" across all four
   locales.
 
+### Brand identity — The Listening Drop (April 25, 2026)
+
+The Murmur brand sheet ([docs/money-app/project/Murmur Brand Sheet.html](./money-app/project/Murmur%20Brand%20Sheet.html)) and logo explorations ([Murmur Logos.html](./money-app/project/Murmur%20Logos.html)) landed alongside this commit. The approved mark is **The Listening Drop** — a speech-bubble droplet on a 160-unit grid, with an inner pulse (a single dot + two concentric arcs at radii 6 / 16 / 28). Visual decisions in the brand sheet that are now load-bearing across the app:
+
+- **Color tokens.** Sage `#3F5A3E` is the only saturated accent; everything else is a warm neutral (Ink `#1B1915`, Cream `#FBFAF7`, Ink 2/3/4 grayscale). **Never blue** — the entire brand position is anti-fintech.
+- **Category tints** (low-saturation pastels). Mobile theme synced to the brand sheet's exact hex values: peach `#F3E7DC`, butter `#F2E8D5`, lavender `#EEE6F0`, rose `#F4DDDD` ([apps/mobile/src/theme/colors.ts](../apps/mobile/src/theme/colors.ts)).
+- **Type stack.** `New York` serif for display + money + headlines; `SF Pro Text` for sans body; `SF Mono` for codey numerics. Already in place via the existing `Typography` tokens — no changes.
+- **Wordmark.** New York Medium, −2.5 letterspacing. Final "r" can pulse sage in motion contexts.
+- **Splash.** 800ms hold on first paint, 320ms fade. Tagline ("Speak it. Spend clearly.") shows on cold start only, not on resume — current Expo splash plugin already handles the timing; the new icon delivers the visual.
+
+**Shipped:**
+- [apps/mobile/src/components/MurmurMark.tsx](../apps/mobile/src/components/MurmurMark.tsx) — reusable React Native SVG component implementing nine variants: `cream` (default), `sage` (brand), `ink` (dark mode), `tinted` (iOS 18 home-screen tinted), `cream-accent`, `stone`, `outline`, `mono-ink`, `mono-cream`. Variants compose a self-contained tile (background + 22% rounded corner + centered droplet) so callers don't need wrapper styles.
+- **Auth screens use the real mark.** [apps/mobile/app/(auth)/sign-in.tsx](../apps/mobile/app/(auth)/sign-in.tsx) and [apps/mobile/app/(auth)/sign-up.tsx](../apps/mobile/app/(auth)/sign-up.tsx) replaced the placeholder `<Text>M</Text>` sage tile with `<MurmurMark size={64} variant="sage" />`. The brand mark is the user's first visual contact with Murmur.
+- **App icon + adaptive icon + splash icon + favicon regenerated** from brand SVGs. New SVG sources live at [apps/mobile/assets/brand/](../apps/mobile/assets/brand/):
+  - `murmur-mark-cream.svg` — 1024 cream-bg + ink droplet → `assets/icon.png` (App Store / launcher)
+  - `murmur-mark-adaptive-foreground.svg` — 1024 transparent-bg with mark in 66% safe zone → `assets/adaptive-icon.png` (Android adaptive foreground)
+  - `murmur-mark-splash.svg` — 1024 transparent-bg, larger mark → `assets/splash-icon.png` (Expo splash plugin centers on cream bg)
+  - `murmur-mark-favicon.svg` — 192 silhouette + dot only (per brand sheet "≤24px drops the inner pulse") → `assets/favicon.png` (web)
+  - `generate-icons.mjs` — Node + sharp regeneration script. Re-run any time the SVGs change: `node apps/mobile/assets/brand/generate-icons.mjs`.
+
+**Not shipped this commit (tracked for follow-up):**
+- 2.6s breathing pulse animation. Brand sheet §06 specifies it for the splash and §01 mentions it for active listening + save events. The Listening view already has a strong identity (amount-as-hero + waveform), and a breathing splash needs a custom splash-to-app transition surface — both deserve their own focused pass. The static brand mark covers the mark-on-surfaces work.
+- Apple Sign In with the wordmark in dark contexts (e.g. paywall hero, dark splash variant).
+- Profile-card avatar replacement on Settings (currently a peach tile with the user's initial — the brand sheet doesn't override this, but a sage MurmurMark with the user's initial overlaid would tighten the brand presence).
+
+**Brand work untested live:**
+- Sign-in + sign-up screens render the actual Listening Drop SVG in sage instead of the M placeholder.
+- Reinstall: new app icon shows up on the home screen (cream tile, ink droplet, cream inner pulse).
+- Splash screen shows the Listening Drop on cream bg before the app loads.
+- Android adaptive icon: launcher mask (circle / squircle / rounded square depending on launcher) renders the droplet centered with safe-zone padding.
+- Category tints across the app match the brand sheet swatches (peach / butter / lavender / rose).
+
 *End of Plan*

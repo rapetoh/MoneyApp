@@ -1,0 +1,659 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8"/>
+<title>Murmur — Brand Sheet</title>
+<style>
+  html, body { margin: 0; padding: 0; background: #F4F1EA;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+    color: #1B1915; }
+  * { box-sizing: border-box; }
+  .page { max-width: 1200px; margin: 0 auto; padding: 56px 40px 80px; }
+  .eyebrow { font-size: 11px; font-weight: 700; letter-spacing: 1.4px;
+    text-transform: uppercase; color: #6C675E; }
+  h1 { font-family: "New York", "Iowan Old Style", Georgia, serif;
+    font-weight: 500; font-size: 56px; letter-spacing: -1.5px; margin: 8px 0 14px;
+    line-height: 1.05; }
+  .lede { font-size: 16px; line-height: 1.6; color: #3A3630; max-width: 680px; }
+  h2 { font-family: "New York", Georgia, serif; font-weight: 500;
+    font-size: 28px; letter-spacing: -0.5px; margin: 0 0 6px; line-height: 1.15; }
+  .sectionLabel { font-size: 11px; font-weight: 700; letter-spacing: 1.2px;
+    text-transform: uppercase; color: #6C675E; margin-bottom: 6px; }
+  .section { margin-top: 64px; }
+  .panel { background: #fff; border-radius: 24px;
+    border: 0.5px solid rgba(40,36,28,0.08);
+    box-shadow: 0 4px 14px rgba(40,36,28,0.04); padding: 32px; }
+  .row { display: grid; grid-template-columns: 280px 1fr; gap: 32px; }
+  @media (max-width: 880px) { .row { grid-template-columns: 1fr; } }
+  .desc { font-size: 14px; line-height: 1.55; color: #3A3630; }
+  .desc b { color: #1B1915; }
+
+  /* App icon grid */
+  .iconGrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px;
+    margin-top: 8px; }
+  .iconCell { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+  .iconCell .label { font-size: 11px; color: #6C675E; font-weight: 600;
+    letter-spacing: 0.4px; text-transform: uppercase; }
+  .iconBox { width: 100%; aspect-ratio: 1/1; border-radius: 22%;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 6px 18px rgba(40,36,28,0.10); }
+
+  /* scale ladder */
+  .ladder { display: flex; align-items: flex-end; gap: 18px; padding: 16px 0; }
+  .lad { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .lad .px { font-size: 10px; color: #9C9589; font-weight: 700; letter-spacing: 0.4px; }
+  .lad .b { background: #1B1915; display:flex; align-items:center; justify-content:center;
+    box-shadow: 0 3px 10px rgba(40,36,28,0.12); }
+
+  /* wordmark */
+  .wordmarkBig {
+    font-family: "New York", "Iowan Old Style", Georgia, serif;
+    font-weight: 500; font-size: 88px; letter-spacing: -2.5px; line-height: 1;
+    color: #1B1915;
+  }
+  .wordmarkBig .dot { color: #3F5A3E; }
+  .wordmarkSmall {
+    font-family: "New York", Georgia, serif;
+    font-weight: 500; font-size: 32px; letter-spacing: -0.7px; color: #1B1915;
+  }
+  .lockup { display: flex; align-items: center; gap: 18px; }
+
+  /* swatches */
+  .swatchGrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+  .swatch { border-radius: 16px; overflow: hidden; border: 0.5px solid rgba(40,36,28,0.08); }
+  .swatch .chip { height: 96px; }
+  .swatch .meta { padding: 12px 14px; background: #fff; }
+  .swatch .name { font-size: 12px; font-weight: 700; color: #1B1915; letter-spacing: -0.1px; }
+  .swatch .hex { font-family: "SF Mono", Menlo, monospace; font-size: 11px;
+    color: #6C675E; margin-top: 2px; }
+
+  /* type specimen */
+  .typeRow { display: grid; grid-template-columns: 100px 1fr; gap: 24px;
+    align-items: baseline; padding: 14px 0; border-bottom: 0.5px solid rgba(40,36,28,0.08); }
+  .typeRow:last-child { border-bottom: none; }
+  .typeRow .meta { font-size: 11px; color: #6C675E; font-weight: 700; letter-spacing: 0.4px;
+    text-transform: uppercase; padding-top: 6px; }
+  .typeSerif { font-family: "New York", "Iowan Old Style", Georgia, serif; }
+  .typeMono { font-family: "SF Mono", Menlo, monospace; }
+
+  /* splash preview */
+  .deviceFrame {
+    width: 280px; height: 580px; background: #1B1915; border-radius: 44px;
+    padding: 12px; box-shadow: 0 30px 60px rgba(40,36,28,0.18);
+    margin: 0 auto;
+  }
+  .deviceScreen {
+    width: 100%; height: 100%; border-radius: 32px; overflow: hidden;
+    position: relative; display: flex; align-items: center; justify-content: center;
+  }
+  .splashLight { background: #FBFAF7; }
+  .splashDark { background: #1B1915; }
+  .breathe { animation: breathe 2.6s ease-in-out infinite; }
+  @keyframes breathe {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50%      { transform: scale(1.08); opacity: 0.85; }
+  }
+  .pulseRing { animation: pulseRing 2.6s ease-in-out infinite; transform-origin: center; }
+  @keyframes pulseRing {
+    0%, 100% { opacity: 0.45; transform: scale(1); }
+    50%      { opacity: 0.18; transform: scale(1.15); }
+  }
+  .pulseRing2 { animation: pulseRing2 2.6s ease-in-out infinite; transform-origin: center; }
+  @keyframes pulseRing2 {
+    0%, 100% { opacity: 0.85; transform: scale(1); }
+    50%      { opacity: 0.5; transform: scale(1.1); }
+  }
+  .splashWord {
+    position: absolute; bottom: 60px; left: 0; right: 0; text-align: center;
+    font-family: "New York", Georgia, serif; font-size: 30px; font-weight: 500;
+    letter-spacing: -0.6px;
+  }
+  .splashSub {
+    position: absolute; bottom: 36px; left: 0; right: 0; text-align: center;
+    font-size: 11px; font-weight: 700; letter-spacing: 1.2px;
+    text-transform: uppercase;
+  }
+
+  /* social */
+  .socialGrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; align-items: end; }
+  .avatarRound {
+    width: 100%; aspect-ratio: 1/1; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 6px 18px rgba(40,36,28,0.12);
+  }
+  .ogImage {
+    grid-column: span 3;
+    aspect-ratio: 1200/630; background: #1B1915; border-radius: 18px;
+    padding: 60px 72px; display: flex; align-items: center; justify-content: space-between;
+    color: #fff; box-shadow: 0 12px 36px rgba(40,36,28,0.18);
+  }
+
+  /* dos and don'ts */
+  .rules { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .rule { padding: 18px; border-radius: 16px; border: 0.5px solid rgba(40,36,28,0.08);
+    background: #FBFAF7; display: flex; gap: 14px; align-items: flex-start; }
+  .rule .marker {
+    width: 26px; height: 26px; border-radius: 13px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-weight: 800; font-size: 14px;
+  }
+  .rule.do .marker { background: #3F5A3E; }
+  .rule.no .marker { background: #843C3C; }
+  .rule .label { font-size: 12px; font-weight: 700; color: #6C675E;
+    letter-spacing: 0.4px; text-transform: uppercase; margin-bottom: 4px; }
+  .rule .body { font-size: 13.5px; line-height: 1.5; color: #1B1915; }
+
+  /* spec card */
+  .specGrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+  .spec { padding: 20px; border-radius: 16px; background: #FBFAF7;
+    border: 0.5px solid rgba(40,36,28,0.08); }
+  .spec h4 { margin: 0 0 8px; font-size: 12px; font-weight: 700;
+    letter-spacing: 0.6px; text-transform: uppercase; color: #6C675E; }
+  .spec p { margin: 0; font-size: 13.5px; line-height: 1.55; color: #1B1915; }
+  .spec code { font-family: "SF Mono", Menlo, monospace; font-size: 12px;
+    color: #3F5A3E; background: #E8EDE3; padding: 1px 6px; border-radius: 4px; }
+
+  .footer { margin-top: 64px; padding-top: 28px; border-top: 0.5px solid rgba(40,36,28,0.12);
+    color: #6C675E; font-size: 13px; }
+</style>
+</head>
+<body>
+
+<!-- Reusable mark — defined once, used everywhere -->
+<svg width="0" height="0" style="position:absolute;">
+  <defs>
+    <symbol id="murmur" viewBox="0 0 160 160">
+      <path d="M80 18 C 122 18, 142 50, 142 86 C 142 118, 116 142, 80 142
+               C 70 142, 60 140, 52 136 L 30 142 L 38 122
+               C 24 110, 18 96, 18 86 C 18 50, 38 18, 80 18 Z"
+        fill="currentColor"/>
+    </symbol>
+    <symbol id="murmurInner" viewBox="0 0 160 160">
+      <circle cx="80" cy="80" r="6" fill="currentColor"/>
+      <path d="M64 80 a16 16 0 0 1 32 0" stroke="currentColor" stroke-width="3.5" fill="none" stroke-linecap="round" opacity="0.85"/>
+      <path d="M52 80 a28 28 0 0 1 56 0" stroke="currentColor" stroke-width="3" fill="none" stroke-linecap="round" opacity="0.45"/>
+    </symbol>
+    <symbol id="murmurFull" viewBox="0 0 160 160">
+      <path d="M80 18 C 122 18, 142 50, 142 86 C 142 118, 116 142, 80 142
+               C 70 142, 60 140, 52 136 L 30 142 L 38 122
+               C 24 110, 18 96, 18 86 C 18 50, 38 18, 80 18 Z"/>
+    </symbol>
+  </defs>
+</svg>
+
+<div class="page">
+
+  <div class="eyebrow">Brand Sheet · v1</div>
+  <h1>Murmur.</h1>
+  <p class="lede">A complete identity system built around <b>The Listening Drop</b> — the speech-bubble droplet you approved. Everything here is implementation-ready: logos as inline SVG, color tokens as hex, type stack, app icons in every iOS variant, splash, wordmark variants, social avatars, do's & don'ts, and a handoff spec for Claude Code.</p>
+
+
+  <!-- ── 01 The Mark ─────────────────────────────────────────── -->
+  <div class="section">
+    <div class="sectionLabel">01 · The mark</div>
+    <h2>The Listening Drop.</h2>
+    <p class="lede" style="margin-bottom: 28px;">A speech bubble compressed to a coin. The inner mark — a single dot with two concentric arcs — is a quiet pulse. It animates: 2.6s breath when the mic is live; expands outward when an expense saves.</p>
+
+    <div class="panel">
+      <div class="row">
+        <div>
+          <div class="sectionLabel">Construction</div>
+          <p class="desc">Built on a 160-unit grid. The droplet uses a 4-point cubic spline; the tail occupies the lower-left quadrant at a 32° angle. Optical center sits 4 units above geometric center to compensate for the tail mass. The inner pulse is locked at radius 6, with arcs at radii 16 and 28 — never use a 4th ring.</p>
+        </div>
+        <div style="display:flex; align-items:center; justify-content:center; min-height: 280px;">
+          <svg width="240" height="240" viewBox="-20 -20 200 200" style="overflow: visible;">
+            <!-- guides -->
+            <rect x="0" y="0" width="160" height="160" fill="none" stroke="#9C9589" stroke-width="0.5" stroke-dasharray="2 3"/>
+            <line x1="80" y1="-12" x2="80" y2="172" stroke="#9C9589" stroke-width="0.5" stroke-dasharray="2 3"/>
+            <line x1="-12" y1="80" x2="172" y2="80" stroke="#9C9589" stroke-width="0.5" stroke-dasharray="2 3"/>
+            <circle cx="80" cy="80" r="62" fill="none" stroke="#9C9589" stroke-width="0.5" stroke-dasharray="2 3"/>
+            <!-- mark -->
+            <path d="M80 18 C 122 18, 142 50, 142 86 C 142 118, 116 142, 80 142 C 70 142, 60 140, 52 136 L 30 142 L 38 122 C 24 110, 18 96, 18 86 C 18 50, 38 18, 80 18 Z" fill="#1B1915"/>
+            <circle cx="80" cy="80" r="6" fill="#FBFAF7"/>
+            <path d="M64 80 a16 16 0 0 1 32 0" stroke="#FBFAF7" stroke-width="3.5" fill="none" stroke-linecap="round" opacity="0.85"/>
+            <path d="M52 80 a28 28 0 0 1 56 0" stroke="#FBFAF7" stroke-width="3" fill="none" stroke-linecap="round" opacity="0.45"/>
+            <!-- annotations -->
+            <text x="172" y="20" font-size="9" fill="#9C9589" font-family="SF Mono, Menlo, monospace">160u</text>
+            <text x="-18" y="160" font-size="9" fill="#9C9589" font-family="SF Mono, Menlo, monospace" transform="rotate(-90 -18 160)">160u</text>
+          </svg>
+        </div>
+      </div>
+
+      <div style="height:1px; background: rgba(40,36,28,0.08); margin: 32px 0;"></div>
+
+      <!-- scale ladder -->
+      <div class="sectionLabel">Scale ladder · all stay legible</div>
+      <div class="ladder">
+        <div class="lad"><div class="b" style="width:16px; height:16px; border-radius:4px;"><svg width="11" height="11" style="color:#fff;"><use href="#murmur"/></svg></div><div class="px">16</div></div>
+        <div class="lad"><div class="b" style="width:22px; height:22px; border-radius:5px;"><svg width="15" height="15" style="color:#fff;"><use href="#murmur"/></svg></div><div class="px">22</div></div>
+        <div class="lad"><div class="b" style="width:32px; height:32px; border-radius:8px;"><svg width="22" height="22" style="color:#fff;"><use href="#murmur"/><use href="#murmurInner" style="color:#FBFAF7;"/></svg></div><div class="px">32</div></div>
+        <div class="lad"><div class="b" style="width:48px; height:48px; border-radius:12px;"><svg width="32" height="32" style="color:#fff;"><use href="#murmur"/><use href="#murmurInner" style="color:#FBFAF7;"/></svg></div><div class="px">48</div></div>
+        <div class="lad"><div class="b" style="width:64px; height:64px; border-radius:14px;"><svg width="44" height="44" style="color:#fff;"><use href="#murmur"/><use href="#murmurInner" style="color:#FBFAF7;"/></svg></div><div class="px">64</div></div>
+        <div class="lad"><div class="b" style="width:96px; height:96px; border-radius:22px;"><svg width="66" height="66" style="color:#fff;"><use href="#murmur"/><use href="#murmurInner" style="color:#FBFAF7;"/></svg></div><div class="px">96</div></div>
+        <div class="lad"><div class="b" style="width:140px; height:140px; border-radius:32px;"><svg width="96" height="96" style="color:#fff;"><use href="#murmur"/><use href="#murmurInner" style="color:#FBFAF7;"/></svg></div><div class="px">140</div></div>
+      </div>
+      <p class="desc" style="color:#6C675E; margin-top: 12px;">At ≤24px the inner pulse drops; only the silhouette remains. Below 16px (favicon territory) the silhouette is also acceptable in solid mono.</p>
+    </div>
+  </div>
+
+
+  <!-- ── 02 App Icons ────────────────────────────────────────── -->
+  <div class="section">
+    <div class="sectionLabel">02 · App icons</div>
+    <h2>Six iOS-ready variants.</h2>
+    <p class="lede" style="margin-bottom: 28px;">All clamped to the 22% radius corner mask iOS applies. The default is the warm-cream version — Murmur is a <i>warm</i> app, not a black one. Dark and tinted variants for iOS 18 home-screen modes.</p>
+
+    <div class="panel">
+      <div class="iconGrid">
+        <!-- Default cream -->
+        <div class="iconCell">
+          <div class="iconBox" style="background: #FBFAF7;">
+            <svg width="62%" height="62%" style="color:#1B1915;">
+              <use href="#murmur"/><use href="#murmurInner" style="color:#FBFAF7;"/>
+            </svg>
+          </div>
+          <div class="label">Default · Cream</div>
+        </div>
+        <!-- Sage -->
+        <div class="iconCell">
+          <div class="iconBox" style="background: #3F5A3E;">
+            <svg width="62%" height="62%" style="color:#FBFAF7;">
+              <use href="#murmur"/><use href="#murmurInner" style="color:#3F5A3E;"/>
+            </svg>
+          </div>
+          <div class="label">Brand · Sage</div>
+        </div>
+        <!-- Ink -->
+        <div class="iconCell">
+          <div class="iconBox" style="background: #1B1915;">
+            <svg width="62%" height="62%" style="color:#FBFAF7;">
+              <use href="#murmur"/><use href="#murmurInner" style="color:#1B1915;"/>
+            </svg>
+          </div>
+          <div class="label">Dark mode · Ink</div>
+        </div>
+        <!-- Tinted (iOS 18) -->
+        <div class="iconCell">
+          <div class="iconBox" style="background: linear-gradient(180deg, #2a2620, #1B1915);">
+            <svg width="62%" height="62%" style="color:#A2B2A1; opacity: 0.95;">
+              <use href="#murmur"/>
+            </svg>
+          </div>
+          <div class="label">iOS Tinted</div>
+        </div>
+        <!-- Cream w/ accent pulse -->
+        <div class="iconCell">
+          <div class="iconBox" style="background: #FBFAF7;">
+            <svg width="62%" height="62%" style="color:#1B1915;">
+              <use href="#murmur"/><use href="#murmurInner" style="color:#3F5A3E;"/>
+            </svg>
+          </div>
+          <div class="label">Cream · accent pulse</div>
+        </div>
+        <!-- Stone -->
+        <div class="iconCell">
+          <div class="iconBox" style="background: #E8EDE3;">
+            <svg width="62%" height="62%" style="color:#3F5A3E;">
+              <use href="#murmur"/><use href="#murmurInner" style="color:#E8EDE3;"/>
+            </svg>
+          </div>
+          <div class="label">Stone</div>
+        </div>
+        <!-- Mono outline -->
+        <div class="iconCell">
+          <div class="iconBox" style="background: #FBFAF7;">
+            <svg width="62%" height="62%" viewBox="0 0 160 160">
+              <path d="M80 18 C 122 18, 142 50, 142 86 C 142 118, 116 142, 80 142 C 70 142, 60 140, 52 136 L 30 142 L 38 122 C 24 110, 18 96, 18 86 C 18 50, 38 18, 80 18 Z"
+                fill="none" stroke="#1B1915" stroke-width="6"/>
+              <circle cx="80" cy="80" r="6" fill="#1B1915"/>
+            </svg>
+          </div>
+          <div class="label">Outline · alt</div>
+        </div>
+        <!-- Notification -->
+        <div class="iconCell">
+          <div class="iconBox" style="background: #fff; position: relative;">
+            <svg width="62%" height="62%" style="color:#1B1915;">
+              <use href="#murmur"/><use href="#murmurInner" style="color:#fff;"/>
+            </svg>
+            <div style="position:absolute; top:8%; right:8%; width:24%; height:24%; border-radius:50%; background:#B8352F; box-shadow: 0 2px 6px rgba(0,0,0,0.18); display:flex; align-items:center; justify-content:center; color:#fff; font-weight:800; font-size: 10px;">3</div>
+          </div>
+          <div class="label">w/ Badge</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ── 03 Wordmark ─────────────────────────────────────────── -->
+  <div class="section">
+    <div class="sectionLabel">03 · Wordmark</div>
+    <h2>New York Medium, −2.5 letterspacing.</h2>
+    <p class="lede" style="margin-bottom: 28px;">The serif is the warmth. Always set in Apple's New York at weight 500. The accent dot on the final "r" can become the listening pulse in motion contexts.</p>
+
+    <div class="panel">
+      <!-- Big wordmark -->
+      <div style="padding: 40px 0; text-align: center; border-bottom: 0.5px solid rgba(40,36,28,0.08);">
+        <div class="wordmarkBig">Murmu<span class="dot">r</span></div>
+      </div>
+
+      <!-- Three lockups -->
+      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; padding-top: 32px;">
+        <div>
+          <div class="sectionLabel">Horizontal lockup</div>
+          <div class="lockup" style="margin-top: 14px;">
+            <div style="width:48px; height:48px; border-radius:12px; background:#1B1915; display:flex; align-items:center; justify-content:center; color:#fff;">
+              <svg width="32" height="32"><use href="#murmur"/></svg>
+            </div>
+            <div class="wordmarkSmall">Murmur</div>
+          </div>
+        </div>
+        <div>
+          <div class="sectionLabel">Stacked</div>
+          <div style="margin-top: 14px; display: flex; flex-direction: column; align-items: flex-start; gap: 10px;">
+            <div style="width:44px; height:44px; border-radius:11px; background:#1B1915; display:flex; align-items:center; justify-content:center; color:#fff;">
+              <svg width="30" height="30"><use href="#murmur"/></svg>
+            </div>
+            <div class="wordmarkSmall" style="font-size: 24px;">Murmur</div>
+          </div>
+        </div>
+        <div>
+          <div class="sectionLabel">Tagline lockup</div>
+          <div style="margin-top: 14px;">
+            <div class="wordmarkSmall">Murmur</div>
+            <div style="height: 1px; background: #1B1915; width: 28px; margin: 8px 0;"></div>
+            <div style="font-size: 11px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: #6C675E;">Speak it. Spend clearly.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ── 04 Color ────────────────────────────────────────────── -->
+  <div class="section">
+    <div class="sectionLabel">04 · Color</div>
+    <h2>Warm, calm, anti-fintech.</h2>
+    <p class="lede" style="margin-bottom: 28px;">Sage is the only saturated color. Everything else is a warm neutral. <b>Never use blue.</b></p>
+
+    <div class="panel">
+      <div class="sectionLabel">Brand</div>
+      <div class="swatchGrid" style="margin: 8px 0 24px;">
+        <div class="swatch"><div class="chip" style="background:#3F5A3E;"></div><div class="meta"><div class="name">Sage</div><div class="hex">#3F5A3E · accent</div></div></div>
+        <div class="swatch"><div class="chip" style="background:#E8EDE3;"></div><div class="meta"><div class="name">Sage Soft</div><div class="hex">#E8EDE3 · accent wash</div></div></div>
+        <div class="swatch"><div class="chip" style="background:#1B1915;"></div><div class="meta"><div class="name">Ink</div><div class="hex">#1B1915 · primary</div></div></div>
+        <div class="swatch"><div class="chip" style="background:#FBFAF7;"></div><div class="meta"><div class="name">Cream</div><div class="hex">#FBFAF7 · canvas</div></div></div>
+      </div>
+
+      <div class="sectionLabel">Neutrals</div>
+      <div class="swatchGrid" style="margin: 8px 0 24px;">
+        <div class="swatch"><div class="chip" style="background:#3A3630;"></div><div class="meta"><div class="name">Ink 2</div><div class="hex">#3A3630 · body</div></div></div>
+        <div class="swatch"><div class="chip" style="background:#6C675E;"></div><div class="meta"><div class="name">Ink 3</div><div class="hex">#6C675E · secondary</div></div></div>
+        <div class="swatch"><div class="chip" style="background:#9C9589;"></div><div class="meta"><div class="name">Ink 4</div><div class="hex">#9C9589 · tertiary</div></div></div>
+        <div class="swatch"><div class="chip" style="background:#F5F2EB;"></div><div class="meta"><div class="name">Stone</div><div class="hex">#F5F2EB · surface 2</div></div></div>
+      </div>
+
+      <div class="sectionLabel">Category tints (low-sat)</div>
+      <div class="swatchGrid">
+        <div class="swatch"><div class="chip" style="background:#F3E7DC;"></div><div class="meta"><div class="name">Peach · Food</div><div class="hex">#F3E7DC</div></div></div>
+        <div class="swatch"><div class="chip" style="background:#F2E8D5;"></div><div class="meta"><div class="name">Butter · Coffee</div><div class="hex">#F2E8D5</div></div></div>
+        <div class="swatch"><div class="chip" style="background:#EEE6F0;"></div><div class="meta"><div class="name">Lavender · Shop</div><div class="hex">#EEE6F0</div></div></div>
+        <div class="swatch"><div class="chip" style="background:#F4DDDD;"></div><div class="meta"><div class="name">Rose · Health</div><div class="hex">#F4DDDD</div></div></div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ── 05 Typography ───────────────────────────────────────── -->
+  <div class="section">
+    <div class="sectionLabel">05 · Typography</div>
+    <h2>One serif. One sans. One mono.</h2>
+    <p class="lede" style="margin-bottom: 28px;">Apple's system stack — no web fonts to load, perfect on iOS, fast on every device.</p>
+
+    <div class="panel">
+      <div class="typeRow">
+        <div class="meta">Display<br/>NY 500</div>
+        <div class="typeSerif" style="font-size: 56px; font-weight: 500; letter-spacing: -1.4px; line-height: 1.05;">Speak it. Spend clearly.</div>
+      </div>
+      <div class="typeRow">
+        <div class="meta">Headline<br/>NY 500</div>
+        <div class="typeSerif" style="font-size: 32px; font-weight: 500; letter-spacing: -0.6px;">Where is my coffee budget going?</div>
+      </div>
+      <div class="typeRow">
+        <div class="meta">Body<br/>SF Text 400</div>
+        <div style="font-size: 16px; line-height: 1.55; max-width: 540px;">A voice-first expense tracker that respects your privacy. Log any expense, any way, in under three seconds — without handing your bank data to anyone.</div>
+      </div>
+      <div class="typeRow">
+        <div class="meta">Eyebrow<br/>SF Text 700</div>
+        <div style="font-size: 11px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: #6C675E;">Today · 12 days left in April</div>
+      </div>
+      <div class="typeRow">
+        <div class="meta">Money<br/>NY 500</div>
+        <div class="typeSerif" style="font-size: 64px; font-weight: 500; letter-spacing: -1.6px; font-variant-numeric: tabular-nums;">$1,237.<span style="opacity:0.55;">42</span></div>
+      </div>
+      <div class="typeRow">
+        <div class="meta">Mono<br/>SF Mono</div>
+        <div class="typeMono" style="font-size: 22px; letter-spacing: 4px; font-variant-numeric: tabular-nums;">7K4·9B2</div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ── 06 Splash ───────────────────────────────────────────── -->
+  <div class="section">
+    <div class="sectionLabel">06 · Splash screen</div>
+    <h2>The breath, on launch.</h2>
+    <p class="lede" style="margin-bottom: 28px;">Two states, light and dark. The pulse breathes at 2.6s — exactly slow enough to feel deliberate, not loading. Hold for 800ms after first paint, fade out as the Today screen draws in.</p>
+
+    <div class="panel">
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 32px;">
+        <div>
+          <div class="sectionLabel" style="margin-bottom: 12px;">Light</div>
+          <div class="deviceFrame">
+            <div class="deviceScreen splashLight">
+              <svg width="120" height="120" class="breathe" style="color:#1B1915;">
+                <use href="#murmur"/>
+              </svg>
+              <svg width="120" height="120" class="pulseRing2" style="position: absolute; color:#FBFAF7;">
+                <use href="#murmurInner"/>
+              </svg>
+              <div class="splashWord" style="color: #1B1915;">Murmur</div>
+              <div class="splashSub" style="color: #6C675E;">Speak it. Spend clearly.</div>
+            </div>
+          </div>
+        </div>
+        <div>
+          <div class="sectionLabel" style="margin-bottom: 12px;">Dark</div>
+          <div class="deviceFrame">
+            <div class="deviceScreen splashDark">
+              <svg width="120" height="120" class="breathe" style="color:#FBFAF7;">
+                <use href="#murmur"/>
+              </svg>
+              <svg width="120" height="120" class="pulseRing2" style="position: absolute; color:#1B1915;">
+                <use href="#murmurInner"/>
+              </svg>
+              <div class="splashWord" style="color: #FBFAF7;">Murmur</div>
+              <div class="splashSub" style="color: #9C9589;">Speak it. Spend clearly.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ── 07 Social ───────────────────────────────────────────── -->
+  <div class="section">
+    <div class="sectionLabel">07 · Social & web</div>
+    <h2>Avatar, OG image, favicon.</h2>
+
+    <div class="panel">
+      <div class="socialGrid">
+        <div>
+          <div class="sectionLabel" style="text-align: center; margin-bottom: 12px;">X / Threads avatar</div>
+          <div class="avatarRound" style="background: #1B1915;">
+            <svg width="60%" height="60%" style="color:#FBFAF7;">
+              <use href="#murmur"/><use href="#murmurInner" style="color:#1B1915;"/>
+            </svg>
+          </div>
+        </div>
+        <div>
+          <div class="sectionLabel" style="text-align: center; margin-bottom: 12px;">Instagram avatar</div>
+          <div class="avatarRound" style="background: #FBFAF7;">
+            <svg width="60%" height="60%" style="color:#1B1915;">
+              <use href="#murmur"/><use href="#murmurInner" style="color:#FBFAF7;"/>
+            </svg>
+          </div>
+        </div>
+        <div>
+          <div class="sectionLabel" style="text-align: center; margin-bottom: 12px;">Brand · Sage avatar</div>
+          <div class="avatarRound" style="background: #3F5A3E;">
+            <svg width="60%" height="60%" style="color:#FBFAF7;">
+              <use href="#murmur"/><use href="#murmurInner" style="color:#3F5A3E;"/>
+            </svg>
+          </div>
+        </div>
+
+        <div class="ogImage">
+          <div>
+            <div style="font-size: 11px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: rgba(255,255,255,0.45);">Murmur · iOS</div>
+            <div style="font-family: 'New York', Georgia, serif; font-size: 60px; font-weight: 500; letter-spacing: -1.5px; line-height: 1.05; margin-top: 12px;">Speak it.<br/>Spend clearly.</div>
+            <div style="margin-top: 24px; font-size: 16px; line-height: 1.55; color: rgba(255,255,255,0.65); max-width: 480px;">Voice-first expense tracker. No bank linking. Free on iPhone, forever.</div>
+          </div>
+          <div style="flex-shrink:0;">
+            <div style="width:160px; height:160px; background:#FBFAF7; border-radius: 36px; display:flex; align-items:center; justify-content:center; box-shadow: 0 20px 40px rgba(0,0,0,0.4);">
+              <svg width="100" height="100" style="color:#1B1915;">
+                <use href="#murmur"/><use href="#murmurInner" style="color:#FBFAF7;"/>
+              </svg>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ── 08 Do/Don't ─────────────────────────────────────────── -->
+  <div class="section">
+    <div class="sectionLabel">08 · Rules of use</div>
+    <h2>Do · Don't.</h2>
+    <div class="panel">
+      <div class="rules">
+        <div class="rule do">
+          <div class="marker">✓</div>
+          <div>
+            <div class="label">Do</div>
+            <div class="body">Use the cream variant as default. Sage as the primary brand-y option. Ink only on busy interfaces where a darker icon adds clarity.</div>
+          </div>
+        </div>
+        <div class="rule no">
+          <div class="marker">×</div>
+          <div>
+            <div class="label">Don't</div>
+            <div class="body">Never use blue, teal, or any cyan. The whole brand position is built on <i>not</i> being fintech.</div>
+          </div>
+        </div>
+        <div class="rule do">
+          <div class="marker">✓</div>
+          <div>
+            <div class="label">Do</div>
+            <div class="body">Animate the inner pulse only when it represents a real state — listening, saving, syncing. Idle = motionless.</div>
+          </div>
+        </div>
+        <div class="rule no">
+          <div class="marker">×</div>
+          <div>
+            <div class="label">Don't</div>
+            <div class="body">Don't add a microphone glyph to the icon. Don't add a coin glyph either. The shape already says both.</div>
+          </div>
+        </div>
+        <div class="rule do">
+          <div class="marker">✓</div>
+          <div>
+            <div class="label">Do</div>
+            <div class="body">Pair the wordmark with at least 12px of clearspace on every side, equal to the cap-height of "M".</div>
+          </div>
+        </div>
+        <div class="rule no">
+          <div class="marker">×</div>
+          <div>
+            <div class="label">Don't</div>
+            <div class="body">Don't outline the wordmark, italicize it, or use sans for the brand name. New York 500 only.</div>
+          </div>
+        </div>
+        <div class="rule do">
+          <div class="marker">✓</div>
+          <div>
+            <div class="label">Do</div>
+            <div class="body">Drop the inner pulse below 24px. Below 16px, solid silhouette only.</div>
+          </div>
+        </div>
+        <div class="rule no">
+          <div class="marker">×</div>
+          <div>
+            <div class="label">Don't</div>
+            <div class="body">Don't apply gradients, drop shadows, or skeuomorphic effects to the mark. The shape is the design.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ── 09 Engineering ──────────────────────────────────────── -->
+  <div class="section">
+    <div class="sectionLabel">09 · Engineering handoff</div>
+    <h2>Drop-in spec for Claude Code.</h2>
+
+    <div class="panel">
+      <div class="specGrid">
+        <div class="spec">
+          <h4>SVG path · droplet</h4>
+          <p style="font-size: 11.5px; line-height: 1.6;"><code style="white-space: pre-wrap; display: block; padding: 10px; background:#1B1915; color:#A2B2A1;">M80 18 C 122 18, 142 50,
+142 86 C 142 118, 116 142,
+80 142 C 70 142, 60 140,
+52 136 L 30 142 L 38 122
+C 24 110, 18 96, 18 86
+C 18 50, 38 18, 80 18 Z</code></p>
+          <p style="margin-top: 8px;">ViewBox: <code>0 0 160 160</code>. Fill <code>currentColor</code>.</p>
+        </div>
+        <div class="spec">
+          <h4>Inner pulse</h4>
+          <p>Center dot <code>r=6</code>, two arcs <code>r=16, 28</code>. Stroke widths <code>3.5, 3</code>. Opacity <code>0.85, 0.45</code>.</p>
+          <p style="margin-top: 8px;">Bind to <code>isListening</code> state; animate transform-scale 1 ↔ 1.08 over 2.6s ease-in-out.</p>
+        </div>
+        <div class="spec">
+          <h4>Color tokens</h4>
+          <p><code>--murmur-ink: #1B1915</code><br/>
+            <code>--murmur-cream: #FBFAF7</code><br/>
+            <code>--murmur-sage: #3F5A3E</code><br/>
+            <code>--murmur-sage-soft: #E8EDE3</code></p>
+        </div>
+        <div class="spec">
+          <h4>Type stack</h4>
+          <p><code>--font-display: "New York", "Iowan Old Style", Georgia, serif</code><br/>
+            <code>--font-text: -apple-system, "SF Pro Text", system-ui, sans-serif</code><br/>
+            <code>--font-mono: "SF Mono", Menlo, monospace</code></p>
+        </div>
+        <div class="spec">
+          <h4>App icon export</h4>
+          <p>Generate at <code>1024×1024</code> from the cream variant. iOS will mask to its own corner radius — don't pre-round.</p>
+          <p style="margin-top: 8px;">Tinted icon: solid silhouette only, no inner pulse.</p>
+        </div>
+        <div class="spec">
+          <h4>Splash spec</h4>
+          <p>Hold <code>800ms</code> after first paint. Fade out <code>320ms</code> on app-ready event. Tagline shows only on cold start (not on resume).</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <div class="footer">
+    Brand sheet v1 · Murmur · Apr 2026 · Pair with <code>DESIGN.md</code> for the full product spec.
+  </div>
+
+</div>
+
+</body>
+</html>

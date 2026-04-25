@@ -1,0 +1,201 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8"/>
+<title>Murmur — Voice Expense Tracker</title>
+<style>
+  @keyframes blink { 0%,50% { opacity: 1 } 50.01%,100% { opacity: 0 } }
+  html, body { margin: 0; padding: 0; overflow: hidden; background: #f0eee9;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; }
+  * { box-sizing: border-box; }
+</style>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="ios-frame.jsx"></script>
+<script type="text/babel" src="macos-window.jsx"></script>
+<script type="text/babel" src="tokens.jsx"></script>
+<script type="text/babel" src="mobile-screens-1.jsx"></script>
+<script type="text/babel" src="mobile-screens-2.jsx"></script>
+<script type="text/babel" src="mobile-screens-3.jsx"></script>
+<script type="text/babel" src="mobile-screens-4.jsx"></script>
+<script type="text/babel" src="mobile-screens-5.jsx"></script>
+<script type="text/babel" src="mobile-screens-6.jsx"></script>
+<script type="text/babel" src="desktop-screens-1.jsx"></script>
+<script type="text/babel" src="desktop-screens-2.jsx"></script>
+
+<script type="text/babel">
+const TWEAKS_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "productName": "Murmur",
+  "accent": "#3F5A3E",
+  "showStickies": true
+}/*EDITMODE-END*/;
+
+function App() {
+  const [tw, setTw] = React.useState(TWEAKS_DEFAULTS);
+  const [editOpen, setEditOpen] = React.useState(false);
+
+  React.useEffect(() => {
+    const handler = (e) => {
+      if (e.data?.type === '__activate_edit_mode') setEditOpen(true);
+      if (e.data?.type === '__deactivate_edit_mode') setEditOpen(false);
+    };
+    window.addEventListener('message', handler);
+    window.parent.postMessage({ type: '__edit_mode_available' }, '*');
+    return () => window.removeEventListener('message', handler);
+  }, []);
+
+  const update = (k, v) => {
+    const next = { ...tw, [k]: v };
+    setTw(next);
+    window.parent.postMessage({ type: '__edit_mode_set_keys', edits: { [k]: v } }, '*');
+  };
+
+  // Override accent
+  React.useEffect(() => {
+    if (window.T) {
+      window.T.accent = tw.accent;
+    }
+  }, [tw.accent]);
+
+  return (
+    <>
+      <DesignCanvas>
+        <DCSection title="Onboarding & first run"
+          subtitle="Privacy-first. Minimum permissions. Optional income for the Ask Murmur feature. Guided first log in the empty state.">
+          <DCArtboard label="01 · Onboarding" width={402} height={874}><S_Onboard/></DCArtboard>
+          <DCArtboard label="02 · Permissions" width={402} height={874}><S_Permissions/></DCArtboard>
+          <DCArtboard label="03 · Income setup (optional)" width={402} height={874}><S_Income/></DCArtboard>
+          <DCArtboard label="04 · Empty state (Day 1)" width={402} height={874}><S_Empty/></DCArtboard>
+          <DCArtboard label="05 · Guided first log" width={402} height={874}><S_DayOne/></DCArtboard>
+          {tw.showStickies && <DCPostIt top={-20} left={420} rotate={-3} width={220}>
+            First 48h decide retention. Guided first log + day-1 hand-holding is the cheapest moat we have.
+          </DCPostIt>}
+        </DCSection>
+
+        <DCSection title="Voice capture — the core loop"
+          subtitle="Lockscreen (3 actions) → listening → confirm. Error state for noisy rooms. Apple Pay auto-capture for when voice is awkward.">
+          <DCArtboard label="06 · Lockscreen (3 actions)" width={402} height={874}><S_Lock/></DCArtboard>
+          <DCArtboard label="07 · Listening" width={402} height={874}><S_Listening/></DCArtboard>
+          <DCArtboard label="08 · Confirm expense" width={402} height={874}><S_Confirm/></DCArtboard>
+          <DCArtboard label="09 · Low-confidence / error" width={402} height={874}><S_Error/></DCArtboard>
+          <DCArtboard label="10 · Apple Pay auto-capture" width={402} height={874}><S_ApplePayNotif/></DCArtboard>
+          {tw.showStickies && <DCPostIt top={-20} left={420} rotate={-2} width={220}>
+            Voice isn't the only path. The lockscreen widget now exposes mic · type · repeat-last as equals.
+          </DCPostIt>}
+        </DCSection>
+
+        <DCSection title="Fallback entry — for public & awkward moments"
+          subtitle="Fast numeric keypad. Category picker as bottom sheet. Text edit when voice catches the wrong merchant.">
+          <DCArtboard label="11 · Manual keypad" width={402} height={874}><S_Keypad/></DCArtboard>
+          <DCArtboard label="12 · Category picker (sheet)" width={402} height={874}><S_CategoryPicker/></DCArtboard>
+          <DCArtboard label="13 · Edit merchant (keyboard)" width={402} height={874}><S_Edit/></DCArtboard>
+        </DCSection>
+
+        <DCSection title="Today tab — the transaction list"
+          subtitle="Budget header line. Merchant logos for polish. Undo snackbar after every voice save.">
+          <DCArtboard label="14 · Today" width={402} height={874}><S_Today/></DCArtboard>
+          <DCArtboard label="15 · Today · undo snackbar" width={402} height={874}><S_Today withUndo/></DCArtboard>
+          <DCArtboard label="16 · Transaction detail" width={402} height={874}><S_Detail/></DCArtboard>
+          <DCArtboard label="17 · Search & filter" width={402} height={874}><S_Search/></DCArtboard>
+          <DCArtboard label="18 · History (months)" width={402} height={874}><S_History/></DCArtboard>
+          {tw.showStickies && <DCPostIt top={-20} left={420} rotate={1} width={220}>
+            Undo is non-negotiable. Voice errors happen, and a 4s snackbar is the cheapest recovery.
+          </DCPostIt>}
+        </DCSection>
+
+        <DCSection title="Insights & Ask Murmur"
+          subtitle="Mobile-light analytics. Ask Murmur — grounded AI over your own data. Recurring subscriptions surface automatically.">
+          <DCArtboard label="19 · Insights" width={402} height={874}><S_Insights/></DCArtboard>
+          <DCArtboard label="20 · Recurring subscriptions" width={402} height={874}><S_Recurring/></DCArtboard>
+          <DCArtboard label="21 · Ask Murmur · entry" width={402} height={874}><S_AskEntry/></DCArtboard>
+          <DCArtboard label="22 · Ask Murmur · PS5 answer" width={402} height={874}><S_AskResult/></DCArtboard>
+          {tw.showStickies && <DCPostIt top={-20} left={420} rotate={-2} width={240}>
+            Ask Murmur is a <b>goal-aware planner</b>, not a chat. Grounded strictly in the user's transactions.
+          </DCPostIt>}
+        </DCSection>
+
+        <DCSection title="Budgets tab"
+          subtitle="Promoted to a first-class tab. Ring for total, bars per category, states for tight/over.">
+          <DCArtboard label="23 · Budgets" width={402} height={874}><S_Budgets/></DCArtboard>
+        </DCSection>
+
+        <DCSection title="Settings, privacy, billing"
+          subtitle="Privacy Center is a first-class surface. Paywall reframed: mobile is free forever, no trial.">
+          <DCArtboard label="24 · Settings" width={402} height={874}><S_Settings/></DCArtboard>
+          <DCArtboard label="25 · Privacy Center" width={402} height={874}><S_Privacy/></DCArtboard>
+          <DCArtboard label="26 · Paywall (desktop only)" width={402} height={874}><S_Paywall/></DCArtboard>
+        </DCSection>
+
+        <DCSection title="Sign-in & account (lazy identity)"
+          subtitle="No account wall. Sign in with Apple only appears when the user wants desktop sync or restores on a new phone.">
+          <DCArtboard label="30 · Sign-in prompt (contextual)" width={402} height={874}><S_SignInPrompt/></DCArtboard>
+          <DCArtboard label="31 · Sign in with Apple sheet" width={402} height={874}><S_SignInApple/></DCArtboard>
+          <DCArtboard label="32 · Pair desktop · QR" width={402} height={874}><S_PairDesktop_QR/></DCArtboard>
+          <DCArtboard label="33 · Pair desktop · success" width={402} height={874}><S_PairDesktop_Success/></DCArtboard>
+          <DCArtboard label="34 · Account (in Settings)" width={402} height={874}><S_Account/></DCArtboard>
+          <DCArtboard label="35 · Restore on new device" width={402} height={874}><S_RestoreDevice/></DCArtboard>
+          {tw.showStickies && <DCPostIt top={-20} left={420} rotate={-2} width={240}>
+            <b>Lazy identity</b>: no sign-in wall at install. Account is created silently on first device pair or first explicit restore. Sign in with Apple only — no email/password.
+          </DCPostIt>}
+        </DCSection>
+
+        <DCSection title="Desktop companion (for reference)"
+          subtitle="Full analytics, forecast, budgets. The paid differentiation — not locked behind a trial.">
+          <DCArtboard label="27 · Dashboard" width={1280} height={820}><D_Dashboard/></DCArtboard>
+          <DCArtboard label="28 · Analytics & forecast" width={1280} height={820}><D_Analytics/></DCArtboard>
+          <DCArtboard label="29 · Budgets" width={1280} height={820}><D_Budgets/></DCArtboard>
+        </DCSection>
+      </DesignCanvas>
+
+      {editOpen && (
+        <div style={{
+          position:'fixed', right: 20, bottom: 20, zIndex: 1000,
+          width: 280, background:'#fff', borderRadius: 14,
+          boxShadow:'0 16px 40px rgba(0,0,0,0.18), 0 0 0 1px rgba(0,0,0,0.08)',
+          padding: 16, fontFamily:'-apple-system, system-ui',
+        }}>
+          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12, letterSpacing: -0.2 }}>Tweaks</div>
+          <Row label="Product name">
+            <input value={tw.productName} onChange={e=>update('productName', e.target.value)}
+              style={{ width:'100%', padding:'6px 8px', border:'1px solid #ddd', borderRadius: 6, fontSize: 12 }}/>
+          </Row>
+          <Row label="Accent color">
+            <div style={{ display:'flex', gap: 6, flexWrap:'wrap' }}>
+              {['#3F5A3E','#3B4F6B','#7A4A22','#5C3F66','#1B1915','#843C3C'].map(c=>(
+                <div key={c} onClick={()=>update('accent', c)} style={{
+                  width: 28, height: 28, borderRadius: 14, background: c, cursor:'pointer',
+                  border: tw.accent===c ? '2px solid #000' : '2px solid transparent',
+                }}/>
+              ))}
+            </div>
+          </Row>
+          <Row label="Post-it notes">
+            <label style={{ display:'flex', alignItems:'center', gap: 8, fontSize: 12 }}>
+              <input type="checkbox" checked={tw.showStickies} onChange={e=>update('showStickies', e.target.checked)}/>
+              Show stickies
+            </label>
+          </Row>
+        </div>
+      )}
+    </>
+  );
+}
+function Row({ label, children }) {
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <div style={{ fontSize: 11, color:'#666', fontWeight: 600, marginBottom: 6, textTransform:'uppercase', letterSpacing: 0.4 }}>{label}</div>
+      {children}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>

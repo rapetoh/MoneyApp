@@ -50,15 +50,18 @@ export const Colors = {
   tabBar: '#FFFFFF',
   tabBarBorder: 'rgba(40,36,28,0.06)',
 
-  // Category tints — harmonious pastels per design doc §3 (peach, sage, lavender,
-  // butter, rose, olive). Low-saturation so they carry meaning without competing
-  // with content.
+  // Category tints. Backgrounds are pinned to the Murmur Brand Sheet §04
+  // "Category tints (low-sat)" hex values so the in-app palette matches the
+  // brand reference exactly. Olive is kept (extra category not in the brand
+  // sheet's four-up but used by the existing app) using a desaturated tone
+  // consistent with the rest. Ink colors hold their existing readable
+  // contrast pairings against each tint.
   categoryTints: {
-    peach: { bg: '#F6E0D1', ink: '#8C4A2A' },
+    peach: { bg: '#F3E7DC', ink: '#8C4A2A' }, // Brand sheet · Food
+    butter: { bg: '#F2E8D5', ink: '#8A6F1F' }, // Brand sheet · Coffee
+    lavender: { bg: '#EEE6F0', ink: '#5A4E7A' }, // Brand sheet · Shop
+    rose: { bg: '#F4DDDD', ink: '#8E424C' }, // Brand sheet · Health
     sage: { bg: '#DDE5D5', ink: '#3F5A3E' },
-    lavender: { bg: '#E2DDEA', ink: '#5A4E7A' },
-    butter: { bg: '#F3E6C2', ink: '#8A6F1F' },
-    rose: { bg: '#F1D9DB', ink: '#8E424C' },
     olive: { bg: '#D9DDC4', ink: '#5A5F34' },
   },
 

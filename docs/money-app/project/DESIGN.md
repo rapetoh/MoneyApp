@@ -346,58 +346,12 @@ The user already has this partially implemented. The design assumes:
   must be another grounded question).
 - No comparison to "other users" — we don't know them.
 
-### Brand identity — The Listening Drop (2026-04-25)
-
-The brand mark and identity system are documented in
-[docs/money-app/project/Murmur Brand Sheet.html](./money-app/project/Murmur%20Brand%20Sheet.html) (with logo explorations in
-[Murmur Logos.html](./money-app/project/Murmur%20Logos.html)). Use those files as
-the visual source of truth — color tokens, type stack, app-icon variants,
-splash spec, do/don'ts. The implementation lives in
-[apps/mobile/src/components/MurmurMark.tsx](../apps/mobile/src/components/MurmurMark.tsx)
-(nine variants) and the rasterized PNGs in `apps/mobile/assets/` are
-regenerated from `apps/mobile/assets/brand/*.svg` via
-`node apps/mobile/assets/brand/generate-icons.mjs`.
-
-### Phase F design override — frictionless sign-in (2026-04-25)
-
-The original "lazy identity / no sign-in wall" design intent was overridden
-during implementation. For a financial app, no-wall is a data-loss path on
-reinstall (anonymous data on the server has nothing to sign back in with).
-Both candidate implementations (local `device_user_id` reconciliation, and
-Supabase `signInAnonymously()`) carry the same failure mode under the surface.
-
-The "no friction" intent is now honored by making the wall **one tap**: SIWA
-hero on iOS, Google hero on Android, email/password collapsed under "More
-options". The welcome screen content (M tile + value props) folded into the
-sign-in screen so the user sees the pitch and the one-tap CTA on the same
-surface — not as separate steps.
-
-This decision is documented in PLAN.md "Phase F" with the full rationale.
-
 ### Technical note
-Model call: use a small, fast model (gpt-4o-mini today; the system prompt is
-model-agnostic so we can swap to Haiku-class without code changes). Inject the
-user's transactions as structured JSON, not free text. The prompt includes an
-explicit "only answer using the data provided" clause and rejects any question
-requiring outside knowledge by setting `out_of_scope: true` with a polite
-short refusal in the verdict.
-
-**Wire shape (Phase E, shipped):**
-- Request: `AskMurmurRequest` in `packages/shared/src/types/ai.ts` — question +
-  locale + currency + monthly_income + last 90 days of transactions (≤500 rows)
-  + active recurring rules.
-- Endpoint: `POST /api/ai/ask-murmur` in `apps/web` — auth via Supabase Bearer
-  token, response is `AskMurmurResponse` (verdict + optional breakdown card +
-  optional accent note + action pill array + attribution + out_of_scope flag).
-- Prompt + validator live in `packages/ai/src/askMurmur.ts`. Validator coerces
-  malformed model replies into safe defaults so the result screen always renders.
-- Mobile screen: `apps/mobile/app/more/ask-result.tsx` traces `S_AskResult` —
-  user bubble + sparkle-avatar Murmur bubble (verdict serif text + breakdown +
-  optional sage note + attribution + action pills). Loading + error + refusal
-  states all render inside the same bubble shape.
-- Plus gating: `usePlusStatus()` hook is the single source of truth. Until IAP
-  ships, returns true only when `__DEV__ && EXPO_PUBLIC_FORCE_PLUS=1`. Free
-  users still see the entry screen and the paywall on submit.
+Model call: use a small, fast model (Haiku-class). Inject the user's
+transactions as structured JSON, not free text. The prompt should
+include an explicit "only answer using the data provided" clause and
+reject any question requiring outside knowledge with a polite
+"I can't answer that from your data alone."
 
 ---
 

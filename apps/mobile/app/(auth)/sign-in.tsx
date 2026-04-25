@@ -12,12 +12,13 @@ import {
   ScrollView,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Link, useRouter } from 'expo-router'
+import { Link } from 'expo-router'
 import * as AppleAuthentication from 'expo-apple-authentication'
 import { Ionicons } from '@expo/vector-icons'
 import { signInWithEmail } from '../../src/hooks/useAuth'
 import { signInWithApple } from '../../src/services/appleAuth'
 import { signInWithGoogle } from '../../src/services/googleAuth'
+import { MurmurMark } from '../../src/components/MurmurMark'
 import { Colors, Typography, Hairline } from '../../src/theme'
 import { t, type Locale } from '@voice-expense/shared'
 
@@ -52,7 +53,6 @@ export default function WelcomeSignInScreen() {
   // back to English. The full locale picker lives in Settings + onboarding's
   // income step — both reachable post-sign-in.
   const locale: Locale = 'en'
-  const router = useRouter()
 
   const [appleAvailable, setAppleAvailable] = useState(false)
   const [showEmailForm, setShowEmailForm] = useState(false)
@@ -119,10 +119,9 @@ export default function WelcomeSignInScreen() {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          {/* Sage M tile — same brand mark as the retired welcome.tsx */}
-          <View style={styles.logoTile}>
-            <Text style={styles.logoGlyph}>M</Text>
-          </View>
+          {/* Murmur — The Listening Drop, sage-tile variant per brand sheet §02. */}
+          <MurmurMark size={64} variant="sage" />
+
 
           <Text style={styles.headline}>{t('onboarding.welcome.headline', locale)}</Text>
           <Text style={styles.lead}>{t('onboarding.welcome.lead', locale)}</Text>
@@ -269,27 +268,9 @@ const styles = StyleSheet.create({
     paddingBottom: 32,
   },
 
-  // Brand mark + headline + lead
-  logoTile: {
-    width: 56,
-    height: 56,
-    borderRadius: 14,
-    backgroundColor: Colors.accent ?? Colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: Colors.accent ?? Colors.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 8,
-  },
-  logoGlyph: {
-    color: '#FFFFFF',
-    fontSize: 28,
-    fontWeight: '800',
-    fontFamily: Typography.fontFamily.sansBold,
-    letterSpacing: -1,
-  },
+  // Brand mark + headline + lead. The Listening Drop is a self-contained
+  // tile (MurmurMark renders its own background + corner radius), so no
+  // wrapping styles are needed for the mark itself.
   headline: {
     fontFamily: Typography.fontFamily.serif,
     fontSize: 40,

@@ -1,0 +1,550 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8"/>
+<title>Murmur — Logo explorations</title>
+<style>
+  html, body { margin: 0; padding: 0; background: #F4F1EA;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+    color: #1B1915; }
+  * { box-sizing: border-box; }
+  .page { max-width: 1200px; margin: 0 auto; padding: 56px 40px 80px; }
+  .eyebrow { font-size: 12px; font-weight: 700; letter-spacing: 1.2px;
+    text-transform: uppercase; color: #6C675E; }
+  h1 { font-family: "New York", "Iowan Old Style", Georgia, serif;
+    font-weight: 500; font-size: 44px; letter-spacing: -1px; margin: 8px 0 12px;
+    line-height: 1.1; }
+  .lede { font-size: 16px; line-height: 1.55; color: #3A3630; max-width: 720px; }
+
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; margin-top: 48px; }
+  @media (max-width: 880px) { .grid { grid-template-columns: 1fr; } }
+
+  .card { background: #FFFFFF; border-radius: 24px;
+    border: 0.5px solid rgba(40,36,28,0.08);
+    overflow: hidden; box-shadow: 0 4px 14px rgba(40,36,28,0.04);
+    display: flex; flex-direction: column; }
+  .card-head { padding: 22px 24px 18px; display: flex; align-items: baseline;
+    justify-content: space-between; gap: 16px; }
+  .name { font-family: "New York", Georgia, serif; font-weight: 500;
+    font-size: 24px; letter-spacing: -0.4px; }
+  .num { font-size: 11px; font-weight: 700; letter-spacing: 0.8px;
+    color: #9C9589; text-transform: uppercase; }
+  .desc { padding: 0 24px 18px; font-size: 13.5px; line-height: 1.5;
+    color: #3A3630; }
+  .desc i { color: #3F5A3E; font-style: normal; font-weight: 600; }
+
+  .stage { background: #FBFAF7; padding: 36px 24px;
+    display: flex; align-items: center; justify-content: center; min-height: 260px;
+    border-top: 0.5px solid rgba(40,36,28,0.08);
+    border-bottom: 0.5px solid rgba(40,36,28,0.08); }
+
+  .scaleRow { display: flex; align-items: center; justify-content: center;
+    gap: 28px; padding: 22px 24px; background: #fff; }
+  .scaleRow .tile {
+    background: #1B1915; color: #fff;
+    width: 64px; height: 64px; border-radius: 14px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .scaleRow .tile.sm { width: 32px; height: 32px; border-radius: 8px; }
+  .scaleRow .tile.md { width: 48px; height: 48px; border-radius: 11px; }
+  .scaleRow .tile.lg { width: 88px; height: 88px; border-radius: 20px; }
+  .scaleRow .tile.light { background: #FFFFFF; color: #1B1915; border: 0.5px solid rgba(40,36,28,0.12); }
+  .scaleRow .tile.accent { background: #3F5A3E; color: #fff; }
+
+  /* wordmark area */
+  .wm { display: flex; align-items: center; gap: 14px; padding: 18px 24px;
+    border-top: 0.5px solid rgba(40,36,28,0.08); background: #FBFAF7; }
+  .wm .glyph { width: 36px; height: 36px; border-radius: 9px;
+    background: #1B1915; color: #fff; display:flex; align-items:center; justify-content:center; }
+  .wm .word { font-family: "New York", Georgia, serif; font-size: 26px;
+    font-weight: 500; letter-spacing: -0.5px; }
+  .wm .tag { margin-left: auto; font-size: 11px; color: #9C9589;
+    letter-spacing: 0.6px; text-transform: uppercase; font-weight: 700; }
+
+  .hero {
+    margin-top: 48px;
+    background: linear-gradient(180deg, #1B1915, #2a2620);
+    color: #fff; padding: 56px 40px; border-radius: 28px;
+    display: flex; align-items: center; gap: 40px;
+  }
+  .hero .label { font-size: 11px; font-weight: 700; letter-spacing: 1.2px;
+    text-transform: uppercase; color: rgba(255,255,255,0.4); }
+  .hero h2 { font-family: "New York", Georgia, serif; font-weight: 500;
+    font-size: 36px; line-height: 1.15; margin: 8px 0 0; letter-spacing: -0.6px; }
+  .hero p { color: rgba(255,255,255,0.65); font-size: 14px; line-height: 1.55;
+    max-width: 480px; margin: 12px 0 0; }
+
+  .footer { margin-top: 64px; padding-top: 32px;
+    border-top: 0.5px solid rgba(40,36,28,0.12);
+    display: flex; gap: 32px; flex-wrap: wrap; color: #6C675E; font-size: 13px; line-height: 1.6; }
+  .footer .col { flex: 1; min-width: 220px; }
+  .footer h4 { font-size: 11px; font-weight: 700; letter-spacing: 0.8px;
+    text-transform: uppercase; color: #1B1915; margin: 0 0 8px; }
+</style>
+</head>
+<body>
+
+<div class="page">
+
+  <div class="eyebrow">Logo Explorations</div>
+  <h1>Murmur — six directions.</h1>
+  <p class="lede">Six logo concepts, each rooted in a different metaphor: voice, breath, money, listening, quietness. Tested at app-icon scale (32 / 48 / 64 / 88px), in a wordmark, and on a dark hero.
+  Pick a direction or two and I'll refine — multiple weights, alternate layouts, splash screen, and brand sheet.</p>
+
+  <div class="grid">
+
+    <!-- 01 — The Listening Drop -->
+    <div class="card">
+      <div class="card-head">
+        <div class="name">The Listening Drop</div>
+        <div class="num">01 · Voice → form</div>
+      </div>
+      <div class="desc">
+        A speech bubble compressed into a soft droplet, with a single sound-pulse inside.
+        <i>The shape of a quiet word.</i> Reads as both a chat bubble and a coin —
+        two metaphors at once, neither shouted.
+      </div>
+      <div class="stage">
+        <!-- big logo -->
+        <svg width="160" height="160" viewBox="0 0 160 160">
+          <defs>
+            <linearGradient id="d1" x1="0" x2="1" y1="0" y2="1">
+              <stop offset="0%" stop-color="#3F5A3E"/>
+              <stop offset="100%" stop-color="#2D4530"/>
+            </linearGradient>
+          </defs>
+          <path d="M80 18 C 122 18, 142 50, 142 86 C 142 118, 116 142, 80 142
+                   C 70 142, 60 140, 52 136 L 30 142 L 38 122
+                   C 24 110, 18 96, 18 86 C 18 50, 38 18, 80 18 Z"
+            fill="url(#d1)"/>
+          <!-- single quiet pulse -->
+          <circle cx="80" cy="80" r="6" fill="#FBFAF7"/>
+          <path d="M64 80 a16 16 0 0 1 32 0" stroke="#FBFAF7" stroke-width="3.5" fill="none" stroke-linecap="round" opacity="0.85"/>
+          <path d="M52 80 a28 28 0 0 1 56 0" stroke="#FBFAF7" stroke-width="3" fill="none" stroke-linecap="round" opacity="0.45"/>
+        </svg>
+      </div>
+      <div class="scaleRow">
+        <!-- scale tiles -->
+        <div class="tile sm">
+          <svg width="22" height="22" viewBox="0 0 160 160">
+            <path d="M80 18 C 122 18, 142 50, 142 86 C 142 118, 116 142, 80 142 C 70 142, 60 140, 52 136 L 30 142 L 38 122 C 24 110, 18 96, 18 86 C 18 50, 38 18, 80 18 Z" fill="#fff"/>
+            <circle cx="80" cy="80" r="9" fill="#1B1915"/>
+          </svg>
+        </div>
+        <div class="tile md">
+          <svg width="32" height="32" viewBox="0 0 160 160">
+            <path d="M80 18 C 122 18, 142 50, 142 86 C 142 118, 116 142, 80 142 C 70 142, 60 140, 52 136 L 30 142 L 38 122 C 24 110, 18 96, 18 86 C 18 50, 38 18, 80 18 Z" fill="#fff"/>
+            <circle cx="80" cy="80" r="7" fill="#1B1915"/>
+            <path d="M62 80 a18 18 0 0 1 36 0" stroke="#1B1915" stroke-width="5" fill="none" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div class="tile">
+          <svg width="44" height="44" viewBox="0 0 160 160">
+            <path d="M80 18 C 122 18, 142 50, 142 86 C 142 118, 116 142, 80 142 C 70 142, 60 140, 52 136 L 30 142 L 38 122 C 24 110, 18 96, 18 86 C 18 50, 38 18, 80 18 Z" fill="#fff"/>
+            <circle cx="80" cy="80" r="7" fill="#1B1915"/>
+            <path d="M62 80 a18 18 0 0 1 36 0" stroke="#1B1915" stroke-width="4.5" fill="none" stroke-linecap="round"/>
+            <path d="M48 80 a32 32 0 0 1 64 0" stroke="#1B1915" stroke-width="4" fill="none" stroke-linecap="round" opacity="0.5"/>
+          </svg>
+        </div>
+        <div class="tile accent lg">
+          <svg width="60" height="60" viewBox="0 0 160 160">
+            <path d="M80 18 C 122 18, 142 50, 142 86 C 142 118, 116 142, 80 142 C 70 142, 60 140, 52 136 L 30 142 L 38 122 C 24 110, 18 96, 18 86 C 18 50, 38 18, 80 18 Z" fill="#fff"/>
+            <circle cx="80" cy="80" r="7" fill="#3F5A3E"/>
+            <path d="M62 80 a18 18 0 0 1 36 0" stroke="#3F5A3E" stroke-width="5" fill="none" stroke-linecap="round"/>
+            <path d="M48 80 a32 32 0 0 1 64 0" stroke="#3F5A3E" stroke-width="4" fill="none" stroke-linecap="round" opacity="0.55"/>
+          </svg>
+        </div>
+      </div>
+      <div class="wm">
+        <div class="glyph">
+          <svg width="22" height="22" viewBox="0 0 160 160">
+            <path d="M80 18 C 122 18, 142 50, 142 86 C 142 118, 116 142, 80 142 C 70 142, 60 140, 52 136 L 30 142 L 38 122 C 24 110, 18 96, 18 86 C 18 50, 38 18, 80 18 Z" fill="#fff"/>
+            <circle cx="80" cy="80" r="9" fill="#1B1915"/>
+          </svg>
+        </div>
+        <div class="word">Murmur</div>
+        <div class="tag">Wordmark</div>
+      </div>
+    </div>
+
+
+    <!-- 02 — Quiet Aperture (concentric m) -->
+    <div class="card">
+      <div class="card-head">
+        <div class="name">Quiet Aperture</div>
+        <div class="num">02 · Letter → wave</div>
+      </div>
+      <div class="desc">
+        A lowercase “m” drawn as two concentric arches — like a sound wave radiating outward,
+        or a calm landscape. <i>Letter and wave fused in one stroke.</i>
+        The most “monogram-y” option, but earns it.
+      </div>
+      <div class="stage" style="background: #1B1915;">
+        <svg width="180" height="160" viewBox="0 0 180 160">
+          <!-- outer arch -->
+          <path d="M20 130 V 70 a 30 30 0 0 1 60 0 V 130 M 80 70 a 30 30 0 0 1 60 0 V 130"
+            stroke="#E8EDE3" stroke-width="9" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+          <!-- inner concentric echo -->
+          <path d="M40 130 V 80 a 12 12 0 0 1 24 0 V 130 M 64 80 a 12 12 0 0 1 24 0 V 130"
+            stroke="#3F5A3E" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round" transform="translate(33 0)"/>
+          <!-- tiny inner dot -->
+          <circle cx="90" cy="92" r="4" fill="#E8EDE3"/>
+        </svg>
+      </div>
+      <div class="scaleRow">
+        <div class="tile sm">
+          <svg width="20" height="20" viewBox="0 0 100 80">
+            <path d="M10 65 V 35 a 15 15 0 0 1 30 0 V 65 M 40 35 a 15 15 0 0 1 30 0 V 65"
+              stroke="#fff" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div class="tile md">
+          <svg width="32" height="26" viewBox="0 0 100 80">
+            <path d="M10 65 V 35 a 15 15 0 0 1 30 0 V 65 M 40 35 a 15 15 0 0 1 30 0 V 65"
+              stroke="#fff" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="55" cy="48" r="3" fill="#3F5A3E"/>
+          </svg>
+        </div>
+        <div class="tile">
+          <svg width="44" height="36" viewBox="0 0 100 80">
+            <path d="M10 65 V 35 a 15 15 0 0 1 30 0 V 65 M 40 35 a 15 15 0 0 1 30 0 V 65"
+              stroke="#fff" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="55" cy="48" r="3.5" fill="#3F5A3E"/>
+          </svg>
+        </div>
+        <div class="tile accent lg">
+          <svg width="64" height="52" viewBox="0 0 100 80">
+            <path d="M10 65 V 35 a 15 15 0 0 1 30 0 V 65 M 40 35 a 15 15 0 0 1 30 0 V 65"
+              stroke="#fff" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="55" cy="48" r="4" fill="#fff" opacity="0.4"/>
+          </svg>
+        </div>
+      </div>
+      <div class="wm">
+        <div class="glyph">
+          <svg width="22" height="18" viewBox="0 0 100 80">
+            <path d="M10 65 V 35 a 15 15 0 0 1 30 0 V 65 M 40 35 a 15 15 0 0 1 30 0 V 65"
+              stroke="#fff" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div class="word">Murmur</div>
+        <div class="tag">Wordmark</div>
+      </div>
+    </div>
+
+
+    <!-- 03 — The Half Circle -->
+    <div class="card">
+      <div class="card-head">
+        <div class="name">Half Breath</div>
+        <div class="num">03 · The exhale</div>
+      </div>
+      <div class="desc">
+        A single half-disc — half full, half quiet. The negative space is the listening.
+        <i>Shape of a quiet exhale, or a coin half-shown.</i>
+        Most minimal of the set; ages best.
+      </div>
+      <div class="stage">
+        <svg width="160" height="160" viewBox="0 0 160 160">
+          <circle cx="80" cy="80" r="62" fill="#1B1915"/>
+          <path d="M80 18 a62 62 0 0 1 0 124 Z" fill="#3F5A3E"/>
+          <!-- center dot -->
+          <circle cx="80" cy="80" r="4.5" fill="#FBFAF7"/>
+        </svg>
+      </div>
+      <div class="scaleRow">
+        <div class="tile sm">
+          <svg width="22" height="22" viewBox="0 0 100 100">
+            <circle cx="50" cy="50" r="38" fill="#fff"/>
+            <path d="M50 12 a38 38 0 0 1 0 76 Z" fill="#3F5A3E"/>
+          </svg>
+        </div>
+        <div class="tile md">
+          <svg width="32" height="32" viewBox="0 0 100 100">
+            <circle cx="50" cy="50" r="38" fill="#fff"/>
+            <path d="M50 12 a38 38 0 0 1 0 76 Z" fill="#3F5A3E"/>
+            <circle cx="50" cy="50" r="3" fill="#1B1915"/>
+          </svg>
+        </div>
+        <div class="tile">
+          <svg width="44" height="44" viewBox="0 0 100 100">
+            <circle cx="50" cy="50" r="38" fill="#fff"/>
+            <path d="M50 12 a38 38 0 0 1 0 76 Z" fill="#3F5A3E"/>
+            <circle cx="50" cy="50" r="3.5" fill="#1B1915"/>
+          </svg>
+        </div>
+        <div class="tile light lg">
+          <svg width="64" height="64" viewBox="0 0 100 100">
+            <circle cx="50" cy="50" r="38" fill="#1B1915"/>
+            <path d="M50 12 a38 38 0 0 1 0 76 Z" fill="#3F5A3E"/>
+            <circle cx="50" cy="50" r="3.5" fill="#FBFAF7"/>
+          </svg>
+        </div>
+      </div>
+      <div class="wm" style="background: #1B1915;">
+        <div class="glyph" style="background: #FBFAF7;">
+          <svg width="22" height="22" viewBox="0 0 100 100">
+            <circle cx="50" cy="50" r="38" fill="#1B1915"/>
+            <path d="M50 12 a38 38 0 0 1 0 76 Z" fill="#3F5A3E"/>
+          </svg>
+        </div>
+        <div class="word" style="color:#fff;">Murmur</div>
+        <div class="tag" style="color: rgba(255,255,255,0.45);">Wordmark · dark</div>
+      </div>
+    </div>
+
+
+    <!-- 04 — Sound currency -->
+    <div class="card">
+      <div class="card-head">
+        <div class="name">Coin & Wave</div>
+        <div class="num">04 · Money meets voice</div>
+      </div>
+      <div class="desc">
+        A coin shape with a soft wave engraved across it — the only direction that explicitly
+        signals "money app" without going fintech.
+        <i>The most discoverable on a busy app drawer.</i>
+      </div>
+      <div class="stage">
+        <svg width="160" height="160" viewBox="0 0 160 160">
+          <defs>
+            <radialGradient id="d4" cx="0.35" cy="0.3" r="0.9">
+              <stop offset="0%" stop-color="#5C7B5A"/>
+              <stop offset="100%" stop-color="#2D4530"/>
+            </radialGradient>
+          </defs>
+          <circle cx="80" cy="80" r="62" fill="url(#d4)"/>
+          <circle cx="80" cy="80" r="62" fill="none" stroke="#FBFAF7" stroke-width="1" opacity="0.18"/>
+          <!-- soft inner ring -->
+          <circle cx="80" cy="80" r="50" fill="none" stroke="#FBFAF7" stroke-width="1" opacity="0.18"/>
+          <!-- engraved wave -->
+          <path d="M40 80 Q 55 64, 70 80 T 100 80 T 130 80" stroke="#FBFAF7" stroke-width="5"
+            fill="none" stroke-linecap="round" opacity="0.95"/>
+          <path d="M40 96 Q 55 86, 70 96 T 100 96 T 120 96" stroke="#FBFAF7" stroke-width="3"
+            fill="none" stroke-linecap="round" opacity="0.45"/>
+        </svg>
+      </div>
+      <div class="scaleRow">
+        <div class="tile sm">
+          <svg width="22" height="22" viewBox="0 0 100 100">
+            <circle cx="50" cy="50" r="38" fill="#fff"/>
+            <path d="M28 52 Q 38 42, 48 52 T 68 52 T 78 52" stroke="#1B1915" stroke-width="5" fill="none" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div class="tile md">
+          <svg width="32" height="32" viewBox="0 0 100 100">
+            <circle cx="50" cy="50" r="38" fill="#fff"/>
+            <path d="M26 50 Q 38 38, 50 50 T 74 50" stroke="#1B1915" stroke-width="4.5" fill="none" stroke-linecap="round"/>
+            <path d="M26 62 Q 38 54, 50 62 T 70 62" stroke="#1B1915" stroke-width="3" fill="none" stroke-linecap="round" opacity="0.5"/>
+          </svg>
+        </div>
+        <div class="tile">
+          <svg width="44" height="44" viewBox="0 0 100 100">
+            <circle cx="50" cy="50" r="38" fill="#fff"/>
+            <path d="M26 50 Q 38 38, 50 50 T 74 50" stroke="#1B1915" stroke-width="4.5" fill="none" stroke-linecap="round"/>
+            <path d="M26 62 Q 38 54, 50 62 T 70 62" stroke="#1B1915" stroke-width="3" fill="none" stroke-linecap="round" opacity="0.5"/>
+          </svg>
+        </div>
+        <div class="tile accent lg">
+          <svg width="60" height="60" viewBox="0 0 100 100">
+            <circle cx="50" cy="50" r="38" fill="none" stroke="#fff" stroke-width="2" opacity="0.4"/>
+            <path d="M26 50 Q 38 38, 50 50 T 74 50" stroke="#fff" stroke-width="5" fill="none" stroke-linecap="round"/>
+            <path d="M26 62 Q 38 54, 50 62 T 70 62" stroke="#fff" stroke-width="3" fill="none" stroke-linecap="round" opacity="0.55"/>
+          </svg>
+        </div>
+      </div>
+      <div class="wm">
+        <div class="glyph" style="background: #3F5A3E;">
+          <svg width="22" height="22" viewBox="0 0 100 100">
+            <circle cx="50" cy="50" r="38" fill="none" stroke="#fff" stroke-width="2" opacity="0.4"/>
+            <path d="M26 50 Q 38 38, 50 50 T 74 50" stroke="#fff" stroke-width="5" fill="none" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div class="word">Murmur</div>
+        <div class="tag">Wordmark · accent</div>
+      </div>
+    </div>
+
+
+    <!-- 05 — Soft Mic -->
+    <div class="card">
+      <div class="card-head">
+        <div class="name">Cradled Mic</div>
+        <div class="num">05 · Literal but warm</div>
+      </div>
+      <div class="desc">
+        A microphone capsule cradled in a cupped hand-arc.
+        <i>The most explicit “voice app” read</i> — useful for cold-traffic
+        marketing pages where the metaphor needs to land in 0.5s.
+      </div>
+      <div class="stage" style="background: #E8EDE3;">
+        <svg width="160" height="160" viewBox="0 0 160 160">
+          <!-- cup -->
+          <path d="M30 86 a50 50 0 0 0 100 0" stroke="#1B1915" stroke-width="9" fill="none" stroke-linecap="round"/>
+          <!-- mic capsule -->
+          <rect x="64" y="34" width="32" height="58" rx="16" fill="#1B1915"/>
+          <!-- mic dot/highlight -->
+          <circle cx="80" cy="50" r="3" fill="#3F5A3E"/>
+          <!-- stem -->
+          <path d="M80 95 v18" stroke="#1B1915" stroke-width="9" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="scaleRow">
+        <div class="tile sm">
+          <svg width="20" height="20" viewBox="0 0 100 100">
+            <path d="M22 56 a28 28 0 0 0 56 0" stroke="#fff" stroke-width="7" fill="none" stroke-linecap="round"/>
+            <rect x="42" y="22" width="16" height="34" rx="8" fill="#fff"/>
+            <path d="M50 60 v12" stroke="#fff" stroke-width="7" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div class="tile md">
+          <svg width="30" height="30" viewBox="0 0 100 100">
+            <path d="M22 56 a28 28 0 0 0 56 0" stroke="#fff" stroke-width="6" fill="none" stroke-linecap="round"/>
+            <rect x="42" y="22" width="16" height="34" rx="8" fill="#fff"/>
+            <path d="M50 60 v12" stroke="#fff" stroke-width="6" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div class="tile">
+          <svg width="42" height="42" viewBox="0 0 100 100">
+            <path d="M22 56 a28 28 0 0 0 56 0" stroke="#fff" stroke-width="6" fill="none" stroke-linecap="round"/>
+            <rect x="42" y="22" width="16" height="34" rx="8" fill="#fff"/>
+            <circle cx="50" cy="32" r="2" fill="#3F5A3E"/>
+            <path d="M50 60 v12" stroke="#fff" stroke-width="6" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div class="tile accent lg">
+          <svg width="60" height="60" viewBox="0 0 100 100">
+            <path d="M22 56 a28 28 0 0 0 56 0" stroke="#fff" stroke-width="6" fill="none" stroke-linecap="round"/>
+            <rect x="42" y="22" width="16" height="34" rx="8" fill="#fff"/>
+            <path d="M50 60 v12" stroke="#fff" stroke-width="6" stroke-linecap="round"/>
+          </svg>
+        </div>
+      </div>
+      <div class="wm">
+        <div class="glyph">
+          <svg width="20" height="20" viewBox="0 0 100 100">
+            <path d="M22 56 a28 28 0 0 0 56 0" stroke="#fff" stroke-width="7" fill="none" stroke-linecap="round"/>
+            <rect x="42" y="22" width="16" height="34" rx="8" fill="#fff"/>
+            <path d="M50 60 v12" stroke="#fff" stroke-width="7" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div class="word">Murmur</div>
+        <div class="tag">Wordmark</div>
+      </div>
+    </div>
+
+
+    <!-- 06 — Whisper Loop -->
+    <div class="card">
+      <div class="card-head">
+        <div class="name">Whisper Loop</div>
+        <div class="num">06 · Continuous gesture</div>
+      </div>
+      <div class="desc">
+        One unbroken stroke that loops back on itself — a closed feedback loop, drawn in a single
+        breath. <i>You log it, Murmur understands it, you see it.</i>
+        Animatable: it draws itself when the app opens.
+      </div>
+      <div class="stage">
+        <svg width="180" height="160" viewBox="0 0 180 160">
+          <path d="M40 100
+                   C 40 40, 130 40, 130 100
+                   C 130 130, 100 140, 80 130
+                   C 60 120, 60 100, 90 92
+                   C 130 82, 150 110, 130 130"
+            stroke="#1B1915" stroke-width="11" fill="none"
+            stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="130" cy="130" r="6.5" fill="#3F5A3E"/>
+        </svg>
+      </div>
+      <div class="scaleRow">
+        <div class="tile sm">
+          <svg width="22" height="22" viewBox="0 0 180 160">
+            <path d="M40 100 C 40 40, 130 40, 130 100 C 130 130, 100 140, 80 130 C 60 120, 60 100, 90 92 C 130 82, 150 110, 130 130"
+              stroke="#fff" stroke-width="14" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div class="tile md">
+          <svg width="34" height="30" viewBox="0 0 180 160">
+            <path d="M40 100 C 40 40, 130 40, 130 100 C 130 130, 100 140, 80 130 C 60 120, 60 100, 90 92 C 130 82, 150 110, 130 130"
+              stroke="#fff" stroke-width="14" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="130" cy="130" r="9" fill="#3F5A3E"/>
+          </svg>
+        </div>
+        <div class="tile">
+          <svg width="46" height="40" viewBox="0 0 180 160">
+            <path d="M40 100 C 40 40, 130 40, 130 100 C 130 130, 100 140, 80 130 C 60 120, 60 100, 90 92 C 130 82, 150 110, 130 130"
+              stroke="#fff" stroke-width="13" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="130" cy="130" r="9" fill="#3F5A3E"/>
+          </svg>
+        </div>
+        <div class="tile accent lg">
+          <svg width="64" height="56" viewBox="0 0 180 160">
+            <path d="M40 100 C 40 40, 130 40, 130 100 C 130 130, 100 140, 80 130 C 60 120, 60 100, 90 92 C 130 82, 150 110, 130 130"
+              stroke="#fff" stroke-width="13" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="130" cy="130" r="9" fill="#fff" opacity="0.45"/>
+          </svg>
+        </div>
+      </div>
+      <div class="wm">
+        <div class="glyph">
+          <svg width="22" height="20" viewBox="0 0 180 160">
+            <path d="M40 100 C 40 40, 130 40, 130 100 C 130 130, 100 140, 80 130 C 60 120, 60 100, 90 92 C 130 82, 150 110, 130 130"
+              stroke="#fff" stroke-width="14" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div class="word">Murmur</div>
+        <div class="tag">Wordmark</div>
+      </div>
+    </div>
+
+  </div><!-- /grid -->
+
+
+  <!-- IN-CONTEXT HERO PREVIEW — using my recommended pick -->
+  <div class="hero">
+    <div style="flex-shrink:0;">
+      <div style="width:140px; height:140px; background:#FBFAF7; border-radius:32px;
+                  display:flex; align-items:center; justify-content:center;
+                  box-shadow: 0 20px 50px rgba(0,0,0,0.4);">
+        <svg width="92" height="92" viewBox="0 0 160 160">
+          <path d="M80 18 C 122 18, 142 50, 142 86 C 142 118, 116 142, 80 142
+                   C 70 142, 60 140, 52 136 L 30 142 L 38 122
+                   C 24 110, 18 96, 18 86 C 18 50, 38 18, 80 18 Z"
+            fill="#1B1915"/>
+          <circle cx="80" cy="80" r="6" fill="#FBFAF7"/>
+          <path d="M64 80 a16 16 0 0 1 32 0" stroke="#FBFAF7" stroke-width="3.5" fill="none" stroke-linecap="round" opacity="0.85"/>
+          <path d="M52 80 a28 28 0 0 1 56 0" stroke="#FBFAF7" stroke-width="3" fill="none" stroke-linecap="round" opacity="0.45"/>
+        </svg>
+      </div>
+    </div>
+    <div>
+      <div class="label">Designer's pick · 01 — The Listening Drop</div>
+      <h2>It is the only direction that says<br/>“voice” and “money” in one shape,<br/>without saying either out loud.</h2>
+      <p>It survives the 32px home-screen test. It works in the lockscreen widget at 22px. It can be drawn one-handed on a napkin. It animates: the inner pulse breathes when the mic is live. And when the app feels quiet — at night, in a low-light theme — the droplet feels like it's holding the user's last thought.</p>
+    </div>
+  </div>
+
+
+  <div class="footer">
+    <div class="col">
+      <h4>What I'd ship</h4>
+      My pick: <b>01 · The Listening Drop</b>. Strong concept, scales clean, ownable.
+      Backup: <b>03 · Half Breath</b> if you want the most timeless, geometric option.
+    </div>
+    <div class="col">
+      <h4>What I'd kill</h4>
+      <b>05 · Cradled Mic</b> reads loudest at small sizes but pegs the brand to "voice app"
+      forever — limits your room to evolve into other input methods.
+    </div>
+    <div class="col">
+      <h4>Next steps</h4>
+      Pick 1–2 directions. I'll do: app-icon set (light/dark/iOS-tinted), splash screen,
+      letter-spaced wordmark, social avatar, and a one-page brand sheet for handoff.
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>

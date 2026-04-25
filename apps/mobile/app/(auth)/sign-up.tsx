@@ -14,6 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Link } from 'expo-router'
 import { signUpWithEmail } from '../../src/hooks/useAuth'
+import { MurmurMark } from '../../src/components/MurmurMark'
 import { Colors, Typography, Hairline } from '../../src/theme'
 import { t } from '@voice-expense/shared'
 import type { Locale } from '@voice-expense/shared'
@@ -78,9 +79,8 @@ export default function SignUpScreen() {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          <View style={styles.logoTile}>
-            <Text style={styles.logoGlyph}>M</Text>
-          </View>
+          <MurmurMark size={64} variant="sage" />
+
 
           <Text style={styles.headline}>{t('auth.create_account', locale)}</Text>
           <Text style={styles.lead}>{t('auth.track_voice', locale)}</Text>
@@ -149,26 +149,8 @@ const styles = StyleSheet.create({
     paddingBottom: 32,
   },
 
-  logoTile: {
-    width: 56,
-    height: 56,
-    borderRadius: 14,
-    backgroundColor: Colors.accent ?? Colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: Colors.accent ?? Colors.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 8,
-  },
-  logoGlyph: {
-    color: '#FFFFFF',
-    fontSize: 28,
-    fontWeight: '800',
-    fontFamily: Typography.fontFamily.sansBold,
-    letterSpacing: -1,
-  },
+  // MurmurMark renders its own tile + corner radius — no logoTile/logoGlyph
+  // wrapping styles needed.
 
   headline: {
     fontFamily: Typography.fontFamily.serif,
