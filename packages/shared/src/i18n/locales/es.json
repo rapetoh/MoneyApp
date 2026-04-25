@@ -103,6 +103,7 @@
   "source.recurring": "Recurrente · generado automáticamente",
   "detail.edit": "Editar",
   "detail.delete": "Eliminar",
+  "detail.recurring": "Recurrente",
   "detail.delete_title": "Eliminar transacción",
   "detail.delete_msg": "Esta acción no se puede deshacer.",
   "detail.deleted": "Eliminado",

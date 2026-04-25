@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '../../src/hooks/useAuth'
 import { useProfile } from '../../src/hooks/useProfile'
 import { useCategories } from '../../src/hooks/useCategories'
+import { useRecurringRules, computeNextOccurrence } from '../../src/hooks/useRecurringRules'
 import { useUndo } from '../../src/hooks/useUndo'
 import {
   getTransactionById,
@@ -120,6 +121,7 @@ export default function TransactionDetailScreen() {
   const { user } = useAuth()
   const { profile } = useProfile(user?.id)
   const { categoryMap } = useCategories(user?.id)
+  const { rules } = useRecurringRules(user?.id)
   const locale = (profile?.locale ?? 'en') as Locale
   const currency = profile?.currency_code ?? 'USD'
   const [txn, setTxn] = useState<Transaction | null>(null)
@@ -208,6 +210,26 @@ export default function TransactionDetailScreen() {
   const categoryName = category?.name ?? null
   const categoryColor = category?.color ?? Colors.ink3 ?? Colors.textSecondary
 
+  // Recurring chip data — only relevant if the txn is flagged. The linked
+  // rule (matched by template_txn_id) gives us frequency + next-due. If no
+  // rule is found (the "ghost" case from issue 1) we still show "Recurring"
+  // so the user sees the saved state, but without frequency/next-due.
+  const linkedRule = txn.is_recurring ? rules.find((r) => r.template_txn_id === txn.id) ?? null : null
+  const nextDue = linkedRule ? computeNextOccurrence(linkedRule) : null
+  const nextDueLabel = nextDue
+    ? nextDue.toLocaleDateString(locale, { month: 'short', day: 'numeric' })
+    : null
+  const recurringChipParts: string[] = []
+  if (txn.is_recurring) {
+    recurringChipParts.push(t('detail.recurring', locale))
+    if (linkedRule) {
+      recurringChipParts.push(t(`recurring.${linkedRule.frequency}`, locale))
+    }
+    if (nextDueLabel) {
+      recurringChipParts.push(`${t('recurring.next_due', locale)} ${nextDueLabel}`)
+    }
+  }
+
   const dateLine = new Date(txn.transacted_at).toLocaleDateString(locale, {
     weekday: 'long',
     month: 'short',
@@ -251,6 +273,23 @@ export default function TransactionDetailScreen() {
               <View style={[styles.categoryChip, { backgroundColor: categoryColor + '22' }]}>
                 <Text style={[styles.categoryChipLabel, { color: categoryColor }]}>
                   {categoryName}
+                </Text>
+              </View>
+            )}
+
+            {/* Recurring chip — shown whenever is_recurring=true. Pulls
+                frequency + next-due from the linked rule if one exists; if
+                not (legacy "ghost" case), just shows "Recurring" so the
+                user can still see the state without going to Edit. */}
+            {txn.is_recurring && (
+              <View style={styles.recurringChip}>
+                <Ionicons
+                  name="repeat"
+                  size={12}
+                  color={Colors.accent ?? Colors.primary}
+                />
+                <Text style={styles.recurringChipLabel}>
+                  {recurringChipParts.join(' · ')}
                 </Text>
               </View>
             )}
@@ -386,6 +425,26 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     letterSpacing: 0.1,
+  },
+  // Recurring chip — sits below the category chip in the hero. Sage-tinted
+  // with a small repeat glyph so it visually echoes the recurring icon
+  // already shown on transaction list rows.
+  recurringChip: {
+    marginTop: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    backgroundColor: Colors.accentSoft ?? Colors.primaryLight,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  recurringChipLabel: {
+    fontFamily: Typography.fontFamily.sansSemiBold,
+    fontSize: 12,
+    fontWeight: '600',
+    letterSpacing: 0.1,
+    color: Colors.accent ?? Colors.primary,
   },
 
   // Fields

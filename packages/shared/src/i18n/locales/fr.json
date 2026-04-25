@@ -103,6 +103,7 @@
   "source.recurring": "Récurrent · généré automatiquement",
   "detail.edit": "Modifier",
   "detail.delete": "Supprimer",
+  "detail.recurring": "Récurrent",
   "detail.delete_title": "Supprimer la transaction",
   "detail.delete_msg": "Cette action est irréversible.",
   "detail.deleted": "Supprimé",

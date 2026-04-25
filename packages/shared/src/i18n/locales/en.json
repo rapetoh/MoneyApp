@@ -103,6 +103,7 @@
   "source.recurring": "Recurring · auto-generated",
   "detail.edit": "Edit",
   "detail.delete": "Delete",
+  "detail.recurring": "Recurring",
   "detail.delete_title": "Delete transaction",
   "detail.delete_msg": "This cannot be undone.",
   "detail.deleted": "Deleted",
