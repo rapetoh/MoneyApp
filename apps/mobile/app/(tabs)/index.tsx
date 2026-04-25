@@ -11,6 +11,7 @@ import { useActiveBudget, usePeriodSpend } from '../../src/hooks/useBudget'
 import { useRecurringRules, computeUpcomingRecurring } from '../../src/hooks/useRecurringRules'
 import { RecurringPatternBanner } from '../../src/components/RecurringPatternBanner'
 import type { RecurringPatternCandidate } from '../../src/services/recurringPatternDetector'
+import { usePlusStatus } from '../../src/hooks/usePlusStatus'
 import { TransactionRow } from '../../src/components/TransactionRow'
 import { Money, MoneyLabel } from '../../src/components/Money'
 import { MiniBars } from '../../src/components/MiniBars'
@@ -129,6 +130,11 @@ export default function TodayScreen() {
   const periodSpend = usePeriodSpend(budget, transactions)
   const { rules: recurringRules, createRule } = useRecurringRules(user?.id)
   const router = useRouter()
+
+  // Auto-recurring detection is a Plus feature (PRD §11 / DESIGN.md §10).
+  // Free-tier users still flag recurring transactions manually via the edit
+  // screen — they just don't get the proactive "we noticed a pattern" nudge.
+  const { isPlus } = usePlusStatus()
 
   // "New pattern detected" accept handler. Creates a recurring rule from the
   // candidate; the detector will exclude this pattern on subsequent runs
@@ -249,14 +255,17 @@ export default function TodayScreen() {
           </View>
         )}
 
-        {/* "New pattern detected" recurring banner — surfaces a single
-            highest-priority candidate at a time, hidden when none exist. */}
-        <RecurringPatternBanner
-          transactions={transactions}
-          existingRules={recurringRules}
-          locale={locale}
-          onAccept={acceptPattern}
-        />
+        {/* "New pattern detected" recurring banner — Plus-gated. Free users
+            still see all their data; they just don't get proactive recurring
+            suggestions and instead manually flag rules from the edit screen. */}
+        {isPlus && (
+          <RecurringPatternBanner
+            transactions={transactions}
+            existingRules={recurringRules}
+            locale={locale}
+            onAccept={acceptPattern}
+          />
+        )}
 
         {/* Spent today + MiniBars */}
         <View style={styles.spentCard}>
