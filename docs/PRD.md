@@ -399,6 +399,14 @@ multi-device sync. The Murmur redesign moves budgets, widgets, full history,
 and multi-device sync into the free mobile tier — the paid gate is now a tight
 bundle of **AI + automation + desktop**, the three genuinely premium surfaces.
 
+**Plus gating implementation status (April 25, 2026):** Ask Murmur is wired
+end-to-end (entry screen → grounded reasoner API → result screen) and gated
+through a single `usePlusStatus()` hook. Until the IAP / receipt-validation
+work lands, the hook returns true only for development builds with
+`EXPO_PUBLIC_FORCE_PLUS=1`; production users hit the paywall on submit. When
+IAP ships, the hook becomes the obvious place to read the receipt-validated
+profile column and the dev override stays as a local-test hatch.
+
 ---
 
 *End of PRD*

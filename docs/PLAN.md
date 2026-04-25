@@ -1121,6 +1121,12 @@ One user-flagged gap, three commits:
 - **Today header clock icon was a clock pointing to the transaction list** — same "icon lies about destination" problem we'd fixed before. Swapped to `list-outline` so the icon matches the destination, consistent with the More drawer's Transactions row. (`1e08301`)
 
 **Still untested live (cumulative across rounds 1–4):**
+
+> User decision 2026-04-25: this list is the user's responsibility to validate on
+> simulator/device. Claude does not stall waiting on it — items here stay pinned
+> until the user confirms or files a defect. New roadmap work proceeds in
+> parallel.
+
 - Tab bar visual on rebuild (FAB is a full circle, pill edge visible, blur shows content behind)
 - Insights trend shows dates + caption
 - Insights HISTORY section (heatmap + months list inline below Forecast)
@@ -1135,5 +1141,47 @@ One user-flagged gap, three commits:
 - `/recurring` screen now refreshes on focus; rule appears after onboarding income or transaction edit toggle
 - Transaction edit shows recurring toggle + frequency picker; ghost-transaction self-heal works (toggle on → save creates rule)
 - Detail screen shows the recurring chip with frequency + next-due
+
+### Phase E — Ask Murmur grounded reasoner (started April 25, 2026)
+
+Design reference: [DESIGN.md](./DESIGN.md) §Ask Murmur and `S_AskResult` in [docs/money-app/project/mobile-screens-5.jsx](./money-app/project/mobile-screens-5.jsx).
+
+The Ask entry screen shipped in Phase D (`e5a4e46`) but its submit, suggestions, and mic all routed to `/more/paywall` — a hollow paywall pitch with no real result view. Phase E builds the backend + result screen so the Plus value proposition is real.
+
+**Decisions:**
+- **Grounded-only.** The reasoner is a closed-book reader over the user's own transactions + income + recurring rules. It MUST refuse questions whose answer requires external information (stock prices, current news, real-world predictions, generic financial advice).
+- **Plus gating** rides on a `__DEV__`-only `EXPO_PUBLIC_FORCE_PLUS` env override for now. The proper `profile.plus_status` column is bundled with the IAP wiring (next phase) so we don't ship a half-built monetization surface; this phase delivers the feature, not the purchase flow.
+- **Structured response.** The model returns a typed JSON shape (verdict + breakdown stat rows + optional accent note + optional action pills + attribution + out-of-scope flag) so the result screen renders the same regardless of locale or question shape. Keeps the chat-bubble UX honest — no free-form prose to leak unsupported claims.
+- **Transaction window.** Send only the user's last 90 days, capped at 500 entries (oldest dropped). Keeps token cost predictable; that's also the window the verdict can credibly justify.
+
+**New types:** `AskMurmurRequest`, `AskMurmurResponse`, `AskMurmurStatRow`, `AskMurmurAction` in [packages/shared/src/types/ai.ts](../packages/shared/src/types/ai.ts).
+
+**Backend:**
+- [packages/ai/src/askMurmur.ts](../packages/ai/src/askMurmur.ts) — `buildAskMurmurPrompt(ctx)` (system prompt enforcing grounded-only, locale-aware, JSON-only) + `validateAskMurmurResponse(raw)` (defensive shape check; coerces missing fields to safe defaults so a malformed AI reply still renders cleanly).
+- [apps/web/src/app/api/ai/ask-murmur/route.ts](../apps/web/src/app/api/ai/ask-murmur/route.ts) — POST endpoint, mirrors the parse-expense route shape (validateToken → OpenAI → JSON). Uses `gpt-4o-mini` by default (`AI_ASK_MODEL` env override). 800 max tokens — enough for a verdict + 8 stat rows + a note paragraph.
+
+**Mobile:**
+- [apps/mobile/app/more/ask-result.tsx](../apps/mobile/app/more/ask-result.tsx) — new screen tracing `S_AskResult`. User bubble + sparkle-avatar Murmur bubble (verdict serif text + breakdown card + optional sage note + attribution + action pills). Loading state shows a typing-dots animation in the assistant bubble. Error state shows a polite "Couldn't reach Ask Murmur — try again in a moment" with a retry button. Out-of-scope refusal renders as a single bubble with no breakdown.
+- [apps/mobile/src/services/askMurmurClient.ts](../apps/mobile/src/services/askMurmurClient.ts) — assembles the request from local stores (last 90d txns from `useTransactions` cache, recurring rules, profile income/currency/locale, known categories) and POSTs it.
+- [apps/mobile/src/hooks/usePlusStatus.ts](../apps/mobile/src/hooks/usePlusStatus.ts) — single source of truth for Plus gating: returns `true` only if `__DEV__ && EXPO_PUBLIC_FORCE_PLUS === '1'`. When the IAP work lands, the hook becomes the obvious place to read the receipt-validated profile column.
+- [apps/mobile/app/more/ask.tsx](../apps/mobile/app/more/ask.tsx) — input bar becomes a real `TextInput`. Submit (suggestions, mic, send) routes through `usePlusStatus()`: free → `/more/paywall`, plus → `/more/ask-result?q=...`. The mic still routes to paywall for now (voice-input parity with the existing `/(tabs)/record` flow is its own task).
+
+**i18n** — new keys per locale (en/fr/es/pt):
+- `ask.thinking`, `ask.error`, `ask.retry`, `ask.followup_placeholder`, `ask.attribution`, `ask.refusal_default`, `ask.action_create_goal`, `ask.action_show_category`, `ask.action_show_transactions`, `ask.action_set_budget`, `ask.breakdown_caption`.
+
+**Out of scope (deliberately deferred, tracked):**
+- Voice follow-ups in Ask (mic on the input bar still routes to paywall — would need to thread `useVoice` through ask-result + transcript→submit; not blocking the launch of Ask).
+- "Create goal / Show category" action pill destinations — the backend returns the action intents already, but the actual goal-creation surface and category-drill destination are tracked under their own line items. The pills render with their copy and a TODO; tapping shows a brief snackbar saying "Coming soon".
+- Caching (Ask results are not cached; each submission is a fresh model call).
+- Plus-status profile column + IAP receipt validation (next phase).
+
+**Untested live, Phase E:**
+- Ask entry input accepts text + send button enables on non-empty
+- Tapping a suggestion submits with that question
+- Free user → paywall on submit (current behavior preserved)
+- Plus user (`EXPO_PUBLIC_FORCE_PLUS=1`) → ask-result with the verdict + breakdown rendered
+- Out-of-scope question (e.g. "what's the S&P 500 today") returns a polite refusal bubble
+- Network failure shows the error bubble with retry
+- Locale switch (en/fr/es/pt) drives both UI strings AND the model's response language
 
 *End of Plan*

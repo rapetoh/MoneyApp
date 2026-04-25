@@ -179,6 +179,15 @@ export default function RootLayout() {
           }}
         />
         <Stack.Screen
+          name="more/ask-result"
+          options={{
+            // The screen renders its own header (back pill + sparkle title)
+            // matching S_AskResult, so the native Stack header is hidden.
+            headerShown: false,
+            presentation: 'card',
+          }}
+        />
+        <Stack.Screen
           name="more/help"
           options={{
             headerShown: true,

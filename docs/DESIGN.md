@@ -347,11 +347,29 @@ The user already has this partially implemented. The design assumes:
 - No comparison to "other users" — we don't know them.
 
 ### Technical note
-Model call: use a small, fast model (Haiku-class). Inject the user's
-transactions as structured JSON, not free text. The prompt should
-include an explicit "only answer using the data provided" clause and
-reject any question requiring outside knowledge with a polite
-"I can't answer that from your data alone."
+Model call: use a small, fast model (gpt-4o-mini today; the system prompt is
+model-agnostic so we can swap to Haiku-class without code changes). Inject the
+user's transactions as structured JSON, not free text. The prompt includes an
+explicit "only answer using the data provided" clause and rejects any question
+requiring outside knowledge by setting `out_of_scope: true` with a polite
+short refusal in the verdict.
+
+**Wire shape (Phase E, shipped):**
+- Request: `AskMurmurRequest` in `packages/shared/src/types/ai.ts` — question +
+  locale + currency + monthly_income + last 90 days of transactions (≤500 rows)
+  + active recurring rules.
+- Endpoint: `POST /api/ai/ask-murmur` in `apps/web` — auth via Supabase Bearer
+  token, response is `AskMurmurResponse` (verdict + optional breakdown card +
+  optional accent note + action pill array + attribution + out_of_scope flag).
+- Prompt + validator live in `packages/ai/src/askMurmur.ts`. Validator coerces
+  malformed model replies into safe defaults so the result screen always renders.
+- Mobile screen: `apps/mobile/app/more/ask-result.tsx` traces `S_AskResult` —
+  user bubble + sparkle-avatar Murmur bubble (verdict serif text + breakdown +
+  optional sage note + attribution + action pills). Loading + error + refusal
+  states all render inside the same bubble shape.
+- Plus gating: `usePlusStatus()` hook is the single source of truth. Until IAP
+  ships, returns true only when `__DEV__ && EXPO_PUBLIC_FORCE_PLUS=1`. Free
+  users still see the entry screen and the paywall on submit.
 
 ---
 

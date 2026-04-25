@@ -27,3 +27,103 @@ export interface AdvisorContext {
   implied_monthly_savings: number
   user_question: string
 }
+
+// ─── Ask Murmur (Phase E) ────────────────────────────────────────────────────
+//
+// Wire format for the grounded-reasoner endpoint at /api/ai/ask-murmur.
+// Shared by mobile client + web route + AI prompt module so the three move
+// together. Free-form prose is intentionally avoided in the response — the
+// model returns a structured shape that the result screen renders directly.
+
+import type { Locale } from '../i18n'
+
+/** Compact transaction record sent to the Ask reasoner. Omits internal sync
+ *  fields. Date is ISO so the model can reason about recency. */
+export interface AskMurmurTransaction {
+  amount: number
+  direction: 'debit' | 'credit'
+  merchant: string | null
+  category_name: string | null
+  transacted_at: string
+  is_recurring: boolean
+}
+
+export interface AskMurmurRecurringRule {
+  name: string | null
+  amount: number
+  direction: 'debit' | 'credit'
+  frequency: string
+}
+
+export interface AskMurmurRequest {
+  question: string
+  locale: Locale
+  currency: string
+  /** ISO date of "today" in the user's timezone. Anchors any "this month",
+   *  "next month" reasoning. */
+  today: string
+  monthly_income: number | null
+  /** Cap: last 90 days, max 500 entries (oldest dropped client-side). */
+  transactions: AskMurmurTransaction[]
+  recurring_rules: AskMurmurRecurringRule[]
+}
+
+/** A single row in the breakdown card on S_AskResult. */
+export interface AskMurmurStatRow {
+  label: string
+  /** Already-formatted display string (e.g. "$4,120", "+$150", "≈ 3.3 months").
+   *  The model formats — the client renders verbatim. */
+  value: string
+  /** Sage-tinted value (positive call-out: "+$150 left over"). */
+  accent?: boolean
+  /** Greyed-out value (informational, e.g. "Avg monthly income"). */
+  muted?: boolean
+}
+
+export type AskMurmurActionIntent =
+  | 'create_goal'
+  | 'show_category'
+  | 'set_budget'
+  | 'show_transactions'
+
+export interface AskMurmurAction {
+  /** Localized button label. Model returns it in the user's locale. */
+  label: string
+  intent: AskMurmurActionIntent
+  /** Free-form params keyed to the intent. e.g. `{ category_name: "Coffee" }`
+   *  for `show_category`, `{ goal_name: "PS5", monthly_amount: "100" }` for
+   *  `create_goal`. The result screen forwards these to the destination once
+   *  those destinations exist. */
+  params?: Record<string, string>
+}
+
+export interface AskMurmurResponse {
+  /** Headline answer. Short, serif-rendered. May contain inline `<b>` for
+   *  emphasis on a single phrase the verdict hinges on. */
+  verdict: {
+    text: string
+    sentiment: 'positive' | 'neutral' | 'negative'
+  }
+  /** Optional breakdown card. Omitted when the answer doesn't have a
+   *  numeric story to tell (e.g. a refusal). */
+  breakdown?: {
+    /** Eyebrow over the rows, e.g. "From your last 3 months". */
+    caption: string
+    rows: AskMurmurStatRow[]
+  }
+  /** Optional sage-tinted note — a single-paragraph nudge or insight. */
+  note?: {
+    text: string
+  }
+  /** Action pills under the bubble. Empty array when none apply. */
+  actions: AskMurmurAction[]
+  /** Always returned — count of transactions the model could see. Surfaced
+   *  on the attribution line so the user can audit grounding. */
+  attribution: {
+    transaction_count: number
+  }
+  /** True when the model could not answer from the user's data alone (e.g.
+   *  "what's the current S&P 500 price"). When true, breakdown / actions
+   *  are typically empty and the verdict explains the refusal politely. */
+  out_of_scope: boolean
+}

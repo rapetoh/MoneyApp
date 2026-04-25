@@ -39,6 +39,7 @@ Everything we depend on outside our own code. Reviewed before Phase 0.
 **API routes using OpenAI**:
 - `apps/web/src/app/api/ai/parse-expense/route.ts` — voice transcript parsing
 - `apps/web/src/app/api/ai/parse-scan/route.ts` — receipt + paycheck OCR (vision)
+- `apps/web/src/app/api/ai/ask-murmur/route.ts` — grounded Q&A over the user's transactions (Plus). Uses `gpt-4o-mini` by default (`AI_ASK_MODEL` override) with `response_format: json_object`, 800 max tokens, temperature 0.3. Per-call cost ~$0.001–0.005 depending on the user's transaction window (last 90 days, capped at 500 rows). The system prompt enforces grounded-only answers; out-of-scope questions are refused via `out_of_scope: true`.
 
 ---
 

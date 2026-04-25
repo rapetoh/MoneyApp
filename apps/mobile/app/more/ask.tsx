@@ -1,9 +1,20 @@
-import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native'
+import { useState } from 'react'
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  Pressable,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
+} from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Stack, useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '../../src/hooks/useAuth'
 import { useProfile } from '../../src/hooks/useProfile'
+import { usePlusStatus } from '../../src/hooks/usePlusStatus'
 import { Colors, Typography, Hairline } from '../../src/theme'
 import { t, type Locale } from '@voice-expense/shared'
 
@@ -20,20 +31,54 @@ const SUGGESTIONS: { icon: string; key: string }[] = [
 /**
  * Ask Murmur — entry state.
  *
- * Matches S_AskEntry in docs/money-app/project/mobile-screens-5.jsx. The
- * grounded-reasoner backend is Phase E; this screen is the plus-gated entry
- * UI. Tapping any suggestion, the input bar, or the mic button routes the
- * user to the paywall — Ask is part of Murmur Plus.
+ * Matches S_AskEntry in docs/money-app/project/mobile-screens-5.jsx.
+ *
+ * Submit routing:
+ * - Free user → /more/paywall (Plus gate)
+ * - Plus user → /more/ask-result?q=<question> (grounded reasoner runs there)
+ *
+ * The mic button still routes to the paywall regardless — voice input inside
+ * Ask is its own milestone (would need to thread useVoice through ask-result
+ * + transcript-to-submit). Phase E ships text-only.
  */
 export default function AskMurmurScreen() {
   const { user } = useAuth()
   const { profile } = useProfile(user?.id)
   const locale = (profile?.locale ?? 'en') as Locale
   const router = useRouter()
+  const { isPlus } = usePlusStatus()
+
+  const [draft, setDraft] = useState('')
 
   function gotoPaywall() {
     router.push('/more/paywall')
   }
+
+  function submitQuestion(question: string) {
+    const trimmed = question.trim()
+    if (!trimmed) return
+    if (!isPlus) {
+      gotoPaywall()
+      return
+    }
+    router.push({ pathname: '/more/ask-result', params: { q: trimmed } })
+  }
+
+  function onSubmitDraft() {
+    submitQuestion(draft)
+  }
+
+  function onSuggestionPress(suggestionKey: string) {
+    submitQuestion(t(suggestionKey, locale))
+  }
+
+  function onMicPress() {
+    // Free users hit the paywall; voice-in-Ask isn't built yet so a Plus
+    // user tapping the mic gets a no-op (the design surface is preserved).
+    if (!isPlus) gotoPaywall()
+  }
+
+  const canSend = draft.trim().length > 0
 
   return (
     <>
@@ -75,7 +120,7 @@ export default function AskMurmurScreen() {
             {SUGGESTIONS.map((s, i) => (
               <Pressable
                 key={i}
-                onPress={gotoPaywall}
+                onPress={() => onSuggestionPress(s.key)}
                 style={({ pressed }) => [
                   styles.suggestionRow,
                   pressed && styles.suggestionRowPressed,
@@ -100,30 +145,62 @@ export default function AskMurmurScreen() {
               phones but still scrolls on smaller ones. */}
           <View style={styles.flex} />
 
-          {/* Input bar + privacy footnote */}
-          <View style={styles.inputWrap}>
-            <Pressable onPress={gotoPaywall} style={styles.inputBar}>
-              <Text style={styles.inputPlaceholder} numberOfLines={1}>
-                {t('ask.input_placeholder', locale)}
-              </Text>
-              <Pressable
-                onPress={gotoPaywall}
-                style={({ pressed }) => [styles.micButton, pressed && styles.micButtonPressed]}
-                hitSlop={6}
-                accessibilityLabel={t('ask.mic_label', locale)}
-              >
-                <Ionicons name="mic" size={20} color="#FFFFFF" />
-              </Pressable>
-            </Pressable>
-            <View style={styles.footerRow}>
-              <Ionicons
-                name="lock-closed"
-                size={11}
-                color={Colors.ink4 ?? Colors.textMuted}
-              />
-              <Text style={styles.footerText}>{t('ask.privacy_note', locale)}</Text>
+          {/* Input bar + privacy footnote.
+              KeyboardAvoidingView lifts the bar above the keyboard on iOS so
+              the user can see what they're typing. */}
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            keyboardVerticalOffset={0}
+          >
+            <View style={styles.inputWrap}>
+              <View style={styles.inputBar}>
+                <TextInput
+                  value={draft}
+                  onChangeText={setDraft}
+                  placeholder={t('ask.input_placeholder', locale)}
+                  placeholderTextColor={Colors.ink4 ?? Colors.textMuted}
+                  style={styles.inputField}
+                  returnKeyType="send"
+                  onSubmitEditing={onSubmitDraft}
+                  multiline={false}
+                  maxLength={600}
+                />
+                {canSend ? (
+                  <Pressable
+                    onPress={onSubmitDraft}
+                    style={({ pressed }) => [
+                      styles.micButton,
+                      pressed && styles.micButtonPressed,
+                    ]}
+                    hitSlop={6}
+                    accessibilityLabel={t('ask.send_label', locale)}
+                  >
+                    <Ionicons name="arrow-up" size={20} color="#FFFFFF" />
+                  </Pressable>
+                ) : (
+                  <Pressable
+                    onPress={onMicPress}
+                    style={({ pressed }) => [
+                      styles.micButton,
+                      pressed && styles.micButtonPressed,
+                    ]}
+                    hitSlop={6}
+                    accessibilityLabel={t('ask.mic_label', locale)}
+                  >
+                    <Ionicons name="mic" size={20} color="#FFFFFF" />
+                  </Pressable>
+                )}
+              </View>
+              <View style={styles.footerRow}>
+                <Ionicons
+                  name="lock-closed"
+                  size={11}
+                  color={Colors.ink4 ?? Colors.textMuted}
+                />
+                <Text style={styles.footerText}>{t('ask.privacy_note', locale)}</Text>
+              </View>
             </View>
-          </View>
+          </KeyboardAvoidingView>
         </ScrollView>
       </SafeAreaView>
     </>
@@ -267,6 +344,13 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: Colors.ink4 ?? Colors.textMuted,
     fontFamily: Typography.fontFamily.sans,
+  },
+  inputField: {
+    flex: 1,
+    fontSize: 15,
+    color: Colors.ink ?? Colors.text,
+    fontFamily: Typography.fontFamily.sans,
+    paddingVertical: 0, // RN adds default vertical padding on Android — kill it
   },
   micButton: {
     width: 44,
