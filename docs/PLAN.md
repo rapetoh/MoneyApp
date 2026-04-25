@@ -1113,4 +1113,27 @@ Type widening to support the above:
 
 No new i18n keys.
 
+### Post-rebuild follow-up, round 4 (April 25, 2026)
+
+One user-flagged gap, three commits:
+
+- **Detail screen had no recurring indicator.** Tapping a transaction showed amount, category, payment, source, note — but nothing about whether the transaction was flagged recurring. User had to enter Edit just to find out. Added a sage chip below the category chip on the detail screen that reads `Recurring · monthly · Next due May 24` when a linked rule exists, or just `Recurring` for ghost transactions (flagged but no rule). Uses the same `Ionicons "repeat"` glyph the transaction-list row already shows. New i18n key per locale: `detail.recurring`. (`5178d74`)
+- **Today header clock icon was a clock pointing to the transaction list** — same "icon lies about destination" problem we'd fixed before. Swapped to `list-outline` so the icon matches the destination, consistent with the More drawer's Transactions row. (`1e08301`)
+
+**Still untested live (cumulative across rounds 1–4):**
+- Tab bar visual on rebuild (FAB is a full circle, pill edge visible, blur shows content behind)
+- Insights trend shows dates + caption
+- Insights HISTORY section (heatmap + months list inline below Forecast)
+- Heatmap prev/next chevrons cycle months; tapping a month row drills into `/more/transactions?month=…`
+- Onboarding income creates a real `credit` transaction + recurring rule (visible in Today list and `/recurring`)
+- Continue button disabled state on Income when amount empty
+- Today's list icon (formerly clock) goes to `/more/transactions`
+- Fresh sign-up: no flash of Today before Welcome
+- Mic flow on a real device (simulator can't validate)
+- "We didn't catch anything" hint appears when mic fails silently
+- Tab-sync: FAB always lands on Voice; Type-instead always on Manual; consecutive Type-instead taps both work
+- `/recurring` screen now refreshes on focus; rule appears after onboarding income or transaction edit toggle
+- Transaction edit shows recurring toggle + frequency picker; ghost-transaction self-heal works (toggle on → save creates rule)
+- Detail screen shows the recurring chip with frequency + next-due
+
 *End of Plan*
