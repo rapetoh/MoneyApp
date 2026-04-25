@@ -7,6 +7,7 @@ import { useAuth } from '../../src/hooks/useAuth'
 import { useProfile } from '../../src/hooks/useProfile'
 import { useTransactions } from '../../src/hooks/useTransactions'
 import { useCategories } from '../../src/hooks/useCategories'
+import { useInsightsUnlock } from '../../src/hooks/useInsightsUnlock'
 import { Money } from '../../src/components/Money'
 import { HistoryHeatmap } from '../../src/components/HistoryHeatmap'
 import { Colors, Typography, Hairline } from '../../src/theme'
@@ -149,6 +150,18 @@ export default function InsightsScreen() {
 
   const isCurrentMonth =
     selectedMonth.getFullYear() === now.getFullYear() && selectedMonth.getMonth() === now.getMonth()
+
+  // Day-3 Insights unlock welcome card. Renders on the user's first visit
+  // after they cross the 3-transaction threshold. Dismissal flips the
+  // SecureStore flag so the badge dot on the tab icon also clears.
+  const totalTxnCount = transactions.filter((tx) => !tx.is_deleted).length
+  const { showWelcome, markSeen } = useInsightsUnlock(totalTxnCount)
+  const [welcomeDismissed, setWelcomeDismissed] = useState(false)
+  const showWelcomeCard = showWelcome && !welcomeDismissed
+  function dismissWelcome() {
+    setWelcomeDismissed(true)
+    void markSeen()
+  }
 
   // Last 12 months available for the picker.
   const monthOptions = useMemo(() => {
@@ -307,6 +320,40 @@ export default function InsightsScreen() {
           </View>
           <Text style={styles.heading}>{t('insights.heading', locale)}</Text>
         </View>
+
+        {/* Day-3 unlock welcome card — first reveal only. Dismissal clears
+            both this card and the badge dot on the tab icon. */}
+        {showWelcomeCard && (
+          <View style={styles.welcomeWrap}>
+            <View style={styles.welcomeCard}>
+              <View style={styles.welcomeHeaderRow}>
+                <View style={styles.welcomeBadge}>
+                  <Ionicons name="sparkles" size={14} color={Colors.accent} />
+                </View>
+                <Text style={styles.welcomeEyebrow}>
+                  {t('insights.unlock_eyebrow', locale)}
+                </Text>
+                <Pressable
+                  onPress={dismissWelcome}
+                  hitSlop={12}
+                  style={({ pressed }) => [
+                    styles.welcomeClose,
+                    pressed && styles.welcomeClosePressed,
+                  ]}
+                  accessibilityLabel={t('common.dismiss', locale)}
+                >
+                  <Ionicons name="close" size={14} color={Colors.ink3} />
+                </Pressable>
+              </View>
+              <Text style={styles.welcomeTitle}>
+                {t('insights.unlock_title', locale)}
+              </Text>
+              <Text style={styles.welcomeBody}>
+                {t('insights.unlock_body', locale)}
+              </Text>
+            </View>
+          </View>
+        )}
 
         {/* Hero: spent for the selected window + delta pill + mini trend. */}
         <View style={styles.heroWrap}>
@@ -488,6 +535,66 @@ const styles = StyleSheet.create({
   },
 
   // Hero
+  // Day-3 Insights unlock welcome card. Sage-tinted accent card with a
+  // sparkle badge + close pill + body copy. Renders only on the user's first
+  // eligible visit, vanishes on dismiss.
+  welcomeWrap: { paddingHorizontal: 20, paddingTop: 14 },
+  welcomeCard: {
+    backgroundColor: Colors.accentSoft ?? Colors.primaryLight,
+    borderRadius: 22,
+    paddingHorizontal: 18,
+    paddingTop: 14,
+    paddingBottom: 18,
+    borderWidth: Hairline.width,
+    borderColor: Hairline.color,
+  },
+  welcomeHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  welcomeBadge: {
+    width: 28,
+    height: 28,
+    borderRadius: 9,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  welcomeEyebrow: {
+    flex: 1,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+    color: Colors.accent ?? Colors.primary,
+    fontFamily: Typography.fontFamily.sansBold,
+  },
+  welcomeClose: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  welcomeClosePressed: { opacity: 0.55 },
+  welcomeTitle: {
+    fontFamily: Typography.fontFamily.serif,
+    fontSize: 22,
+    lineHeight: 28,
+    letterSpacing: -0.4,
+    color: Colors.ink ?? Colors.text,
+    fontWeight: '500',
+    marginTop: 12,
+  },
+  welcomeBody: {
+    fontSize: 14,
+    lineHeight: 21,
+    color: Colors.ink2 ?? Colors.textSecondary,
+    fontFamily: Typography.fontFamily.sans,
+    marginTop: 6,
+  },
+
   heroWrap: { paddingHorizontal: 20, paddingTop: 12 },
   heroCard: {
     backgroundColor: Colors.surface2 ?? Colors.card,

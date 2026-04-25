@@ -9,6 +9,8 @@ import { useCategories } from '../../src/hooks/useCategories'
 import { useProfile } from '../../src/hooks/useProfile'
 import { useActiveBudget, usePeriodSpend } from '../../src/hooks/useBudget'
 import { useRecurringRules, computeUpcomingRecurring } from '../../src/hooks/useRecurringRules'
+import { RecurringPatternBanner } from '../../src/components/RecurringPatternBanner'
+import type { RecurringPatternCandidate } from '../../src/services/recurringPatternDetector'
 import { TransactionRow } from '../../src/components/TransactionRow'
 import { Money, MoneyLabel } from '../../src/components/Money'
 import { MiniBars } from '../../src/components/MiniBars'
@@ -125,8 +127,26 @@ export default function TodayScreen() {
   const { profile } = useProfile(user?.id)
   const { budget } = useActiveBudget(user?.id)
   const periodSpend = usePeriodSpend(budget, transactions)
-  const { rules: recurringRules } = useRecurringRules(user?.id)
+  const { rules: recurringRules, createRule } = useRecurringRules(user?.id)
   const router = useRouter()
+
+  // "New pattern detected" accept handler. Creates a recurring rule from the
+  // candidate; the detector will exclude this pattern on subsequent runs
+  // (matched by amount + name against the active rules).
+  async function acceptPattern(c: RecurringPatternCandidate): Promise<boolean> {
+    const rule = await createRule({
+      name: c.merchant || null,
+      amount: c.amount,
+      currency_code: c.currency_code,
+      category_id: c.category_id,
+      direction: c.direction,
+      payment_method: c.payment_method,
+      note: null,
+      frequency: c.frequency,
+      template_txn_id: c.templateTxnId,
+    })
+    return rule != null
+  }
 
   const locale = (profile?.locale ?? 'en') as Locale
   const currency = profile?.currency_code ?? 'USD'
@@ -228,6 +248,15 @@ export default function TodayScreen() {
             </Text>
           </View>
         )}
+
+        {/* "New pattern detected" recurring banner — surfaces a single
+            highest-priority candidate at a time, hidden when none exist. */}
+        <RecurringPatternBanner
+          transactions={transactions}
+          existingRules={recurringRules}
+          locale={locale}
+          onAccept={acceptPattern}
+        />
 
         {/* Spent today + MiniBars */}
         <View style={styles.spentCard}>

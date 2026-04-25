@@ -4,12 +4,22 @@ import { BlurView } from 'expo-blur'
 import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '../../src/hooks/useAuth'
 import { useProfile } from '../../src/hooks/useProfile'
+import { useTransactions } from '../../src/hooks/useTransactions'
+import { useInsightsUnlock } from '../../src/hooks/useInsightsUnlock'
 import { Colors, Typography } from '../../src/theme'
 import { t, type Locale } from '@voice-expense/shared'
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name']
 
-function TabIcon({ focused, name }: { focused: boolean; name: IoniconName }) {
+function TabIcon({
+  focused,
+  name,
+  badge,
+}: {
+  focused: boolean
+  name: IoniconName
+  badge?: boolean
+}) {
   return (
     <View style={[styles.tabIconWrap, focused && styles.tabIconWrapActive]}>
       <Ionicons
@@ -17,6 +27,7 @@ function TabIcon({ focused, name }: { focused: boolean; name: IoniconName }) {
         size={22}
         color={focused ? Colors.white : Colors.textSecondary}
       />
+      {badge && <View style={styles.tabBadge} />}
     </View>
   )
 }
@@ -32,7 +43,14 @@ function RecordIcon() {
 export default function TabsLayout() {
   const { user } = useAuth()
   const { profile } = useProfile(user?.id)
+  const { transactions } = useTransactions(user?.id)
   const locale = (profile?.locale ?? 'en') as Locale
+
+  // Day-3 Insights unlock badge — sage dot on the Insights tab icon once the
+  // user has 3+ transactions logged AND hasn't yet opened Insights to clear
+  // the milestone. Cleared by the Insights screen via `markSeen()`.
+  const txnCount = transactions.filter((t) => !t.is_deleted).length
+  const { badge: insightsBadge } = useInsightsUnlock(txnCount)
 
   return (
     <Tabs
@@ -69,7 +87,11 @@ export default function TabsLayout() {
         options={{
           title: t('tabs.insights', locale),
           tabBarIcon: ({ focused }) => (
-            <TabIcon focused={focused} name={focused ? 'stats-chart' : 'stats-chart-outline'} />
+            <TabIcon
+              focused={focused}
+              name={focused ? 'stats-chart' : 'stats-chart-outline'}
+              badge={insightsBadge}
+            />
           ),
         }}
       />
@@ -158,6 +180,19 @@ const styles = StyleSheet.create({
   },
   tabIconWrapActive: {
     backgroundColor: Colors.primary,
+  },
+  // Day-3 Insights unlock dot — small sage circle in the upper-right of the
+  // Insights tab icon. Vanishes the first time the user opens Insights.
+  tabBadge: {
+    position: 'absolute',
+    top: 2,
+    right: 4,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: Colors.accent ?? Colors.primary,
+    borderWidth: 1.5,
+    borderColor: Colors.white,
   },
   recordButton: {
     width: 56,

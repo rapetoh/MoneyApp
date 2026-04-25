@@ -1299,4 +1299,37 @@ The Murmur brand sheet ([docs/money-app/project/Murmur Brand Sheet.html](./money
 - Android adaptive icon: launcher mask (circle / squircle / rounded square depending on launcher) renders the droplet centered with safe-zone padding.
 - Category tints across the app match the brand sheet swatches (peach / butter / lavender / rose).
 
+### Phase H — Retention mechanics (started April 25, 2026)
+
+Per `breezy-painting-zephyr.md` Phase H + DESIGN.md §"Retention mechanics".
+Three pieces: Day-3 Insights unlock, recurring "new pattern detected" banner,
+Day-2 dunning notification. The first two ship without new native deps; the
+third requires `expo-notifications` + a prebuild and is committed separately.
+
+**Shipped (part 1 — Day-3 unlock + new-pattern banner):**
+
+- [apps/mobile/src/hooks/useInsightsUnlock.ts](../apps/mobile/src/hooks/useInsightsUnlock.ts) — single source of truth for the Day-3 Insights badge milestone. Returns `{ badge, showWelcome, markSeen }` driven by transaction count + a SecureStore flag (`insights_unlocked_seen`) that survives sign-out (it's a device-level UX milestone, not user-account data). Eligibility threshold: 3 non-deleted transactions.
+- Tab bar ([apps/mobile/app/(tabs)/_layout.tsx](../apps/mobile/app/(tabs)/_layout.tsx)) renders a small sage dot in the Insights tab icon's upper-right corner when `badge=true`. Vanishes the moment the user opens Insights for the first time.
+- Insights screen ([apps/mobile/app/(tabs)/insights.tsx](../apps/mobile/app/(tabs)/insights.tsx)) shows a sage-tinted welcome card on the first eligible visit ("Three logs in. Patterns ahead."). Dismiss button calls `markSeen()` so the card and the badge clear together. Captured into local state on mount so the card persists across the dismissal-→-rerender cycle.
+- [apps/mobile/src/services/recurringPatternDetector.ts](../apps/mobile/src/services/recurringPatternDetector.ts) — pure-logic detector. Scans transactions, groups by `(merchant lowercased, amount in cents)`, requires ≥2 occurrences over a ≥21-day spread, skips transactions already flagged `is_recurring` or covered by an existing active rule, skips credits, filters out user-dismissed keys. Frequency inferred from median inter-occurrence gap (≤9d weekly / ≤20 biweekly / ≤45 monthly / ≤95 quarterly / >95 yearly). Returns candidates sorted by `amount × occurrences` so the heaviest pattern surfaces first.
+- [apps/mobile/src/components/RecurringPatternBanner.tsx](../apps/mobile/src/components/RecurringPatternBanner.tsx) — Today-screen banner that surfaces a single highest-priority candidate at a time. Two CTAs: **Set up** (parent runs `createRule`; banner self-dismisses on success), **Not now** (records the candidate's key in SecureStore — capped at 100 entries, FIFO-evicted, key `recurring_pattern_dismissed_v1` — so the same pattern never surfaces again).
+- [apps/mobile/app/(tabs)/index.tsx](../apps/mobile/app/(tabs)/index.tsx) wires the banner above the spent-today card and supplies an `acceptPattern` handler that calls `useRecurringRules.createRule` with the candidate's full payload (including `template_txn_id` so the rule is linked to the transaction that anchored the detection).
+
+**i18n** — 9 new keys per locale (en/fr/es/pt): `common.dismiss`, `home.pattern_eyebrow`, `home.pattern_title` (with `{merchant}/{amount}/{frequency}` placeholders), `home.pattern_body` (with `{count}`), `home.pattern_accept`, `home.pattern_dismiss`, `insights.unlock_eyebrow`, `insights.unlock_title`, `insights.unlock_body`.
+
+**Pending (part 2 — Day-2 dunning):**
+
+- Install `expo-notifications`, run `npx expo prebuild --clean`.
+- Permission prompt at the right moment (probably end of onboarding or after the first transaction — the iOS push permission is one-shot and burning it before the user understands the value is bad UX).
+- Schedule a local notification 24h after each transaction; reschedule on every new transaction. "You usually log by now. Anything to capture?" — design doc tone is gentle, not "don't miss out".
+- Cancel the schedule when the user logs a transaction.
+
+**Phase H untested live (part 1):**
+- Sage badge dot on Insights tab when txnCount ≥ 3 and the welcome hasn't been seen.
+- Welcome card renders on the first Insights open after unlock; dismiss clears the card AND the badge.
+- "New pattern detected" banner appears on Today when 2+ same-merchant-same-amount transactions span ≥21 days.
+- Set up button creates a new rule visible in `/recurring`.
+- Not now hides the pattern permanently (across app restarts).
+- Banner only surfaces one candidate at a time.
+
 *End of Plan*
