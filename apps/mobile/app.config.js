@@ -38,6 +38,16 @@ module.exports = {
       'expo-apple-authentication',
       'expo-web-browser',
       'expo-sqlite',
+      // Day-2 dunning local notification (Phase H). Local-only — no remote
+      // push infrastructure needed. Notifications fire even when the app is
+      // fully closed. Color is the Murmur sage accent.
+      [
+        'expo-notifications',
+        {
+          icon: './assets/adaptive-icon.png',
+          color: '#3F5A3E',
+        },
+      ],
       [
         'expo-speech-recognition',
         {

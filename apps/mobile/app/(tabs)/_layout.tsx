@@ -6,6 +6,7 @@ import { useAuth } from '../../src/hooks/useAuth'
 import { useProfile } from '../../src/hooks/useProfile'
 import { useTransactions } from '../../src/hooks/useTransactions'
 import { useInsightsUnlock } from '../../src/hooks/useInsightsUnlock'
+import { useDayTwoDunning } from '../../src/hooks/useDayTwoDunning'
 import { Colors, Typography } from '../../src/theme'
 import { t, type Locale } from '@voice-expense/shared'
 
@@ -51,6 +52,11 @@ export default function TabsLayout() {
   // the milestone. Cleared by the Insights screen via `markSeen()`.
   const txnCount = transactions.filter((t) => !t.is_deleted).length
   const { badge: insightsBadge } = useInsightsUnlock(txnCount)
+
+  // Day-2 dunning local notification. Watches the transaction list at the
+  // tabs layer so every save / delete / wipe routes through one lifecycle
+  // without each save call site having to remember to schedule.
+  useDayTwoDunning(locale, transactions)
 
   return (
     <Tabs

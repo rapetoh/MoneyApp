@@ -1317,12 +1317,23 @@ third requires `expo-notifications` + a prebuild and is committed separately.
 
 **i18n** — 9 new keys per locale (en/fr/es/pt): `common.dismiss`, `home.pattern_eyebrow`, `home.pattern_title` (with `{merchant}/{amount}/{frequency}` placeholders), `home.pattern_body` (with `{count}`), `home.pattern_accept`, `home.pattern_dismiss`, `insights.unlock_eyebrow`, `insights.unlock_title`, `insights.unlock_body`.
 
-**Pending (part 2 — Day-2 dunning):**
+**Shipped (part 2 — Day-2 dunning):**
 
-- Install `expo-notifications`, run `npx expo prebuild --clean`.
-- Permission prompt at the right moment (probably end of onboarding or after the first transaction — the iOS push permission is one-shot and burning it before the user understands the value is bad UX).
-- Schedule a local notification 24h after each transaction; reschedule on every new transaction. "You usually log by now. Anything to capture?" — design doc tone is gentle, not "don't miss out".
-- Cancel the schedule when the user logs a transaction.
+- `expo-notifications@~0.32.16` installed via `npx expo install`. Plugin added to `app.config.js` with the sage accent + adaptive-icon foreground for the Android notification icon. **Requires `npx expo prebuild --clean` + a fresh dev-client build before notifications fire on-device.**
+- [apps/mobile/src/services/dayTwoDunning.ts](../apps/mobile/src/services/dayTwoDunning.ts) — local-only schedule/cancel/permission API. `scheduleDayTwo()` cancels any prior pending notification, then schedules a TIME_INTERVAL trigger 24h out (intentionally not a calendar trigger — we don't want it pinned to a clock time). `cancelDayTwo()` clears the persisted id. `setUserOptedOut(true)` writes the SecureStore flag + cancels. `ensureDayTwoPermissionAndSchedule()` is the first-transaction prompt path: asks once, schedules on grant, no-ops on deny. `getPermissionStatus()` accepts iOS PROVISIONAL as granted (quiet delivery is fine for a gentle nudge). The notification handler is configured app-wide for foreground display: banner + sound + no badge.
+- [apps/mobile/src/hooks/useDayTwoDunning.ts](../apps/mobile/src/hooks/useDayTwoDunning.ts) — lifecycle hook called once at the tabs layer. Watches transaction count across renders: list grew 0→N for the first time → prompt + schedule; list grew N→N+1 → silent reschedule; list shrank → no-op (delete intent already understood); list went to 0 → cancel pending. The first render seeds the ref without firing so existing-user cold starts don't re-prompt.
+- [apps/mobile/app/(tabs)/_layout.tsx](../apps/mobile/app/(tabs)/_layout.tsx) calls `useDayTwoDunning(locale, transactions)` once so every save / delete / wipe routes through one lifecycle without each save call site having to remember to schedule.
+- [apps/mobile/app/more/settings.tsx](../apps/mobile/app/more/settings.tsx) — new "Reminders" group with a "Daily check-in nudge" toggle. Off → calls `setUserOptedOut(true)` (cancels pending). On → flips the flag back, runs `ensureDayTwoPermissionAndSchedule` so a previously-denied user can re-prompt the OS by toggling.
+
+**i18n** — 4 new keys per locale (en/fr/es/pt): `dunning.day2_title`, `dunning.day2_body`, `settings.reminders`, `settings.dunning_label`.
+
+**Phase H untested live (part 2):**
+- First transaction triggers the iOS / Android notification permission dialog.
+- Subsequent transactions silently reschedule the 24h timer.
+- 24h after the last transaction, a local notification fires with the dunning copy.
+- Settings → Reminders → toggle off cancels the pending notification.
+- Settings toggle on (after permission denied) re-prompts the OS dialog (or routes to system Settings on permanent deny — OS-handled).
+- Wipe-to-empty cancels any pending notification.
 
 **Phase H untested live (part 1):**
 - Sage badge dot on Insights tab when txnCount ≥ 3 and the welcome hasn't been seen.

@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import {
   View,
   Text,
@@ -22,6 +22,11 @@ import { useApiUrl } from '../../src/hooks/useApiUrl'
 import { SetGroup, SetRow } from '../../src/components/SettingsList'
 import { BudgetEditorModal } from '../../src/components/BudgetEditorModal'
 import { IncomeEditorModal } from '../../src/components/IncomeEditorModal'
+import {
+  isUserOptedOut as isDunningOptedOut,
+  setUserOptedOut as setDunningOptedOut,
+  ensureDayTwoPermissionAndSchedule,
+} from '../../src/services/dayTwoDunning'
 import { Colors, Typography, Radius, Hairline } from '../../src/theme'
 import { t, type Locale } from '@voice-expense/shared'
 import type { BudgetPeriod } from '@voice-expense/shared'
@@ -72,6 +77,26 @@ export default function SettingsScreen() {
   const locale = (profile?.locale ?? 'en') as Locale
   const currency = profile?.currency_code ?? 'USD'
   const localeName = LOCALES.find((l) => l.value === locale)?.label ?? 'English'
+
+  // Day-2 dunning toggle. Reads from SecureStore on mount; writes back +
+  // cancels the pending notification on opt-out, re-prompts permission and
+  // reschedules on opt-in. `null` while the SecureStore read is in flight
+  // so the toggle doesn't flicker on cold start.
+  const [dunningEnabled, setDunningEnabled] = useState<boolean | null>(null)
+  useEffect(() => {
+    isDunningOptedOut().then((out) => setDunningEnabled(!out))
+  }, [])
+  const handleDunningToggle = useCallback(async () => {
+    if (dunningEnabled === null) return
+    const next = !dunningEnabled
+    setDunningEnabled(next)
+    if (next) {
+      await setDunningOptedOut(false)
+      await ensureDayTwoPermissionAndSchedule(locale)
+    } else {
+      await setDunningOptedOut(true)
+    }
+  }, [dunningEnabled, locale])
 
   const periodKey =
     BUDGET_PERIODS.find((p) => p.value === (budget?.period ?? 'monthly'))?.key ??
@@ -228,6 +253,17 @@ export default function SettingsScreen() {
               last
             />
           )}
+        </SetGroup>
+
+        {/* Reminders — Day-2 dunning toggle. */}
+        <SetGroup label={t('settings.reminders', locale)}>
+          <SetRow
+            label={t('settings.dunning_label', locale)}
+            toggle
+            value={dunningEnabled === true}
+            onToggle={handleDunningToggle}
+            last
+          />
         </SetGroup>
 
         {/* Privacy */}
