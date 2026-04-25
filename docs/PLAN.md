@@ -1184,4 +1184,87 @@ The Ask entry screen shipped in Phase D (`e5a4e46`) but its submit, suggestions,
 - Network failure shows the error bubble with retry
 - Locale switch (en/fr/es/pt) drives both UI strings AND the model's response language
 
+### Phase F — Frictionless sign-in (April 25, 2026)
+
+**Decision (override of design doc).** The Murmur design spec calls for "lazy
+identity / no sign-in wall" — the app would launch with no auth required and
+prompt for an account only when the user explicitly triggered something that
+needs identity. After pressure-testing both implementation paths (a local
+`device_user_id` with reconciliation on first sign-in, and Supabase
+`signInAnonymously()`), we overrode the design call:
+
+- For a financial app, "no sign-in" means an unrecoverable data-loss path on
+  reinstall / device wipe. Users invest weeks of capture work into expense
+  trackers; the failure mode of "open the app on a new phone, all your data is
+  gone" is severe enough that no design ergonomics justify it. The original
+  plan's `device_user_id` approach has the same flaw — it's still a UUID
+  nobody can sign back into.
+- Every serious app in the category (YNAB, Copilot, MonAi, PocketGuard) keeps
+  a sign-in step. The "no friction" intent is honored not by removing the
+  wall but by making the wall one tap.
+- Apple's App Store guideline 4.8 also requires **Sign In with Apple** to be
+  offered when an iOS app provides any third-party login — even a soft "lazy"
+  wall would still need SIWA in place, so the work isn't avoided.
+
+**What shipped:**
+
+The `(onboarding)/welcome.tsx` screen was retired and its content (sage M
+tile, serif "Speak it. Spend clearly.", three value props for voice / no bank
+linking / desktop) merged into [`apps/mobile/app/(auth)/sign-in.tsx`](../apps/mobile/app/(auth)/sign-in.tsx).
+The combined screen is the user's first interaction:
+
+- **Platform-aware CTA ordering.** On iOS, Sign In with Apple is the hero
+  button (rendered via `expo-apple-authentication`'s native button) with
+  Google as the outlined secondary. On Android, Google is the bold ink hero
+  with Sign In with Apple as the secondary (handed off to a web OAuth flow —
+  styled identically to the iOS version so users see the same option set on
+  both platforms).
+- **"More options" expandable** reveals the email + password form for users
+  who explicitly want a managed account. Sign-up is reachable via a "Don't
+  have an account? Create one" link inside this expandable.
+- **Privacy note** at the foot of the screen: "Your data is yours. We never
+  sell it. Your email is only used to keep you signed in." Localized in
+  en/fr/es/pt.
+
+[`apps/mobile/app/(auth)/sign-up.tsx`](../apps/mobile/app/(auth)/sign-up.tsx)
+got the same visual refresh (sage M tile, serif headline, sage submit pill,
+success-state ✓ tile + dark-ink "Back to Sign In" button) so users dropping
+into it from the sign-in expandable see the same design language.
+
+**Routing changes** in [`apps/mobile/app/_layout.tsx`](../apps/mobile/app/_layout.tsx):
+post-auth users with `profile.onboarding_completed_at == null` now route
+directly to `/(onboarding)/permissions` (was `/(onboarding)/welcome`). The
+onboarding flow shrinks from 3 steps (Welcome → Permissions → Income) to 2
+(Permissions → Income). Step labels updated across all four locales
+(`onboarding.permissions.progress` → "Step 1 of 2", `onboarding.income.progress`
+→ "Step 2 of 2").
+
+**i18n** — 3 new keys per locale (en/fr/es/pt): `auth.more_options`,
+`auth.hide_email_form`, `auth.privacy_note`.
+
+**What did NOT change:**
+- `useAuth.ts` is untouched. No anonymous-auth bootstrap, no
+  `signInAnonymously()` call. Existing sessions still work; new users still
+  go through a real provider.
+- Apple, Google, and email/password flows are all preserved. Only the
+  presentation changed.
+- Sign-out, sign-up, all auth functions in `useAuth` keep their current
+  signatures.
+- The Supabase Auth dashboard does NOT need any toggle changes for this
+  phase. (The earlier proposal to enable anonymous sign-ins was withdrawn
+  with the override.)
+
+**Phase F untested live:**
+- Sign-in screen renders the M tile + serif headline + 3 value props above
+  the auth CTAs.
+- iOS: SIWA button is the hero; Google + email options are below.
+- Android: Google is the hero; SIWA (web flow) is the secondary.
+- "More options" reveals the email form; "Hide email options" collapses it.
+- Sign up via "Create one" still routes to the create-account screen.
+- Sign-out from Settings still works (returns the user to the redesigned
+  sign-in screen on next launch).
+- Onboarding flow is now permissions → income (no welcome step).
+- Step progress text reads "Step 1 of 2" / "Step 2 of 2" across all four
+  locales.
+
 *End of Plan*

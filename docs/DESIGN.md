@@ -346,6 +346,22 @@ The user already has this partially implemented. The design assumes:
   must be another grounded question).
 - No comparison to "other users" — we don't know them.
 
+### Phase F design override — frictionless sign-in (2026-04-25)
+
+The original "lazy identity / no sign-in wall" design intent was overridden
+during implementation. For a financial app, no-wall is a data-loss path on
+reinstall (anonymous data on the server has nothing to sign back in with).
+Both candidate implementations (local `device_user_id` reconciliation, and
+Supabase `signInAnonymously()`) carry the same failure mode under the surface.
+
+The "no friction" intent is now honored by making the wall **one tap**: SIWA
+hero on iOS, Google hero on Android, email/password collapsed under "More
+options". The welcome screen content (M tile + value props) folded into the
+sign-in screen so the user sees the pitch and the one-tap CTA on the same
+surface — not as separate steps.
+
+This decision is documented in PLAN.md "Phase F" with the full rationale.
+
 ### Technical note
 Model call: use a small, fast model (gpt-4o-mini today; the system prompt is
 model-agnostic so we can swap to Haiku-class without code changes). Inject the

@@ -12,7 +12,8 @@ import { t, type Locale } from '@voice-expense/shared'
 type PermStatus = 'idle' | 'granted' | 'denied'
 
 /**
- * Step 2 — Permissions. Matches S_Permissions in mobile-screens-4.jsx.
+ * Step 1 — Permissions. Matches S_Permissions in mobile-screens-4.jsx.
+ * (Was step 2 of 3 before the welcome step folded into the sign-in screen.)
  * Only asks for the microphone here; Shortcuts/Apple-Pay and Face ID from
  * the mockup are optional follow-ups that don't need to block onboarding.
  */

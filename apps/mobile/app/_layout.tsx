@@ -44,7 +44,7 @@ export default function RootLayout() {
   // DataEvents.emitProfile is synchronous at the emitter but each listener's
   // refetch is async and not awaited — so when income.tsx navigates to
   // /(tabs), this layout's `profile` state hasn't updated yet, and without
-  // this guard the routing gate would re-push to /(onboarding)/welcome and
+  // this guard the routing gate would re-push to /(onboarding)/permissions and
   // then only settle once the refetch resolves.
   const prevSegmentRef = useRef<string | undefined>(undefined)
 
@@ -70,7 +70,7 @@ export default function RootLayout() {
       if (!profile) {
         // hold on /(auth) for a moment; the effect re-runs once profile arrives
       } else if (profile.onboarding_completed_at == null) {
-        router.replace('/(onboarding)/welcome')
+        router.replace('/(onboarding)/permissions')
       } else {
         router.replace('/(tabs)')
       }
@@ -85,7 +85,7 @@ export default function RootLayout() {
       // Authed user who hasn't finished onboarding — push into the flow.
       // Skipped when the user has just exited /(onboarding) to /(tabs) so
       // the stale profile doesn't bounce them back.
-      router.replace('/(onboarding)/welcome')
+      router.replace('/(onboarding)/permissions')
     }
 
     prevSegmentRef.current = segmentGroup
