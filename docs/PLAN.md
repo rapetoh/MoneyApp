@@ -1383,4 +1383,26 @@ modal copy, and PDF chrome.
 - Share sheet appears with platform-native destinations (Mail, Files, AirDrop on iOS).
 - File name in destinations is `murmur-YYYY-MM-DD.{ext}`.
 
+### Handoff to next session — Phase I desktop (April 25, 2026)
+
+**This session shipped:** Phase E (Ask Murmur), Phase F (frictionless sign-in), Brand identity (Listening Drop), Phase H (Day-3 Insights unlock + recurring pattern banner + Day-2 dunning notification), Plus dev-mode bypass, Plus data export. Nine commits past `7018612`.
+
+**Open the next session at:**
+1. `git log --oneline 7018612..HEAD` — read the nine commits in chronological order top-down for full context.
+2. `docs/PLAN.md` — read from the bottom up; every section since "Phase E — Ask Murmur grounded reasoner" was added this session.
+3. Memory file `project_murmur_redesign.md` — already updated with the same roll-up.
+
+**Native-dep batch pending:** before notifications and export work on-device, the user needs to run `npx expo prebuild --clean` + a fresh dev-client build in `apps/mobile/`. Four packages in one rebuild: `expo-notifications`, `expo-file-system@19`, `expo-sharing`, `expo-print`.
+
+**Next thread is Phase I — desktop companion.** Per the user's call (2026-04-25), it's its own session. The shape:
+
+- **`apps/web` is API-only today** (Next.js routes serving `/api/ai/parse-expense`, `/api/ai/parse-scan`, `/api/ai/ask-murmur`). No product UI exists. Phase I requires building the actual web UI from the desktop screen mockups in `docs/money-app/project/desktop-screens-{1,2}.jsx`.
+- The web UI ports the mobile experience to a wider canvas: today/insights/budgets/recurring/ask/history live as routes under a left-rail navigation. Plus-gating reapplied (export, Ask, recurring auto-detect mirror the mobile gating). Same Supabase-backed data — no schema changes needed.
+- Once the web UI is real, the desktop companion is **Electron-wrap `apps/web` + bundle with electron-builder + sign + notarize for macOS**. The signing/notarization step is interactive (needs the user's Apple Developer credentials) — flag it explicitly when the time comes.
+- QR pairing flow (mobile shows QR, desktop scans, both authenticate via Supabase, 60s rotation) — bigger architectural piece. Plan B if QR is too much for v1: just sign in directly on desktop with the same Supabase account, skip pairing.
+
+**What's parked, NOT skipped:** IAP / RevenueCat wiring, Phase G native widgets, Phase E loose ends (voice in Ask, action destinations, caching), brand 2.6s breathing pulse on Listening + Splash, pre-launch infra (icon already shipped; still need privacy policy + ToS + store metadata + Sentry).
+
+**Untested-live list** at the bottom of each phase section in this PLAN.md is the user's QA agenda. Pinned — Claude doesn't gate on it.
+
 *End of Plan*
