@@ -10,6 +10,7 @@ import {
   ScrollView,
   Platform,
   AppState,
+  ActivityIndicator,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import * as Linking from 'expo-linking'
@@ -27,6 +28,9 @@ import {
   setUserOptedOut as setDunningOptedOut,
   ensureDayTwoPermissionAndSchedule,
 } from '../../src/services/dayTwoDunning'
+import { exportAndShare, type ExportFormat } from '../../src/services/exportData'
+import { useCategories } from '../../src/hooks/useCategories'
+import { usePlusStatus } from '../../src/hooks/usePlusStatus'
 import { Colors, Typography, Radius, Hairline } from '../../src/theme'
 import { t, type Locale } from '@voice-expense/shared'
 import type { BudgetPeriod } from '@voice-expense/shared'
@@ -61,8 +65,10 @@ export default function SettingsScreen() {
   const { user } = useAuth()
   const { profile, updateProfile } = useProfile(user?.id)
   const { transactions } = useTransactions(user?.id)
+  const { categories } = useCategories(user?.id)
   const { budget, setBudget } = useActiveBudget(user?.id)
   const router = useRouter()
+  const { isPlus } = usePlusStatus()
 
   const [budgetModal, setBudgetModal] = useState(false)
   const [incomeModal, setIncomeModal] = useState(false)
@@ -86,6 +92,36 @@ export default function SettingsScreen() {
   useEffect(() => {
     isDunningOptedOut().then((out) => setDunningEnabled(!out))
   }, [])
+  // Plus-gated data export. Free users tapping the row see the paywall;
+  // Plus users get a three-button format picker (CSV / JSON / PDF) that
+  // hands the file off to the system share sheet.
+  const [exportPickerOpen, setExportPickerOpen] = useState(false)
+  const [exporting, setExporting] = useState<ExportFormat | null>(null)
+  function openExport() {
+    if (!isPlus) {
+      router.push('/more/paywall')
+      return
+    }
+    setExportPickerOpen(true)
+  }
+  async function runExport(format: ExportFormat) {
+    setExporting(format)
+    try {
+      await exportAndShare(format, {
+        transactions,
+        categories,
+        locale,
+        currency,
+      })
+      setExportPickerOpen(false)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      Alert.alert(t('export.failed_title', locale), message)
+    } finally {
+      setExporting(null)
+    }
+  }
+
   const handleDunningToggle = useCallback(async () => {
     if (dunningEnabled === null) return
     const next = !dunningEnabled
@@ -255,6 +291,20 @@ export default function SettingsScreen() {
           )}
         </SetGroup>
 
+        {/* Data — Plus-gated export. */}
+        <SetGroup label={t('settings.data', locale)}>
+          <SetRow
+            label={t('settings.export_label', locale)}
+            detail={
+              isPlus
+                ? t('settings.export_detail_plus', locale)
+                : t('settings.export_detail_free', locale)
+            }
+            onPress={openExport}
+            last
+          />
+        </SetGroup>
+
         {/* Reminders — Day-2 dunning toggle. */}
         <SetGroup label={t('settings.reminders', locale)}>
           <SetRow
@@ -330,6 +380,45 @@ export default function SettingsScreen() {
         }
         onClose={() => setIncomeModal(false)}
       />
+
+      {/* Export format picker (Plus). Three rows: CSV / JSON / PDF.
+          Tapping kicks off `runExport`, which builds the file, writes it
+          to the cache directory, and hands it to the system share sheet.
+          The modal closes on success; failures show an Alert. */}
+      <Modal visible={exportPickerOpen} animationType="slide" presentationStyle="pageSheet">
+        <SafeAreaView style={styles.modal} edges={['top', 'bottom', 'left', 'right']}>
+          <View style={styles.modalHeader}>
+            <Pressable onPress={() => setExportPickerOpen(false)}>
+              <Text style={styles.modalCancel}>{t('common.cancel', locale)}</Text>
+            </Pressable>
+            <Text style={styles.modalTitle}>{t('export.picker_title', locale)}</Text>
+            <View style={{ width: 60 }} />
+          </View>
+          {(['csv', 'json', 'pdf'] as ExportFormat[]).map((fmt, i) => {
+            const isExportingThis = exporting === fmt
+            return (
+              <View key={fmt}>
+                {i > 0 && <View style={styles.rowDivider} />}
+                <Pressable
+                  style={styles.localeRow}
+                  onPress={() => runExport(fmt)}
+                  disabled={exporting !== null}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.localeLabel}>
+                      {t(`export.fmt_${fmt}_label`, locale)}
+                    </Text>
+                    <Text style={styles.modalHint}>
+                      {t(`export.fmt_${fmt}_hint`, locale)}
+                    </Text>
+                  </View>
+                  {isExportingThis && <ActivityIndicator color={Colors.accent} />}
+                </Pressable>
+              </View>
+            )
+          })}
+        </SafeAreaView>
+      </Modal>
 
       {/* Currency modal */}
       <Modal visible={currencyModal} animationType="slide" presentationStyle="pageSheet">

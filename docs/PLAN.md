@@ -1343,4 +1343,44 @@ third requires `expo-notifications` + a prebuild and is committed separately.
 - Not now hides the pattern permanently (across app restarts).
 - Banner only surfaces one candidate at a time.
 
+### Data export — Plus tier (April 25, 2026)
+
+The paywall has promised "data export" since Phase D; it is now real. Plus
+users can export the full transaction history from Settings → Data → Export
+your data, picking from three formats. Each export writes to the cache
+directory and hands the file off to the system share sheet — Mail, Files,
+AirDrop, Messages, etc. Murmur never uploads any of the export.
+
+**Stack:**
+- `expo-file-system@~19.0.21` — new v19 `Paths` + `File` API. Cache
+  directory access (`Paths.cache`), file create/write/move via `File`
+  instances. The legacy `FileSystem.writeAsStringAsync` API is not used
+  anywhere in the export path.
+- `expo-sharing@~14.0.8` — system share sheet for the file URI.
+- `expo-print@~15.0.8` — PDF generation. Renders an HTML template through
+  WebKit on iOS / the Android print framework on Android. No web fonts
+  loaded — relies on system serif (`New York` / `Georgia`) so the PDF
+  matches the Murmur brand sheet's type rules without bundle bloat.
+
+All three of these are native modules and require **`npx expo prebuild
+--clean` + a fresh dev-client build** (same step needed for the Phase H
+expo-notifications add — one rebuild covers both).
+
+**Implementation:**
+- [apps/mobile/src/services/exportData.ts](../apps/mobile/src/services/exportData.ts) — pure formatters + the share-flow IO. `buildCSV`, `buildJSON`, `pdfHTML`, and `exportAndShare(format, input)`. CSV intentionally uses dot-decimal + comma-separator (the universal Excel/Numbers/Sheets contract) regardless of UI locale; JSON is structured with `app: 'Murmur'` + `version: 1` so future Murmur instances can re-import it cleanly. The PDF template uses serif money + sage credit highlighting + the brand-sheet color tokens. Files are named `murmur-YYYY-MM-DD.{csv,json,pdf}`.
+- [apps/mobile/app/more/settings.tsx](../apps/mobile/app/more/settings.tsx) — new "Data" group with an "Export your data" row. Free users tapping the row hit the paywall; Plus users get a three-button format-picker modal (CSV / JSON / PDF) with a tooltip line on each option. Tapping a format runs the export and hands the file to the share sheet; failures surface as an Alert.
+
+**i18n** — 22 new keys per locale (en/fr/es/pt) for the Settings entries,
+modal copy, and PDF chrome.
+
+**Untested live:**
+- Settings → Data → Export shows the row with "CSV · JSON · PDF" detail when Plus, "Murmur Plus" detail when free.
+- Free user tap routes to /more/paywall.
+- Plus user tap opens the format picker.
+- CSV exports cleanly — open in Excel/Numbers and rows align.
+- JSON exports as structured `{ app, version, exported_at, transactions }`.
+- PDF exports with the serif title, totals card, and table.
+- Share sheet appears with platform-native destinations (Mail, Files, AirDrop on iOS).
+- File name in destinations is `murmur-YYYY-MM-DD.{ext}`.
+
 *End of Plan*
