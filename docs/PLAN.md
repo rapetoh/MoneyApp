@@ -1383,26 +1383,1185 @@ modal copy, and PDF chrome.
 - Share sheet appears with platform-native destinations (Mail, Files, AirDrop on iOS).
 - File name in destinations is `murmur-YYYY-MM-DD.{ext}`.
 
-### Handoff to next session — Phase I desktop (April 25, 2026)
+### Phase I part 1 — Desktop web UI (April 25, 2026)
 
-**This session shipped:** Phase E (Ask Murmur), Phase F (frictionless sign-in), Brand identity (Listening Drop), Phase H (Day-3 Insights unlock + recurring pattern banner + Day-2 dunning notification), Plus dev-mode bypass, Plus data export. Nine commits past `7018612`.
+Per `breezy-painting-zephyr.md` Phase I and the desktop mockups at
+[docs/money-app/project/desktop-screens-1.jsx](./money-app/project/desktop-screens-1.jsx)
++ [desktop-screens-2.jsx](./money-app/project/desktop-screens-2.jsx). Up to
+this commit `apps/web` was API-only — three Next.js routes (parse-expense,
+parse-scan, ask-murmur) plus a placeholder dashboard with a dark sidebar
+that didn't match the brand. This commit ports the mobile product surface
+to the wider canvas: same Supabase-backed data, no schema changes, no new
+API routes. The Electron wrap + signing/notarization is the next step;
+this commit just makes the web UI real first.
+
+**Design system:** [apps/web/src/lib/theme.ts](../apps/web/src/lib/theme.ts)
+rewritten to mirror the mobile `colors.ts` and the project tokens
+(`tokens.jsx`). Adds the full ink scale (1–4), category tints
+(food/transit/shopping/bills/coffee/health/work/other), surface and
+hairline tokens, and the type stack — New York / Iowan Old Style for
+display + money, SF Pro Text for sans body, SF Mono for codey numerics.
+Web fonts removed — system fonts only, matching the brand sheet.
+
+**Brand mark** at [apps/web/src/components/MurmurMark.tsx](../apps/web/src/components/MurmurMark.tsx)
+— SVG implementation of The Listening Drop with the same five variants as
+the mobile component (cream / sage / ink / mono-ink / mono-cream). Used in
+the sidebar, Ask Murmur header, and the login screen.
+
+**Reusable primitives** that stay in lock-step with the mobile equivalents:
+
+- [Money](../apps/web/src/components/Money.tsx) — serif money figures with
+  the small-sign superscript treatment.
+- [Card](../apps/web/src/components/Card.tsx) — light + dark variants with
+  the eyebrow / right-slot / body slot the mockups use everywhere.
+- [KPI](../apps/web/src/components/KPI.tsx) — the four-up tile with delta
+  badges. `positiveIsGood={false}` flips the red/green polarity for spend.
+- [Chip](../apps/web/src/components/Chip.tsx) — category pills tinted by
+  category name via [lib/categories.ts](../apps/web/src/lib/categories.ts).
+- [MerchantLogo](../apps/web/src/components/MerchantLogo.tsx) — known-brand
+  table (Netflix / Uber / Trader Joe's / etc.) with category-tinted
+  fallback for unknown merchants.
+- [Icons](../apps/web/src/components/Icons.tsx) — the SF-symbols-ish stroke
+  set (mic / search / plus / chart / sparkle / refresh / send / lock /
+  download / settings / signOut).
+- [Toolbar](../apps/web/src/components/Toolbar.tsx) — page header with
+  ⌘K-styled search affordance.
+- [PaywallGate](../apps/web/src/components/PaywallGate.tsx) — soft-wall
+  with sage CTA for Plus-gated routes. Mirrors the mobile paywall tone.
+
+**Sidebar** at [apps/web/src/components/Sidebar.tsx](../apps/web/src/components/Sidebar.tsx)
+— rewritten from the dark-rail to the cream glassmorphic version that
+matches the mockups. Three groups: Overview (Today, Transactions),
+Analyze (Insights, Budgets, Recurring, Ask Murmur), Data (Export,
+Settings). Plus-gated items show a small "Plus" pill when not active.
+User card at the foot with sign-out hover button.
+
+**Plus gating** at [apps/web/src/lib/plus.ts](../apps/web/src/lib/plus.ts)
+— mirror of the mobile `usePlusStatus` contract: free in
+`process.env.NODE_ENV !== 'production'`, false otherwise. Same dev-mode
+bypass so the developer can exercise the Plus surface without IAP setup.
+Production paths stay walled until RevenueCat lands.
+
+**Routes shipped:**
+
+- **[/dashboard](../apps/web/src/app/dashboard/page.tsx) — Today.** Server
+  component. Greeting (good morning/afternoon/evening + display name +
+  pace vs last month), KPI strip (spent this month, daily average over
+  last 7 days, largest category, projected month-end — each with a delta
+  badge vs the prior period), trend chart (cumulative-by-day this month
+  vs same span last month, sage gradient + dashed prev), category rings
+  (top 5), recent activity (last 5 with merchant logos, voice mic icon,
+  category chip, signed money figure), weekly pulse (dark card with
+  serif insight + Mon→Sun bar pulse derived from last 4 weeks).
+- **[/dashboard/transactions](../apps/web/src/app/dashboard/transactions/page.tsx)
+  — Transactions.** Client component with realtime subscription. Glass
+  search input, segmented direction filter, two date inputs.
+  Day-grouped list (Today / Yesterday / weekday + date) with merchant
+  logo + meta (time · payment method · note) + chip + signed amount.
+- **[/dashboard/insights](../apps/web/src/app/dashboard/insights/page.tsx)
+  — Insights (Plus).** Server component. Forecast chart over 6 months
+  history + 3 forecast months (running average), patterns card (heaviest
+  weekday / largest category share / month-over-month trend), top
+  merchants over 90 days with sage horizontal bars, weekday-by-hour
+  heatmap. Walled behind PaywallGate when not Plus.
+- **[/dashboard/budgets](../apps/web/src/app/dashboard/budgets/page.tsx)
+  — Budgets.** Client component. Stat row (on track / near limit / over
+  counts), overall ring with sage stroke + projected spend message,
+  per-category list with progress bars colored by status. New-budget
+  form supports overall and per-category scopes across the five periods.
+- **[/dashboard/recurring](../apps/web/src/app/dashboard/recurring/page.tsx)
+  — Recurring.** Client component. Auto-detected patterns surfaced via
+  the same heuristic as the mobile banner — copied as
+  [lib/recurringPatternDetector.ts](../apps/web/src/lib/recurringPatternDetector.ts)
+  to keep the two surfaces in lock-step. "Set up" creates a real rule;
+  "Not now" pins a dismissed key in localStorage (capped at 100, FIFO).
+  Active rules list shows next occurrence + pause; paused rules can be
+  resumed.
+- **[/dashboard/ask](../apps/web/src/app/dashboard/ask/page.tsx) —
+  Ask Murmur (Plus).** Client component. Builds the same wire request as
+  the mobile `askMurmurClient` (last 90 days, max 500 transactions, only
+  active recurring rules), POSTs to `/api/ai/ask-murmur` with the user's
+  Supabase access token. Renders the structured response: serif verdict
+  tinted by sentiment, breakdown card, sage note, attribution count.
+  Suggestion chips for first-time users.
+- **[/dashboard/export](../apps/web/src/app/dashboard/export/page.tsx) —
+  Export (Plus).** Client component. Date range + transaction summary,
+  three format cards: CSV (BOM + dot decimal so Excel / Numbers /
+  Sheets all open clean), JSON (`{ app: 'Murmur', version: 1, ... }` so
+  a future Murmur instance can re-import), PDF (opens a new window
+  with brand-styled HTML and triggers `window.print()` so the user can
+  Save as PDF from the system print dialog — no JS PDF library, no
+  bundle bloat).
+
+**Login** at [apps/web/src/app/login/page.tsx](../apps/web/src/app/login/page.tsx)
+— refreshed with the real MurmurMark and the brand tagline ("Speak it.
+Spend clearly." for sign-in, "Start tracking by speaking — no bank
+linking." for sign-up). Google + email/password auth flows untouched.
+
+**What's NOT shipped this commit (tracked for follow-up):**
+
+- **Electron-wrap.** Phase I part 2. Wrap `apps/web` with electron-builder
+  → bundle for macOS (.app + .dmg) → sign with the user's Apple Developer
+  credentials → notarize via `notarytool`. Interactive — needs the user's
+  Team ID + app-specific password. Plan to defer until the web UI gets
+  some live testing first.
+- **QR pairing.** Out of scope for the v1 desktop wrap; the user will
+  sign in directly on desktop with the same Supabase account (the same
+  cookie-based session works in Electron's WebContents). QR pairing
+  remains a future enhancement if a no-credentials desktop hand-off ever
+  becomes a stronger requirement.
+- **Settings polish.** The settings page still uses the legacy theme
+  styling — it works but doesn't carry the new toolbar / serif headlines.
+  Untouched on this pass; a 5-minute follow-up.
+- **Voice composer in Ask.** Mobile's Ask supports voice; desktop sends
+  text-only for now. Web Speech API is a small add when there's appetite.
+
+**Phase I untested live:**
+- Sidebar renders the cream glass with Listening Drop sage tile and three
+  groups (Overview / Analyze / Data); active route gets the sage pill.
+- /dashboard greeting reads "Good morning, {name}." with the pace line
+  reflecting actual data; KPIs show real deltas; trend chart, category
+  rings, recent table all render against the user's transactions.
+- /dashboard/transactions filters work (search + segmented direction +
+  date range); realtime subscription updates on insert from mobile.
+- /dashboard/insights renders the forecast chart, patterns, top
+  merchants, heatmap when in dev (Plus); shows the paywall gate in prod.
+- /dashboard/budgets new-budget form saves overall + per-category
+  budgets; ring updates; remove (×) deactivates and disappears.
+- /dashboard/recurring detects patterns when there are 2+ same-merchant
+  + same-amount transactions ≥21 days apart; "Set up" creates a rule;
+  "Not now" hides it across reloads (localStorage).
+- /dashboard/ask streams the suggestion chips first-run; submitting a
+  question hits /api/ai/ask-murmur and renders the structured response;
+  attribution count matches transactions sent.
+- /dashboard/export saves CSV (opens cleanly in Excel/Numbers), JSON
+  (valid `{ app, version, ... }`), PDF (Save-as-PDF dialog from the new
+  window).
+- /login renders MurmurMark sage tile + serif headline; Google + email
+  flows still complete to /dashboard.
+
+### Phase I part 1 fixes — feedback round 1 (April 25, 2026)
+
+After the first walkthrough of the desktop UI, the user flagged five issues
+plus the navigation-fluidity question. All addressed in this commit:
+
+- **Conversation flow on Ask Murmur.** The result-card pattern made sense on
+  mobile (small screen, one thing at a time) but felt broken on desktop —
+  no follow-ups, no thread to scroll. Upgraded the wire format to support
+  optional conversation history (backward-compatible: mobile sends none and
+  keeps its existing UX). Server caps history at the last 6 turns and
+  clips each field at 1000 chars. The desktop Ask page is now a chat
+  thread: user bubbles right-aligned in sage, assistant turns left with
+  the brand mark + verdict + breakdown card + sage note, composer pinned
+  at the foot. "New conversation" button in the toolbar resets the thread.
+- **Removed the awkward "90 days / never the open web" line** that exposed
+  implementation detail. Replaced with a quieter "Murmur reads only your
+  transactions — ask follow-ups freely." that only shows on the empty
+  state.
+- **Removed the fake \u2318K search bar** from the Today toolbar. It looked
+  interactive, but clicking it went nowhere and the input wasn't even
+  focusable. Toolbar now only renders the title + optional right-slot
+  actions; the real search lives on the Transactions page where it works.
+- **Real merchant logos.** [MerchantLogo](../apps/web/src/components/MerchantLogo.tsx)
+  rewritten to mirror the mobile [MerchantAvatar](../apps/mobile/src/components/MerchantAvatar.tsx):
+  same Google favicon endpoint (`t0.gstatic.com/faviconV2`), same
+  `KNOWN_DOMAINS` table for merchants whose domain can't be derived from
+  the name, same fallback chain (merchant initial \u2192 category initial
+  \u2192 question mark) with deterministic merchant-color hashing, same
+  re-fetch-on-resync behavior. Plumbed `merchant_domain` from the
+  transaction record through the Today + Transactions surfaces so AI's
+  domain hint wins over the heuristic guess.
+- **Recurring indicator on transactions.** New
+  [Icon.recurring](../apps/web/src/components/Icons.tsx) glyph (refresh
+  loop). Surfaces inline next to the merchant name on Today's recent
+  activity and on the Transactions list; the Transactions list also gains
+  a "Recurring" word in the meta line. The mic icon for voice-logged
+  rows stays.
+- **Hardcoded currency + locale fixed.** Money figures used to print `$`
+  with `'en-US'` grouping conventions everywhere, ignoring profile
+  preferences. The [Money](../apps/web/src/components/Money.tsx) component
+  now takes required `currency` + optional `locale` props and uses
+  `Intl.NumberFormat.formatToParts` to render the correct symbol +
+  grouping for any currency (EUR / GBP / XAF / JPY / etc). Plumbed
+  `profile.currency_code` + `profile.locale` through every page that
+  renders money or dates: Dashboard (KPIs, trend, rings, recent, pulse,
+  greeting subtitle), Transactions (rows + day-grouped headers),
+  Insights (forecast chart y-axis + budget label + patterns), Budgets
+  (overall ring center, per-category list, status pills), Recurring
+  (totals, rule rows, candidate cards), Ask Murmur (locale piped to the
+  AI request), Export (summary card + PDF chrome + footer date).
+- **Sidebar navigation now SPA.** Replaced `<a href>` in
+  [Sidebar.tsx](../apps/web/src/components/Sidebar.tsx) with `next/link`
+  + `prefetch`. Same on the "View all" link inside Today's recent
+  activity. Page transitions no longer trigger a full page reload, the
+  sidebar doesn't re-mount on each click, and Next.js's hover-prefetch
+  warms the new route's data block before the user clicks.
+
+**Navigation fluidity audit (the user's question).** With the changes
+above, here's the honest read:
+
+- **Smooth:** /transactions, /budgets, /recurring, /ask, /export are all
+  client components. Clicks route instantly via `next/link`; data is
+  fetched in `useEffect` and the page hydrates with a brief skeleton-less
+  shell, then fills in. Realtime subscriptions on /transactions pick up
+  inserts from the mobile app live.
+- **Mostly smooth:** /dashboard and /dashboard/insights are server
+  components. Hover-prefetch warms them; on click they swap in. There's
+  a perceptible pause on a cold connection because the page can't paint
+  until Supabase returns. No `loading.tsx` skeleton today \u2014 if the
+  user reports friction during walkthrough, that's the next add.
+- **Active-state transition** is a 120ms background animation on the
+  sidebar items so the sage pill doesn't snap.
+- **Open follow-up:** /dashboard does a fresh transaction fetch on every
+  visit. Once the dataset is large enough that this feels slow, the
+  pragmatic fix is a server-side cache layer (Next 15 React Cache or a
+  short-lived `unstable_cache`) keyed on user id. Not needed yet.
+
+**Phase I part 1 fixes untested live:**
+- Sidebar nav clicks no longer reload the page (header / scroll / state
+  preserved across routes).
+- Today + Transactions show real merchant favicons for known brands
+  (Netflix, Uber, Trader Joe's, etc.) and tinted-letter fallbacks
+  otherwise.
+- Recurring indicator (refresh-loop glyph) appears on transactions where
+  `is_recurring=true`.
+- Money figures render in the user's currency + locale (set Currency
+  to EUR in Settings \u2192 see `\u20ac1.234,56` instead of `$1,234.56`).
+- Ask Murmur shows the chat thread on follow-up questions; "and what
+  about coffee?" or "show me only weekends" works because prior turns
+  go into the prompt; "New conversation" resets.
+- /dashboard toolbar no longer shows a search bar.
+
+### Phase I part 1 fixes — feedback round 2 (April 25, 2026)
+
+Second walkthrough surfaced four more items. All addressed in this commit
+plus a documented stance on Murmur's product scope.
+
+**Scope rule \u2014 codified.** The previous prompt said "no generic financial
+advice," which over-applied: Murmur was refusing legitimate planning
+questions ("what plan would you give me to manage my money better?") with
+"I can only provide insights based on your own data." That refusal kills
+the product. The new boundary, written into [packages/ai/src/askMurmur.ts](../packages/ai/src/askMurmur.ts):
+
+- **In scope** \u2014 anything reasoned from the user's own data + universal
+  personal-finance principles: read/summarize, patterns + leaks +
+  forecasts, budget caps, savings rates, goal pacing, affordability
+  checks, subscription audits, **personalized step-by-step plans**.
+  Recommending category trade-offs ("redirect $80/mo from Coffee gets
+  you to your goal one month sooner") is in scope when grounded in the
+  user's transactions.
+- **Out of scope** (refuse politely, set `out_of_scope=true`):
+  - Specific securities, instruments, third-party products (stocks,
+    crypto, ETFs, banks, credit cards, insurance providers). This is
+    investment advice \u2014 Murmur is not an RIA.
+  - Tax filing or preparation as a CPA would (cite a CPA).
+  - Legal advice on debts, contracts, bankruptcy (cite a lawyer).
+  - Medical or insurance coverage decisions.
+  - External knowledge the data block doesn't contain (current prices,
+    today's news, restaurant reviews, weather).
+- **Borderline rule, explicit:** "what plan would you give me?" is
+  in-scope and must be answered with the user's actual numbers, not
+  refused.
+
+The mental model in plain English: Murmur is your **bookkeeper that
+thinks with you**, not your **broker / CPA / lawyer**. The first is
+unregulated and high-leverage; the rest are regulated for good reason.
+
+**Charts in answers.** Extended `AskMurmurResponse` with optional
+`chart: { type, title, data, caption? }` and four chart kinds:
+- `bar` \u2014 short ordered series (last 7 days, weekday averages).
+- `line` \u2014 trend over time (monthly spend, cumulative within month).
+- `donut` \u2014 share-of-total when 3\u20136 buckets (top categories).
+- `horizontal_bar` \u2014 ranked lists where labels are long (top merchants).
+
+The model returns structured points only \u2014 never raw SVG \u2014 so
+hallucinated visualizations are impossible by construction. The validator
+in `validateAskMurmurResponse` drops the chart when the type is unknown,
+the data has fewer than 2 points, all donut shares are zero, or values
+aren't finite/non-negative. Charts attached to refusals are stripped.
+
+Renderer at [apps/web/src/components/AskChart.tsx](../apps/web/src/components/AskChart.tsx)
+\u2014 pure SVG (no recharts), category-aware colors via the same tint
+mapping as the rest of the desktop UI. Currency + locale piped in so
+EUR/JPY/etc render correctly.
+
+**Thinking-state animation.** The static dot was static no more.
+- The brand mark itself now breathes during the model's pending state \u2014
+  2.6s ease-in-out loop on the inner dot + the two pulse arcs, matching
+  the brand sheet \u00a706 specification. Driven by an `animating` prop on
+  [MurmurMark](../apps/web/src/components/MurmurMark.tsx) and CSS
+  keyframes in `globals.css`. Lands a parked brand follow-up ("brand
+  2.6s breathing pulse") on the surface where it makes the most sense.
+- A new [ThinkingDots](../apps/web/src/components/ThinkingDots.tsx) wave
+  (three dots, 1.2s stagger) sits next to "Thinking through your data\u2026"
+  for clarity \u2014 screen-readers + visual users both see motion.
+
+**Voice input on web Ask.** Added a mic button in the composer when the
+browser supports the Web Speech API (Chrome / Edge / Safari 15+). Firefox
+doesn't ship it; the button is feature-detected so Firefox users get the
+text-only composer they had before. Locale-aware (`en-US` / `fr-FR` /
+`es-ES` / `pt-BR`), interim transcripts populate the input live, click
+again or stop speaking to finalize. Implementation note: SpeechRecognition
+isn't in the standard TS lib, so a minimal interface is declared inline
+to keep `tsc --noEmit` clean without pulling lib.dom changes.
+
+**Deferred:** the mobile Ask loading state still uses `ActivityIndicator`.
+Replacing it with a matching three-dot wave is in the next mobile pass.
+
+**Phase I part 1 fixes round 2 untested live:**
+- Asking "give me a plan to manage my money better" returns a plan
+  grounded in the user's transactions instead of "I can only provide
+  insights based on your own data."
+- Asking "should I buy NVDA?" still gets refused with a polite
+  out-of-scope verdict.
+- Murmur replies sometimes include a chart (donut for category
+  questions, line for trend questions, horizontal bars for
+  top-merchants).
+- The brand mark breathes during the thinking state; three-dot wave
+  appears next to "Thinking through your data\u2026".
+- Mic button in the Ask composer pops a permission prompt on first
+  click; speaking populates the input live; clicking again stops.
+- Firefox: no mic button (feature-detect); composer is text-only.
+
+### Hot-fixes after the alignment pass (May 4, 2026)
+
+Two real bugs the user caught + one missing feature:
+
+1. **JSX text was showing literal `\u00b7` / `\u2014` / `\u2192` etc.** \u2014
+   I'd written escape sequences directly in JSX text content (e.g.
+   `<div>Mind map \u00b7 May</div>`), which is HTML-text and doesn't
+   interpret JS escapes. Replaced every JSX-text escape with the actual
+   Unicode character across all touched files (lenses, dashboard pages,
+   ask/recurring/settings, sidebar, KPI). Strings inside JS literals
+   (`'Fran\u00e7ais'`) are untouched \u2014 those still parse.
+2. **Stray `\u2190` in the "Back to summary" button** in the Ask Murmur
+   deep view. Replaced with `\u2190` literal arrow.
+3. **Overview had no month picker** \u2014 the page anchored to "current
+   month" with no way to navigate. Added [MonthPicker.tsx](../apps/web/src/components/MonthPicker.tsx)
+   with prev / next chevrons + a 24-month dropdown, wired into the
+   Overview toolbar via `<Toolbar right={\u2026} />`. The page reads
+   `?month=YYYY-MM` and anchors all six lenses to the chosen month so
+   switching months updates the whole Overview at once.
+
+Verified: `npx turbo typecheck --force` clean, `next build` clean
+(17/17 routes).
+
+### Desktop UI \u2014 Full Cloud Design alignment (May 4, 2026)
+
+The user shared the latest Cloud Design bundle (which had expanded
+significantly past the April 19 export). New canonical design files now
+live under `docs/money-app/project/desktop-screens-{1,2,3,4,mindmap}.jsx`.
+Implemented every desktop surface against the new design in a single PR;
+no preserved functionality regressed.
+
+**Sidebar IA migration** ([Sidebar.tsx](../apps/web/src/components/Sidebar.tsx))
+\u2014 reorganized into Overview / Plan / Analyze / Settings groups; "Today"
+renamed to "Overview"; added Recurring count badge (live count from
+`recurring_rules` query in [layout.tsx](../apps/web/src/app/dashboard/layout.tsx))
+and `AI` pill on Ask Murmur. `Reports & forecast` is the new label for
+the Insights page. Export preserved (in Data group).
+
+**Overview rebuild** ([dashboard/page.tsx](../apps/web/src/app/dashboard/page.tsx))
+\u2014 replaces "Today" with the multi-lens Overview. Server component
+loads transactions + categories + recurring once, computes the KPI summary
+line ("$X in \u00b7 $Y out \u00b7 $Z saved \u00b7 N transactions"), and routes
+the body through `?lens=` URL state to one of six visualizations:
+- [MindMap.tsx](../apps/web/src/components/lenses/MindMap.tsx) \u2014 default;
+  XMind-style radial with Income / Expenses / Saved / Plan branches and
+  top-merchant leaves under each expense category.
+- [Flow.tsx](../apps/web/src/components/lenses/Flow.tsx) \u2014 Sankey-style
+  ribbons from income sources to expense categories to top merchants.
+- [Calendar.tsx](../apps/web/src/components/lenses/Calendar.tsx) \u2014 daily
+  heatmap grid + day-detail panel (click any cell to see that day's
+  transactions).
+- [Treemap.tsx](../apps/web/src/components/lenses/Treemap.tsx) \u2014
+  categories sized by spend; Saved & invested gets its own bottom band.
+- [Cashflow.tsx](../apps/web/src/components/lenses/Cashflow.tsx) \u2014
+  daily balance line + per-day income/expense bars + summary panel.
+- [Matrix.tsx](../apps/web/src/components/lenses/Matrix.tsx) \u2014
+  6-month \u00d7 category grid with sparklines + month-over-month delta.
+- [LensPills.tsx](../apps/web/src/components/LensPills.tsx) is the
+  switcher (URL-state-driven so deep links land on the right lens).
+
+**Transactions** ([transactions/page.tsx](../apps/web/src/app/dashboard/transactions/page.tsx))
+\u2014 table redesigned with DATE / MERCHANT / CATEGORY / SOURCE / ACCOUNT /
+AMOUNT columns; filter tabs at the top (`All / Voice / Apple Pay /
+Recurring / Income`) keyed off the transaction's `source` and
+`is_recurring` fields. Source chips: Voice (sage), Apple Pay (slate),
+Recurring (brown), Typed (neutral). Header shows `184 transactions \u00b7
+156 voice \u00b7 18 Apple Pay \u00b7 \u2026` breakdown. Toolbar has dark
+"Export CSV" button linking to /dashboard/export. Merchant logos
+(Google Favicon V2 + colored-letter fallback) and recurring icon next to
+merchant names preserved per user's explicit ask.
+
+**Ask Murmur** ([ask/page.tsx](../apps/web/src/app/dashboard/ask/page.tsx))
+\u2014 dual-mode rebuild per user's "Dive deeper" idea:
+- Default `summary` mode: a single rich answer card with `MURMUR'S READ`
+  eyebrow, serif verdict, optional projection chart, "How I got there"
+  math breakdown, optional sage note, attribution line. Right rail has
+  `SOURCES USED` (live counts of voice expenses, recent income deposits,
+  active recurring rules) and dark `TRY ALSO` panel with 4 suggestions.
+- Click "Dive deeper" \u2192 morphs to thread mode: full conversation thread
+  with smaller follow-up bubbles + Back to summary toggle.
+- New top-level questions (search bar / Try Also click) replace the
+  current answer card; conversation history dropdown + Supabase
+  persistence + voice mic in composer + "New conversation" button all
+  preserved.
+
+**Recurring** ([recurring/page.tsx](../apps/web/src/app/dashboard/recurring/page.tsx))
+\u2014 rebuilt as the design's Recurring & subscriptions table layout:
+- Header stats: Monthly / Annual cost / To review (review count =
+  detected candidates from the Plus pattern detector).
+- New patterns banner (dashed accent border) preserved \u2014 `Set up` /
+  `Not now` actions still wire to `acceptCandidate` / `dismissCandidate`.
+- Table: SERVICE / AMOUNT / FREQUENCY / NEXT CHARGE / STATUS with
+  ACTIVE pills (click to pause) or PAUSED rows (click to resume).
+- Right rail: `NEXT 30 DAYS \u00b7 CHARGES` calendar (cells highlighted
+  on charge days, count badges, "$X in charges hit before [date]"
+  footer) + dark `POTENTIAL SAVINGS` card sized off the detected
+  candidates.
+
+**Settings** ([settings/page.tsx](../apps/web/src/app/dashboard/settings/page.tsx))
+\u2014 rebuilt with sticky left sub-nav (Account / Sync & devices / Plan &
+billing / Privacy / Voice & language / Export / About) + stacked
+section cards on the right that scroll to match. Account section
+preserves the existing display name / currency / locale form. Sign-out
+sits below the sub-nav. Plan & billing reflects Plus status from the
+existing `lib/plus.ts` helper.
+
+**Verification:** `npx turbo typecheck --force` \u2014 5/5 clean across all
+workspaces. `next build` of `apps/web` \u2014 17/17 routes generate
+cleanly. PRESERVE list intact: merchant logos, recurring icon on rows,
+Plus gating, Ask Murmur conversation thread + history dropdown +
+Supabase persistence, voice mic in Ask composer, data export
+(CSV/JSON/PDF), realtime sync, 4-locale i18n, Plus dev-mode bypass.
+
+#### Earlier today \u2014 Cloud Design alignment pass (partial bundle, May 3, 2026)
+
+Tightened apps/web against `docs/money-app/project/desktop-screens-{1,2}.jsx`. No
+mobile changes. No regressions to shipped functionality (Plus gating, Ask Murmur
+thread + history, recurring auto-detect, data export, settings, Web Speech mic,
+realtime, paywall gate \u2014 all preserved).
+
+**What changed:**
+- **Sidebar** ([apps/web/src/components/Sidebar.tsx](../apps/web/src/components/Sidebar.tsx)): width 240\u2192230, padding 12\u21928, restructured to a floating glass panel (absolute `inset:8`, `borderRadius:18`, opacity `0.8`, with inner highlight + outer drop shadow) instead of a flat-edge column. Brand row now uses 24px MurmurMark + sans wordmark `14px / weight 700 / letter-spacing -0.3` (was serif 18). Group label padding `8px 18px 4px` and nav item margin `1px 10px` to match design indentation. User card meta updated to "Synced just now".
+- **Toolbar** ([apps/web/src/components/Toolbar.tsx](../apps/web/src/components/Toolbar.tsx)): padding 24\u219220. Now includes a frosted "Search expenses \u2318K" field on the right of every dashboard screen. \u2318K / Ctrl-K focuses it from anywhere; submitting routes to `/dashboard/transactions?q=\u2026`. The transactions page reads `?q=` and prefills its own filter.
+- **KPI** ([apps/web/src/components/KPI.tsx](../apps/web/src/components/KPI.tsx)): new `forecast` prop \u2014 paints `Icon.sparkle(ink4, 14)` in the top-right corner so projection KPIs read as projections at a glance.
+- **Period selector** ([apps/web/src/components/PeriodPills.tsx](../apps/web/src/components/PeriodPills.tsx)): new component. Pill group `Week / Month / Quarter / Year` rendered in the Dashboard toolbar's right slot. Wired to `?period=` URL state. Dashboard ([apps/web/src/app/dashboard/page.tsx](../apps/web/src/app/dashboard/page.tsx)) now computes `periodWindow(period, now)` + `previousPeriodWindow(period, now)` and feeds every KPI / TrendChart / CatRings off the chosen window. KPI labels adapt: "Spent this {week|month|quarter|year}" / "Projected {period}-end". Forecast badge fires on the projection KPI.
+- **Dashboard charts**: TrendChart inner padding 24\u219220 to match design's tighter chart bleed. CatRings inner total amount swapped from `font.serif` to `font.display` (per `T.fDisp` in the design \u2014 design's intentional sans choice for constrained ring spaces).
+- **Insights toolbar** ([apps/web/src/app/dashboard/insights/page.tsx](../apps/web/src/app/dashboard/insights/page.tsx)): added a downward-chevron glyph on the "Last 6 months" filter chip + the dark "\u2728 Generate report" button (triggers `window.print()` so users get a printable view of the current Insights state). New `Icon.chev` glyph in [Icons.tsx](../apps/web/src/components/Icons.tsx).
+- **Budgets ring** ([apps/web/src/app/dashboard/budgets/page.tsx](../apps/web/src/app/dashboard/budgets/page.tsx)): inner amount in the overall ring swapped from `font.serif` to `font.display` (matches design's `T.fDisp` for the same reason as CatRings).
+
+**Already aligned with design (verified, no change needed):** Insights serif title + 3-col bottom layout + sparkle-tile pattern rows + weekday\u00d7hour heatmap + top-merchants bar list; Budgets serif title + summary stats row (On track / Near limit / Over) + per-category status pills + ring stroke params.
+
+**Verification:** `npx turbo typecheck` clean across all 5 workspaces; `next build` of `apps/web` succeeds (17 routes generated, dashboard at 2.99 kB First Load JS).
+
+#### Ask Murmur \u2014 structural date-filter fix + verification harness (May 3, 2026, evening)
+
+After the morning fix shipped, the date-window bug recurred in user
+testing: the model was still writing its own date math despite
+\`windows.\*\` and \`helpers.inWindow\` being available. The new prompt
+guidance was a recommendation, not a guarantee. This evening's change
+removes the model's ability to fail on standard windows entirely.
+
+**What's structural now:**
+- The sandbox pre-computes ten windowed subsets and exposes them as
+  named variables: \`transactions_today\`, \`transactions_this_month\`,
+  \`transactions_last_month\`, \`transactions_this_year\`,
+  \`transactions_last_year\`, \`transactions_last_7_days\`,
+  \`transactions_last_30_days\`, \`transactions_last_90_days\`,
+  \`transactions_last_6_months\`, \`transactions_last_12_months\`.
+- The \`run_query\` tool description and the system prompt both list
+  the subsets and tell the model: for any standard window, use the
+  pre-computed variable; do NOT write a date filter. Only specific
+  calendar dates and ad-hoc windows still go through manual filtering.
+- The data-mismatch detector retries with an explicit hint pointing
+  the model at the exact subset variable when its verdict contradicts
+  the deterministic data overview ("you said no expenses this year,
+  but \`transactions_this_year\` has 6 entries; use that subset").
+- \`parseLocaleNumber\` no longer parses \`"$20,000"\` as \`20\` \u2014
+  the heuristic now distinguishes thousands-comma (3-digit tail / multi-comma)
+  from European decimal-comma (1\u20132 digit tail).
+
+**Verification:**
+- New script at [packages/ai/src/__tests__/askMurmur.verify.ts](../packages/ai/src/__tests__/askMurmur.verify.ts).
+- Drives the actual sandbox via \`resolveToolCall('run_query', \u2026)\`
+  on a synthetic dataset shaped like the real user's data (April 2026
+  expenses + older entries + 2024 entry for a year-range edge case).
+- Asserts every windowed subset has the correct count, the data
+  overview has the right shape and flags, the per-category breakdown
+  for "this year" produces the expected categories with the expected
+  totals, the sandbox security boundary holds (no \`require\`, no
+  \`process\`, no \`new Function\`), the locale-number parser handles
+  \`"$20,000"\` and \`"20,5"\` correctly, the prompt builder injects the
+  data overview, and the summarize-fallback snapshot ranks Housing
+  first.
+- Run with \`npm --prefix packages/ai run verify\`. 27 / 27 checks
+  pass; \`npx turbo typecheck\` clean across all 5 workspaces;
+  production build of \`apps/web\` succeeds.
+
+#### Earlier today \u2014 first attempt at the date-window fix
+
+**Status:** the date-window patch and the mobile bundler crash that
+were the open items at the previous handoff are both shipped in this
+session. The architecture (two tools, one attempt, narrow retry,
+summarize fallback) is unchanged.
+
+**What was actually broken (root causes):**
+1. **Mobile build was crashing** with "Unable to resolve module
+   `node:vm` from packages/ai/src/askMurmurTools.ts." Cause: the
+   `@voice-expense/ai` barrel re-exported `askMurmurTools.ts`, which
+   imports `node:vm`. Mobile only consumes `parseExpense` /
+   `parseScan`, but Metro pulls the whole barrel into the dependency
+   graph and chokes on Node-only `vm`.
+2. **Date-window bug** \u2014 the model wrote
+   `new Date(today).getMonth()` while `today` is a string, the query
+   returned an empty array, the model reported "no expenses this
+   month" even when an April expense existed.
+3. **Summarize-fallback was silently broken** \u2014 it called
+   `resolveToolCall('top_categories', \u2026)` and `'monthly_series'`,
+   but only `run_query` and `compare` are registered. Both calls
+   returned `{ ok: false, error: 'Unknown tool' }` and the snapshot
+   handed to the model was full of `null`s.
+
+**Patches that landed:**
+- **Split the `@voice-expense/ai` package into two entry points:**
+  - `@voice-expense/ai` (client-safe, `index.ts`) \u2014 only
+    `parseExpense`, `parseScan`, `parseExpenseLocally`,
+    `buildAdvisorContext`, `getPrompt`, `getScanPrompt`. No `node:vm`.
+    Mobile imports stay unchanged and now bundle clean.
+  - `@voice-expense/ai/server` (`server.ts`) \u2014 the Ask Murmur
+    sandbox + tool resolver + prompt builder + validators. Used only
+    by the Next.js API routes.
+  - `package.json` declares both subpaths via the `exports` field;
+    `apps/web/tsconfig.json` declares the `@voice-expense/ai/server`
+    path mapping so TS resolves it.
+- **Date windows in the sandbox.** `buildSandboxContext` now exposes
+  `windows.{today, thisMonth, lastMonth, thisYear, lastYear,
+  last7Days, last30Days, last90Days, last6Months, last12Months}` as
+  `{ start: Date, end: Date }` pairs computed from `ctx.today`. New
+  `helpers.inWindow(items, window)` filters by `transacted_at`. The
+  `run_query` tool description and the `buildAskMurmurPrompt` body
+  both direct the model at `windows.*` and explicitly forbid
+  `new Date(today)` math.
+- **Summarize-fallback uses inline aggregation.** New
+  `buildSummarySnapshot(ctx)` in `askMurmurTools.ts` computes top
+  categories + monthly series for the last 6 months directly from
+  `ctx.transactions`. The `runSummarizeFallback` route function
+  imports it from `@voice-expense/ai/server` and never touches
+  `resolveToolCall`. Removes the silent-null path.
+
+**Files touched:**
+- `packages/ai/src/index.ts` \u2014 trimmed to client-safe re-exports.
+- `packages/ai/src/server.ts` \u2014 new server entry.
+- `packages/ai/package.json` \u2014 multi-entry `exports` field.
+- `packages/ai/src/askMurmurTools.ts` \u2014 `buildWindows`,
+  `inWindow`, sandbox `windows` + `helpers.inWindow`, updated tool
+  description, new `buildSummarySnapshot` export.
+- `packages/ai/src/askMurmur.ts` \u2014 prompt now points at
+  `windows.*` and forbids manual date math from `today`.
+- `apps/web/src/app/api/ai/ask-murmur/route.ts` \u2014 imports moved
+  to `@voice-expense/ai/server`; fallback uses
+  `buildSummarySnapshot`.
+- `apps/web/tsconfig.json` \u2014 added
+  `@voice-expense/ai/server` path mapping.
+
+**Verification done:** `npx turbo typecheck` clean across all 5
+workspaces (shared, ai, supabase, web, mobile). Mobile no longer
+imports anything that pulls `node:vm` into its bundle.
+
+**Test the user should run on next launch:**
+1. Restart the Expo dev server (Metro cache may still hold the old
+   `node:vm` resolution failure). The "Unable to resolve module
+   node:vm" error should be gone.
+2. On desktop `/ask`, ask: "Was it this month?" and "no expenses in
+   April?" with a known April transaction in the data. The model
+   should call `helpers.inWindow(transactions, windows.thisMonth)`
+   and answer correctly on the first try.
+3. Force the summarize-fallback path by asking a deliberately broad
+   question on a tiny dataset and watch the verdict cite real
+   per-category totals (not blank / null).
+
+#### Prior handoff context (kept for reference)
+
+The previous chat's context filled. Ask Murmur went through several
+architectural rebuilds in that chat (catalog tools \u2192
+code-execution \u2192 trust-the-LLM rebuild). The latest version ships
+and works for most questions, but a specific class of bug surfaced in
+user testing right at the end and was fixed in this session:
+
+**The bug, observed:** Asked "was it this month?" / "no expenses in
+April?" \u2014 Murmur replied "You have not incurred any expenses
+this month" multiple times, despite a $20,000 expense on April 11
+that the same conversation had already established. When asked
+differently ("when did it occur?", "so it did not occur this month?"),
+the model gave the correct answer (April 11, this month). So the
+contradiction is *within the same conversation*.
+
+**Diagnosed cause:** the model is writing date-window filters in
+JavaScript inside the run_query sandbox, and it gets the date math
+wrong silently. Likely culprits: \`new Date(today).getMonth()\` while
+\`today\` is a string, or a timezone-offset start-of-month, or
+year-month string compare that excludes the right month. The query
+doesn't throw; it returns an empty array; the model believes its own
+buggy query.
+
+**The proposed fix (NOT SHIPPED).** Stop letting the model do date
+math at all. Pre-compute every common window in the sandbox and expose
+them as ready-to-use Date pairs:
+
+\`\`\`ts
+windows = {
+  today:        { start, end },
+  thisMonth:    { start, end },
+  lastMonth:    { start, end },
+  thisYear:     { start, end },
+  lastYear:     { start, end },
+  last7Days:    { start, end },
+  last30Days:   { start, end },
+  last90Days:   { start, end },
+  last6Months:  { start, end },
+}
+\`\`\`
+
+Plus a \`helpers.inWindow(items, window)\` that filters transactions
+to those whose \`transacted_at\` falls inside an inclusive
+{ start, end } window. The prompt then directs the model to use these
+instead of writing date code.
+
+The exact patch was drafted but rejected mid-way through the previous
+chat (user wanted explanation first, not immediate code). The patch
+lives in [packages/ai/src/askMurmurTools.ts](../packages/ai/src/askMurmurTools.ts):
+modify \`buildSandboxContext\` to add the windows object + the
+\`inWindow\` helper, then update \`buildAskMurmurPrompt\` in
+[packages/ai/src/askMurmur.ts](../packages/ai/src/askMurmur.ts) to
+recommend \`windows.*\` over manual date math.
+
+**State of the architecture (last shipped, working for most cases):**
+- Two tools: \`run_query\` (sandboxed JS) + \`compare\` (structural
+  direction guarantee).
+- Single LLM attempt by default with the tool catalog.
+- One narrow retry only on: comparison-direction violation OR empty
+  verdict. Polite language is no longer flagged \u2014 the previous
+  forbidden-phrase regex was producing more failures than it
+  prevented.
+- Summarize-fallback LLM call (no tools, simple "summarize this
+  user's spending in 2-3 sentences with one chart") when even the
+  retry returns empty.
+- Conversation persistence on Supabase
+  (\`ask_conversations\` + \`ask_messages\` tables, RLS-pinned).
+  Migration at [supabase/migrations/007_ask_conversations.sql](../supabase/migrations/007_ask_conversations.sql)
+  must be applied to the user's Supabase project for this to persist
+  in production.
+- Charts auto-generate per the prompt's REQUIRED / OPTIONAL /
+  FORBIDDEN rules. Mic on web Ask via Web Speech API.
+
+**Critical user-feedback principles** (codified in memory; new chat
+must respect these):
+- **No workarounds.** When patches start stacking, stop and rebuild
+  the architecture. See \`feedback_no_workarounds.md\`.
+- **Fix completely.** When fixing a bug, audit the whole class, not
+  the specific instance. See \`feedback_fix_completely.md\`.
+- **Owner responsibility.** Claude is the engineer of record on this
+  project; perfection is the bar. See \`feedback_owner_responsibility.md\`.
+- **Drive forward.** Don't stall on "what should I do?" \u2014 make
+  calls and ship. See \`feedback_drive_forward.md\`.
+- **Always update docs as part of every change.** See
+  \`feedback_update_docs.md\`.
+- **Ask before acting on opinion questions.** When user asks "what do
+  you think?" reply with opinion first, don't build. See
+  \`feedback_ask_before_acting.md\`.
+
+**What the next chat should do, in order:** done in this session \u2014
+fix shipped per the "Patches that landed" list at the top of this
+section.
+
+**Untested live (cumulative across the whole Ask Murmur work):**
+- Date-window questions ("this month", "in April", "last 7 days")
+  \u2014 windows fix shipped, awaiting user verification.
+- Refusal-class questions (stocks, tax, legal, medical) \u2014 the
+  prompt scope rules cover these.
+- F&D vs Housing comparison-direction \u2014 still structurally
+  protected by the compare tool + validator.
+- Conversation persistence (history dropdown, switch between past
+  conversations, soft-delete) \u2014 verified working but only after
+  the user applies the 007 migration.
+- Any question involving non-trivial date filters \u2014 likely to
+  need the windows fix.
+
+**What's still parked from earlier sessions:** mobile native-deps
+prebuild (\`npx expo prebuild --clean\` for expo-notifications,
+expo-sharing, expo-print). Phase I part 2 Electron wrap. IAP / RC
+wiring. Phase G native widgets. Pre-launch infra (privacy policy,
+ToS, store metadata, Sentry).
+
+### Ask Murmur \u2014 trust-the-LLM rebuild (April 26, 2026, second pass)
+
+**Why this section exists.** The previous architecture (forbidden-phrase
+regex + 3-attempt loop + regex intent classifier with hardcoded
+windows) had many bespoke moving parts. Each part was its own future
+failure surface, and aggressive validation was *generating* false
+failures from normal LLM output. A polite verdict containing the word
+"sorry" or "having trouble" (in normal contexts) was being flagged as a
+give-up, retried, exhausted, and shipped as a brittle hardcoded
+fallback that frequently picked the wrong window.
+
+The fix is fewer moving parts.
+
+**Architecture, simplified:**
+
+- **Trust the LLM by default.** Single attempt to gpt-4o with the tool
+  catalog. If the response has a non-trivial verdict (>= 8 chars) and
+  the comparison-direction validator passes, we ship it. No regex on
+  polite language, no aggressive give-up detection.
+- **One narrow retry.** Comparison-direction violation OR empty verdict
+  triggers exactly one retry, with the specific issue surfaced. Both
+  conditions are structural \u2014 the response either contradicts a
+  compare call or said nothing at all.
+- **Summarize-fallback LLM call** as the safety net when even the retry
+  produced an empty verdict. A simple no-tools call: "summarize the
+  user's spending in 2-3 sentences with a chart" given a precomputed
+  snapshot of top categories + monthly series. Trust whatever the
+  model returns; ship it. This replaces the regex intent classifier
+  and per-intent deterministic builders entirely.
+
+**Files removed:** \`packages/ai/src/askMurmurFallback.ts\` (the regex
+classifier with its 7 hardcoded intents and per-intent builders).
+
+**Why this isn't another workaround.** The failure surface shrank to
+two structural signals (comparison flip, empty verdict). Everything
+else \u2014 including questions the regex classifier couldn't classify,
+windows that didn't match, polite phrasings the forbidden-list
+mis-flagged \u2014 is no longer a failure case at all. The user's
+response is whatever the LLM says, and the LLM is good at producing
+grounded answers from a sandbox-computed dataset. When it isn't, the
+summarize fallback gives a guaranteed real-data answer to any question
+shape.
+
+**Cost trade.** Same as before: 1 LLM call typical, 2 on the rare
+retry, 3 in the worst case (primary + retry + summarize fallback). The
+summarize fallback is no-tools, so it's fast and cheap.
+
+**Untested live:**
+- "I want a full and explanatory report of my spending this year" \u2192
+  real grounded answer; if the LLM struggles, the summarize fallback
+  ships a grounded summary with a chart.
+- "Can I have a chart?" \u2192 the LLM produces a chart per the prompt
+  rules; if it doesn't, the summarize fallback ships one.
+- "What's my biggest category?" \u2192 real category + amount.
+- F&D vs Housing comparison \u2192 still structurally guarded by the
+  compare-direction validator.
+- A question the previous regex classifier couldn't classify \u2192
+  the LLM answers it; no regex pattern needed.
+
+### Ask Murmur \u2014 zero-failure-language guarantee (April 26, 2026)
+
+**The bar.** Per [DESIGN.md \u00a78](./money-app/project/DESIGN.md) and the
+user's hard line: every in-scope question must return a real answer
+about the user's own money, every refusal-class question gets a polite
+refusal, and no failure language exists anywhere in the user's
+experience. Not "couldn't compute," not "data processing error," not
+"having trouble," not "try rephrasing." Ever.
+
+**Architecture grounded in research.** Cross-checked against Shinhan's
+production AI PB paper, OpenAI's code-interpreter guidance, and the
+production reliability patterns from getmaxim / buildmvpfast: the right
+shape is (1) sandboxed code execution as the deterministic computer,
+(2) classified failure handling \u2014 transient vs tool error vs
+semantic give-up each get different recovery paths, (3) safe-template
+fallbacks that match the SHAPE of the user's question rather than
+returning generic snapshots or error messages.
+
+**What ships:**
+
+- **Forbidden-language list in the prompt** at [packages/ai/src/askMurmur.ts](../packages/ai/src/askMurmur.ts).
+  The system prompt now enumerates every variant the model is forbidden
+  from writing in a verdict ("data processing error", "couldn't
+  determine/compute/find/verify/access", "technical issue", "internal
+  error", "something went wrong", "try rephrasing", "having trouble",
+  "apologize", etc.). The model is also explicitly instructed: tool
+  errors are not a valid reason to set out_of_scope=true \u2014 read
+  the error, fix the code, call run_query again.
+- **Server-side classified retry loop** in [route.ts](../apps/web/src/app/api/ai/ask-murmur/route.ts).
+  Each question gets up to 3 LLM attempts. After every attempt we
+  classify failure into three buckets and feed retry instructions for
+  whichever fired:
+  - Tool errors: surface the specific sandbox error to the model with
+    "fix the code and call run_query again."
+  - Semantic give-up: regex-detect any forbidden phrase or empty
+    verdict, retry with "your previous verdict gave up; failure
+    language is never acceptable."
+  - Comparison-direction violation: same as before, retry with the
+    contradicting subjects surfaced.
+  - Soft issues (numbers we couldn't trace) are logged but never
+    trigger retry or block the response.
+- **Intent classifier + intent-aware fallback** at [askMurmurFallback.ts](../packages/ai/src/askMurmurFallback.ts).
+  Regex over the question text classifies it as
+  `category | merchant | affordability | trend | forecast | recurring | refusal | other`.
+  Each class has a dedicated deterministic builder that produces a
+  real, grounded response from the user's actual transactions:
+  - category \u2192 top categories with donut chart + breakdown
+  - merchant \u2192 top merchants with horizontal bars
+  - affordability \u2192 last-30-day net cash flow with income/spend rows
+  - trend \u2192 6-month series with line chart
+  - forecast \u2192 90-day average net per month
+  - recurring \u2192 active recurring with monthly + yearly totals
+  - refusal \u2192 polite locale-aware refusal per DESIGN.md \u00a78
+  - other \u2192 the broadest useful answer (top categories)
+  This fallback fires only when all 3 LLM attempts fail validation \u2014
+  rare in practice with gpt-4o + tool calling, but the safety net
+  guarantees a real answer to the SHAPE of the question even in the
+  worst case.
+- **Client-side auto-retry on transport failure** in [ask/page.tsx](../apps/web/src/app/dashboard/ask/page.tsx).
+  A network or 5xx error triggers one silent retry after 1.2s. If that
+  also fails, the pending bubble is replaced with a neutral
+  "Tap to try again" pill rather than an error message.
+- **Stripped failure language from every user-facing code path.** The
+  validateAskMurmurResponse fallback for empty verdicts no longer
+  returns "I couldn't compute..." \u2014 it returns an empty string,
+  which the give-up detector correctly classifies as a failed attempt
+  and retries. The iteration-cap fallback inside runConversation now
+  returns an empty verdict for the same reason. The client's transport
+  error handler no longer shows "Something went wrong" \u2014 it shows
+  a tappable retry pill. Validated by grep across the codebase.
+
+**Deletes / replaces:**
+- `validateAskMurmurResponse` no longer substitutes "I couldn't compute
+  an answer from your transactions just now."
+- `runConversation` no longer returns "I'm having trouble with that
+  one right now. Give me another try in a moment." on iteration-cap.
+- The client's `error` thread role still exists for legacy paths but
+  the transport-error path now uses the new `retry` role with a
+  neutral pill instead.
+
+**Result the user observes:**
+- "What's my biggest category?" \u2192 real category + amount, every
+  time. If the LLM somehow flubs three times, the deterministic
+  category builder still ships a real answer with a donut chart.
+- "Can I afford a $400 trip next month?" \u2192 real cash-flow answer
+  with income/spend/net rows.
+- "Should I buy NVDA?" \u2192 polite refusal per DESIGN.md hard rules.
+- Network glitch \u2192 silent retry; if still failing, "Tap to try
+  again" pill, not an error message.
+- Genuinely arbitrary question the LLM struggles with \u2192 falls
+  through to a 90-day spending overview phrased as a real answer.
+
+**The bar in one line:** no user-facing string in the codebase contains
+any of the forbidden failure phrases. Every code path either returns a
+real grounded answer, retries until it can, or in the absolute worst
+case ships an intent-shaped deterministic answer \u2014 never an error.
+
+### Ask Murmur \u2014 code-execution rebuild (April 25, 2026, second pass)
+
+**Why this section exists.** The previous numerical-correctness pass (the
+"Facts block + regex validator" architecture below) was a workaround. Two
+problems with it:
+
+1. The Facts blob was a fixed catalog of pre-computed aggregates. If the
+   user asked something the catalog didn't anticipate ("biggest single
+   transaction", "spend on Tuesdays before noon", "average gap between
+   Uber rides"), the model had to fudge or refuse.
+2. The regex validator threw false positives constantly \u2014 user's own
+   numbers ("can I afford a $400 trip?"), window descriptors ("90 days"),
+   and legitimate derived values that the Facts blob didn't precompute.
+   Each false positive tempted a "loosen the tolerance" patch. Whack-a-mole.
+
+The proper architecture is **code execution**, the same pattern OpenAI's
+ChatGPT Advanced Data Analysis and Anthropic's Code Execution Tool use.
+
+**What ships:**
+
+- [packages/ai/src/askMurmurTools.ts](../packages/ai/src/askMurmurTools.ts)
+  \u2014 two tools, OpenAI function-calling format:
+  - **`run_query({ code, description })`** \u2014 sandboxed Node `vm`
+    execution of arbitrary JavaScript over the user's data. Inside the
+    sandbox: `transactions`, `recurring_rules`, `today`, `currency`,
+    `locale`, `monthly_income`, plus core JS (Math/Date/Array/Object/Map/
+    Set/JSON) and a small `helpers` object (round/windowDays/sumBy/groupBy).
+    Hardened context: no `process`, no `require`, no `Function`
+    constructor, no I/O, no network. 1-second timeout, 50KB result-size
+    cap, 4000-char code limit. The sandbox is the deterministic computer.
+  - **`compare({ a: { label, value }, b: { label, value } })`** \u2014
+    structural comparison-direction guarantee. The model passes two
+    values it computed via `run_query`; this tool returns
+    `a_greater | b_greater | equal`. The validator checks every
+    "more A than B" phrase in the verdict against a `compare` result.
+    This is the structural fix for the original F&D-vs-Housing flip.
+- [packages/ai/src/askMurmur.ts](../packages/ai/src/askMurmur.ts)
+  \u2014 prompt rewritten with two CRITICAL sections at the top:
+  - "Every total/average/count/percentage in your final response MUST
+    come from a `run_query` result. Never compute or estimate any
+    number yourself."
+  - "Whenever the verdict makes a numerical comparison, call `compare`
+    with both values and use the tool's direction. Quote both numbers
+    inline."
+  Plus the existing scope rules (no securities/regulated advice, planning
+  from user data is in scope) and chart guidance (when required vs.
+  forbidden).
+- New validator
+  `validateAskMurmurResponseAgainstCalls(response, calls, question)`
+  in [askMurmur.ts](../packages/ai/src/askMurmur.ts):
+  - Builds a trusted-numbers set: every number that appeared in any
+    successful tool-call result (recursive walk of result JSON) plus
+    every number parsed out of the user's own question.
+  - Every monetary figure / percentage / count cited in the response
+    must trace back to that set, with small rounding tolerance ($0.50
+    or 1% relative; 1 percentage point).
+  - Comparison-direction check: each "more/less/higher/lower than"
+    phrase in the verdict is matched against a `compare` tool result
+    whose subjects (labels) appear in the surrounding text. If the
+    verdict's direction disagrees, the response is rejected.
+- [apps/web/src/app/api/ai/ask-murmur/route.ts](../apps/web/src/app/api/ai/ask-murmur/route.ts)
+  rewritten as a multi-turn tool loop. The model can call tools up to
+  12 times before emitting the final structured JSON. On validation
+  failure the prompt is rebuilt with the specific issues appended; the
+  model gets one retry. If retry also fails, we ship a graceful
+  verification fallback rather than a wrong number.
+- Default model still **`gpt-4o`** (full, not -mini). gpt-4o handles
+  function-calling natively and is materially better at multi-step
+  reasoning. Override via `AI_ASK_MODEL` env var.
+
+**Files removed:** `packages/ai/src/askMurmurFacts.ts` (the workaround).
+
+**Why this isn't another workaround.** The set of answerable questions
+equals the set of questions JavaScript can compute against the user's
+data \u2014 i.e. every question that is deterministically answerable
+from transactions + recurring rules. There is no question that fits the
+data shape but can't be expressed as JS. No "expand the catalog," no
+"loosen tolerances," no "add another bucket to Facts." If the user asks
+"what's the biggest gap between two consecutive Uber rides?", the model
+writes a JS query and gets the deterministic answer.
+
+**Mobile + web both benefit.** The fix is server-side behind
+`/api/ai/ask-murmur`. Once mobile rebuilds its dev client (the parked
+prebuild), it gets the same correctness guarantees automatically.
+
+**Cost trade.** Each request now potentially makes 2\u20136 model
+round-trips (each tool call is a round-trip in the model's reasoning).
+With gpt-4o + function-calling this is a few seconds end-to-end.
+Acceptable for a money app where wrong numbers are unacceptable.
+
+**Untested live:**
+- Asking "F&D vs Housing" returns a verdict that quotes both numbers
+  and gets the direction right.
+- Asking "what's my biggest single transaction in 90 days?" \u2014 a
+  question the old Facts blob didn't precompute \u2014 returns the
+  correct answer because the model wrote a `run_query` for it.
+- Asking "should I buy NVDA?" still gets refused with an out-of-scope
+  verdict.
+- Across two consecutive identical questions, cited totals don't drift
+  (temperature 0 + deterministic sandbox).
+- Questions that genuinely can't be answered from the data return the
+  graceful "couldn't compute every figure" fallback rather than a
+  hallucinated number.
+
+### Ask Murmur \u2014 numerical-correctness rebuild (April 25, 2026)
+
+**Problem.** The Ask reasoner was making arithmetic and comparison errors:
+the verdict said "you spend more on Food & Dining than Housing" while the
+breakdown showed F&D=$160 and Housing=$20,000. Same data, different totals
+across consecutive turns ($210 vs $160). Lower temperature, prompt nudges,
+or a stronger model all reduce these errors probabilistically \u2014 they
+do not eliminate them. For a money app, that's not acceptable.
+
+**Fix \u2014 architectural, not cosmetic.** Take arithmetic out of the
+model's hands.
+
+1. **Deterministic Facts block** at [packages/ai/src/askMurmurFacts.ts](../packages/ai/src/askMurmurFacts.ts).
+   Pure TypeScript over the request's transactions + recurring rules;
+   computes every aggregate the model could need:
+   - Total spent / income for this-month / last-month / 30d / 90d.
+   - Net cash flow 90d, daily averages 30d/90d.
+   - `by_category_90d` with totals per window (90d, 30d, this month, last
+     month) + transaction counts.
+   - `by_merchant_90d` (top 25 by 90d spend) with same window totals.
+   - `by_month_last_6` with locale-friendly labels + iso anchor.
+   - `by_weekday_90d` with average per occurrence (so a Friday with three
+     coffees still counts as one Friday).
+   - Recurring monthly + yearly totals, recurring active count.
+   - Transaction counts at every window.
+
+2. **Prompt rewritten** at [packages/ai/src/askMurmur.ts](../packages/ai/src/askMurmur.ts).
+   Two new "CRITICAL" sections at the top:
+   - **Numerical accuracy:** every figure in the response must come from
+     Facts. Do not perform arithmetic. Do not estimate. The transactions
+     block is for context lookups (specific dates, raw notes) only.
+   - **Comparison correctness:** any numerical comparison in the verdict
+     must include both numbers inline ("$160 vs $20,000"), and the
+     direction (more/less) must agree with those numbers.
+
+3. **Post-hoc validator** at the bottom of the same file:
+   `validateAskMurmurResponseAgainstFacts(response, facts)`. Extracts
+   every currency figure, percentage, and count from the verdict + note +
+   breakdown rows + chart data, and checks each against a `TrustedSet`
+   built from Facts (currency tolerance: $1 absolute or 2% relative;
+   percentage tolerance: 1.5pp; counts: exact). Also flags:
+   - Comparison-direction failures (`more|less|higher|lower|above|below|
+     exceeds` near two numbers \u2014 if the asserted direction
+     contradicts the numbers, the response is rejected).
+   - Sum-mismatch failures (when a "Total" row sits alongside line items
+     and the items don't sum to the total within rounding).
+
+4. **Retry-with-feedback loop** in [apps/web/src/app/api/ai/ask-murmur/route.ts](../apps/web/src/app/api/ai/ask-murmur/route.ts).
+   On validation failure the prompt is rebuilt with the specific issues
+   appended ("your previous answer failed verification: \u2026"); the
+   model gets one second chance. If the retry also fails, the API
+   returns a graceful fallback verdict ("I can answer this from your
+   data, but I couldn't verify every figure on this run\u2026") \u2014
+   never a wrong number.
+
+5. **Temperature 0** on the model call. There's no creativity required
+   when narrating a deterministic facts block; determinism cuts drift on
+   retries.
+
+The model is now a narrator over a fact set, not a calculator. Wrong
+numbers are caught structurally before they reach the user; if the model
+can't get it right twice, we say so honestly.
+
+**Mobile + web both benefit.** All the work lives behind the
+`/api/ai/ask-murmur` endpoint that both surfaces hit. No client changes
+required \u2014 same wire format, same response shape.
+
+**Cost note.** Each request now potentially costs 2 model calls instead of
+1 (the retry on validation failure). In practice the first attempt
+succeeds for most well-formed questions; the retry fires when the model
+flubs arithmetic. Worth the cost vs. shipping bad numbers. If/when we
+upgrade the model env var (`AI_ASK_MODEL`) to `gpt-4o`, the retry rate
+drops further.
+
+**Untested live:**
+- Asking the F&D vs Housing comparison from the original screenshot
+  returns a verdict that quotes both numbers and gets the direction
+  right.
+- A pathological question ("how much did I spend on phantom-category?")
+  either returns out-of-scope or surfaces the verification fallback
+  rather than a hallucinated number.
+- Across two consecutive identical questions, the cited totals don't
+  drift.
+
+### Ask Murmur \u2014 conversation persistence (April 25, 2026)
+
+**Problem.** Ask Murmur threads were component state only \u2014 navigating
+to /transactions and back, refreshing, or closing the tab erased every
+question and answer. The user can't build context, can't review past
+plans, can't pick up where they left off. Same architecture failure as
+asking an LLM to do arithmetic: a workaround (localStorage) would have
+"solved" persistence on one browser, not actually solved it.
+
+**Fix \u2014 Supabase tables + RLS, same pattern as the rest of the app.**
+
+**Schema** at [supabase/migrations/007_ask_conversations.sql](../supabase/migrations/007_ask_conversations.sql):
+
+- \`ask_conversations\` (one row per thread): id, user_id, title (auto-derived
+  from the first question), started_at, last_message_at, is_deleted (soft
+  delete so an undo is always possible), timestamps. Indexed by
+  (user_id, last_message_at DESC) where not deleted.
+- \`ask_messages\` (one row per turn): id, conversation_id, user_id,
+  role ('user' | 'assistant'), question (user only), response JSONB
+  (assistant only \u2014 stores the full validated AskMurmurResponse so
+  re-rendering is a single deserialize). Constraint forces the right
+  payload per role.
+- RLS pinned to \`auth.uid() = user_id\` on both tables. Browser client
+  reads/writes directly; no service role required.
+- \`bump_ask_conversation_last_message\` trigger updates the parent
+  conversation's last_message_at on every message insert so the history
+  list stays sorted without a join.
+
+**Data layer** at [apps/web/src/lib/askMurmurStorage.ts](../apps/web/src/lib/askMurmurStorage.ts)
+\u2014 \`loadMostRecentConversation\`, \`loadConversation\`, \`listConversations\`,
+\`createConversation\`, \`appendUserMessage\`, \`appendAssistantMessage\`,
+\`softDeleteConversation\`. Pure thin wrappers over the Supabase client;
+no business logic.
+
+**Ask page integration** at [apps/web/src/app/dashboard/ask/page.tsx](../apps/web/src/app/dashboard/ask/page.tsx):
+
+- On mount, load the user's most recent active conversation + messages
+  and hydrate the thread. Walking back into /ask shows the prior
+  conversation ready for follow-ups.
+- The conversations list (top 30 most recent) loads in parallel for the
+  toolbar history dropdown.
+- On send: if no active conversation, create a row first (auto-titled
+  from the first question, truncated to 60 chars). Persist the user
+  message, await the model, persist the assistant response. The pending
+  state's transient id is replaced by the database id so React keys are
+  stable across reloads.
+- "New conversation" button clears the in-memory thread and unsets the
+  active conversation \u2014 a fresh row only gets created on the next
+  send (so the table doesn't fill up with empty conversations from idle
+  clicks).
+- History dropdown in the toolbar shows past conversations with title +
+  last-message timestamp. Clicking switches the thread. The trash button
+  per row soft-deletes; if the user just deleted the conversation they
+  were viewing, the page falls back to the next most-recent or empty.
+
+**Mobile** still uses the one-shot result-card UX and doesn't persist
+yet. When mobile wants persistence we'll move \`askMurmurStorage.ts\`
+into \`packages/shared\` and call from the mobile client too \u2014 same
+tables, same RLS.
+
+**Migration to apply (one-time, on the user's Supabase project):**
+The migration file is in the repo at \`supabase/migrations/007_ask_conversations.sql\`.
+Apply via the Supabase CLI (\`supabase db push\`) or paste into the SQL
+editor on the dashboard. Until the migration runs the Ask page will fail
+silently on every persist attempt (errors are console.error'd, the
+in-memory thread still works).
+
+**Untested live:**
+- Open /ask, ask a question, navigate to /transactions, come back \u2014
+  the conversation is still there.
+- Refresh the page \u2014 the conversation is still there.
+- Click "New conversation" \u2014 thread clears, history dropdown still
+  shows the previous one.
+- Open the History dropdown, switch between conversations.
+- Delete a conversation \u2014 it disappears from the list; if it was the
+  active one, the page falls back to the next most-recent.
+- Sign out \u2014 the conversations stay in Supabase (RLS hides them from
+  any other user); on sign-in they're back.
+
+### Handoff to next session — Phase I part 2 (April 25, 2026)
+
+**This session shipped:** Phase E (Ask Murmur), Phase F (frictionless
+sign-in), Brand identity (Listening Drop), Phase H (Day-3 Insights unlock
++ recurring pattern banner + Day-2 dunning notification), Plus dev-mode
+bypass, Plus data export, **Phase I part 1 — desktop web UI**.
 
 **Open the next session at:**
-1. `git log --oneline 7018612..HEAD` — read the nine commits in chronological order top-down for full context.
-2. `docs/PLAN.md` — read from the bottom up; every section since "Phase E — Ask Murmur grounded reasoner" was added this session.
-3. Memory file `project_murmur_redesign.md` — already updated with the same roll-up.
+1. `git log --oneline 7018612..HEAD` — read the commits in order for full
+   context.
+2. `docs/PLAN.md` — read from the bottom up; the Phase I part 1 section
+   above is the most recent context.
+3. Memory file `project_murmur_redesign.md`.
 
-**Native-dep batch pending:** before notifications and export work on-device, the user needs to run `npx expo prebuild --clean` + a fresh dev-client build in `apps/mobile/`. Four packages in one rebuild: `expo-notifications`, `expo-file-system@19`, `expo-sharing`, `expo-print`.
+**Native-dep batch still pending (mobile):** `npx expo prebuild --clean`
++ a fresh dev-client build in `apps/mobile/` for `expo-notifications`,
+`expo-file-system@19`, `expo-sharing`, `expo-print`.
 
-**Next thread is Phase I — desktop companion.** Per the user's call (2026-04-25), it's its own session. The shape:
+**Next thread is Phase I part 2 — Electron wrap + signing.** The web UI
+is real now; the desktop companion is the same web UI shrink-wrapped:
 
-- **`apps/web` is API-only today** (Next.js routes serving `/api/ai/parse-expense`, `/api/ai/parse-scan`, `/api/ai/ask-murmur`). No product UI exists. Phase I requires building the actual web UI from the desktop screen mockups in `docs/money-app/project/desktop-screens-{1,2}.jsx`.
-- The web UI ports the mobile experience to a wider canvas: today/insights/budgets/recurring/ask/history live as routes under a left-rail navigation. Plus-gating reapplied (export, Ask, recurring auto-detect mirror the mobile gating). Same Supabase-backed data — no schema changes needed.
-- Once the web UI is real, the desktop companion is **Electron-wrap `apps/web` + bundle with electron-builder + sign + notarize for macOS**. The signing/notarization step is interactive (needs the user's Apple Developer credentials) — flag it explicitly when the time comes.
-- QR pairing flow (mobile shows QR, desktop scans, both authenticate via Supabase, 60s rotation) — bigger architectural piece. Plan B if QR is too much for v1: just sign in directly on desktop with the same Supabase account, skip pairing.
+- **Electron skeleton.** New `apps/desktop/` workspace. `electron` +
+  `electron-builder` deps. Main process loads a single BrowserWindow
+  pointing at the production-built `apps/web` (either packaged static
+  output or hosted at the same domain). Preload script for any native
+  bridge (file save dialogs, OS-native menu).
+- **macOS first.** Universal binary (arm64 + x64). Sign with the user's
+  Developer ID Application certificate. Notarize via `notarytool`
+  (interactive — needs Team ID + app-specific password). DMG output.
+- **Windows + Linux** can follow once macOS is shipping.
+- **Open question — host vs bundle.** Cleaner but slower path is hosting
+  the Next.js app and pointing Electron at the URL (so Murmur web stays
+  one app). Faster ship is `next export` static output bundled inside
+  the .app. Recommend bundle-first for v1 since it doesn't require new
+  hosting infra; revisit if the bundle gets stale faster than the user
+  can update.
 
-**What's parked, NOT skipped:** IAP / RevenueCat wiring, Phase G native widgets, Phase E loose ends (voice in Ask, action destinations, caching), brand 2.6s breathing pulse on Listening + Splash, pre-launch infra (icon already shipped; still need privacy policy + ToS + store metadata + Sentry).
+**What's parked, NOT skipped:** IAP / RevenueCat wiring, Phase G native
+widgets, Phase E loose ends (voice in Ask, action destinations, caching),
+brand 2.6s breathing pulse on Listening + Splash, pre-launch infra (icon
+already shipped; still need privacy policy + ToS + store metadata +
+Sentry), settings polish, voice composer in desktop Ask.
 
-**Untested-live list** at the bottom of each phase section in this PLAN.md is the user's QA agenda. Pinned — Claude doesn't gate on it.
+**Untested-live list** at the bottom of each phase section in this
+PLAN.md is the user's QA agenda. Pinned — Claude doesn't gate on it.
 
 *End of Plan*

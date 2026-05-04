@@ -1,15 +1,7 @@
 // Desktop screens for Murmur companion app
 // All screens inside MacWindow (1280x800 typical)
 
-function MurmurSidebar({ active='dashboard' }) {
-  const items = [
-    { k:'dashboard', label:'Dashboard', icon: Icon.chart },
-    { k:'tx', label:'Transactions', icon: Icon.list },
-    { k:'analytics', label:'Analytics', icon: Icon.chart },
-    { k:'budgets', label:'Budgets', icon: Icon.sparkle },
-    { k:'forecast', label:'Forecast', icon: Icon.sparkle },
-    { k:'export', label:'Export', icon: Icon.list },
-  ];
+function MurmurSidebar({ active='overview' }) {
   return (
     <div style={{
       width: 230, height: '100%', padding: 8, flexShrink: 0,
@@ -37,19 +29,19 @@ function MurmurSidebar({ active='dashboard' }) {
           <div style={{ fontSize: 14, fontWeight: 700, color: T.ink, letterSpacing: -0.3 }}>Murmur</div>
         </div>
         <SidebarGroup label="Overview">
-          {items.slice(0,2).map(i=>(
-            <SidebarItem key={i.k} label={i.label} icon={i.icon} active={active===i.k}/>
-          ))}
+          <SidebarItem k="overview" label="Overview" icon={Icon.chart} active={active==='overview'}/>
+          <SidebarItem k="tx" label="Transactions" icon={Icon.list} active={active==='tx'}/>
+        </SidebarGroup>
+        <SidebarGroup label="Plan">
+          <SidebarItem k="budgets" label="Budgets" icon={Icon.sparkle} active={active==='budgets'}/>
+          <SidebarItem k="recurring" label="Recurring" icon={Icon.list} active={active==='recurring'} badge="6"/>
+          <SidebarItem k="ask" label="Ask Murmur" icon={Icon.sparkle} active={active==='ask'} pill/>
         </SidebarGroup>
         <SidebarGroup label="Analyze">
-          {items.slice(2,5).map(i=>(
-            <SidebarItem key={i.k} label={i.label} icon={i.icon} active={active===i.k}/>
-          ))}
+          <SidebarItem k="reports" label="Reports & forecast" icon={Icon.chart} active={active==='reports'}/>
         </SidebarGroup>
-        <SidebarGroup label="Data">
-          {items.slice(5).map(i=>(
-            <SidebarItem key={i.k} label={i.label} icon={i.icon} active={active===i.k}/>
-          ))}
+        <SidebarGroup label="">
+          <SidebarItem k="settings" label="Settings" icon={Icon.list} active={active==='settings'}/>
         </SidebarGroup>
       </div>
       {/* user at bottom */}
@@ -80,7 +72,7 @@ function SidebarGroup({ label, children }) {
     </div>
   );
 }
-function SidebarItem({ label, icon, active }) {
+function SidebarItem({ label, icon, active, badge, pill, k }) {
   return (
     <div style={{
       display:'flex', alignItems:'center', gap: 8, margin:'1px 10px',
@@ -89,7 +81,19 @@ function SidebarItem({ label, icon, active }) {
       color: active ? '#fff' : T.ink2, fontSize: 12.5, fontWeight: 500,
     }}>
       {icon(active ? '#fff' : T.ink3, 14)}
-      <span>{label}</span>
+      <span style={{ flex: 1 }}>{label}</span>
+      {badge && <span style={{
+        fontSize: 10, fontWeight: 700,
+        padding:'1px 6px', borderRadius: 8,
+        background: active ? 'rgba(255,255,255,0.22)' : T.surface2,
+        color: active ? '#fff' : T.ink3,
+      }}>{badge}</span>}
+      {pill && <span style={{
+        fontSize: 9, fontWeight: 800, letterSpacing: 0.5,
+        padding:'1px 6px', borderRadius: 8,
+        background: active ? 'rgba(255,255,255,0.22)' : T.accentSoft,
+        color: active ? '#fff' : T.accent, textTransform:'uppercase',
+      }}>AI</span>}
     </div>
   );
 }
@@ -118,7 +122,7 @@ function MurmurWindow({ title, children, active, toolbarRight }) {
               border:`0.5px solid ${T.line}`, fontSize: 12, color: T.ink3,
             }}>
               {Icon.search(T.ink3, 13)} Search expenses
-              <span style={{ color: T.ink4, fontFamily: T.fMono, fontSize: 11 }}>⌘K</span>
+              <span style={{ color: T.ink4, fontFamily: T.fMono, fontSize: 11 }}>\u2318K</span>
             </div>
           </div>
         </div>
@@ -130,7 +134,7 @@ function MurmurWindow({ title, children, active, toolbarRight }) {
   );
 }
 
-// ─── Desktop 1: Dashboard ─────────────────────────────────────────
+// \u2500\u2500\u2500 Desktop 1: Dashboard \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 function D_Dashboard() {
   return (
     <MurmurWindow title="Dashboard" active="dashboard" toolbarRight={
@@ -152,7 +156,7 @@ function D_Dashboard() {
             Good morning, Jordan.
           </div>
           <div style={{ fontSize: 13, color: T.ink3, marginTop: 4 }}>
-            You're tracking ahead — <span style={{ color: T.accent, fontWeight: 600 }}>$310 below</span> your April pace.
+            You're tracking ahead \u2014 <span style={{ color: T.accent, fontWeight: 600 }}>$310 below</span> your April pace.
           </div>
         </div>
       </div>
@@ -160,7 +164,7 @@ function D_Dashboard() {
       <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap: 14, marginBottom: 16 }}>
         <KPI label="Spent this month"   value={1330} delta={-12} sub="vs March"/>
         <KPI label="Daily average"       value={73.88} delta={-8} sub="last 7 days" small/>
-        <KPI label="Largest category"    value={412}  custom="Food & drink · 31%"/>
+        <KPI label="Largest category"    value={412}  custom="Food & drink \u00b7 31%"/>
         <KPI label="Projected month-end" value={2240} delta={-14} sub="vs usual" forecast/>
       </div>
       {/* Middle row: trend + categories */}
@@ -215,7 +219,7 @@ function KPI({ label, value, delta, sub, small=false, custom, forecast=false }) 
             color: delta<0 ? T.accent : '#A94646',
             background: delta<0 ? T.accentSoft : '#F4DDDD',
             padding:'2px 7px', borderRadius: 6, fontWeight: 700,
-          }}>{delta<0?'↓':'↑'} {Math.abs(delta)}%</span>
+          }}>{delta<0?'\u2193':'\u2191'} {Math.abs(delta)}%</span>
         )}
         <span style={{ color: T.ink3 }}>{custom || sub}</span>
       </div>
@@ -236,7 +240,7 @@ function LegendDot() {
   );
 }
 function TrendChart() {
-  // two lines — this month (accent) and last (muted)
+  // two lines \u2014 this month (accent) and last (muted)
   const w = 640, h = 220, pad = 20;
   const cur = [20,35,28,45,60,55,72,68,90,82,100,95,85,78,92,88,80,70];
   const prev = [30,42,38,50,72,68,88,82,102,110,118,112,110,115,120,118,116,112];
@@ -319,11 +323,11 @@ function CatRings() {
 }
 function DeskTxTable() {
   const rows = [
-    { amt: 12.40, m:'Blue Bottle Coffee', cat:'coffee', label:'Coffee', t:'Today · 9:41', voice: true },
-    { amt: 28.50, m:'Uber',               cat:'transit', label:'Transit', t:'Today · 8:12', voice: true },
+    { amt: 12.40, m:'Blue Bottle Coffee', cat:'coffee', label:'Coffee', t:'Today \u00b7 9:41', voice: true },
+    { amt: 28.50, m:'Uber',               cat:'transit', label:'Transit', t:'Today \u00b7 8:12', voice: true },
     { amt: 62.30, m:"Trader Joe's",       cat:'food', label:'Groceries', t:'Yesterday', voice: true },
     { amt: 14.00, m:'Netflix',            cat:'bills', label:'Subscription', t:'Yesterday', voice: false },
-    { amt: 38.80, m:'Rappi · Dinner',     cat:'food', label:'Food', t:'Apr 16', voice: true },
+    { amt: 38.80, m:'Rappi \u00b7 Dinner',     cat:'food', label:'Food', t:'Apr 16', voice: true },
   ];
   return (
     <div>
@@ -362,7 +366,7 @@ function PulseCard() {
   return (
     <div style={{ display:'flex', flexDirection:'column', gap: 14 }}>
       <div style={{ fontFamily: T.fSerif, fontSize: 20, lineHeight: 1.35, color:'#fff', fontWeight: 500 }}>
-        You spend <span style={{ color:'#C9D6BE' }}>34% less</span> on weekends — but coffee doubles on Fridays.
+        You spend <span style={{ color:'#C9D6BE' }}>34% less</span> on weekends \u2014 but coffee doubles on Fridays.
       </div>
       <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap: 4 }}>
         {['M','T','W','T','F','S','S'].map((d,i)=>{

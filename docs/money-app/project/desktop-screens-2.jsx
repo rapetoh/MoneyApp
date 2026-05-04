@@ -2,7 +2,7 @@
 
 function D_Analytics() {
   return (
-    <MurmurWindow title="Analytics · Forecast" active="forecast" toolbarRight={
+    <MurmurWindow title="Reports & forecast" active="reports" toolbarRight={
       <div style={{ display:'flex', gap: 8, alignItems:'center' }}>
         <div style={{
           padding:'6px 10px', fontSize: 12, fontWeight: 600,
@@ -34,14 +34,14 @@ function D_Analytics() {
         border:`0.5px solid ${T.line}`, marginBottom: 14, height: 360 }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom: 8 }}>
           <div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: T.ink3, letterSpacing: 0.6, textTransform:'uppercase' }}>Monthly total · forecast</div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: T.ink3, letterSpacing: 0.6, textTransform:'uppercase' }}>Monthly total \u00b7 forecast</div>
             <div style={{ marginTop: 6, display:'flex', alignItems:'baseline', gap: 12 }}>
               <Money value={2240} size={34}/>
               <span style={{ fontSize: 13, color: T.ink3 }}>projected for April</span>
               <span style={{
                 fontSize: 12, color: T.accent, fontWeight: 700,
                 background: T.accentSoft, padding:'2px 8px', borderRadius: 6,
-              }}>−14% vs 6-mo average</span>
+              }}>\u221214% vs 6-mo average</span>
             </div>
           </div>
           <div style={{ display:'flex', gap: 14, fontSize: 11, color: T.ink3, fontWeight: 600 }}>
@@ -62,7 +62,7 @@ function D_Analytics() {
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap: 14 }}>
         <Card title="Patterns">
           <div style={{ display:'flex', flexDirection:'column', gap: 10 }}>
-            <Insight text={<>Friday is your <b>heaviest</b> day — avg <b>$84</b>.</>}/>
+            <Insight text={<>Friday is your <b>heaviest</b> day \u2014 avg <b>$84</b>.</>}/>
             <Insight text={<>Coffee spend rose <b>+22%</b> over 3 months.</>}/>
             <Insight text={<>Subscriptions now <b>17%</b> of total. Review?</>}/>
           </div>
@@ -88,7 +88,7 @@ function D_Analytics() {
             ))}
           </div>
         </Card>
-        <Card title="Heatmap · weekday × hour">
+        <Card title="Heatmap \u00b7 weekday \u00d7 hour">
           <Heatmap/>
         </Card>
       </div>
@@ -217,7 +217,7 @@ function Heatmap() {
   );
 }
 
-// ─── Desktop 3: Budgets ──────────────────────────────────────────
+// \u2500\u2500\u2500 Desktop 3: Budgets \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 function D_Budgets() {
   const budgets = [
     { cat:'food', label:'Food & drink', spent: 412, cap: 500 },
