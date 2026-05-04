@@ -1,0 +1,53 @@
+appId: com.murmur.app
+productName: Murmur
+copyright: Copyright © 2026 Murmur
+
+directories:
+  output: release
+  buildResources: build
+
+afterPack: build/afterPack.cjs
+
+files:
+  - dist/main.js
+  - dist/main.js.map
+  - dist/preload.js
+  - dist/preload.js.map
+  - package.json
+
+extraResources:
+  - from: dist/web
+    to: web
+    filter:
+      - '**/*'
+
+mac:
+  category: public.app-category.finance
+  icon: build/icon.icns
+  target:
+    - target: dmg
+      arch:
+        - arm64
+        - x64
+  gatekeeperAssess: false
+  # Unsigned v1 build — ad-hoc signature only. When the Developer ID
+  # Application cert is wired up, set:
+  #   CSC_LINK / CSC_KEY_PASSWORD env vars (or signing identity) +
+  #   APPLE_ID / APPLE_APP_SPECIFIC_PASSWORD / APPLE_TEAM_ID for
+  # notarization, and re-enable hardenedRuntime + entitlements:
+  #   hardenedRuntime: true
+  #   entitlements: build/entitlements.mac.plist
+  #   entitlementsInherit: build/entitlements.mac.plist
+  identity: null
+
+dmg:
+  title: Install Murmur
+  background: null
+  contents:
+    - x: 130
+      y: 220
+      type: file
+    - x: 410
+      y: 220
+      type: link
+      path: /Applications

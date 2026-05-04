@@ -1,0 +1,17 @@
+node_modules/
+dist/
+release/
+
+# The repo root .gitignore matches `build/`; re-include our source
+# build files so they get tracked, but keep generated icon binaries
+# ignored (regenerate via `npm run icns`).
+!build/
+!build/afterPack.cjs
+!build/entitlements.mac.plist
+build/icon.icns
+build/icon.png
+
+*.dmg
+*.zip
+*.blockmap
+.DS_Store

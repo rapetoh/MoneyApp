@@ -2564,4 +2564,116 @@ Sentry), settings polish, voice composer in desktop Ask.
 **Untested-live list** at the bottom of each phase section in this
 PLAN.md is the user's QA agenda. Pinned — Claude doesn't gate on it.
 
+### Phase I part 2 — Electron wrap (May 4, 2026)
+
+**Decision: bundle, don't host.** The web UI has dynamic API routes
+(`/api/ai/ask-murmur`, `/api/ai/parse-expense`, `/api/ai/parse-scan`,
+`/auth/callback`) that proxy OpenAI and complete Supabase OAuth. A
+static `next export` would lose them. So the desktop app embeds a
+**Next.js standalone server** as a child process and points a single
+`BrowserWindow` at `http://127.0.0.1:<freePort>/`. All API routes work
+unchanged, the OpenAI key stays in the main process env (no client
+exposure), and Supabase keeps its existing browser-side auth flow.
+
+**Workspace.** New [apps/desktop/](../apps/desktop/) — picked up by
+the root `npm` workspaces glob (`apps/*`).
+
+**Pieces:**
+
+- [apps/web/next.config.ts](../apps/web/next.config.ts) gets
+  `output: 'standalone'` + `outputFileTracingRoot: '../..'` so the
+  monorepo workspace deps (`@voice-expense/shared`, `@voice-expense/ai`)
+  are traced into the standalone bundle.
+- [apps/desktop/src/main.ts](../apps/desktop/src/main.ts) is the
+  Electron main process. On `app.whenReady()` it picks a free port,
+  spawns `process.execPath` (Electron-as-Node via
+  `ELECTRON_RUN_AS_NODE=1`) running the standalone `server.js`, polls
+  the port until ready, and creates a `BrowserWindow` with
+  `titleBarStyle: 'hiddenInset'`, `backgroundColor: '#F4F1EA'` (cream
+  bgDesk), `contextIsolation: true`, `nodeIntegration: false`,
+  `sandbox: true`. External `http(s)` links open via
+  `shell.openExternal`. macOS gets the standard Edit / View / Window
+  menu. On `before-quit` / `window-all-closed` the embedded server is
+  SIGTERM'd.
+- [apps/desktop/src/preload.ts](../apps/desktop/src/preload.ts) — minimal
+  context bridge exposing `window.murmur.{ platform, versions }`.
+  Native bridge stubs (file save dialog, etc.) land here when needed.
+- [apps/desktop/scripts/bundle-web.mjs](../apps/desktop/scripts/bundle-web.mjs)
+  stages the standalone bundle into `apps/desktop/dist/web/`: copies
+  `.next/standalone/` plus `.next/static/` and `public/` (which
+  `output: 'standalone'` does NOT include — they have to be
+  alongside the server entry).
+- [apps/desktop/scripts/generate-icns.mjs](../apps/desktop/scripts/generate-icns.mjs)
+  rasterizes [murmur-mark-cream.svg](../apps/mobile/assets/brand/murmur-mark-cream.svg)
+  through `sharp` at the 10 sizes Apple expects in an iconset, then
+  runs `iconutil -c icns` to produce
+  [apps/desktop/build/icon.icns](../apps/desktop/build/icon.icns).
+- [apps/desktop/electron-builder.yml](../apps/desktop/electron-builder.yml)
+  configures the package: `appId: com.murmur.app`, mac DMG target with
+  both `arm64` and `x64`, finance category, the brand `.icns`,
+  `extraResources` copies `dist/web` → `Contents/Resources/web/`.
+- [apps/desktop/build/afterPack.cjs](../apps/desktop/build/afterPack.cjs)
+  is an electron-builder hook that runs `codesign --force --deep
+  --sign -` on the staged `.app` before DMG packaging — without this,
+  macOS refuses to launch because the partial linker-ad-hoc signature
+  produces *"code has no resources but signature indicates they must
+  be present"*. After the hook runs, `codesign --verify --deep`
+  reports *"valid on disk"* + *"satisfies its Designated
+  Requirement"*.
+
+**Build pipeline (one command):** `npm --prefix apps/desktop run dist`
+chains: `next build` (standalone) → `bundle-web.mjs` (stage) → `tsc -p`
+(compile main + preload) → `electron-builder` (mac arm64 + x64 DMGs
+with afterPack ad-hoc sign).
+
+**Output (verified May 4, 2026):**
+- `apps/desktop/release/Murmur-0.1.0-arm64.dmg` — 109 MB, APFS,
+  `hdiutil verify` checksum VALID.
+- `apps/desktop/release/Murmur-0.1.0.dmg` — 116 MB (x64).
+- The `.app` bundle is 305 MB unpacked (Electron framework +
+  bundled Next standalone server with traced node_modules + workspace
+  packages). Smoke-tested standalone server boot: 71 ms cold-start
+  via `node server.js` directly, redirects unauthenticated `/` to
+  `/login` as expected.
+
+**v1 deliberately ships unsigned.** `identity: null` +
+`hardenedRuntime` left disabled (it can't coexist with `null` identity).
+The afterPack ad-hoc sign keeps the launch path intact on the user's
+own machine. End users would still need to right-click → Open
+because Gatekeeper rejects ad-hoc-signed apps from the internet.
+
+**Code-signing handoff (interactive task — NOT done in this session):**
+1. User installs his Developer ID Application certificate into the
+   login keychain (or exports a `.p12` and points `CSC_LINK` /
+   `CSC_KEY_PASSWORD` env vars at it).
+2. Edit `electron-builder.yml`: drop `identity: null`, re-enable
+   `hardenedRuntime: true`, `entitlements: build/entitlements.mac.plist`,
+   `entitlementsInherit: build/entitlements.mac.plist`. The
+   entitlements file is already written with the JIT + network +
+   audio-input rights Electron needs.
+3. Delete or short-circuit `afterPack.cjs` (real signing replaces the
+   ad-hoc one).
+4. Set `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID` env
+   vars and add `notarize: { teamId: '<id>' }` (or set
+   `mac.notarize: true`) to electron-builder.yml so notarytool runs
+   automatically post-build.
+5. `npm --prefix apps/desktop run dist` — produces a signed +
+   notarized + stapled DMG.
+
+**Untested-live (Phase I part 2):**
+- Open the arm64 DMG, drag Murmur.app to Applications, launch it.
+  The window should boot to `/login` with the cream desktop bg, sage
+  accents, and the Murmur sidebar — same UI you walked through in the
+  desktop web session.
+- Sign in with Google / Apple / email.
+- Confirm Ask Murmur, /transactions, /budgets, /insights, /recurring,
+  /export all work end-to-end inside the wrapped app.
+- Quit and reopen — the embedded server should restart cleanly.
+- Test the x64 DMG on an Intel mac if one's available.
+
+**What's still parked:** the full code-signing + notarization
+interactive session above; Windows + Linux DMG/AppImage targets;
+auto-updates via electron-updater; native bridge (system save dialog
+for export, deep links).
+
 *End of Plan*
