@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense } from 'react'
 import { createClient } from '../../lib/supabase/client'
 import { colors, font, fontSize, spacing, radius } from '../../lib/theme'
+import { MurmurMark } from '../../components/MurmurMark'
 
 function LoginForm() {
   const router = useRouter()
@@ -70,15 +71,16 @@ function LoginForm() {
       <div style={styles.card}>
         {/* Logo */}
         <div style={styles.logo}>
-          <div style={styles.logoMark} />
-          <span style={styles.logoText}>Voice Expense</span>
+          <MurmurMark size={48} variant="sage" rounded />
         </div>
 
         <h1 style={styles.heading}>
           {mode === 'signin' ? 'Welcome back' : 'Create account'}
         </h1>
         <p style={styles.subheading}>
-          {mode === 'signin' ? 'Sign in to your dashboard' : 'Start tracking your expenses'}
+          {mode === 'signin'
+            ? 'Speak it. Spend clearly.'
+            : 'Start tracking by speaking — no bank linking.'}
         </p>
 
         {error && <div style={styles.errorBox}>{error}</div>}
@@ -186,23 +188,12 @@ const styles: Record<string, React.CSSProperties> = {
     gap: spacing.sm,
     marginBottom: spacing.sm,
   },
-  logoMark: {
-    width: 32,
-    height: 32,
-    borderRadius: radius.md,
-    background: colors.primary,
-  },
-  logoText: {
-    fontFamily: font.sans,
-    fontWeight: 700,
-    fontSize: fontSize.md,
-    color: colors.text,
-  },
   heading: {
-    fontFamily: font.sans,
-    fontWeight: 700,
-    fontSize: fontSize['2xl'],
+    fontFamily: font.serif,
+    fontWeight: 500,
+    fontSize: fontSize['3xl'],
     color: colors.text,
+    letterSpacing: -0.6,
   },
   subheading: {
     fontFamily: font.sans,
