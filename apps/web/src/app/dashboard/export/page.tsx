@@ -7,6 +7,7 @@ import { Card } from '../../../components/Card'
 import { Money } from '../../../components/Money'
 import { Icon } from '../../../components/Icons'
 import { PaywallGate } from '../../../components/PaywallGate'
+import { usePlus } from '../../../lib/plus'
 
 type Txn = {
   id: string
@@ -28,7 +29,7 @@ export default function ExportPage() {
   const [categories, setCategories] = useState<Array<{ id: string; name: string }>>([])
   const [profile, setProfile] = useState<{ currency_code?: string; locale?: string } | null>(null)
   const [loading, setLoading] = useState(true)
-  const [isPlus, setIsPlus] = useState(false)
+  const { isPlus } = usePlus()
   const [busy, setBusy] = useState<Format | null>(null)
 
   const now = new Date()
@@ -38,7 +39,6 @@ export default function ExportPage() {
   const [dateTo, setDateTo] = useState(defaultTo)
 
   useEffect(() => {
-    setIsPlus(process.env.NODE_ENV !== 'production')
     async function load() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return

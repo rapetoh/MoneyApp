@@ -8,6 +8,7 @@ import { Icon } from '../../../components/Icons'
 import { PaywallGate } from '../../../components/PaywallGate'
 import { ThinkingDots } from '../../../components/ThinkingDots'
 import { AskChart } from '../../../components/AskChart'
+import { usePlus } from '../../../lib/plus'
 import {
   loadMostRecentConversation,
   loadConversation,
@@ -96,7 +97,7 @@ function sanitize(text: string): string {
 
 export default function AskMurmurPage() {
   const supabase = createClient()
-  const [isPlus, setIsPlus] = useState(false)
+  const { isPlus } = usePlus()
   const [authed, setAuthed] = useState(false)
   const [userId, setUserId] = useState<string | null>(null)
   const [profile, setProfile] = useState<
@@ -125,7 +126,6 @@ export default function AskMurmurPage() {
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null)
 
   useEffect(() => {
-    setIsPlus(process.env.NODE_ENV !== 'production')
     const SR = getSpeechRecognitionCtor()
     if (SR) {
       const r = new SR() as SpeechRecognitionLike

@@ -7,6 +7,10 @@ body {
   background-color: #F4F1EA; /* bgDesk — recessed desktop canvas per DESIGN.md §3 */
   color: #1B1915;
   -webkit-font-smoothing: antialiased;
+  /* DesktopChrome.tsx sets --desktop-title-bar to 36px when running
+     inside the Electron app and 0px on plain web, leaving room for the
+     macOS traffic-light buttons. */
+  padding-top: var(--desktop-title-bar, 0px);
 }
 
 a { color: inherit; text-decoration: none; }

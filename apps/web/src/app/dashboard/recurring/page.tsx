@@ -10,6 +10,7 @@ import {
   detectRecurringPatterns,
   type RecurringPatternCandidate,
 } from '../../../lib/recurringPatternDetector'
+import { usePlus } from '../../../lib/plus'
 import type { RecurringRule, RecurringFrequency } from '@voice-expense/shared'
 
 type Txn = {
@@ -143,7 +144,7 @@ export default function RecurringPage() {
   const [rules, setRules] = useState<RecurringRule[]>([])
   const [transactions, setTransactions] = useState<Txn[]>([])
   const [categories, setCategories] = useState<Cat[]>([])
-  const [isPlus, setIsPlus] = useState(false)
+  const { isPlus } = usePlus()
   const [loading, setLoading] = useState(true)
   const [dismissed, setDismissed] = useState<Set<string>>(new Set())
   const [profile, setProfile] = useState<{ currency_code?: string; locale?: string } | null>(null)
@@ -178,7 +179,6 @@ export default function RecurringPage() {
   }
 
   useEffect(() => {
-    setIsPlus(process.env.NODE_ENV !== 'production')
     setDismissed(readDismissed())
     load()
   }, [])

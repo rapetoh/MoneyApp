@@ -3,6 +3,8 @@ import { createClient } from '../../lib/supabase/server'
 import { getProfile } from '../../lib/data'
 import { Sidebar } from '../../components/Sidebar'
 import { colors } from '../../lib/theme'
+import { PlusProvider } from '../../lib/plus'
+import { resolvePlusStatus } from '../../lib/plus.server'
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient()
@@ -19,13 +21,16 @@ export default async function DashboardLayout({ children }: { children: React.Re
   ])
   const displayName = profile?.display_name ?? user.email?.split('@')[0] ?? 'User'
   const recurringCount = recurringResult.count ?? 0
+  const { isPlus } = resolvePlusStatus()
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: colors.background }}>
-      <Sidebar displayName={displayName} recurringCount={recurringCount} />
-      <main style={{ flex: 1, overflowX: 'hidden', minWidth: 0 }}>
-        {children}
-      </main>
-    </div>
+    <PlusProvider isPlus={isPlus}>
+      <div style={{ display: 'flex', minHeight: '100vh', background: colors.background }}>
+        <Sidebar displayName={displayName} recurringCount={recurringCount} />
+        <main style={{ flex: 1, overflowX: 'hidden', minWidth: 0 }}>
+          {children}
+        </main>
+      </div>
+    </PlusProvider>
   )
 }

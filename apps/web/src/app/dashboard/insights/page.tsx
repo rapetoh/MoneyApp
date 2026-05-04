@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '../../../lib/supabase/server'
 import { getProfile, getTransactions, getCategories, getActiveBudgets } from '../../../lib/data'
-import { getPlusStatus } from '../../../lib/plus'
+import { resolvePlusStatus } from '../../../lib/plus.server'
 import { colors, font, radius, cat, type CategoryTint } from '../../../lib/theme'
 import { tintFor } from '../../../lib/categories'
 import { Toolbar } from '../../../components/Toolbar'
@@ -172,7 +172,7 @@ export default async function InsightsPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { isPlus } = getPlusStatus()
+  const { isPlus } = resolvePlusStatus()
 
   const [profile, transactions, categories, budgets] = await Promise.all([
     getProfile(supabase, user.id),

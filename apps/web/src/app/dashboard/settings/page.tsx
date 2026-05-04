@@ -5,6 +5,7 @@ import { createClient } from '../../../lib/supabase/client'
 import { colors, font, radius } from '../../../lib/theme'
 import { Toolbar } from '../../../components/Toolbar'
 import { Icon } from '../../../components/Icons'
+import { usePlus } from '../../../lib/plus'
 
 const CURRENCIES = ['USD', 'EUR', 'GBP', 'CAD', 'CHF', 'JPY', 'AUD', 'XAF', 'NGN', 'GHS']
 const LOCALES = [
@@ -119,7 +120,7 @@ export default function SettingsPage() {
   }
 
   const initial = (displayName || email || 'U').trim()[0]?.toUpperCase() ?? 'U'
-  const isPlus = process.env.NODE_ENV !== 'production'
+  const { isPlus } = usePlus()
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>

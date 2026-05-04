@@ -1,5 +1,4 @@
-import { app, BrowserWindow, shell, Menu, dialog } from 'electron'
-import { spawn, ChildProcess } from 'node:child_process'
+import { app, BrowserWindow, shell, Menu, dialog, utilityProcess, type UtilityProcess } from 'electron'
 import { createServer } from 'node:net'
 import { join } from 'node:path'
 import { existsSync, readFileSync } from 'node:fs'
@@ -9,7 +8,7 @@ import * as http from 'node:http'
 const isDev = !app.isPackaged
 const HOSTNAME = '127.0.0.1'
 
-let nextServer: ChildProcess | null = null
+let nextServer: UtilityProcess | null = null
 let mainWindow: BrowserWindow | null = null
 
 function findFreePort(): Promise<number> {
@@ -125,16 +124,23 @@ async function startEmbeddedServer(): Promise<number> {
   const port = await findFreePort()
   const envFromFile = loadEnvFile()
 
-  nextServer = spawn(process.execPath, [entry], {
+  // utilityProcess.fork is Electron's purpose-built API for running
+  // Node code as a managed child of the main process. Critically, it
+  // does NOT re-launch the Electron binary as a child, so macOS
+  // LaunchServices does not register a second app instance and no
+  // stray Terminal-looking window pops up at launch (which was the
+  // failure mode of `child_process.spawn(process.execPath, ...,
+  // ELECTRON_RUN_AS_NODE: '1')`).
+  nextServer = utilityProcess.fork(entry, [], {
     cwd: join(entry, '..'),
     env: {
       ...envFromFile,
       NODE_ENV: 'production',
       PORT: String(port),
       HOSTNAME,
-      ELECTRON_RUN_AS_NODE: '1',
     },
-    stdio: ['ignore', 'pipe', 'pipe'],
+    stdio: 'pipe',
+    serviceName: 'murmur-next-server',
   })
 
   nextServer.stdout?.on('data', (chunk) => {
@@ -143,9 +149,9 @@ async function startEmbeddedServer(): Promise<number> {
   nextServer.stderr?.on('data', (chunk) => {
     process.stderr.write(`[next] ${chunk}`)
   })
-  nextServer.on('exit', (code, signal) => {
+  nextServer.on('exit', (code) => {
     if (code !== 0 && code !== null) {
-      console.error(`Embedded Next server exited unexpectedly (code=${code}, signal=${signal})`)
+      console.error(`Embedded Next server exited unexpectedly (code=${code})`)
     }
     nextServer = null
   })
@@ -155,8 +161,8 @@ async function startEmbeddedServer(): Promise<number> {
 }
 
 function killEmbeddedServer() {
-  if (nextServer && !nextServer.killed) {
-    nextServer.kill('SIGTERM')
+  if (nextServer) {
+    nextServer.kill()
     nextServer = null
   }
 }
