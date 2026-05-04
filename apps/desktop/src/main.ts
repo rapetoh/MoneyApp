@@ -2,7 +2,7 @@ import { app, BrowserWindow, shell, Menu, dialog } from 'electron'
 import { spawn, ChildProcess } from 'node:child_process'
 import { createServer } from 'node:net'
 import { join } from 'node:path'
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { setTimeout as delay } from 'node:timers/promises'
 import * as http from 'node:http'
 
@@ -62,6 +62,57 @@ function resolveServerEntry(): string {
   return join(process.resourcesPath, 'web/apps/web/server.js')
 }
 
+/**
+ * Parse a .env-style file (KEY=VALUE lines, # comments, blank lines).
+ * No interpolation, no expansion — just the bare format. Strips
+ * surrounding quotes when present.
+ */
+function parseEnvFile(contents: string): Record<string, string> {
+  const env: Record<string, string> = {}
+  for (const rawLine of contents.split(/\r?\n/)) {
+    const line = rawLine.trim()
+    if (!line || line.startsWith('#')) continue
+    const eq = line.indexOf('=')
+    if (eq === -1) continue
+    const key = line.slice(0, eq).trim()
+    let value = line.slice(eq + 1).trim()
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1)
+    }
+    env[key] = value
+  }
+  return env
+}
+
+/**
+ * Load the user's .env from `<userData>/.env`. The packaged app is
+ * launched from Finder with a clean GUI environment that does not
+ * inherit the user's shell vars, so the embedded Next server cannot
+ * see OPENAI_API_KEY etc. unless we plant them here.
+ *
+ * On macOS this resolves to:
+ *   ~/Library/Application Support/Murmur/.env
+ *
+ * Returns the merged env (process.env + file overrides). If the file
+ * is missing, returns process.env unchanged so a developer running
+ * `npm run dev` (which inherits the shell env) still works.
+ */
+function loadEnvFile(): NodeJS.ProcessEnv {
+  const userDataEnv = join(app.getPath('userData'), '.env')
+  if (!existsSync(userDataEnv)) return { ...process.env }
+  try {
+    const parsed = parseEnvFile(readFileSync(userDataEnv, 'utf8'))
+    console.log(`[murmur] loaded env from ${userDataEnv} (${Object.keys(parsed).length} keys)`)
+    return { ...process.env, ...parsed }
+  } catch (err) {
+    console.error(`[murmur] failed to read ${userDataEnv}`, err)
+    return { ...process.env }
+  }
+}
+
 async function startEmbeddedServer(): Promise<number> {
   const entry = resolveServerEntry()
   if (!existsSync(entry)) {
@@ -72,11 +123,12 @@ async function startEmbeddedServer(): Promise<number> {
   }
 
   const port = await findFreePort()
+  const envFromFile = loadEnvFile()
 
   nextServer = spawn(process.execPath, [entry], {
     cwd: join(entry, '..'),
     env: {
-      ...process.env,
+      ...envFromFile,
       NODE_ENV: 'production',
       PORT: String(port),
       HOSTNAME,
