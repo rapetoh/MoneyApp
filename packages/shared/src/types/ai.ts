@@ -55,6 +55,18 @@ export interface AskMurmurRecurringRule {
   frequency: string
 }
 
+/** Single prior turn used to give the reasoner conversation context on
+ *  desktop. The mobile result-card flow is one-shot and sends no history;
+ *  desktop renders a chat thread and replays the last few turns so the model
+ *  can resolve "and last month?" / "show me only weekends" follow-ups. Each
+ *  prior turn is stored as the user's question + the assistant's verdict
+ *  text — we keep history compact (model doesn't need the full breakdown
+ *  card to resolve the next question). */
+export interface AskMurmurHistoryTurn {
+  question: string
+  answer: string
+}
+
 export interface AskMurmurRequest {
   question: string
   locale: Locale
@@ -66,6 +78,45 @@ export interface AskMurmurRequest {
   /** Cap: last 90 days, max 500 entries (oldest dropped client-side). */
   transactions: AskMurmurTransaction[]
   recurring_rules: AskMurmurRecurringRule[]
+  /** Optional. Prior turns in the same desktop conversation (oldest first).
+   *  Capped server-side to the last 6 turns. Mobile sends none — the result
+   *  card is one-shot. */
+  history?: AskMurmurHistoryTurn[]
+}
+
+/** Visualization the model can attach to a verdict to make a numeric story
+ *  legible at a glance. The client renders SVG \u2014 the model never returns
+ *  raw SVG. We keep the shape narrow on purpose so the model can't hallucinate
+ *  weird grammars; what we lose in expressiveness we gain in safety. */
+export type AskMurmurChartType =
+  /** Vertical bars. Use for time series with discrete buckets (last 6 weekdays,
+   *  last 12 months) where order matters along the x-axis. */
+  | 'bar'
+  /** Smooth line. Use for trend over time (cumulative spend over the month,
+   *  monthly spend across 6+ months). */
+  | 'line'
+  /** Donut. Use for share-of-total when there are 3\u20136 buckets and the user
+   *  cares about proportions (top categories, expense vs. income). */
+  | 'donut'
+  /** Horizontal bars. Use for a ranked list (top merchants, top categories)
+   *  where labels are long and order matters. */
+  | 'horizontal_bar'
+
+export interface AskMurmurChartPoint {
+  /** Short label for the x-axis or legend. Localized by the model. */
+  label: string
+  /** Numeric value. Currency follows request.currency \u2014 the client formats. */
+  value: number
+}
+
+export interface AskMurmurChart {
+  type: AskMurmurChartType
+  /** Short title rendered above the chart. Localized. */
+  title: string
+  /** 2\u201310 points. Anything outside that range is clipped client-side. */
+  data: AskMurmurChartPoint[]
+  /** Optional one-line caption under the chart for context. Localized. */
+  caption?: string
 }
 
 /** A single row in the breakdown card on S_AskResult. */
@@ -111,6 +162,10 @@ export interface AskMurmurResponse {
     caption: string
     rows: AskMurmurStatRow[]
   }
+  /** Optional chart attached to the answer. Use it when the data has a
+   *  shape worth seeing (categories breakdown, monthly trend, top merchants).
+   *  Omitted for one-number questions or refusals. */
+  chart?: AskMurmurChart
   /** Optional sage-tinted note — a single-paragraph nudge or insight. */
   note?: {
     text: string
