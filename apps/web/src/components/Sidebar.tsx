@@ -159,18 +159,25 @@ export function Sidebar({
 const styles: Record<string, React.CSSProperties> = {
   sidebar: {
     width: 230,
-    minHeight: '100vh',
-    height: '100vh',
+    // Fill the layout div exactly. The dashboard layout's parent is
+    // sized to `calc(100vh - var(--desktop-title-bar))`, so 100% here
+    // resolves to "the visible column height" — no overflow at the
+    // bottom (user card stays in view), no document overflow (body
+    // has nothing to scroll past). The previous `100vh` was 36 px
+    // taller than its container in Electron, which made the document
+    // taller than the viewport and triggered the body scrollbar.
+    //
+    // `position: sticky` + `align-self: flex-start` are kept as a
+    // backstop: if `<main>` ever scrolls and somehow propagates to
+    // body (it shouldn't, but defensive), the sidebar pins below the
+    // title strip rather than sliding under the macOS traffic lights.
+    height: '100%',
     padding: 8,
     display: 'flex',
     flexDirection: 'column',
     background: 'transparent',
     flexShrink: 0,
     position: 'sticky',
-    // Inside the Electron build, DesktopChrome.tsx sets
-    // --desktop-title-bar to 36px so the sidebar sticks BELOW the
-    // traffic-light strip. On plain web the var resolves to 0 and the
-    // sidebar pins to viewport top as before.
     top: 'var(--desktop-title-bar, 0px)',
     alignSelf: 'flex-start',
   },
