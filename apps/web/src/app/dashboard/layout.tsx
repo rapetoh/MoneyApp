@@ -25,9 +25,28 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   return (
     <PlusProvider isPlus={isPlus}>
-      <div style={{ display: 'flex', minHeight: '100vh', background: colors.background }}>
+      {/* The whole dashboard occupies one screen — sidebar + main are
+          locked to viewport height (minus the macOS title strip in
+          Electron). Only `<main>` is allowed to scroll, and only when
+          its inner content actually overflows. The body itself never
+          scrolls — that's how Claude Code / Linear / Notion behave on
+          desktop. */}
+      <div
+        style={{
+          display: 'flex',
+          height: 'calc(100vh - var(--desktop-title-bar, 0px))',
+          background: colors.background,
+        }}
+      >
         <Sidebar displayName={displayName} recurringCount={recurringCount} />
-        <main style={{ flex: 1, overflowX: 'hidden', minWidth: 0 }}>
+        <main
+          style={{
+            flex: 1,
+            overflowY: 'auto',
+            overflowX: 'hidden',
+            minWidth: 0,
+          }}
+        >
           {children}
         </main>
       </div>

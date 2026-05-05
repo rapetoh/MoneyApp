@@ -129,13 +129,19 @@ export default async function OverviewPage({
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  page: { display: 'flex', flexDirection: 'column', minHeight: '100vh' },
+  // Fill the parent <main>, which is sized to the available viewport
+  // height by dashboard/layout.tsx. No `minHeight: 100vh` here — that
+  // forces the page taller than the visible area when the macOS title
+  // strip is eating 36 px, which produced the body-level scroll the
+  // user complained about.
+  page: { display: 'flex', flexDirection: 'column', height: '100%' },
   content: {
     padding: '0 20px 20px',
     display: 'flex',
     flexDirection: 'column',
     gap: 14,
     flex: 1,
+    minHeight: 0,
   },
   headerRow: {
     display: 'flex',

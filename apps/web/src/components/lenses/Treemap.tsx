@@ -26,57 +26,57 @@ interface Cell {
   big: boolean
 }
 
+// Two-row treemap with a per-row minimum-width floor so a $20 category
+// next to a $20 K one is still readable. Top row gets 80% of the
+// canvas height for the bigger items; tail row 20% for the long tail.
+// Values returned as percentages of the canvas (0-100) on each axis.
 function layoutCells(
   items: Array<{ label: string; amt: number; color: string }>,
-  totalSpace: number,
 ): Cell[] {
   if (items.length === 0) return []
   const total = items.reduce((s, i) => s + i.amt, 0)
   if (total <= 0) return []
 
-  // Two-row layout: top row 80% height for the bigger items, bottom row 20%
-  // for the long tail.
   const sorted = [...items].sort((a, b) => b.amt - a.amt)
-  const totalTop = Math.min(sorted.length, 4)
-  const topItems = sorted.slice(0, totalTop)
-  const tailItems = sorted.slice(totalTop)
+  const TOP_COUNT = 4
+  const topItems = sorted.slice(0, TOP_COUNT)
+  const tailItems = sorted.slice(TOP_COUNT)
 
   const cells: Cell[] = []
-  const topTotal = topItems.reduce((s, i) => s + i.amt, 0)
-  let xCursor = 0
-  for (const it of topItems) {
-    const w = (it.amt / Math.max(topTotal, 1)) * 100
-    cells.push({
-      x: xCursor,
-      y: 0,
-      w,
-      h: tailItems.length > 0 ? 80 : 100,
-      label: it.label,
-      amt: it.amt,
-      color: it.color,
-      big: w * 80 > 1000,
-    })
-    xCursor += w
-  }
-  if (tailItems.length > 0) {
-    const tailTotal = tailItems.reduce((s, i) => s + i.amt, 0)
-    let xt = 0
-    for (const it of tailItems) {
-      const w = (it.amt / Math.max(tailTotal, 1)) * 100
+
+  function packRow(
+    rowItems: typeof topItems,
+    yPct: number,
+    hPct: number,
+    minWPct: number,
+  ): void {
+    if (rowItems.length === 0) return
+    const rowTotal = rowItems.reduce((s, i) => s + i.amt, 0)
+    if (rowTotal <= 0) return
+    const minSum = minWPct * rowItems.length
+    const flexible = Math.max(0, 100 - minSum)
+    let xCursor = 0
+    for (const it of rowItems) {
+      const w = minWPct + (it.amt / rowTotal) * flexible
       cells.push({
-        x: xt,
-        y: 80,
+        x: xCursor,
+        y: yPct,
         w,
-        h: 20,
+        h: hPct,
         label: it.label,
         amt: it.amt,
         color: it.color,
-        big: false,
+        // "Big" tile gets larger typography; threshold is the share of
+        // the canvas the cell occupies, in pct² area.
+        big: w * hPct > 1500,
       })
-      xt += w
+      xCursor += w
     }
   }
-  void totalSpace
+
+  packRow(topItems, 0, tailItems.length > 0 ? 80 : 100, 14)
+  if (tailItems.length > 0) packRow(tailItems, 80, 20, 18)
+
   return cells
 }
 
@@ -94,8 +94,14 @@ export function TreemapLens({ props }: { props: LensProps }) {
     color: catTokens[tintFor(name)].fg,
   }))
 
-  const cells = layoutCells(items, 100)
-
+  const cells = layoutCells(items)
+  // Reserve the bottom strip for "Saved & invested" only when the user
+  // actually saved this month; otherwise expenses fill the whole
+  // canvas. SAVED_BAND_PCT is the height of that strip as a fraction
+  // of the canvas (matches the 22% the layoutCells call leaves below
+  // y=78 when saved > 0; here we subtract the BAND so saved sits in
+  // its own row without colliding with the tail row).
+  const showSavedBand = saved > 0
   const totalFlow = expenseTotal + saved
 
   return (
@@ -157,51 +163,60 @@ export function TreemapLens({ props }: { props: LensProps }) {
             No spending logged this month yet.
           </div>
         )}
-        {cells.map((c, i) => (
-          <div
-            key={i}
-            style={{
-              position: 'absolute',
-              left: `${c.x * 0.78}%`,
-              top: `${c.y * 0.78}%`,
-              width: `${c.w * 0.78}%`,
-              height: `${c.h * 0.78}%`,
-              padding: 4,
-            }}
-          >
+        {/* Cells fill the full canvas now — the previous "Quick
+            read" sidebar duplicated stats already in the page header
+            and visually swallowed ~22% of the chart for nothing.
+            When savings exist, the bottom 22% of the canvas is the
+            "Saved & invested" band; expenses are scaled into the
+            remaining 78%. Without savings, expenses fill the whole
+            canvas. */}
+        {cells.map((c, i) => {
+          const yScale = showSavedBand ? 0.78 : 1
+          return (
             <div
+              key={i}
               style={{
-                width: '100%',
-                height: '100%',
-                borderRadius: 6,
-                background: c.color,
-                opacity: 0.85,
-                padding: 14,
-                color: '#fff',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'space-between',
-                overflow: 'hidden',
+                position: 'absolute',
+                left: `${c.x}%`,
+                top: `${c.y * yScale}%`,
+                width: `${c.w}%`,
+                height: `${c.h * yScale}%`,
+                padding: 4,
               }}
             >
-              <div style={{ fontSize: c.big ? 14 : 12, fontWeight: 700, opacity: 0.95 }}>
-                {c.label}
-              </div>
               <div
                 style={{
-                  fontFamily: font.display,
-                  fontSize: c.big ? 24 : 16,
-                  fontWeight: 700,
-                  letterSpacing: -0.4,
+                  width: '100%',
+                  height: '100%',
+                  borderRadius: 6,
+                  background: c.color,
+                  opacity: 0.85,
+                  padding: 14,
+                  color: '#fff',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  overflow: 'hidden',
                 }}
               >
-                {fmt(c.amt, props.currency, props.locale)}
+                <div style={{ fontSize: c.big ? 14 : 12, fontWeight: 700, opacity: 0.95 }}>
+                  {c.label}
+                </div>
+                <div
+                  style={{
+                    fontFamily: font.display,
+                    fontSize: c.big ? 24 : 16,
+                    fontWeight: 700,
+                    letterSpacing: -0.4,
+                  }}
+                >
+                  {fmt(c.amt, props.currency, props.locale)}
+                </div>
               </div>
             </div>
-          </div>
-        ))}
-        {/* Saved & invested band */}
-        {saved > 0 && (
+          )
+        })}
+        {showSavedBand && (
           <div
             style={{
               position: 'absolute',
@@ -241,56 +256,6 @@ export function TreemapLens({ props }: { props: LensProps }) {
             </div>
           </div>
         )}
-        {/* Right-side margin filler */}
-        <div
-          style={{
-            position: 'absolute',
-            left: '78%',
-            top: '0',
-            width: '22%',
-            height: saved > 0 ? '78%' : '100%',
-            padding: 4,
-          }}
-        >
-          <div
-            style={{
-              width: '100%',
-              height: '100%',
-              borderRadius: 6,
-              background: colors.surface,
-              border: `0.5px solid ${colors.line}`,
-              padding: 14,
-              color: colors.ink3,
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 8,
-              fontSize: 11,
-              lineHeight: 1.5,
-            }}
-          >
-            <div
-              style={{
-                fontSize: 10,
-                fontWeight: 700,
-                color: colors.ink3,
-                letterSpacing: 0.6,
-                textTransform: 'uppercase',
-              }}
-            >
-              Quick read
-            </div>
-            <div>
-              <b style={{ color: colors.ink }}>{fmt(expenseTotal, props.currency, props.locale)}</b>{' '}
-              spent across {Object.keys(debitsByCat).length} categories.
-            </div>
-            {saved > 0 && (
-              <div>
-                <b style={{ color: colors.accent }}>{fmt(saved, props.currency, props.locale)}</b>{' '}
-                stayed unspent.
-              </div>
-            )}
-          </div>
-        </div>
       </div>
     </div>
   )
