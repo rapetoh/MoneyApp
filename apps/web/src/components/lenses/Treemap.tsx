@@ -105,7 +105,7 @@ export function TreemapLens({ props }: { props: LensProps }) {
         borderRadius: 16,
         border: `0.5px solid ${colors.line}`,
         padding: 20,
-        height: '100%',
+        height: 600,
         display: 'flex',
         flexDirection: 'column',
         fontFamily: font.sans,

@@ -29,16 +29,32 @@ interface Node {
   mid: number
 }
 
-function stack(items: Array<{ label: string; amt: number; color: string }>, height: number): Node[] {
+// Sankey columns break visually when items have wildly different
+// magnitudes — a $20K item dwarfs a $20 item to the point where the
+// small one becomes 0.05% of the column and its label crashes into
+// every neighbour. Cap the column at 8 items, give each a minimum
+// 26 px slot so the label has room to breathe, and distribute the
+// remaining height proportionally to amount.
+function stack(
+  items: Array<{ label: string; amt: number; color: string }>,
+  height: number,
+): Node[] {
   if (items.length === 0) return []
-  const total = items.reduce((s, i) => s + i.amt, 0)
+  const MIN_H = 26
+  const MAX_ITEMS = 8
+  const sorted = [...items].sort((a, b) => b.amt - a.amt).slice(0, MAX_ITEMS)
+  const total = sorted.reduce((s, i) => s + i.amt, 0)
   if (total <= 0) return []
-  const gapTotal = height * 0.12
-  const usable = height - gapTotal
-  const gap = items.length > 1 ? gapTotal / (items.length - 1) : 0
+
+  const gap = 8
+  const totalGap = gap * Math.max(0, sorted.length - 1)
+  const minTotal = MIN_H * sorted.length
+  const usable = Math.max(MIN_H * sorted.length, height - totalGap)
+  const flexible = Math.max(0, usable - minTotal)
+
   let y = 20
-  return items.map((it) => {
-    const h = (it.amt / total) * usable
+  return sorted.map((it) => {
+    const h = MIN_H + (it.amt / total) * flexible
     const node: Node = { ...it, y, h, mid: y + h / 2 }
     y += h + gap
     return node
@@ -106,7 +122,7 @@ export function FlowLens({ props }: { props: LensProps }) {
         borderRadius: 16,
         border: `0.5px solid ${colors.line}`,
         padding: 20,
-        height: '100%',
+        height: 600,
         fontFamily: font.sans,
         display: 'flex',
         flexDirection: 'column',

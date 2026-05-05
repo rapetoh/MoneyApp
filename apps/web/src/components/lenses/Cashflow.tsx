@@ -70,7 +70,7 @@ export function CashflowLens({ props }: { props: LensProps }) {
   const savingsRate = totalIn > 0 ? Math.round((net / totalIn) * 100) : null
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: 14, height: '100%', fontFamily: font.sans }}>
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: 14, height: 600, fontFamily: font.sans }}>
       <div
         style={{
           background: '#fff',

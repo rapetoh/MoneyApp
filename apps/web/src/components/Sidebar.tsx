@@ -167,7 +167,11 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'transparent',
     flexShrink: 0,
     position: 'sticky',
-    top: 0,
+    // Inside the Electron build, DesktopChrome.tsx sets
+    // --desktop-title-bar to 36px so the sidebar sticks BELOW the
+    // traffic-light strip. On plain web the var resolves to 0 and the
+    // sidebar pins to viewport top as before.
+    top: 'var(--desktop-title-bar, 0px)',
     alignSelf: 'flex-start',
   },
   // Absolutely positioned floating glass panel — sits 8px in from each

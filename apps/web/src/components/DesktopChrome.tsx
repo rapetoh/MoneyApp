@@ -56,8 +56,11 @@ export function DesktopChrome() {
         // `-webkit-app-region: no-drag` to remain clickable. The strip
         // is purely visual padding right now, so blanket drag is fine.
         WebkitAppRegion: 'drag',
-        // Transparent so the cream desktop bg shows through.
-        background: 'transparent',
+        // Opaque cream — must mask any content that scrolls underneath
+        // (sidebar logo, page header, etc.) so the macOS traffic lights
+        // never collide with app content. Same colour as bgDesk so the
+        // strip is invisible to the user but visually load-bearing.
+        background: '#F4F1EA',
       } as React.CSSProperties}
     />
   )

@@ -73,7 +73,7 @@ export function CalendarLens({ props }: { props: LensProps }) {
   const selTotal = dayTotal[sel] ?? 0
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 14, height: '100%', fontFamily: font.sans }}>
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 14, height: 600, fontFamily: font.sans }}>
       <div
         style={{
           background: '#fff',
