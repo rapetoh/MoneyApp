@@ -80,12 +80,16 @@ function buildBranches(p: LensProps, displayName: string): Branch[] {
       const m = t.merchant ?? 'Other'
       merchTotals[m] = (merchTotals[m] ?? 0) + t.amount
     }
-    const leaves = topN(
+    // Keep up to 25 merchants per category — enough to see a real
+    // distribution at "show all" without exploding the canvas. The
+    // visible cap is enforced separately at render time (default 5
+    // shown, "+N more" terminator reveals the rest).
+    const sorted = topN(
       Object.entries(merchTotals).map(([m, a]) => ({ m, a })),
       (x) => x.a,
-      3,
+      25,
     ).map((m) => `${m.m} · ${fmt(m.a)}`)
-    return { label: `${s.name} · ${fmt(s.amt)}`, leaves }
+    return { label: `${s.name} · ${fmt(s.amt)}`, leaves: sorted }
   })
 
   const recurringMonthly = p.recurring
@@ -148,12 +152,20 @@ export function MindMapLens({ props, displayName }: { props: LensProps; displayN
   const cy = CANVAS_H / 2
   const branches = buildBranches(props, displayName)
 
-  // Branch fold (parent) and sub fold (child). A leaf chip only renders
-  // when both its branch AND its sub-node are expanded — that's the
-  // contract that fixes the "leaves overflow the viewport even though
-  // their parent is collapsed" complaint.
+  // Branch fold (parent) and sub-card leaf-limit (child). The sub
+  // card's leaves only render when its branch is expanded AND the
+  // sub's leaf-limit > 0 — that's how we keep collapsed parents from
+  // leaking children into the viewport.
+  //
+  // Leaf-limit per sub:
+  //   0    → collapsed (sub-card with no leaves shown)
+  //   5    → "show top 5" (default expanded state)
+  //   >=N  → "show all" up to total leaf count
+  // Click the sub-card to toggle 0 ↔ 5; click the "+N more" terminator
+  // to jump 5 → all. Re-clicking the sub-card snaps back to 0.
+  const VISIBLE_LEAVES_DEFAULT = 5
   const [collapsedBranches, setCollapsedBranches] = useState<Set<string>>(new Set())
-  const [collapsedSubs, setCollapsedSubs] = useState<Set<string>>(new Set())
+  const [subLeafLimits, setSubLeafLimits] = useState<Record<string, number>>({})
 
   function toggleBranch(label: string) {
     setCollapsedBranches((prev) => {
@@ -163,13 +175,14 @@ export function MindMapLens({ props, displayName }: { props: LensProps; displayN
       return next
     })
   }
-  function toggleSub(key: string) {
-    setCollapsedSubs((prev) => {
-      const next = new Set(prev)
-      if (next.has(key)) next.delete(key)
-      else next.add(key)
-      return next
+  function toggleSubLeaves(key: string, totalLeaves: number) {
+    setSubLeafLimits((prev) => {
+      const cur = prev[key] ?? 0
+      return { ...prev, [key]: cur === 0 ? Math.min(VISIBLE_LEAVES_DEFAULT, totalLeaves) : 0 }
     })
+  }
+  function expandAllSubLeaves(key: string, totalLeaves: number) {
+    setSubLeafLimits((prev) => ({ ...prev, [key]: totalLeaves }))
   }
 
   // Pan / zoom state. Translation in viewport CSS pixels; scale is a
@@ -315,11 +328,12 @@ export function MindMapLens({ props, displayName }: { props: LensProps; displayN
     }).format(v)
 
   // Dotted grid pattern — repeats with the canvas so dots flow under
-  // the cursor as the user pans (the Stitch / Claude Design feel).
-  // Density 24px at scale 1; the CSS background-size scales with the
-  // pan layer so dots stay constant pixel-size at scale 1 and visibly
-  // zoom when the user zooms in/out, matching the rest of the canvas.
-  const dotsBg = `radial-gradient(${colors.line}99 1.2px, transparent 1.6px)`
+  // the cursor as the user pans (the tldraw / Stitch / Claude Design
+  // feel). `colors.line` is rgba 8% which is invisible against the
+  // cream bg, so we use a stronger ink at 18% directly. 22px lattice;
+  // background-size scales with zoom so the grid breathes with the
+  // canvas instead of appearing pinned to the viewport.
+  const dotsBg = `radial-gradient(rgba(28,24,17,0.18) 1.4px, transparent 1.8px)`
 
   return (
     <div
@@ -385,7 +399,7 @@ export function MindMapLens({ props, displayName }: { props: LensProps; displayN
           // dot phase tracks `view.tx`/`view.ty` so the pattern flows
           // under the pointer when the canvas pans.
           backgroundImage: dotsBg,
-          backgroundSize: `${24 * view.scale}px ${24 * view.scale}px`,
+          backgroundSize: `${22 * view.scale}px ${22 * view.scale}px`,
           backgroundPosition: `${view.tx}px ${view.ty}px`,
           touchAction: 'none',
         }}
@@ -585,29 +599,24 @@ export function MindMapLens({ props, displayName }: { props: LensProps; displayN
                     const sy = y - subSpread / 2 + si * 64 + 32
                     const sx = x + dirX * 220
                     const subKey = `${b.label}::${si}`
-                    const isSubCollapsed = collapsedSubs.has(subKey)
+                    const limit = subLeafLimits[subKey] ?? 0
+                    const visibleLeaves = s.leaves.slice(0, limit)
+                    const hiddenCount = Math.max(0, s.leaves.length - limit)
+                    const expanded = limit > 0
                     const hasLeaves = s.leaves.length > 0
+                    const slotCount = visibleLeaves.length + (hiddenCount > 0 ? 1 : 0)
                     return (
-                      <div
-                        key={subKey}
-                        style={{
-                          position: 'absolute',
-                          left: sx,
-                          top: sy,
-                          transform: `translate(${b.side === 'left' ? '-100%' : '0'}, -50%)`,
-                          zIndex: 3,
-                          maxWidth: 260,
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: b.side === 'left' ? 'flex-end' : 'flex-start',
-                          fontFamily: font.sans,
-                        }}
-                      >
+                      <React.Fragment key={subKey}>
                         <button
                           data-no-pan
                           type="button"
-                          onClick={() => hasLeaves && toggleSub(subKey)}
+                          onClick={() => hasLeaves && toggleSubLeaves(subKey, s.leaves.length)}
                           style={{
+                            position: 'absolute',
+                            left: sx,
+                            top: sy,
+                            transform: `translate(${b.side === 'left' ? '-100%' : '0'}, -50%)`,
+                            zIndex: 3,
                             padding: '7px 12px',
                             borderRadius: 10,
                             background: '#fff',
@@ -622,13 +631,14 @@ export function MindMapLens({ props, displayName }: { props: LensProps; displayN
                             gap: 8,
                             whiteSpace: 'nowrap',
                             maxWidth: 240,
+                            fontFamily: font.sans,
                           }}
                           title={
                             !hasLeaves
                               ? s.label
-                              : isSubCollapsed
-                              ? `Expand ${s.label}`
-                              : `Collapse ${s.label}`
+                              : expanded
+                              ? `Collapse ${s.label}`
+                              : `Expand ${s.label}`
                           }
                         >
                           <span
@@ -651,50 +661,134 @@ export function MindMapLens({ props, displayName }: { props: LensProps; displayN
                                 padding: '1px 5px',
                               }}
                             >
-                              {isSubCollapsed ? `+${s.leaves.length}` : '−'}
+                              {expanded ? '−' : `+${s.leaves.length}`}
                             </span>
                           )}
                         </button>
-                        {hasLeaves && !isSubCollapsed && (
-                          <div
-                            style={{
-                              marginTop: 6,
-                              paddingLeft: b.side === 'left' ? 0 : 12,
-                              paddingRight: b.side === 'left' ? 12 : 0,
-                              borderLeft:
-                                b.side === 'right' ? `1.5px dotted ${b.color}55` : 'none',
-                              borderRight:
-                                b.side === 'left' ? `1.5px dotted ${b.color}55` : 'none',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              gap: 3,
-                              alignItems: b.side === 'left' ? 'flex-end' : 'flex-start',
-                            }}
-                          >
-                            {s.leaves.map((leaf, li) => (
+
+                        {/* Leaf connectors — drawn as a small SVG layer
+                            anchored at the sub-card so the curves bend
+                            from the sub-card edge to each leaf. */}
+                        {expanded &&
+                          slotCount > 0 &&
+                          (() => {
+                            const lx = sx + dirX * 200
+                            const slots: number[] = []
+                            for (let i = 0; i < slotCount; i++) {
+                              slots.push(sy + (i - (slotCount - 1) / 2) * 26)
+                            }
+                            return (
+                              <svg
+                                style={{
+                                  position: 'absolute',
+                                  left: 0,
+                                  top: 0,
+                                  width: CANVAS_W,
+                                  height: CANVAS_H,
+                                  pointerEvents: 'none',
+                                  zIndex: 1,
+                                }}
+                              >
+                                {slots.map((ly, li) => {
+                                  const c1x = sx + dirX * 60
+                                  const c1y = sy
+                                  const c2x = lx - dirX * 50
+                                  const c2y = ly
+                                  return (
+                                    <path
+                                      key={li}
+                                      d={`M ${sx},${sy} C ${c1x},${c1y} ${c2x},${c2y} ${lx},${ly}`}
+                                      stroke={b.color}
+                                      strokeWidth={1.6}
+                                      fill="none"
+                                      opacity="0.45"
+                                      strokeLinecap="round"
+                                    />
+                                  )
+                                })}
+                              </svg>
+                            )
+                          })()}
+
+                        {/* Each visible leaf is its own positioned chip
+                            so the layout reads as a real tree (one node
+                            per merchant) rather than a list crammed
+                            below the parent card. */}
+                        {expanded &&
+                          visibleLeaves.map((leaf, li) => {
+                            const lx = sx + dirX * 200
+                            const ly = sy + (li - (slotCount - 1) / 2) * 26
+                            return (
                               <div
-                                key={li}
+                                key={`${subKey}-leaf-${li}`}
                                 data-no-pan
                                 style={{
+                                  position: 'absolute',
+                                  left: lx,
+                                  top: ly,
+                                  transform: `translate(${
+                                    b.side === 'left' ? '-100%' : '0'
+                                  }, -50%)`,
+                                  zIndex: 3,
                                   fontSize: 11,
+                                  fontFamily: font.sans,
                                   color: colors.ink3,
                                   fontWeight: 500,
-                                  padding: '3px 8px',
-                                  borderRadius: 4,
-                                  background: 'rgba(255,255,255,0.85)',
+                                  padding: '3px 9px',
+                                  borderRadius: 8,
+                                  background: '#fff',
                                   whiteSpace: 'nowrap',
                                   overflow: 'hidden',
                                   textOverflow: 'ellipsis',
                                   maxWidth: 240,
-                                  border: `0.5px solid ${b.color}33`,
+                                  border: `0.5px solid ${b.color}55`,
+                                  boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
                                 }}
                               >
                                 {leaf}
                               </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
+                            )
+                          })}
+
+                        {/* "+N more" terminator — clicking expands the
+                            sub-card to show every merchant. Lives in
+                            the same vertical slot as a leaf so the
+                            curves stay symmetrical. */}
+                        {expanded && hiddenCount > 0 && (() => {
+                          const lx = sx + dirX * 200
+                          const tIdx = visibleLeaves.length
+                          const ly = sy + (tIdx - (slotCount - 1) / 2) * 26
+                          return (
+                            <button
+                              data-no-pan
+                              type="button"
+                              onClick={() => expandAllSubLeaves(subKey, s.leaves.length)}
+                              style={{
+                                position: 'absolute',
+                                left: lx,
+                                top: ly,
+                                transform: `translate(${
+                                  b.side === 'left' ? '-100%' : '0'
+                                }, -50%)`,
+                                zIndex: 3,
+                                fontSize: 11,
+                                fontFamily: font.sans,
+                                color: b.color,
+                                fontWeight: 700,
+                                padding: '3px 9px',
+                                borderRadius: 8,
+                                background: '#fff',
+                                border: `1px dashed ${b.color}`,
+                                cursor: 'pointer',
+                                whiteSpace: 'nowrap',
+                              }}
+                              title={`Show all ${s.leaves.length} merchants`}
+                            >
+                              +{hiddenCount} more
+                            </button>
+                          )
+                        })()}
+                      </React.Fragment>
                     )
                   })}
               </React.Fragment>
