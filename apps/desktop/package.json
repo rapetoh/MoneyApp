@@ -1,5 +1,6 @@
 {
   "name": "@voice-expense/desktop",
+  "productName": "Murmur",
   "version": "0.1.0",
   "private": true,
   "description": "Murmur desktop app — Electron wrapper around the Next.js web UI with an embedded standalone server.",
