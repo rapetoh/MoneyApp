@@ -2672,8 +2672,181 @@ because Gatekeeper rejects ad-hoc-signed apps from the internet.
 - Test the x64 DMG on an Intel mac if one's available.
 
 **What's still parked:** the full code-signing + notarization
-interactive session above; Windows + Linux DMG/AppImage targets;
-auto-updates via electron-updater; native bridge (system save dialog
-for export, deep links).
+interactive session above; Linux AppImage target; auto-updates via
+electron-updater; native bridge (system save dialog for export, deep
+links).
+
+### Phase I part 2 follow-up — desktop QA arc + Windows build (May 4–10, 2026)
+
+The packaged macOS DMG made it to the user's machine and revealed a
+long string of regressions through walkthroughs. Whole arc landed in
+commits `d43a36f` → `618467d`. Highlights:
+
+**Launch chrome (commits `d43a36f` → `203516a`):**
+- `child_process.spawn(process.execPath, [serverJs], {
+  ELECTRON_RUN_AS_NODE: 1 })` was triggering a stray Terminal-shaped
+  window on every launch — LaunchServices was registering the spawned
+  Electron-as-Node child as a second app instance. Replaced with
+  `utilityProcess.fork(serverJs, ...)`, Electron's purpose-built API
+  for managed Node children. No second LaunchServices entry, no extra
+  window.
+- Finder-launched apps inherit a clean GUI env that doesn't see the
+  user's shell — so `OPENAI_API_KEY` etc. weren't reaching the
+  embedded server, Ask Murmur 500'd, Plus paywall stayed up. Added
+  [apps/desktop/src/main.ts:loadEnvFile](../apps/desktop/src/main.ts)
+  which reads `<userData>/.env` and merges into the spawned env.
+- macOS traffic-lights overlapping the sidebar logo: added a 36-px
+  draggable strip via [apps/web/src/components/DesktopChrome.tsx](../apps/web/src/components/DesktopChrome.tsx)
+  and `body { padding-top: var(--desktop-title-bar) }` so content
+  starts below the strip on macOS only.
+
+**Plus gating split (commit `d43a36f`):**
+- Replaced ad-hoc `process.env.NODE_ENV !== 'production'` checks
+  scattered across pages with a proper resolver
+  [apps/web/src/lib/plus.server.ts](../apps/web/src/lib/plus.server.ts)
+  + React context [apps/web/src/lib/plus.tsx](../apps/web/src/lib/plus.tsx).
+  `dashboard/layout.tsx` resolves once per request server-side and
+  passes through `<PlusProvider isPlus={...}>`. Resolver honours a
+  runtime `MURMUR_DEV_PLUS=1` env override so the user can toggle
+  the gate from `<userData>/.env` without rebuilding.
+
+**Mind-map rebuild (commit `0152a9e`):**
+- Replaced the horizontal-scroll viewport with a real infinite
+  canvas: drag-to-pan, wheel-pan, ⌘+scroll-to-zoom around the
+  cursor, recenter button. Dotted background tracks `view.tx/ty` so
+  dots flow under the cursor as the user pans (Stitch / Claude Design
+  feel). Each merchant becomes its own positioned chip with a curved
+  bezier connector to its sub-category card; the previous layout
+  stacked chips inside the parent card and read as cluttered.
+  Two-level fold: each branch can collapse its sub-nodes, each
+  sub-card can collapse its merchants, and a `+N more` terminator
+  reveals all merchants when there are more than the visible 5.
+
+**Treemap full-canvas + lens fixed-heights (commits `885abeb`,
+`6ac2cd3`):**
+- The treemap had a "Quick read" sidebar that swallowed 22% of the
+  canvas to repeat stats already in the page header. Dropped. Cells
+  now use 100% width with a per-row minimum-width floor (14% top,
+  18% tail) so a $20 category next to a $20 K one stays readable.
+- All lenses (Treemap, Calendar, Cashflow, Matrix) switched from
+  `height: '100%'` to `height: 600` after the percent-height was
+  collapsing because the parent flex chain didn't propagate a
+  determinate height. Mind map already used `height: 600`; the rest
+  match now.
+
+**Body-scroll lock (commits `c638b4a`, then reverted-and-redone
+`8e5f8aa` / `430613a` / `c638b4a`):**
+- Goal: dashboard occupies one screen, only `<main>` scrolls when
+  needed, body never scrolls. Initial fix added `html, body {
+  height: 100vh; overflow: hidden }` plus sidebar `height: 100%`,
+  which **locked scroll correctly** but **triggered a Chromium
+  compositing/paint bug** that left `dashboard/page.tsx`'s toolbar
+  text + headerRow + lens pills *unpainted* on screen — DOM, color,
+  visibility, opacity were all correct via `getBoundingClientRect`
+  and `getComputedStyle`, but pixels never reached the screen.
+- After diagnosing via DevTools console (`document.querySelectorAll('main > div > div > div')...`),
+  rolled back the html/body overflow and committed the **minimal**
+  fix in `c638b4a`: sidebar `height: '100%'` only. Layout chain
+  alone (`body padding-top` + `layout div height: calc(100vh -
+  title-bar)` + sidebar fits exactly) is enough to keep the body
+  from overflowing — no `overflow: hidden` needed, no paint bug.
+
+**Plus env-loader correctness (commits `1daa9bd`, `3eac9ee`):**
+- Added [apps/web/src/app/api/plus-status/route.ts](../apps/web/src/app/api/plus-status/route.ts)
+  diagnostic endpoint to expose what the server-side resolver
+  actually sees. Diagnostic returned `MURMUR_DEV_PLUS: null`
+  *despite* the env file existing — root cause: Electron's
+  `app.getName()` defaulted to package.json `name`
+  (`@voice-expense/desktop`), so `app.getPath('userData')` resolved
+  to `~/Library/Application Support/@voice-expense/desktop/` not
+  `Murmur/`. The user's env file was at the right name but the app
+  was looking under the wrong one. Fix: added `"productName":
+  "Murmur"` to [apps/desktop/package.json](../apps/desktop/package.json).
+  Electron reads productName at app init, before
+  `app.whenReady()`. After the fix the diagnostic returned
+  `isPlus: true`, `MURMUR_DEV_PLUS: '1'`, `OPENAI_API_KEY_set:
+  true` — Plus paywall gone, Ask Murmur AI calls work end-to-end
+  in the packaged build.
+- The `/api/plus-status` route is **still in the tree** as of this
+  handoff. Remove it in a follow-up commit when convenient (1-line
+  delete-the-folder).
+
+**Windows build (commit `618467d`):**
+- `electron-builder.yml` now has a `win:` section with NSIS target
+  (`oneClick=true`, Start-menu + desktop shortcuts, custom installer
+  icon, x64 only — Windows arm64 still rare in the wild).
+- New script: `npm --prefix apps/desktop run dist:win` cross-compiles
+  from macOS via electron-builder + Wine. Wine is Intel-only so
+  Apple Silicon Macs need **Rosetta 2** installed once
+  (`softwareupdate --install-rosetta --agree-to-license`).
+- [apps/desktop/scripts/generate-icns.mjs](../apps/desktop/scripts/generate-icns.mjs)
+  now also produces `build/icon.ico` packed with the seven standard
+  ICO sizes (16/24/32/48/64/128/256) via `png-to-ico`.
+- DesktopChrome now mounts only on macOS (`platform === 'darwin'`).
+  On Windows the OS provides its own native title bar — no custom
+  drag strip needed; the CSS var `--desktop-title-bar` falls back to
+  `0px` and all the layout calc()s adapt automatically.
+- Output: `apps/desktop/release/Murmur-Setup-0.1.0.exe` (92 MB).
+  Unsigned — Windows SmartScreen warns on first launch and the user
+  clicks *More info → Run anyway* once.
+
+### Handoff to next session — reviews + tests (May 10, 2026)
+
+**This session shipped:** Phase I part 2 follow-up arc above —
+desktop QA closed, Plus dev unlock working end-to-end, Windows build
+added. 18 commits ahead of `origin/main`, nothing pushed yet.
+
+**Open the next session by:**
+1. Reading the user's review notes — these are the **highest-
+   priority input**:
+   - [docs/CROSS_PLATFORM_REVIEW.md](CROSS_PLATFORM_REVIEW.md)
+   - [docs/DESKTOP_REVIEW.md](DESKTOP_REVIEW.md)
+   - [docs/MOBILE_REVIEW.md](MOBILE_REVIEW.md)
+   - [docs/LOGIC_REVIEW.md](LOGIC_REVIEW.md)
+   These are untracked QA notes the user has been keeping while
+   walking through the app. Triage them into a prioritised fix list
+   before touching code. *I (the previous chat) did not read these
+   yet.*
+2. Run `git log --oneline 7018612..HEAD` for the full Phase I part 2
+   commit arc with detailed messages.
+3. Read this PLAN.md from the bottom up — Phase I part 2 sections
+   are the most recent context.
+4. Memory file `project_murmur_redesign.md` for project-level state
+   summary.
+
+**Build artifacts on disk right now (May 10):**
+- `apps/desktop/release/Murmur-Setup-0.1.0.exe` (92 MB Windows
+  installer, x64) — fresh
+- `/Applications/Murmur.app` — the user's installed macOS copy from
+  the `c638b4a` build
+- macOS DMGs **not** in `release/` (cleared before the Windows
+  build); rerun `npm --prefix apps/desktop run dist` if needed
+
+**Backlog, in priority order:**
+1. **Reviews triage** — read the four `*_REVIEW.md` files, build a
+   prioritised fix list, execute. Likely the bulk of the next
+   session's work.
+2. **Remove `/api/plus-status` debug route** — 1-line cleanup once
+   reviews are in flight.
+3. **macOS code-signing + notarization** — interactive. The user
+   already has an Apple Developer account ($99/year, paid).
+   electron-builder.yml has the steps documented in the previous
+   Phase I part 2 section. Needs ~30 min: install Developer ID
+   Application cert into login keychain, gather Team ID + Apple
+   ID + app-specific password, edit electron-builder.yml to drop
+   `identity: null` and re-enable hardenedRuntime + entitlements,
+   short-circuit `afterPack.cjs`, set CSC + APPLE_ID env vars,
+   rebuild.
+4. **Windows code-signing** — separate cert (EV cert recommended
+   for SmartScreen reputation). Defer until macOS signing lands.
+5. **Real Plus subscriptions** (IAP / RevenueCat) — interactive.
+6. **Visual smoke-test in build pipeline** — promised twice in this
+   session, not built. Boots the packaged app, asserts toolbar text
+   pixels exist, fails the build if regression. Stops "toolbar
+   disappeared"-style bugs from reaching the user. Worth doing
+   before more big changes.
+7. Phase G widgets, brand pulse animation, voice in Ask, mobile
+   native-dep prebuild + dev-client rebuild, pre-launch infra
+   (privacy/ToS/Sentry/store metadata) — all parked.
 
 *End of Plan*
