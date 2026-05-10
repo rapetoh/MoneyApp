@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url'
 import { execFile as execFileCb } from 'node:child_process'
 import { promisify } from 'node:util'
 import sharp from 'sharp'
+import pngToIco from 'png-to-ico'
 
 const execFile = promisify(execFileCb)
 const here = dirname(fileURLToPath(import.meta.url))
@@ -14,6 +15,7 @@ const repoRoot = resolve(here, '../../..')
 const sourceSvg = resolve(repoRoot, 'apps/mobile/assets/brand/murmur-mark-cream.svg')
 const buildDir = resolve(here, '..', 'build')
 const outIcns = resolve(buildDir, 'icon.icns')
+const outIco = resolve(buildDir, 'icon.ico')
 const outIconPng = resolve(buildDir, 'icon.png')
 
 if (!existsSync(sourceSvg)) {
@@ -62,3 +64,17 @@ await execFile('iconutil', ['-c', 'icns', iconset, '-o', outIcns])
 await rm(tmp, { recursive: true, force: true })
 console.log(`✓ ${outIcns}`)
 console.log(`✓ ${outIconPng}`)
+
+// Windows .ico — pack the standard ICO sizes (16, 24, 32, 48, 64, 128, 256)
+// from the same brand SVG.
+const icoSizes = [16, 24, 32, 48, 64, 128, 256]
+const icoBuffers = await Promise.all(
+  icoSizes.map((size) =>
+    sharp(sourceSvg, { density: 384 })
+      .resize(size, size, { fit: 'contain', background: { r: 244, g: 241, b: 234, alpha: 1 } })
+      .png()
+      .toBuffer(),
+  ),
+)
+await writeFile(outIco, await pngToIco(icoBuffers))
+console.log(`✓ ${outIco}`)

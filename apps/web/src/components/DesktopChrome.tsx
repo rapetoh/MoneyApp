@@ -7,14 +7,18 @@ import { useEffect, useState } from 'react'
  * window in the packaged Electron desktop app, leaving room for the
  * macOS traffic-light buttons (red/yellow/green at the top-left).
  *
- * On pure web, `window.murmur` is undefined and this component renders
- * nothing — the layout is identical to before.
+ * Only mounts on **macOS** (`platform === 'darwin'`). On Windows the
+ * OS provides its own native title bar with min/max/close buttons
+ * above the BrowserWindow content — there's no traffic-light strip
+ * to clear, and the layout looks correct without any extra padding.
+ * On pure web, `window.murmur` is undefined and this component
+ * renders nothing.
  *
- * In the Electron build, the preload exposes `window.murmur.platform`;
- * we add a fixed-position 36px strip with `-webkit-app-region: drag`
- * so the whole strip works as a window-drag handle (matches Linear /
- * Notion / Slack on macOS), and we set a CSS variable so `<body>` can
- * pad its content down by the same amount.
+ * The preload exposes `window.murmur.platform`; we add a fixed-position
+ * 36px strip with `-webkit-app-region: drag` so the whole strip works
+ * as a window-drag handle (matches Linear / Notion / Slack on macOS),
+ * and we set a CSS variable so `<body>` can pad its content down by
+ * the same amount.
  */
 declare global {
   interface Window {
@@ -28,19 +32,19 @@ declare global {
 const TITLE_BAR_HEIGHT = 36
 
 export function DesktopChrome() {
-  const [isDesktop, setIsDesktop] = useState(false)
+  const [isMac, setIsMac] = useState(false)
 
   useEffect(() => {
     if (typeof window === 'undefined') return
-    const inElectron = Boolean(window.murmur)
-    setIsDesktop(inElectron)
+    const onMac = window.murmur?.platform === 'darwin'
+    setIsMac(onMac)
     document.documentElement.style.setProperty(
       '--desktop-title-bar',
-      inElectron ? `${TITLE_BAR_HEIGHT}px` : '0px'
+      onMac ? `${TITLE_BAR_HEIGHT}px` : '0px'
     )
   }, [])
 
-  if (!isDesktop) return null
+  if (!isMac) return null
 
   return (
     <div

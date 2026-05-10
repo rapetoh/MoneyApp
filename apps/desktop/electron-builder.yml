@@ -51,3 +51,28 @@ dmg:
       y: 220
       type: link
       path: /Applications
+
+win:
+  icon: build/icon.ico
+  target:
+    - target: nsis
+      arch:
+        - x64
+  # Unsigned v1 — Windows SmartScreen will warn on first launch and the
+  # user must click "More info → Run anyway" once. When a code-signing
+  # cert is wired up (EV cert recommended for SmartScreen reputation),
+  # set CSC_LINK + CSC_KEY_PASSWORD env vars at build time.
+
+nsis:
+  # One-step install: writes the app to Program Files for the current
+  # user, drops a Start-menu shortcut + desktop shortcut, no installer
+  # wizard pages. Standard "looks like a real Windows app" experience.
+  oneClick: true
+  perMachine: false
+  allowToChangeInstallationDirectory: false
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Murmur
+  installerIcon: build/icon.ico
+  uninstallerIcon: build/icon.ico
+  artifactName: ${productName}-Setup-${version}.${ext}
