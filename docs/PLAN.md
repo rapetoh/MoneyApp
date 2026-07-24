@@ -3209,4 +3209,94 @@ added. 18 commits ahead of `origin/main`, nothing pushed yet.
    native-dep prebuild + dev-client rebuild, pre-launch infra
    (privacy/ToS/Sentry/store metadata) — all parked.
 
+### Session — backend deployed live + reviews arc closed out (July 23, 2026)
+
+The project sat untouched from May 17 to July 23. This session's job
+was "review everything, finish it up." What it found and shipped:
+
+**Recovery + commit hygiene.**
+- The entire May 10–17 reviews-triage arc (P0 batches 1–2, P1
+  batches 1–2 — ~63 files, migrations 008–012, delete-user Edge
+  Function) was sitting **uncommitted** in the working tree. Verified
+  green (typecheck 6/6, AI harness), then committed as `67b3858`.
+- Supabase project `voice-expense-tracker` had been **auto-paused**
+  by the free tier during the idle months — the whole backend was
+  down. Restored to ACTIVE_HEALTHY.
+
+**Backend actually deployed (it never had been).**
+- Migrations 008–012 applied to the live database (only 001–007 were
+  ever applied; the P0 data-integrity fixes existed only in files).
+- `generate-recurring` + `delete-user` Edge Functions deployed —
+  the functions list was empty before this session, meaning server-
+  side recurring generation had **never run in production**; only the
+  mobile catch-up was generating occurrences.
+- pg_cron + pg_net enabled; `generate-recurring-daily` scheduled at
+  06:00 UTC. Smoke-tested live: 200 + `{generated:0,errors:0}` with
+  the service key, 401 without.
+- `generate-recurring` gained an explicit service-role-key check
+  (deployed with platform verify_jwt off — that can't validate the
+  new `sb_secret_*` key format — so the function enforces auth
+  itself).
+
+**Reviews triage — P1 batch 3 (`fdda4f7`).**
+- Desktop transaction CRUD (CROSS §1.2 CRITICAL): web Transactions
+  page gains Add / click-row-to-edit / soft-delete with the full
+  sync-field contract (client_id, version bumps, FX snapshot).
+  Inline "+ New category…" in the form covers CROSS §1.3.
+- Insights free on web, matching mobile (CROSS §4.2).
+
+**Ask Murmur persistence unified (`27557c2`).**
+- askMurmurStorage → `packages/shared/src/askStorage.ts`; mobile
+  one-shot asks now persist to the same `ask_conversations` /
+  `ask_messages` tables and appear in the desktop history dropdown.
+- PRD §7 updated to the honest storage contract (supersedes the
+  v1.0 "never stored server-side" line).
+
+**P2 polish (`7681c27`).**
+- Tab icons: Today hamburger → home, Budgets clock → wallet.
+- `currencySymbolFor` moved to shared; all six amount surfaces use
+  it (IncomeEditorModal had a hardcoded `$`).
+- Settings/Help version rows read `Constants.expoConfig.version`.
+
+**Verified:** typecheck 6/6, AI harness green, web production build
+passes.
+
+### Handoff — current state + remaining backlog (July 23, 2026)
+
+**Everything is committed and pushed.** The backend is live and
+consistent with the code. The reviews arc is closed except the
+items below.
+
+**Remaining backlog, in priority order:**
+1. **User smoke runs** (owed from the P0 batches, still unverified
+   on-device): credit-card receipt → `payment_method='credit_card'`;
+   monthly paystub → `monthly` cadence; fresh onboarding → income
+   txn shows its recurring rule; dedup query in PLAN returns zero
+   rows.
+2. **macOS code-signing + notarization** — interactive, ~30 min,
+   steps documented in the Phase I part 2 section. Then Windows
+   signing.
+3. **Real Plus subscriptions** (IAP / RevenueCat) — interactive.
+   The `plus_status` column + unified resolver make this a pure
+   backend wire-up now.
+4. **Apple SIWA on web login** (CROSS §1.1 CRITICAL) — needs the
+   web-callback OAuth client registered in the user's Apple
+   Developer account, so it's blocked on an interactive step.
+5. **Web i18n** (CROSS §6.4) — web UI is hardcoded English while
+   mobile ships 4 locales. Large but mechanical; `t()` +
+   locale files already exist in shared.
+6. **Visual smoke-test in build pipeline** — promised in the May
+   sessions, still not built.
+7. Remaining MEDIUM/LOW review items: desktop recurring-rule manual
+   CRUD (§1.8), voice_language picker (§2.1), forgot-password flow,
+   comma decimal input, offline-first recurring rules, PWA push.
+8. Pre-launch infra: register `murmur.app` + real `support@` inbox,
+   privacy policy/ToS pages, Sentry, store metadata, Phase G
+   widgets.
+
+**Supabase free-tier pause warning:** the project pauses after ~1
+week of inactivity. If the app "stops working" after a break, check
+project status first — restore takes one click (or ask Claude to
+restore it via MCP).
+
 *End of Plan*
