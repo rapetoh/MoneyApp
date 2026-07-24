@@ -1,14 +1,12 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '../../../lib/supabase/server'
 import { getProfile, getTransactions, getCategories, getActiveBudgets } from '../../../lib/data'
-import { resolvePlusStatus } from '../../../lib/plus.server'
 import { colors, font, radius, cat, type CategoryTint } from '../../../lib/theme'
 import { tintFor } from '../../../lib/categories'
 import { Toolbar } from '../../../components/Toolbar'
 import { Card } from '../../../components/Card'
 import { Money } from '../../../components/Money'
 import { Icon } from '../../../components/Icons'
-import { PaywallGate } from '../../../components/PaywallGate'
 import { InsightsToolbarRight } from './InsightsToolbarRight'
 import { aggAmount } from '@voice-expense/shared'
 
@@ -185,25 +183,9 @@ export default async function InsightsPage() {
     getActiveBudgets(supabase, user.id),
   ])
 
-  // Resolve Plus from the now-loaded profile so `plus_status === 'active'`
-  // flips the gate in production. Dev hatches still apply when the
-  // column is null/free.
-  const { isPlus } = resolvePlusStatus(profile)
-
-  if (!isPlus) {
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column' }}>
-        <Toolbar title="Insights" />
-        <div style={{ padding: '0 24px 24px' }}>
-          <PaywallGate
-            feature="Insights"
-            title="Six months of patterns and a forecast for next month."
-            body="See your trend, top merchants, the days you spend the most, and a projection that adapts as you log."
-          />
-        </div>
-      </div>
-    )
-  }
+  // Insights is free on every platform (CROSS §4.2). Mobile never
+  // gated it; the web gate was the mismatch. Plus keeps Ask Murmur,
+  // auto recurring, export formats, and desktop-companion perks.
 
   const txns = transactions as Txn[]
   const cats = categories as Array<{ id: string; name: string }>

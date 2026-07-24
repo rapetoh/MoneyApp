@@ -63,6 +63,21 @@ Deno.serve(async (req) => {
     return new Response('Method not allowed', { status: 405 })
   }
 
+  // The platform's verify_jwt can't validate the new sb_secret_* key
+  // format, so the function is deployed with verify_jwt off and does
+  // its own check: the caller must present the service-role key
+  // (which the platform injects into our env). The pg_cron job sends
+  // it in the Authorization header. Without this, anyone who found
+  // the URL could trigger generation runs.
+  const auth = req.headers.get('Authorization') ?? ''
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+  if (!serviceKey || auth !== `Bearer ${serviceKey}`) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      status: 401,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  }
+
   const now = new Date()
   let generated = 0
   let errors = 0

@@ -1,7 +1,8 @@
 'use client'
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
+import { snapshotFx } from '@voice-expense/shared'
 import { createClient } from '../../../lib/supabase/client'
 import { colors, font, radius } from '../../../lib/theme'
 import { Toolbar } from '../../../components/Toolbar'
@@ -16,6 +17,7 @@ type Txn = {
   id: string
   amount: number
   direction: 'debit' | 'credit'
+  currency_code: string
   merchant: string | null
   merchant_domain: string | null
   note: string | null
@@ -24,8 +26,30 @@ type Txn = {
   source: string | null
   transacted_at: string
   is_recurring?: boolean
+  version?: number | null
+  fx_rate_to_profile?: number | null
+  amount_in_profile_currency?: number | null
 }
 type Cat = { id: string; name: string; color?: string | null }
+
+const PAYMENT_METHODS: Array<{ value: string; label: string }> = [
+  { value: '', label: 'Not specified' },
+  { value: 'cash', label: 'Cash' },
+  { value: 'credit_card', label: 'Credit card' },
+  { value: 'debit_card', label: 'Debit card' },
+  { value: 'digital_wallet', label: 'Digital wallet' },
+  { value: 'bank_transfer', label: 'Bank transfer' },
+  { value: 'other', label: 'Other' },
+]
+
+const NEW_CATEGORY = '__new__'
+
+/** transacted_at ISO → value for a datetime-local input, in local time. */
+function toLocalInputValue(iso: string): string {
+  const d = new Date(iso)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
 
 type FilterKey = 'all' | 'voice' | 'apple-pay' | 'recurring' | 'income'
 
@@ -73,6 +97,20 @@ export default function TransactionsPage() {
   const [search, setSearch] = useState(initialQ)
   const [filter, setFilter] = useState<FilterKey>(filterParam)
 
+  // --- Entry form (create + edit). `editingId` null = new transaction.
+  const [showForm, setShowForm] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [fAmount, setFAmount] = useState('')
+  const [fDirection, setFDirection] = useState<'debit' | 'credit'>('debit')
+  const [fMerchant, setFMerchant] = useState('')
+  const [fNote, setFNote] = useState('')
+  const [fCategoryId, setFCategoryId] = useState('')
+  const [fNewCatName, setFNewCatName] = useState('')
+  const [fPayment, setFPayment] = useState('')
+  const [fDate, setFDate] = useState('')
+  const [formError, setFormError] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+
   // Re-sync the in-page search when the toolbar pushes a new ?q= via the
   // global search field. Without this, navigating from another tab to
   // /dashboard/transactions?q=foo wouldn't update the input.
@@ -84,31 +122,32 @@ export default function TransactionsPage() {
     setFilter(filterParam)
   }, [filterParam])
 
-  useEffect(() => {
-    async function load() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-      const [txns, cats, prof] = await Promise.all([
-        supabase
-          .from('transactions')
-          .select('*')
-          .eq('user_id', user.id)
-          .eq('is_deleted', false)
-          .order('transacted_at', { ascending: false }),
-        supabase
-          .from('categories')
-          .select('id, name, color')
-          .eq('user_id', user.id)
-          .eq('is_archived', false),
-        supabase.from('profiles').select('currency_code, locale').eq('id', user.id).single(),
-      ])
-      setTransactions((txns.data ?? []) as Txn[])
-      setCategories((cats.data ?? []) as Cat[])
-      setProfile(prof.data)
-      setLoading(false)
-    }
-    load()
+  const load = useCallback(async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const [txns, cats, prof] = await Promise.all([
+      supabase
+        .from('transactions')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('is_deleted', false)
+        .order('transacted_at', { ascending: false }),
+      supabase
+        .from('categories')
+        .select('id, name, color')
+        .eq('user_id', user.id)
+        .eq('is_archived', false),
+      supabase.from('profiles').select('currency_code, locale').eq('id', user.id).single(),
+    ])
+    setTransactions((txns.data ?? []) as Txn[])
+    setCategories((cats.data ?? []) as Cat[])
+    setProfile(prof.data)
+    setLoading(false)
   }, [])
+
+  useEffect(() => {
+    load()
+  }, [load])
 
   // Realtime. The channel name + the postgres_changes filter both
   // include the user's id so Supabase only sends this client the
@@ -160,6 +199,177 @@ export default function TransactionsPage() {
     else params.set('filter', f)
     const qs = params.toString()
     router.push(qs ? `${pathname}?${qs}` : pathname)
+  }
+
+  function openNewForm() {
+    setEditingId(null)
+    setFAmount('')
+    setFDirection('debit')
+    setFMerchant('')
+    setFNote('')
+    setFCategoryId('')
+    setFNewCatName('')
+    setFPayment('')
+    setFDate(toLocalInputValue(new Date().toISOString()))
+    setFormError(null)
+    setShowForm(true)
+  }
+
+  function openEditForm(t: Txn) {
+    setEditingId(t.id)
+    setFAmount(String(t.amount))
+    setFDirection(t.direction)
+    setFMerchant(t.merchant ?? '')
+    setFNote(t.note ?? '')
+    setFCategoryId(t.category_id ?? '')
+    setFNewCatName('')
+    setFPayment(t.payment_method ?? '')
+    setFDate(toLocalInputValue(t.transacted_at))
+    setFormError(null)
+    setShowForm(true)
+  }
+
+  function closeForm() {
+    setShowForm(false)
+    setEditingId(null)
+    setFormError(null)
+  }
+
+  /** Resolves the form's category selection to an id — creating the
+   *  category first when "+ New category" was picked (CROSS §1.3). */
+  async function resolveCategoryId(userId: string): Promise<{ id: string | null; error: string | null }> {
+    if (fCategoryId !== NEW_CATEGORY) return { id: fCategoryId || null, error: null }
+    const name = fNewCatName.trim()
+    if (!name) return { id: null, error: 'Enter a name for the new category' }
+    const normalized = name.toLowerCase()
+    // Reuse an existing category on name collision instead of failing
+    // the UNIQUE(user_id, name_normalized) constraint.
+    const existing = categories.find((c) => c.name.trim().toLowerCase() === normalized)
+    if (existing) return { id: existing.id, error: null }
+    const { data, error } = await supabase
+      .from('categories')
+      .insert({ user_id: userId, name, name_normalized: normalized })
+      .select('id')
+      .single()
+    if (error || !data) return { id: null, error: error?.message ?? 'Could not create category' }
+    return { id: data.id, error: null }
+  }
+
+  async function handleFormSave() {
+    const parsed = parseFloat(fAmount.replace(',', '.'))
+    if (isNaN(parsed) || parsed <= 0) {
+      setFormError('Enter a valid amount')
+      return
+    }
+    setSaving(true)
+    setFormError(null)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      setSaving(false)
+      setFormError('Not signed in')
+      return
+    }
+    const cat = await resolveCategoryId(user.id)
+    if (cat.error) {
+      setSaving(false)
+      setFormError(cat.error)
+      return
+    }
+    const transactedAt = fDate ? new Date(fDate).toISOString() : new Date().toISOString()
+    const shared = {
+      amount: parsed,
+      direction: fDirection,
+      merchant: fMerchant.trim() || null,
+      note: fNote.trim() || null,
+      category_id: cat.id,
+      payment_method: fPayment || null,
+      transacted_at: transactedAt,
+    }
+
+    if (editingId) {
+      const row = transactions.find((t) => t.id === editingId)
+      // Amount edits recompute the FX snapshot with the row's stored
+      // rate (dated to transacted_at, which doesn't change) — mirrors
+      // the mobile editTransaction path. Rows awaiting backfill stay
+      // null and the mobile backfill sweep picks them up.
+      const fxPatch =
+        row?.fx_rate_to_profile != null
+          ? { amount_in_profile_currency: Math.round(parsed * row.fx_rate_to_profile * 100) / 100 }
+          : {}
+      const { error } = await supabase
+        .from('transactions')
+        .update({
+          ...shared,
+          ...fxPatch,
+          version: (row?.version ?? 1) + 1,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', editingId)
+        .eq('user_id', user.id)
+      setSaving(false)
+      if (error) {
+        setFormError(error.message)
+        return
+      }
+    } else {
+      const id = crypto.randomUUID()
+      const now = new Date().toISOString()
+      const currency = profile?.currency_code ?? 'USD'
+      // Same-currency short-circuits to rate 1.0 without a network
+      // call; the manual web form always enters amounts in the
+      // profile currency, so this never blocks the save.
+      const fx = await snapshotFx(transactedAt, currency, currency, parsed)
+      const { error } = await supabase.from('transactions').insert({
+        id,
+        user_id: user.id,
+        ...shared,
+        currency_code: currency,
+        merchant_domain: null,
+        source: 'manual',
+        amount_in_profile_currency: fx?.amount_in_profile_currency ?? null,
+        fx_rate_to_profile: fx?.fx_rate_to_profile ?? null,
+        fx_rate_date: fx?.fx_rate_date ?? null,
+        client_id: id,
+        client_created_at: now,
+        version: 1,
+        is_deleted: false,
+      })
+      setSaving(false)
+      if (error) {
+        setFormError(error.message)
+        return
+      }
+    }
+    closeForm()
+    await load()
+  }
+
+  async function handleDelete() {
+    if (!editingId) return
+    if (!window.confirm('Delete this transaction? It can be recovered for 30 days.')) return
+    setSaving(true)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      setSaving(false)
+      return
+    }
+    const row = transactions.find((t) => t.id === editingId)
+    const { error } = await supabase
+      .from('transactions')
+      .update({
+        is_deleted: true,
+        deleted_at: new Date().toISOString(),
+        version: (row?.version ?? 1) + 1,
+      })
+      .eq('id', editingId)
+      .eq('user_id', user.id)
+    setSaving(false)
+    if (error) {
+      setFormError(error.message)
+      return
+    }
+    closeForm()
+    await load()
   }
 
   const monthStart = useMemo(() => new Date(monthY, monthM, 1, 0, 0, 0, 0), [monthY, monthM])
@@ -236,6 +446,27 @@ export default function TransactionsPage() {
               cleared={!monthFilterActive}
               clearLabel="All time"
             />
+            <button
+              type="button"
+              onClick={openNewForm}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '6px 12px',
+                background: colors.accent,
+                color: '#fff',
+                borderRadius: radius.md,
+                border: 'none',
+                fontFamily: font.sans,
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              <Icon.plus color="#fff" size={12} />
+              Add transaction
+            </button>
             <Link
               href="/dashboard/export"
               style={{
@@ -290,6 +521,136 @@ export default function TransactionsPage() {
           </div>
         </div>
 
+        {showForm && (
+          <div style={styles.formCard}>
+            <div style={styles.formTitle}>
+              {editingId ? 'Edit transaction' : 'New transaction'}
+            </div>
+            {formError && <div style={styles.formError}>{formError}</div>}
+            <div style={styles.formRow}>
+              <div style={styles.field}>
+                <label style={styles.label}>Amount ({profile?.currency_code ?? 'USD'})</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={fAmount}
+                  onChange={(e) => setFAmount(e.target.value)}
+                  placeholder="0.00"
+                  style={styles.input}
+                  autoFocus
+                />
+              </div>
+              <div style={styles.field}>
+                <label style={styles.label}>Type</label>
+                <select
+                  value={fDirection}
+                  onChange={(e) => setFDirection(e.target.value as 'debit' | 'credit')}
+                  style={styles.select}
+                >
+                  <option value="debit">Expense</option>
+                  <option value="credit">Income</option>
+                </select>
+              </div>
+              <div style={styles.field}>
+                <label style={styles.label}>Date</label>
+                <input
+                  type="datetime-local"
+                  value={fDate}
+                  onChange={(e) => setFDate(e.target.value)}
+                  style={styles.input}
+                />
+              </div>
+            </div>
+            <div style={styles.formRow}>
+              <div style={styles.field}>
+                <label style={styles.label}>Merchant</label>
+                <input
+                  type="text"
+                  value={fMerchant}
+                  onChange={(e) => setFMerchant(e.target.value)}
+                  placeholder="Where was it?"
+                  style={styles.input}
+                />
+              </div>
+              <div style={styles.field}>
+                <label style={styles.label}>Category</label>
+                <select
+                  value={fCategoryId}
+                  onChange={(e) => setFCategoryId(e.target.value)}
+                  style={styles.select}
+                >
+                  <option value="">None</option>
+                  {categories
+                    .slice()
+                    .sort((a, b) => a.name.localeCompare(b.name))
+                    .map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  <option value={NEW_CATEGORY}>+ New category…</option>
+                </select>
+              </div>
+              {fCategoryId === NEW_CATEGORY && (
+                <div style={styles.field}>
+                  <label style={styles.label}>New category name</label>
+                  <input
+                    type="text"
+                    value={fNewCatName}
+                    onChange={(e) => setFNewCatName(e.target.value)}
+                    placeholder="e.g. Hobbies"
+                    style={styles.input}
+                  />
+                </div>
+              )}
+              <div style={styles.field}>
+                <label style={styles.label}>Payment method</label>
+                <select
+                  value={fPayment}
+                  onChange={(e) => setFPayment(e.target.value)}
+                  style={styles.select}
+                >
+                  {PAYMENT_METHODS.map((p) => (
+                    <option key={p.value} value={p.value}>
+                      {p.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div style={styles.formRow}>
+              <div style={styles.field}>
+                <label style={styles.label}>Note</label>
+                <input
+                  type="text"
+                  value={fNote}
+                  onChange={(e) => setFNote(e.target.value)}
+                  placeholder="Optional"
+                  style={styles.input}
+                />
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'space-between' }}>
+              <div>
+                {editingId && (
+                  <button type="button" onClick={handleDelete} disabled={saving} style={styles.deleteBtn}>
+                    Delete
+                  </button>
+                )}
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button type="button" onClick={closeForm} style={styles.cancelBtn}>
+                  Cancel
+                </button>
+                <button type="button" onClick={handleFormSave} disabled={saving} style={styles.saveBtn}>
+                  {saving ? 'Saving…' : 'Save'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Table */}
         <div style={styles.tableCard}>
           <div style={styles.tableHead}>
@@ -321,8 +682,11 @@ export default function TransactionsPage() {
                 return (
                   <div
                     key={t.id}
+                    onClick={() => openEditForm(t)}
+                    title="Click to edit"
                     style={{
                       ...styles.tableRow,
+                      cursor: 'pointer',
                       borderBottom: i === filtered.length - 1 ? 'none' : `0.5px solid ${colors.line}`,
                     }}
                   >
@@ -435,6 +799,79 @@ const chipStyles: Record<string, React.CSSProperties> = {
 
 const styles: Record<string, React.CSSProperties> = {
   content: { padding: '0 20px 20px', display: 'flex', flexDirection: 'column', gap: 14 },
+  formCard: {
+    background: colors.card,
+    borderRadius: radius.xl,
+    border: `0.5px solid ${colors.line}`,
+    padding: 16,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 12,
+    fontFamily: font.sans,
+  },
+  formTitle: { fontFamily: font.sans, fontWeight: 700, fontSize: 14, color: colors.ink },
+  formRow: { display: 'flex', gap: 12, flexWrap: 'wrap' },
+  field: { flex: 1, minWidth: 160, display: 'flex', flexDirection: 'column', gap: 4 },
+  label: { fontFamily: font.sans, fontSize: 11, color: colors.ink3, fontWeight: 600 },
+  input: {
+    padding: '8px 10px',
+    borderRadius: radius.md,
+    border: `0.5px solid ${colors.line}`,
+    fontFamily: font.sans,
+    fontSize: 13,
+    background: colors.surface,
+    color: colors.ink,
+  },
+  select: {
+    padding: '8px 10px',
+    borderRadius: radius.md,
+    border: `0.5px solid ${colors.line}`,
+    fontFamily: font.sans,
+    fontSize: 13,
+    background: colors.surface,
+    color: colors.ink,
+  },
+  cancelBtn: {
+    padding: '7px 14px',
+    borderRadius: radius.md,
+    border: `0.5px solid ${colors.line}`,
+    background: 'transparent',
+    color: colors.ink2,
+    fontFamily: font.sans,
+    fontSize: 12,
+    fontWeight: 600,
+    cursor: 'pointer',
+  },
+  saveBtn: {
+    padding: '7px 14px',
+    borderRadius: radius.md,
+    border: 'none',
+    background: colors.ink,
+    color: '#fff',
+    fontFamily: font.sans,
+    fontSize: 12,
+    fontWeight: 600,
+    cursor: 'pointer',
+  },
+  deleteBtn: {
+    padding: '7px 14px',
+    borderRadius: radius.md,
+    border: '0.5px solid #A94646',
+    background: 'transparent',
+    color: '#A94646',
+    fontFamily: font.sans,
+    fontSize: 12,
+    fontWeight: 600,
+    cursor: 'pointer',
+  },
+  formError: {
+    fontFamily: font.sans,
+    fontSize: 12,
+    color: '#A94646',
+    background: '#F7E7E7',
+    padding: '6px 10px',
+    borderRadius: radius.md,
+  },
   headerRow: {
     display: 'flex',
     justifyContent: 'space-between',
