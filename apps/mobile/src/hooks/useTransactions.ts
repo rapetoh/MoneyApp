@@ -5,7 +5,9 @@ import { enqueue } from '../services/sync/syncQueue'
 import { syncManager } from '../services/sync/SyncManager'
 import { DataEvents } from '../events/dataEvents'
 import type { Transaction } from '@voice-expense/shared'
+import { snapshotFx, aggAmount } from '@voice-expense/shared'
 import * as Crypto from 'expo-crypto'
+import { getCurrentProfileCurrency } from '../services/profileCurrency'
 
 export function useTransactions(userId: string | undefined) {
   const [transactions, setTransactions] = useState<Transaction[]>([])
@@ -79,6 +81,14 @@ export function useTransactions(userId: string | undefined) {
 
     const now = new Date().toISOString()
     const clientId = Crypto.randomUUID()
+
+    // FX snapshot (migration 011). Same-currency → 1.0 short-circuits
+    // without a network call. Different currency → frankfurter.app
+    // lookup; on failure the row saves without the snapshot and gets
+    // picked up by the backfill sweep on next online launch.
+    const profileCurrency = getCurrentProfileCurrency()
+    const fx = await snapshotFx(now, fields.currency_code, profileCurrency, fields.amount)
+
     const txn: Transaction = {
       id: clientId,
       user_id: userId,
@@ -90,6 +100,9 @@ export function useTransactions(userId: string | undefined) {
       merchant_domain: fields.merchant_domain ?? null,
       note: fields.note,
       payment_method: fields.payment_method,
+      amount_in_profile_currency: fx?.amount_in_profile_currency ?? null,
+      fx_rate_to_profile: fx?.fx_rate_to_profile ?? null,
+      fx_rate_date: fx?.fx_rate_date ?? null,
       transacted_at: now,
       source: fields.source ?? 'manual',
       raw_transcript: fields.raw_transcript ?? null,
@@ -147,6 +160,25 @@ export function useTransactions(userId: string | undefined) {
     if (!userId) return { error: 'Not authenticated' }
 
     await updateTransactionFields(id, fields)
+
+    // If the amount changed, the FX snapshot is now stale. Reuse the
+    // row's existing `fx_rate_to_profile` (the rate is dated to the
+    // transaction's transacted_at — that day doesn't change) and
+    // recompute the converted amount in place. No network call.
+    // When the row has no snapshot yet (foreign-currency historical
+    // row awaiting backfill), we leave the snapshot null and let the
+    // backfill pick it up.
+    if (fields.amount != null) {
+      const store = await import('../services/sync/transactionStore')
+      const row = await store.getTransactionById(id)
+      if (row?.fx_rate_to_profile != null) {
+        await store.updateAmountSnapshot(
+          id,
+          Math.round(fields.amount * row.fx_rate_to_profile * 100) / 100,
+        )
+      }
+    }
+
     await loadLocal()
     DataEvents.emitTransactions(userId)
 
@@ -175,11 +207,11 @@ export function useMonthSummary(transactions: Transaction[]) {
 
   const totalIncome = monthTxns
     .filter((t) => t.direction === 'credit')
-    .reduce((sum, t) => sum + t.amount, 0)
+    .reduce((sum, t) => sum + aggAmount(t), 0)
 
   const totalExpenses = monthTxns
     .filter((t) => t.direction === 'debit')
-    .reduce((sum, t) => sum + t.amount, 0)
+    .reduce((sum, t) => sum + aggAmount(t), 0)
 
   const netBalance = totalIncome - totalExpenses
 

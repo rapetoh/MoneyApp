@@ -21,7 +21,10 @@ export default async function DashboardLayout({ children }: { children: React.Re
   ])
   const displayName = profile?.display_name ?? user.email?.split('@')[0] ?? 'User'
   const recurringCount = recurringResult.count ?? 0
-  const { isPlus } = resolvePlusStatus()
+  // Pass the profile in so `plus_status === 'active'` flips the gate
+  // on production once IAP populates the column. Dev-only env hatches
+  // still take effect when the column is null/free.
+  const { isPlus } = resolvePlusStatus(profile)
 
   return (
     <PlusProvider isPlus={isPlus}>

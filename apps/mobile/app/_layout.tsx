@@ -8,6 +8,7 @@ import { syncManager } from '../src/services/sync/SyncManager'
 import { useShortcutHandler } from '../src/hooks/useShortcutHandler'
 import { seedDefaultCategories } from '../src/services/seedCategories'
 import { runRecurringCatchUp } from '../src/services/recurringCatchUp'
+import { runFxBackfill } from '../src/services/fxBackfill'
 import { UndoProvider } from '../src/hooks/useUndo'
 import { t } from '@voice-expense/shared'
 import type { Locale } from '@voice-expense/shared'
@@ -96,6 +97,11 @@ export default function RootLayout() {
 
       // Generate any missed recurring transactions since last app open
       runRecurringCatchUp(session.user.id)
+
+      // Convert any foreign-currency historical rows that pre-date the
+      // FX snapshot migration. Self-throttles to FX_BACKFILL_BATCH per
+      // launch and is a no-op once everything is filled in.
+      runFxBackfill(session.user.id)
     }
   }, [session, loading, segments, router, profile, ready])
 

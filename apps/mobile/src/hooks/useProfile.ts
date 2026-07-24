@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { DataEvents } from '../events/dataEvents'
+import { setCurrentProfileCurrency } from '../services/profileCurrency'
 import type { Profile, ProfileUpdate } from '@voice-expense/shared'
 
 // On fresh sign-up, the profile row is created by a server-side trigger
@@ -29,6 +30,10 @@ export function useProfile(userId: string | undefined) {
 
     if (data) {
       setProfile(data as Profile)
+      // Keep the in-memory profile-currency cache in sync so write
+      // paths (createTransaction, recurringCatchUp) can snapshot FX
+      // without prop-drilling. See services/profileCurrency.ts.
+      setCurrentProfileCurrency((data as Profile).currency_code)
       setLoading(false)
       retryStartRef.current = null
       if (retryTimerRef.current) {

@@ -1,9 +1,15 @@
-import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native'
+import { useState } from 'react'
+import { View, Text, StyleSheet, ScrollView, Pressable, Alert } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Stack, useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '../../src/hooks/useAuth'
 import { useProfile } from '../../src/hooks/useProfile'
+import { useTransactions } from '../../src/hooks/useTransactions'
+import { useCategories } from '../../src/hooks/useCategories'
+import { supabase } from '../../src/lib/supabase'
+import { exportAndShare } from '../../src/services/exportData'
+import { wipeAllUserData } from '../../src/services/sync/transactionStore'
 import { Colors, Typography, Hairline } from '../../src/theme'
 import { t, type Locale } from '@voice-expense/shared'
 
@@ -108,8 +114,84 @@ function SetRow({
 export default function PrivacyScreen() {
   const { user } = useAuth()
   const { profile } = useProfile(user?.id)
+  const { transactions } = useTransactions(user?.id)
+  const { categories } = useCategories(user?.id)
   const locale = (profile?.locale ?? 'en') as Locale
+  const currency = profile?.currency_code ?? 'USD'
   const router = useRouter()
+
+  const [exporting, setExporting] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+
+  // Privacy's Export-all is the GDPR right to data portability — free
+  // for every user, not Plus-gated (the convenience exporter in Settings
+  // still offers a format picker; this one ships a complete JSON dump,
+  // the format mandated as "structured, commonly used, machine-readable").
+  async function handleExportAll() {
+    if (exporting) return
+    setExporting(true)
+    try {
+      await exportAndShare('json', { transactions, categories, locale, currency })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      Alert.alert(t('privacy.export_all_failed', locale), message)
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  // GDPR right to erasure. Calls the server-side `delete-user` Edge
+  // Function (the only path that can also remove the auth.users row —
+  // SDK calls can't because they need the service-role key), then wipes
+  // local SQLite, then signs out. The destructive-style Alert is the
+  // confirmation gate; deletion happens only on the second tap.
+  async function handleDeleteAll() {
+    if (deleting || !user?.id) return
+    Alert.alert(
+      t('privacy.delete_all_title', locale),
+      t('privacy.delete_all_body', locale),
+      [
+        { text: t('common.cancel', locale), style: 'cancel' },
+        {
+          text: t('privacy.delete_all_confirm', locale),
+          style: 'destructive',
+          onPress: async () => {
+            setDeleting(true)
+            try {
+              const { data: sessionData } = await supabase.auth.getSession()
+              const token = sessionData?.session?.access_token
+              if (!token) throw new Error('Not authenticated')
+
+              const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL
+              const res = await fetch(`${supabaseUrl}/functions/v1/delete-user`, {
+                method: 'POST',
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                  'Content-Type': 'application/json',
+                },
+              })
+              if (!res.ok) {
+                const body = (await res.json().catch(() => ({}))) as { error?: string }
+                throw new Error(body.error ?? `HTTP ${res.status}`)
+              }
+
+              // Server confirms the account is gone — clear the local
+              // mirror so a re-sign-up on the same device starts truly
+              // empty, then sign out (invalidates the cached session).
+              await wipeAllUserData(user.id)
+              await supabase.auth.signOut()
+              // The root layout's auth listener will route to /(auth)/sign-in
+              // when the session clears; no manual router.replace needed.
+            } catch (err) {
+              const message = err instanceof Error ? err.message : String(err)
+              Alert.alert(t('privacy.delete_all_failed', locale), message)
+              setDeleting(false)
+            }
+          },
+        },
+      ],
+    )
+  }
 
   return (
     <>
@@ -185,10 +267,22 @@ export default function PrivacyScreen() {
             />
           </SetGroup>
 
-          {/* Your rights */}
+          {/* Your rights — GDPR-grade controls. Export lands as a
+              machine-readable JSON dump via the system share sheet;
+              Delete tears down the entire account through the
+              `delete-user` Edge Function and signs the user out. Both
+              are unconditionally available, including for free users. */}
           <SetGroup label={t('privacy.group_rights', locale)}>
-            <SetRow label={t('privacy.export_all', locale)} />
-            <SetRow label={t('privacy.delete_all', locale)} danger last />
+            <SetRow
+              label={exporting ? t('privacy.export_all_busy', locale) : t('privacy.export_all', locale)}
+              onPress={handleExportAll}
+            />
+            <SetRow
+              label={deleting ? t('privacy.delete_all_busy', locale) : t('privacy.delete_all', locale)}
+              onPress={handleDeleteAll}
+              danger
+              last
+            />
           </SetGroup>
         </ScrollView>
       </SafeAreaView>

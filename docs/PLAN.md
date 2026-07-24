@@ -2790,6 +2790,366 @@ commits `d43a36f` → `618467d`. Highlights:
   Unsigned — Windows SmartScreen warns on first launch and the user
   clicks *More info → Run anyway* once.
 
+### Reviews triage — P0 batch (May 10, 2026)
+
+Four cross-cutting QA docs landed under [docs/reviews/](reviews/) —
+`CROSS_PLATFORM_REVIEW.md`, `DESKTOP_REVIEW.md`, `MOBILE_REVIEW.md`,
+`LOGIC_REVIEW.md`. Triage produced a P0/P1/P2 list (notes in the chat
+transcript and `memory/project_murmur_redesign.md`). P0 is the
+data-integrity + honest-claims batch — everything that silently
+corrupts a user's data or misleads them. P1 is capability gaps
+(desktop CRUD, Apple SIWA on web, unified `isPlus`). P2 is polish
+(i18n, mobile tab icons, currency display).
+
+**P0 shipped this batch (LOGIC §1.3.1, §1.3.2, §1.4, §1.5.x):**
+
+1. **Recurring catch-up de-duplication (LOGIC §1.5.1–§1.5.3).**
+   The mobile catch-up and the `generate-recurring` Edge Function both
+   generated occurrences for the same `(rule, date)` pair, each with a
+   fresh UUID, and the existing `version` check did not catch them
+   because that protects identical-id collisions, not different-id
+   duplicates.
+   - **Migration 008** at
+     [supabase/migrations/008_recurring_dedup_constraint.sql](../supabase/migrations/008_recurring_dedup_constraint.sql).
+     Soft-deletes any duplicates already on disk (keeps the earliest
+     row per `(user, rule, transacted_at::date)` by `created_at`),
+     then builds a partial unique index
+     `idx_txn_recurring_dedup` on the same tuple with
+     `WHERE recurring_rule_id IS NOT NULL AND is_deleted = false`.
+     Manual / voice / scan rows (rule_id = NULL) are exempt.
+   - **SyncManager** detects Postgres `23505` on that index, soft-
+     deletes the loser locally so SQLite matches the server view, and
+     drops the queue entry without ticking the retry counter
+     ([apps/mobile/src/services/sync/SyncManager.ts](../apps/mobile/src/services/sync/SyncManager.ts)).
+   - **Mobile catch-up** now writes `last_generated` to Supabase
+     **after each occurrence**, not once at the end of the loop. An
+     interrupted catch-up resumes from the right point on next
+     launch. It also checks SQLite with the new
+     `hasRecurringOccurrence(userId, ruleId, isoDate)` helper before
+     generating — if `pullRemote` already pulled down the server-cron
+     row, catch-up advances `last_generated` and skips, avoiding a
+     guaranteed local index violation.
+   - **Local SQLite mirror** at
+     [apps/mobile/src/services/sync/localDb.ts](../apps/mobile/src/services/sync/localDb.ts).
+     Same partial unique index, same dedup pass in `migrateSchema()`
+     before the index is built so existing installs don't fail
+     index creation on historical bad data.
+
+2. **Receipt scan auto-defaulting to `payment_method='cash'` (LOGIC §1.3.1).**
+   The receipt prompt at [packages/ai/src/prompt.ts](../packages/ai/src/prompt.ts)
+   didn't ask for `payment_method` at all and the save path at
+   `record.tsx` fell back to `'cash'` on null. Every credit-card
+   receipt was being logged as a cash transaction.
+   - Receipt prompt now requests `payment_method` and gives the model
+     concrete on-receipt signals to read (VISA/MASTERCARD/AMEX with
+     last-4 → `credit_card`, DEBIT/EFTPOS → `debit_card`, CASH
+     TENDERED → `cash`, APPLE PAY / GOOGLE PAY → `digital_wallet`).
+     Explicit instruction to return `null` when the receipt does not
+     show a payment method — "do not guess cash".
+   - `record.tsx`'s save path no longer falls back to `'cash'`. The
+     same `?? null` change applies to voice transcripts where the AI
+     can't determine a method.
+   - The edit screen's state widens to `PaymentMethod | null`. When
+     the user loads an existing transaction with no payment method,
+     no chip is selected, and saving without picking preserves
+     `null` instead of silently promoting the row to cash.
+   - Local SQLite `payment_method` column loses its
+     `NOT NULL DEFAULT 'cash'` constraint to match Supabase. New
+     installs get the loose column on first table create; existing
+     installs get the constraint dropped via a table-swap migration
+     in `migrateSchema()` (SQLite has no DROP NOT NULL).
+
+3. **Paycheck scan hardcoding `recurring_frequency_suggestion: "biweekly"` (LOGIC §1.3.2).**
+   The paycheck prompt template literally pre-filled `"biweekly"` in
+   the JSON the model was asked to return. Every monthly / weekly /
+   semimonthly paychecked user had to manually correct the suggested
+   cadence.
+   - Prompt now asks the model to determine cadence from the
+     pay-period dates on the stub. Returns `"weekly"` / `"biweekly"`
+     / `"monthly"` from the existing `RecurringFrequency` enum, or
+     `null` when only one pay period is visible or when the cadence
+     is semimonthly (which the enum doesn't yet represent — flagged
+     for a future enum extension if user feedback warrants it).
+   - Paycheck prompt also now sets `payment_method: "bank_transfer"`
+     since paychecks land via direct deposit. Matches the convention
+     already used by income onboarding.
+
+4. **Onboarding income → orphan rule (LOGIC §1.4, MOBILE §3.7).**
+   The income step at [apps/mobile/app/(onboarding)/income.tsx](../apps/mobile/app/(onboarding)/income.tsx)
+   called `createTransaction` and `createRule` separately and never
+   linked them. Every user's first income transaction looked broken
+   on the detail screen because the rule lookup
+   (`rules.find(r => r.template_txn_id === txn.id)`) returned null.
+   - Capture `txnId` from `createTransaction` and pass it as
+     `template_txn_id` to `createRule`. Matches the pattern already
+     used by the voice, manual entry, and edit-screen flows.
+
+**Typecheck:** `npx turbo typecheck` passes across all 6 packages
+after the batch. The `packages/ai` verification harness still passes
+its 27 assertions (the prompt changes are to the scan prompts, not
+the Ask Murmur prompts the harness exercises).
+
+**Open P0 questions waiting on the user (no code changes blocked on
+them yet — they shape the architecture of the next P0 round):**
+- `raw_transcript` syncing despite the "not stored" privacy claim
+  (MOBILE §4.1, DESKTOP §5.2): strip on sync, or keep storing + add
+  opt-in + change copy?
+- Dead privacy buttons (MOBILE §3.6, DESKTOP §3.2): wire them
+  (Export-all via existing `exportData.ts`, build Delete-all flow,
+  persist web toggles), or hide until wired?
+- Multi-currency totals (LOGIC §2.1): FX at write-time (rate
+  snapshot per txn) or FX at read-time (daily rate table)?
+- Support email: do you own `murmur.app`? Where should support@
+  forward?
+
+**Verification the user owes a smoke run on:**
+- Open a Supabase SQL editor and run
+  `SELECT user_id, recurring_rule_id, (transacted_at AT TIME ZONE 'UTC')::date AS day,
+   COUNT(*) FROM transactions WHERE recurring_rule_id IS NOT NULL
+   AND is_deleted = false GROUP BY 1,2,3 HAVING COUNT(*) > 1;` to
+  confirm migration 008's dedup actually cleaned existing dupes
+  (should return zero rows after apply).
+- Re-take a credit-card receipt → confirm `payment_method` lands as
+  `credit_card`, not `cash`.
+- Re-photograph a monthly paystub → confirm the suggested cadence is
+  `monthly`, not biweekly. If the stub only shows one period, expect
+  `null` and the modal staying on its default frequency.
+- Walk a fresh onboarding (clean install) → open the auto-created
+  income transaction's detail screen → confirm the recurring chip
+  shows the frequency and the next-due date (not the bare
+  "Recurring" ghost case).
+
+### Reviews triage — P0 batch 2 (May 10, 2026)
+
+The second P0 batch. Closes the privacy honesty + multi-currency + email
+items the first batch flagged as decisions-needed. Ownership note: the
+calls on FX strategy, privacy-toggle persistence, E2E-copy fix, and
+support email were taken on the engineering side rather than punted
+to the user — the user explicitly delegated those after the first batch.
+
+**Privacy: `raw_transcript` stops syncing (MOBILE §4.1, DESKTOP §5.2,
+LOGIC §6.5).**
+- [SyncManager.ts](../apps/mobile/src/services/sync/SyncManager.ts)
+  strips `raw_transcript` from the upsert payload before pushing to
+  Supabase. The transcript lives only on the recording device. The
+  ON CONFLICT clause in `upsertTransaction` never updates
+  `raw_transcript`, so a later `pullRemote` bringing back the
+  null-transcript server row does not overwrite the local copy.
+- [Migration 009](../supabase/migrations/009_strip_raw_transcript.sql)
+  NULLs out every historical row's `raw_transcript`. The column stays
+  in the schema so a future opt-in surface can re-introduce
+  transcripts without another schema change.
+
+**Privacy controls: real wiring on both platforms (MOBILE §3.6,
+DESKTOP §3.2).**
+- [Migration 010](../supabase/migrations/010_privacy_preferences.sql)
+  adds `profiles.analytics_opt_in` (default false) and
+  `profiles.crash_reports_opt_in` (default true).
+- Web [Settings → Privacy](../apps/web/src/app/dashboard/settings/page.tsx)
+  loads + persists those columns via `persistPrivacyFlag(column,
+  next)` with optimistic UI and rollback on write failure.
+- Mobile [more/privacy.tsx](../apps/mobile/app/more/privacy.tsx) wires
+  Export-all and Delete-all (both previously dead rows). Export-all
+  reuses the existing `exportData.ts` service in JSON format —
+  unconditionally free because GDPR data portability cannot be
+  paywalled (the convenience format-picker in Settings → Data stays
+  Plus). Delete-all triggers a destructive-style native Alert; on
+  confirm it calls the new server-side
+  [`delete-user` Edge Function](../supabase/functions/delete-user/index.ts),
+  wipes local SQLite via `wipeAllUserData(userId)`, then signs out.
+- Web Settings has the same two GDPR controls. Delete-all uses the
+  same Edge Function and forces a hard navigation to `/login`.
+- New i18n keys (`privacy.export_all_busy`, `privacy.delete_all_*`)
+  in all four locales.
+
+**Privacy copy: "End-to-end encrypted" replaced (DESKTOP §5.1).**
+- The Sync & devices card on web Settings now reads "Encrypted in
+  transit and at rest, protected by row-level security tied to your
+  account. Murmur stores your transactions but never connects to
+  your bank." Honest copy. Real E2E would be months of work and
+  break Ask Murmur's grounded reasoning; the right call is the copy.
+
+**Support email: single shared constant (MOBILE §6.1, DESKTOP §6.2).**
+- New
+  [packages/shared/src/brand.ts](../packages/shared/src/brand.ts)
+  exposes `SUPPORT_EMAIL` and `SUPPORT_MAILTO`. Both surfaces now
+  point at `support@murmur.app` (the placeholder web already used).
+  The personal Gmail in `apps/mobile/app/more/help.tsx` is gone.
+  Pre-launch follow-up: register `murmur.app` (if not already) and
+  point `support@` at the real inbox.
+
+**Multi-currency: write-time FX snapshot (LOGIC §2.1).**
+- The honest fix, not a workaround. Aggregations sum the snapshot,
+  not raw `amount`, so `$1000 + €50` stops appearing as `$1050`.
+- [Migration 011](../supabase/migrations/011_fx_snapshot.sql) adds
+  `amount_in_profile_currency`, `fx_rate_to_profile`, `fx_rate_date`
+  to `transactions`. Backfills same-currency rows in place (rate
+  1.0). Foreign-currency historical rows stay NULL pending
+  client-side backfill (see below).
+- FX provider:
+  [packages/shared/src/utils/fx.ts](../packages/shared/src/utils/fx.ts)
+  — `snapshotFx(transactedAt, fromCurrency, toCurrency, amount)`
+  hits frankfurter.app (free, ECB-sourced, no API key). In-process
+  cache by `(date, from, to)`. Same-currency short-circuits without
+  a network call. On lookup failure returns null and the row saves
+  unsnapshotted (backfill picks it up later).
+- Write paths now snapshot at save time:
+  - [useTransactions.createTransaction](../apps/mobile/src/hooks/useTransactions.ts) — voice / manual / scan / onboarding.
+  - [recurringCatchUp.ts](../apps/mobile/src/services/recurringCatchUp.ts) — mobile catch-up. Rate dated to the occurrence's `transacted_at`, not today, so historical rebuilds use the right rate.
+  - [generate-recurring Edge Function](../supabase/functions/generate-recurring/index.ts) — server cron. Per-user profile cache + per-pair rate cache so a batch run with many users on the same currency pair fetches once.
+  - [editTransaction](../apps/mobile/src/hooks/useTransactions.ts) — when the user edits a txn's amount, the cached `fx_rate_to_profile` recomputes the snapshot in place. No network call (rate is dated to transacted_at, which doesn't change).
+- Profile-currency cache:
+  [profileCurrency.ts](../apps/mobile/src/services/profileCurrency.ts)
+  holds the current value in a module-level singleton, populated by
+  `useProfile` on every load. Write paths read it without prop-
+  drilling.
+- Aggregations: new `aggAmount(t)` helper in the shared FX module
+  reads `amount_in_profile_currency` and returns 0 for unsnapshotted
+  rows. Updated 13 call sites: mobile Today, Insights (sumDebits +
+  category breakdown), Budgets (`usePeriodSpend`), useMonthSummary;
+  web Dashboard KPIs, Insights (totals, weekday matrix, hour
+  buckets), Budgets (overall + per-category), Export totals, plus
+  every lens (Flow, Calendar, Cashflow, Treemap, Matrix, MindMap)
+  and the lens helper `groupByCategory`. Single-row display uses
+  `t.amount` (raw, original currency) and was deliberately left
+  alone — that's the right field for showing "$50 dinner".
+- Foreign-currency historical backfill:
+  [fxBackfill.ts](../apps/mobile/src/services/fxBackfill.ts) runs on
+  app launch (alongside `runRecurringCatchUp`). Self-throttles to
+  100 rows per launch — a user with thousands of foreign txns gets
+  converted across several opens rather than burning a single
+  launch on rate fetches. Idempotent.
+- Local SQLite mirrors the schema. New columns added in `localDb.ts`
+  init + ALTER paths so existing installs migrate cleanly.
+
+**Typecheck:** 6/6 packages pass. **AI verify:** 27/27.
+
+**Still open from the reviews (next batch decisions still on me):**
+- Unified `isPlus` resolver reading `profile.plus_status` once IAP
+  wires the real entitlements.
+- Desktop transaction CRUD (no add / edit / delete on web today).
+- `monthly_income` not editable on web Settings.
+- Apple SIWA on web login (iOS users locked out of desktop).
+- Electron `setWindowOpenHandler` denies all + PDF export uses
+  `window.print` — both broken in the packaged app.
+- Budgets page not realtime + "Overall" hardcoded to monthly.
+- Mobile Ask follow-up bar dead UI (remove until feature lands).
+- Insights gating mismatch (mobile free / web Plus) — call: free on
+  both (lower friction, matches PLAN's Plus locked-decision list).
+- Ask Murmur persistence (web persists / mobile doesn't / PRD says
+  session-only) — call: persist on both, PRD update follows code.
+
+### Reviews triage — P1 batch 1 (May 11, 2026)
+
+Small, surgical fixes that close three of the cross-platform gaps the
+review docs flagged. Continued accountability mode — decisions taken on
+the engineering side rather than punted.
+
+**Unified `isPlus` resolver (CROSS §1.5, §4.1, DESKTOP §4.1, MOBILE §3.10).**
+- New
+  [packages/shared/src/plus.ts](../packages/shared/src/plus.ts) exposes
+  `isPlusFromProfile(profile)` — the canonical "is this user Plus?"
+  read. Returns true only when `profile.plus_status === 'active'`.
+- New
+  [migration 012](../supabase/migrations/012_plus_status.sql) adds the
+  `plus_status` column (`'active' | 'lapsed' | 'free' | null`) with a
+  CHECK constraint. NULL is the default — new profiles start free
+  without an explicit write.
+- Web server resolver
+  [plus.server.ts](../apps/web/src/lib/plus.server.ts) now accepts an
+  optional profile and resolves in order:
+  `isPlusFromProfile(profile)` → `MURMUR_DEV_PLUS=1` env →
+  `NODE_ENV !== 'production'` → false. Production reads the column
+  exclusively; dev hatches still let local development unlock
+  surfaces.
+- Mobile [usePlusStatus](../apps/mobile/src/hooks/usePlusStatus.ts) now
+  reads via `useAuth` + `useProfile`, returns
+  `isPlusFromProfile(profile) || __DEV__`. The hook surface remains
+  `{ isPlus, loading }` — callers don't change.
+- Web [dashboard/layout.tsx](../apps/web/src/app/dashboard/layout.tsx)
+  passes the loaded profile to `resolvePlusStatus(profile)` so the
+  `PlusProvider` context value reflects `plus_status` once the column
+  is populated. Insights page does the same after its parallel
+  profile fetch.
+- **Removed**: `/api/plus-status` diagnostic route. The env-loader bug
+  it was instrumenting was closed by `3eac9ee` (productName fix); the
+  endpoint had been on the cleanup list since.
+- This is the wire-up that makes IAP / RevenueCat shippable as a
+  pure backend change: when receipt validation lands and writes
+  `plus_status = 'active'`, every surface flips at once with no
+  client-side coordination required.
+
+**`monthly_income` editable on web Settings (CROSS §1.4, DESKTOP §3.1).**
+- [settings/page.tsx](../apps/web/src/app/dashboard/settings/page.tsx)
+  Account form gained a Monthly income input. Stored as a string in
+  React state so the field behaves like normal text — empty allowed,
+  no spinner artifacts. Save parses (strips thousand separators +
+  currency symbols), validates `n ≥ 0`, persists null on empty/invalid
+  so the user can clear their income. Inline help text explains it
+  powers Ask Murmur affordability reasoning.
+- The schema field exists on `profiles.monthly_income`; only the UI
+  was missing. Ask Murmur on desktop now picks up updates after the
+  next request load.
+
+**Removed dead Ask follow-up bar on mobile (MOBILE §3.2).**
+- The bar at the bottom of
+  [more/ask-result.tsx](../apps/mobile/app/more/ask-result.tsx) looked
+  like a chat input — placeholder text + sage-coloured circular mic
+  button — but the mic only called `router.back()`. Users tapped
+  expecting "submit my follow-up" and got the opposite. Removed until
+  multi-turn lands on mobile (web's `/dashboard/ask` already
+  supports it via the conversation thread). Bar + styles + comment
+  replaced with a single-line note explaining the removal so the next
+  pass through the file knows the bar is intentionally not there.
+
+**Typecheck:** 6/6 packages pass. **AI verify:** 27/27.
+
+### Reviews triage — P1 batch 2 (May 17, 2026)
+
+**Real PDF export on desktop + web (DESKTOP §1.1, §4.7).**
+- The Electron `setWindowOpenHandler` deny-all branch was already
+  closed in commit `d43a36f` (Phase I part 2 follow-up arc). The
+  DESKTOP review was stale on that point.
+- The remaining half — replacing the `window.print()`-through-a-popup
+  approach with a real PDF generator — landed in
+  [export/page.tsx](../apps/web/src/app/dashboard/export/page.tsx).
+  Added `jspdf@^4.2` + `jspdf-autotable@^5` as dependencies of
+  `@voice-expense/web`. The export now produces a downloadable
+  `.pdf` Blob via the standard `<a download>` pattern — no popup,
+  no print dialog, no "Pop-ups blocked" alert that could never be
+  satisfied in Electron. Dynamic import so the ~120 KB library only
+  loads when the user actually exports. autoTable handles
+  pagination, header repetition, and column alignment; the layout
+  matches the brand (eyebrow + serif title + totals strip + sage
+  credit colour) within jsPDF's primitive draw API. The previous
+  `pdfHTML` helper and `escape` utility were removed — they were
+  exclusively used by the popup path.
+
+**Budgets page realtime + period-aware Overall + scope-edit sheet (DESKTOP §4.4, §4.5, §4.6, LOGIC §3.3).**
+- [budgets/page.tsx](../apps/web/src/app/dashboard/budgets/page.tsx)
+  subscribes to `postgres_changes` on `transactions` AND `budgets`
+  scoped to the current user (matches the mobile pattern in
+  `useTransactions`). An expense logged on mobile reflects on the
+  ring within the realtime debounce, no manual reload. Channel name
+  is randomised per-mount to survive React Strict Mode's double-
+  invoke.
+- The "Overall" spend math now uses `periodStart(overall.period)`
+  rather than hardcoded `'monthly'`. A user with a weekly $500
+  budget no longer sees their week's cap compared against a
+  full calendar month of spend.
+- Header copy uses `periodTitle` / `periodSuffix` helpers so the
+  page reads "Weekly budgets" / "this week" when the overall is
+  weekly, etc. — no more hardcoded "this month".
+- [transaction/edit.tsx](../apps/mobile/app/transaction/edit.tsx)
+  gained the just-this-one / all-future scope prompt for editing a
+  `recurring_generated` occurrence (LOGIC §3.3). Calendar-app
+  standard — fixes the "I got a raise; please apply going forward"
+  case. Look-up tries `txn.recurring_rule_id` first, then falls
+  back to `template_txn_id` so both server-cron generated rows and
+  legacy template rows route correctly.
+
+**Typecheck:** 6/6 packages pass. **AI verify:** 27/27.
+
 ### Handoff to next session — reviews + tests (May 10, 2026)
 
 **This session shipped:** Phase I part 2 follow-up arc above —

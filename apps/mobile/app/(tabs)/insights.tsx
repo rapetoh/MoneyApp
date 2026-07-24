@@ -11,7 +11,7 @@ import { useInsightsUnlock } from '../../src/hooks/useInsightsUnlock'
 import { Money } from '../../src/components/Money'
 import { HistoryHeatmap } from '../../src/components/HistoryHeatmap'
 import { Colors, Typography, Hairline } from '../../src/theme'
-import { formatCurrency, t, type Locale } from '@voice-expense/shared'
+import { formatCurrency, t, aggAmount, type Locale } from '@voice-expense/shared'
 import type { Transaction } from '@voice-expense/shared'
 
 function monthKey(d: Date) {
@@ -130,7 +130,7 @@ function sumDebits(txns: Transaction[], start: Date, end: Date): number {
   const e = end.toISOString()
   return txns
     .filter((tx) => !tx.is_deleted && tx.direction === 'debit' && tx.transacted_at >= s && tx.transacted_at < e)
-    .reduce((acc, tx) => acc + tx.amount, 0)
+    .reduce((acc, tx) => acc + aggAmount(tx), 0)
 }
 
 export default function InsightsScreen() {
@@ -241,7 +241,7 @@ export default function InsightsScreen() {
       const name = cat?.name ?? t('transactions.uncategorized', locale)
       const color = cat?.color ?? Colors.ink4 ?? Colors.textMuted
       if (!byId[id]) byId[id] = { id, name, color, amount: 0 }
-      byId[id].amount += tx.amount
+      byId[id].amount += aggAmount(tx)
     }
     const rows = Object.values(byId).sort((a, b) => b.amount - a.amount).slice(0, 6)
     const total = rows.reduce((s, r) => s + r.amount, 0)

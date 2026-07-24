@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { colors, font, cat as catTokens } from '../../lib/theme'
 import { tintFor } from '../../lib/categories'
 import { type LensProps, monthDebits } from './types'
+import { aggAmount } from '@voice-expense/shared'
 
 function fmt(value: number, currency: string, locale: string): string {
   return new Intl.NumberFormat(locale, {
@@ -27,7 +28,7 @@ export function CalendarLens({ props }: { props: LensProps }) {
     const d = new Date(t.transacted_at)
     if (d.getMonth() !== monthIdx || d.getFullYear() !== year) continue
     const day = d.getDate()
-    dayTotal[day] += t.amount
+    dayTotal[day] += aggAmount(t)
     if (!dayTxns[day]) dayTxns[day] = []
     dayTxns[day].push(t)
   }

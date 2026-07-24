@@ -10,6 +10,13 @@ export * from './types/recurring'
 // Utils
 export * from './utils/currency'
 export * from './utils/date'
+export * from './utils/fx'
 
 // i18n
 export * from './i18n'
+
+// Brand
+export * from './brand'
+
+// Plus entitlement
+export * from './plus'

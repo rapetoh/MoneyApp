@@ -110,31 +110,42 @@ export default function TransactionsPage() {
     load()
   }, [])
 
-  // Realtime
+  // Realtime. The channel name + the postgres_changes filter both
+  // include the user's id so Supabase only sends this client the
+  // changes it actually needs — without that filter Realtime
+  // broadcasts every change on the `transactions` table to every
+  // subscribed user. Random suffix keeps React Strict Mode's
+  // double-invoke from colliding on the same channel name.
   useEffect(() => {
-    const channel = supabase
-      .channel('web:transactions')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'transactions' },
-        () => {
-          supabase.auth.getUser().then(({ data: { user } }) => {
-            if (!user) return
-            supabase
+    let active = true
+    let channel: ReturnType<typeof supabase.channel> | null = null
+    void (async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user || !active) return
+      const userId = user.id
+      channel = supabase
+        .channel(`web:transactions:${userId}:${Math.random().toString(36).slice(2)}`)
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'transactions', filter: `user_id=eq.${userId}` },
+          async () => {
+            const { data } = await supabase
               .from('transactions')
               .select('*')
-              .eq('user_id', user.id)
+              .eq('user_id', userId)
               .eq('is_deleted', false)
               .order('transacted_at', { ascending: false })
-              .then(({ data }) => {
-                if (data) setTransactions(data as Txn[])
-              })
-          })
-        },
-      )
-      .subscribe()
+            if (data && active) setTransactions(data as Txn[])
+          },
+        )
+        .subscribe()
+    })()
     return () => {
-      supabase.removeChannel(channel)
+      active = false
+      if (channel) {
+        channel.unsubscribe()
+        void supabase.removeChannel(channel)
+      }
     }
   }, [])
 

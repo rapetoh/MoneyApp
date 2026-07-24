@@ -80,6 +80,48 @@ Deno.serve(async (req) => {
     })
   }
 
+  // Cache profile.currency_code per user across the loop — the cron
+  // typically generates many rows for the same user (multiple bills,
+  // paycheck, etc.) and we don't need to re-read the profile each time.
+  const profileCurrencyByUser = new Map<string, string>()
+
+  async function getProfileCurrency(userId: string): Promise<string> {
+    const cached = profileCurrencyByUser.get(userId)
+    if (cached) return cached
+    const { data } = await supabase
+      .from('profiles')
+      .select('currency_code')
+      .eq('id', userId)
+      .single()
+    const code = (data as { currency_code?: string } | null)?.currency_code ?? 'USD'
+    profileCurrencyByUser.set(userId, code)
+    return code
+  }
+
+  // FX rate cache per (date, from, to) so a single cron run hitting
+  // many users on the same currency pair only fetches once.
+  const fxCache = new Map<string, number>()
+  async function fetchRate(date: string, from: string, to: string): Promise<number | null> {
+    if (from === to) return 1
+    const key = `${date}|${from}|${to}`
+    const cached = fxCache.get(key)
+    if (cached != null) return cached
+    try {
+      const res = await fetch(
+        `https://api.frankfurter.app/${date}?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
+      )
+      if (!res.ok) return null
+      const body = (await res.json()) as { rates?: Record<string, number> }
+      const rate = body?.rates?.[to]
+      if (typeof rate !== 'number' || !Number.isFinite(rate) || rate <= 0) return null
+      fxCache.set(key, rate)
+      return rate
+    } catch (err) {
+      console.warn('[generate-recurring] FX fetch failed:', err)
+      return null
+    }
+  }
+
   for (const rule of (rules as RecurringRule[]) ?? []) {
     const next = computeNext(rule)
     if (!next) continue          // rule expired
@@ -88,6 +130,16 @@ Deno.serve(async (req) => {
     // Create the transaction
     const txnId = crypto.randomUUID()
     const nowIso = now.toISOString()
+    const transactedAt = next.toISOString()
+    const fxDate = transactedAt.slice(0, 10)
+
+    // FX snapshot — migration 011. Same currency → rate 1, no
+    // network. Different currency → frankfurter.app on the txn's
+    // date. On lookup failure we still insert the row but leave the
+    // snapshot null; the mobile-side backfill picks it up later.
+    const profileCurrency = await getProfileCurrency(rule.user_id)
+    const rate = await fetchRate(fxDate, rule.currency_code, profileCurrency)
+    const amountInProfile = rate != null ? Math.round(rule.amount * rate * 100) / 100 : null
 
     const { error: txnError } = await supabase.from('transactions').insert({
       id: txnId,
@@ -99,7 +151,10 @@ Deno.serve(async (req) => {
       merchant: rule.name,
       note: rule.note,
       payment_method: rule.payment_method,
-      transacted_at: next.toISOString(),
+      amount_in_profile_currency: amountInProfile,
+      fx_rate_to_profile: rate,
+      fx_rate_date: rate != null ? fxDate : null,
+      transacted_at: transactedAt,
       source: 'recurring_generated',
       is_recurring: true,
       recurring_rule_id: rule.id,

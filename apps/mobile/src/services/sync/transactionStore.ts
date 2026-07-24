@@ -18,6 +18,9 @@ function rowToTransaction(row: Record<string, unknown>): Transaction {
     merchant_domain: (row.merchant_domain as string) ?? null,
     note: (row.note as string) ?? null,
     payment_method: row.payment_method as Transaction['payment_method'],
+    amount_in_profile_currency: (row.amount_in_profile_currency as number) ?? null,
+    fx_rate_to_profile: (row.fx_rate_to_profile as number) ?? null,
+    fx_rate_date: (row.fx_rate_date as string) ?? null,
     transacted_at: row.transacted_at as string,
     source: row.source as Transaction['source'],
     raw_transcript: (row.raw_transcript as string) ?? null,
@@ -49,10 +52,11 @@ export async function upsertTransaction(txn: Transaction): Promise<void> {
   await db.runAsync(
     `INSERT INTO transactions (
       id, user_id, amount, direction, currency_code, category_id, merchant, merchant_domain, note,
-      payment_method, transacted_at, source, raw_transcript, ai_confidence,
+      payment_method, amount_in_profile_currency, fx_rate_to_profile, fx_rate_date,
+      transacted_at, source, raw_transcript, ai_confidence,
       is_recurring, recurring_rule_id, client_id, client_created_at, version,
       is_deleted, deleted_at, synced_at, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(id) DO UPDATE SET
       amount = excluded.amount,
       direction = excluded.direction,
@@ -61,6 +65,9 @@ export async function upsertTransaction(txn: Transaction): Promise<void> {
       merchant_domain = excluded.merchant_domain,
       note = excluded.note,
       payment_method = excluded.payment_method,
+      amount_in_profile_currency = excluded.amount_in_profile_currency,
+      fx_rate_to_profile = excluded.fx_rate_to_profile,
+      fx_rate_date = excluded.fx_rate_date,
       transacted_at = excluded.transacted_at,
       version = excluded.version,
       is_deleted = excluded.is_deleted,
@@ -79,6 +86,9 @@ export async function upsertTransaction(txn: Transaction): Promise<void> {
       txn.merchant_domain ?? null,
       txn.note ?? null,
       txn.payment_method,
+      txn.amount_in_profile_currency ?? null,
+      txn.fx_rate_to_profile ?? null,
+      txn.fx_rate_date ?? null,
       txn.transacted_at,
       txn.source,
       txn.raw_transcript ?? null,
@@ -129,9 +139,70 @@ export async function updateTransactionFields(
   )
 }
 
+/**
+ * Update only the `amount_in_profile_currency` snapshot for a row.
+ * Used by `editTransaction` when the user changes the txn amount —
+ * the rate is dated to the transaction's day (unchanged) so we can
+ * recompute the converted amount in place without a network call.
+ * Does not touch the row's version or sync state; the caller's
+ * `editTransaction` already bumps version + enqueues a sync.
+ */
+export async function updateAmountSnapshot(
+  id: string,
+  amountInProfileCurrency: number,
+): Promise<void> {
+  const db = await getDb()
+  await db.runAsync(
+    'UPDATE transactions SET amount_in_profile_currency = ? WHERE id = ?',
+    [amountInProfileCurrency, id],
+  )
+}
+
 export async function getTransactionById(id: string): Promise<Transaction | null> {
   const db = await getDb()
   const row = await db.getFirstAsync('SELECT * FROM transactions WHERE id = ?', [id])
   if (!row) return null
   return rowToTransaction(row as Record<string, unknown>)
+}
+
+/**
+ * Wipes every row from local SQLite for this user. Called from the
+ * Privacy → Delete all flow after the server-side `delete-user` Edge
+ * Function has cleared the user's account, so the next sign-in (with a
+ * fresh account) doesn't see ghosts of the deleted data. Also clears the
+ * sync queue because any pending entries reference rows that no longer
+ * exist on Supabase.
+ */
+export async function wipeAllUserData(userId: string): Promise<void> {
+  const db = await getDb()
+  await db.runAsync('DELETE FROM transactions WHERE user_id = ?', [userId])
+  // Sync queue is not user-scoped at the schema level (only one user is
+  // ever signed in at a time), so we clear it wholesale.
+  await db.runAsync('DELETE FROM sync_queue')
+}
+
+/**
+ * True when a live recurring-generated row already exists for the given
+ * (user, rule, calendar-date) tuple. Used by `runRecurringCatchUp` to
+ * skip occurrences that the server cron has already produced and
+ * `pullRemote` has already brought into SQLite — without this check the
+ * catch-up loop would hit the partial unique index on insert.
+ */
+export async function hasRecurringOccurrence(
+  userId: string,
+  ruleId: string,
+  isoDate: string,
+): Promise<boolean> {
+  const db = await getDb()
+  const day = isoDate.slice(0, 10)
+  const row = await db.getFirstAsync(
+    `SELECT 1 FROM transactions
+     WHERE user_id = ?
+       AND recurring_rule_id = ?
+       AND substr(transacted_at, 1, 10) = ?
+       AND is_deleted = 0
+     LIMIT 1`,
+    [userId, ruleId, day],
+  )
+  return Boolean(row)
 }

@@ -1,6 +1,7 @@
 import { colors, font, cat as catTokens } from '../../lib/theme'
 import { tintFor } from '../../lib/categories'
 import { type LensProps, monthDebits, monthCredits, groupByCategory } from './types'
+import { aggAmount } from '@voice-expense/shared'
 
 // Treemap of category spend for the month. Saved & invested gets its own
 // row at the bottom (income - debits) so the whole money picture is one
@@ -83,8 +84,8 @@ function layoutCells(
 export function TreemapLens({ props }: { props: LensProps }) {
   const debits = monthDebits(props)
   const credits = monthCredits(props)
-  const incomeTotal = credits.reduce((s, t) => s + t.amount, 0)
-  const expenseTotal = debits.reduce((s, t) => s + t.amount, 0)
+  const incomeTotal = credits.reduce((s, t) => s + aggAmount(t), 0)
+  const expenseTotal = debits.reduce((s, t) => s + aggAmount(t), 0)
   const saved = Math.max(0, incomeTotal - expenseTotal)
 
   const debitsByCat = groupByCategory(debits)

@@ -2,6 +2,7 @@ import React from 'react'
 import { colors, font, cat as catTokens } from '../../lib/theme'
 import { tintFor } from '../../lib/categories'
 import type { LensProps } from './types'
+import { aggAmount } from '@voice-expense/shared'
 
 // 6-month × category grid. Rows = categories. Cols = trailing 6 months.
 // Cell intensity scales with amount; trend column shows a tiny sparkline +
@@ -52,7 +53,7 @@ export function MatrixLens({ props }: { props: LensProps }) {
     const k = t.category_name ?? 'Uncategorized'
     allCats.add(k)
     if (!matrix[k]) matrix[k] = new Array(months.length).fill(0)
-    matrix[k][mIdx] += t.amount
+    matrix[k][mIdx] += aggAmount(t)
   }
 
   // Sort by latest-month spend desc; trim to top 8 to keep the grid legible.

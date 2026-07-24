@@ -8,6 +8,7 @@ import {
   monthCredits,
   groupByCategory,
 } from './types'
+import { aggAmount } from '@voice-expense/shared'
 
 // XMind-style radial diagram of the user's whole financial month.
 // Center node = the user; four branches = Income / Expenses / Saved &
@@ -52,8 +53,8 @@ function clamp(v: number, lo: number, hi: number): number {
 function buildBranches(p: LensProps, displayName: string): Branch[] {
   const debits = monthDebits(p)
   const credits = monthCredits(p)
-  const incomeTotal = credits.reduce((s, t) => s + t.amount, 0)
-  const expenseTotal = debits.reduce((s, t) => s + t.amount, 0)
+  const incomeTotal = credits.reduce((s, t) => s + aggAmount(t), 0)
+  const expenseTotal = debits.reduce((s, t) => s + aggAmount(t), 0)
   const saved = Math.max(0, incomeTotal - expenseTotal)
 
   const fmt = (v: number) => fmtMoney(v, p.currency, p.locale)
@@ -78,7 +79,7 @@ function buildBranches(p: LensProps, displayName: string): Branch[] {
     for (const t of debits) {
       if ((t.category_name ?? 'Uncategorized') !== s.name) continue
       const m = t.merchant ?? 'Other'
-      merchTotals[m] = (merchTotals[m] ?? 0) + t.amount
+      merchTotals[m] = (merchTotals[m] ?? 0) + aggAmount(t)
     }
     // Keep up to 25 merchants per category — enough to see a real
     // distribution at "show all" without exploding the canvas. The
@@ -298,8 +299,8 @@ export function MindMapLens({ props, displayName }: { props: LensProps; displayN
     })
   }
 
-  const incomeTotal = monthCredits(props).reduce((s, t) => s + t.amount, 0)
-  const expenseTotal = monthDebits(props).reduce((s, t) => s + t.amount, 0)
+  const incomeTotal = monthCredits(props).reduce((s, t) => s + aggAmount(t), 0)
+  const expenseTotal = monthDebits(props).reduce((s, t) => s + aggAmount(t), 0)
   const net = incomeTotal - expenseTotal
 
   const branchEnd = (b: Branch): [number, number] => {

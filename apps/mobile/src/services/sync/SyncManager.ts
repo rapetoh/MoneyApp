@@ -7,8 +7,19 @@
 import NetInfo, { NetInfoState } from '@react-native-community/netinfo'
 import { supabase } from '../../lib/supabase'
 import { getPendingEntries, removeEntry, incrementRetry, resetDeadLetterEntries } from './syncQueue'
-import { upsertTransaction } from './transactionStore'
+import { upsertTransaction, softDeleteTransaction } from './transactionStore'
 import type { Transaction } from '@voice-expense/shared'
+
+// Recurring-generated dedup conflict — see migration 008. Postgres returns
+// SQLSTATE 23505 with an `idx_txn_recurring_dedup` mention when two writers
+// produce the same (rule, date) occurrence. Supabase surfaces the Postgrest
+// error with `.code` and a `.message` substring; we accept either signal
+// so a future name change to the index doesn't silently regress this path.
+function isRecurringDedupConflict(error: { code?: string; message?: string } | null): boolean {
+  if (!error) return false
+  if (error.code === '23505') return true
+  return Boolean(error.message?.includes('idx_txn_recurring_dedup'))
+}
 
 type SyncListener = (syncing: boolean, pendingCount: number) => void
 
@@ -83,10 +94,33 @@ class SyncManager {
             const payload = JSON.parse(entry.payload)
 
             if (entry.operation === 'create' || entry.operation === 'update') {
-              const { error } = await supabase.from('transactions').upsert(payload, {
+              // raw_transcript stays local-only — the Privacy screen
+              // promises "voice not stored" and the schema comment in
+              // 001_initial_schema.sql says the column is "stored
+              // locally only". Stripping here keeps that promise. The
+              // upsert's ON CONFLICT SET in transactionStore.ts does not
+              // touch raw_transcript, so a later pullRemote bringing back
+              // the null-transcript server row will not overwrite the
+              // local copy on the recording device.
+              const { raw_transcript: _stripped, ...serverPayload } = payload
+              const { error } = await supabase.from('transactions').upsert(serverPayload, {
                 onConflict: 'id',
               })
-              if (error) throw new Error(error.message)
+              if (error) {
+                // 23505 on the recurring-dedup index means another writer
+                // (the server cron, or this device on a prior launch)
+                // already created the same recurring occurrence. The local
+                // row is the loser of the race — soft-delete it locally so
+                // SQLite matches the server's view, then drop the queue
+                // entry. Without this branch the retry counter would tick
+                // forever because the violation is permanent.
+                if (isRecurringDedupConflict(error)) {
+                  await softDeleteTransaction(payload.id)
+                  await removeEntry(entry.id)
+                  continue
+                }
+                throw new Error(error.message)
+              }
 
               // Mark as synced in local DB
               await upsertTransaction({ ...payload, synced_at: new Date().toISOString() })

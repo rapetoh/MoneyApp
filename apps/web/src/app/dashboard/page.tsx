@@ -13,6 +13,7 @@ import { TreemapLens } from '../../components/lenses/Treemap'
 import { CashflowLens } from '../../components/lenses/Cashflow'
 import { MatrixLens } from '../../components/lenses/Matrix'
 import { isLensKey, type LensKey, type LensProps, type LensTxn } from '../../components/lenses/types'
+import { aggAmount } from '@voice-expense/shared'
 
 type Cat = { id: string; name: string }
 
@@ -60,6 +61,7 @@ export default async function OverviewPage({
   // history-aware lenses (Matrix) can look at trailing months too.
   const lensTxns: LensTxn[] = transactions.map((t: any) => ({
     amount: t.amount,
+    amount_in_profile_currency: t.amount_in_profile_currency ?? null,
     direction: t.direction,
     category_id: t.category_id ?? null,
     category_name: t.category_id ? catMap[t.category_id] ?? null : null,
@@ -88,8 +90,8 @@ export default async function OverviewPage({
     const d = new Date(t.transacted_at)
     if (d < monthStart || d > monthEnd) continue
     monthCount += 1
-    if (t.direction === 'credit') monthIn += t.amount
-    else monthOut += t.amount
+    if (t.direction === 'credit') monthIn += aggAmount(t)
+    else monthOut += aggAmount(t)
   }
   const saved = Math.max(0, monthIn - monthOut)
 

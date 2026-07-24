@@ -8,10 +8,12 @@ import { Money } from '../../../components/Money'
 import { Icon } from '../../../components/Icons'
 import { PaywallGate } from '../../../components/PaywallGate'
 import { usePlus } from '../../../lib/plus'
+import { aggAmount } from '@voice-expense/shared'
 
 type Txn = {
   id: string
   amount: number
+  amount_in_profile_currency: number | null
   direction: 'debit' | 'credit'
   merchant: string | null
   note: string | null
@@ -73,10 +75,10 @@ export default function ExportPage() {
 
   const totalExpenses = filtered
     .filter((t) => t.direction === 'debit')
-    .reduce((s, t) => s + t.amount, 0)
+    .reduce((s, t) => s + aggAmount(t), 0)
   const totalIncome = filtered
     .filter((t) => t.direction === 'credit')
-    .reduce((s, t) => s + t.amount, 0)
+    .reduce((s, t) => s + aggAmount(t), 0)
 
   function fileBase() {
     return `murmur-${dateFrom}-to-${dateTo}`
@@ -149,33 +151,119 @@ export default function ExportPage() {
   async function exportPDF() {
     setBusy('pdf')
     try {
-      const html = pdfHTML({
-        from: dateFrom,
-        to: dateTo,
-        currency,
-        locale,
-        transactions: filtered,
-        catMap,
-        totalExpenses,
-        totalIncome,
+      // Dynamic import so jsPDF (~120KB) only loads when the user
+      // actually exports — keeps the initial bundle the same shape as
+      // before for users on free who never see this surface.
+      const [{ jsPDF }, autoTableModule] = await Promise.all([
+        import('jspdf'),
+        import('jspdf-autotable'),
+      ])
+      const autoTable = autoTableModule.default
+
+      const doc = new jsPDF({ unit: 'pt', format: 'letter' })
+      const pageW = doc.internal.pageSize.getWidth()
+
+      const fmt = (v: number) =>
+        new Intl.NumberFormat(locale, { style: 'currency', currency }).format(v)
+
+      // Header band — eyebrow + serif title + totals row, matching the
+      // brand style of the previous HTML template (the visual we lost
+      // is hand-crafted typography, which jsPDF doesn't have built-in;
+      // we get a close enough match with the right sizes + colours).
+      doc.setTextColor('#6C675E')
+      doc.setFontSize(9)
+      doc.setFont('helvetica', 'bold')
+      doc.text(`MURMUR · ${dateFrom} → ${dateTo}`, 40, 56)
+
+      doc.setTextColor('#1B1915')
+      doc.setFontSize(26)
+      doc.setFont('times', 'normal')
+      doc.text('Transactions', 40, 92)
+
+      // Totals strip
+      const totalsY = 124
+      doc.setDrawColor(220, 216, 206)
+      doc.setLineWidth(0.5)
+      doc.roundedRect(40, totalsY - 18, pageW - 80, 64, 8, 8)
+
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(8)
+      doc.setTextColor('#6C675E')
+      doc.text('TOTAL EXPENSES', 56, totalsY)
+      doc.text('TOTAL INCOME', 56 + (pageW - 80) / 3, totalsY)
+      doc.text('TRANSACTIONS', 56 + ((pageW - 80) / 3) * 2, totalsY)
+
+      doc.setFont('times', 'normal')
+      doc.setFontSize(16)
+      doc.setTextColor('#1B1915')
+      doc.text(fmt(totalExpenses), 56, totalsY + 22)
+      doc.setTextColor('#3F5A3E')
+      doc.text(
+        `+${fmt(totalIncome).replace(/^[+\-]/, '')}`,
+        56 + (pageW - 80) / 3,
+        totalsY + 22,
+      )
+      doc.setTextColor('#1B1915')
+      doc.text(
+        String(filtered.length),
+        56 + ((pageW - 80) / 3) * 2,
+        totalsY + 22,
+      )
+
+      // Transaction table. autoTable paginates automatically and re-
+      // emits the header on every page, so the user gets a clean
+      // multi-page document for long ranges.
+      autoTable(doc, {
+        startY: totalsY + 60,
+        head: [['Date', 'Merchant', 'Category', 'Amount']],
+        body: filtered.map((t) => {
+          const cat = t.category_id ? catMap[t.category_id]?.name ?? '' : ''
+          const sign = t.direction === 'credit' ? '+' : '−'
+          const display = fmt(t.amount).replace(/^[+−\-]/, '')
+          return [t.transacted_at.slice(0, 10), t.merchant ?? '', cat, `${sign}${display}`]
+        }),
+        styles: { fontSize: 9, cellPadding: 6, lineColor: [225, 222, 213], lineWidth: 0.5 },
+        headStyles: {
+          fillColor: false,
+          textColor: [108, 103, 94],
+          fontStyle: 'bold',
+          fontSize: 8,
+          cellPadding: { top: 8, right: 6, bottom: 8, left: 6 },
+        },
+        columnStyles: {
+          0: { cellWidth: 70 },
+          3: { halign: 'right', cellWidth: 80, fontStyle: 'bold' },
+        },
+        didParseCell: (data) => {
+          // Sage-tinted credits to match the brand colour for income.
+          if (data.section === 'body' && data.column.index === 3) {
+            const cell = data.cell.raw as string
+            if (typeof cell === 'string' && cell.startsWith('+')) {
+              data.cell.styles.textColor = [63, 90, 62]
+            }
+          }
+        },
+        theme: 'plain',
+        margin: { left: 40, right: 40 },
       })
-      const win = window.open('', '_blank', 'width=900,height=1100')
-      if (!win) {
-        alert('Pop-ups blocked. Allow pop-ups to export PDF.')
-        return
+
+      // Footer on every page
+      const pageCount = doc.getNumberOfPages()
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(8)
+      doc.setTextColor('#9C9589')
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i)
+        const h = doc.internal.pageSize.getHeight()
+        doc.text(
+          `Exported by Murmur · ${new Date().toLocaleString(locale)} · ${filtered.length} transactions`,
+          40,
+          h - 28,
+        )
+        doc.text(`Page ${i} / ${pageCount}`, pageW - 40, h - 28, { align: 'right' })
       }
-      win.document.open()
-      win.document.write(html)
-      win.document.close()
-      // Slight delay so the print stylesheet applies before the dialog opens.
-      setTimeout(() => {
-        try {
-          win.focus()
-          win.print()
-        } catch {
-          // Ignored — user can still print from the menu.
-        }
-      }, 250)
+
+      doc.save(`${fileBase()}.pdf`)
     } finally {
       setBusy(null)
     }
@@ -326,95 +414,6 @@ function FormatCard({
       </div>
     </button>
   )
-}
-
-function pdfHTML(args: {
-  from: string
-  to: string
-  currency: string
-  locale: string
-  transactions: Txn[]
-  catMap: Record<string, { id: string; name: string }>
-  totalExpenses: number
-  totalIncome: number
-}): string {
-  const fmt = (v: number) =>
-    new Intl.NumberFormat(args.locale, { style: 'currency', currency: args.currency }).format(v)
-  const rows = args.transactions
-    .map((t) => {
-      const cat = t.category_id ? args.catMap[t.category_id]?.name ?? '' : ''
-      const sign = t.direction === 'credit' ? '+' : '−'
-      const color = t.direction === 'credit' ? '#3F5A3E' : '#1B1915'
-      const date = t.transacted_at.slice(0, 10)
-      return `<tr>
-        <td>${escape(date)}</td>
-        <td>${escape(t.merchant ?? '')}</td>
-        <td>${escape(cat)}</td>
-        <td style="text-align:right;font-variant-numeric:tabular-nums;color:${color};font-weight:600">
-          ${sign}${escape(fmt(t.amount).replace(/^[+−\-]/, ''))}
-        </td>
-      </tr>`
-    })
-    .join('')
-  return `<!doctype html>
-<html><head>
-<meta charset="utf-8">
-<title>Murmur · ${args.from} to ${args.to}</title>
-<style>
-  @page { margin: 28pt 32pt; size: letter; }
-  * { box-sizing: border-box; }
-  body {
-    font-family: "New York", "Iowan Old Style", Georgia, serif;
-    color: #1B1915; margin: 0;
-  }
-  .meta {
-    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
-    color: #6C675E; font-size: 11px; letter-spacing: 0.6px; text-transform: uppercase;
-    font-weight: 700;
-  }
-  h1 { font-weight: 500; font-size: 32px; letter-spacing: -0.6px; margin: 4px 0 24px; }
-  .totals { display: flex; gap: 40px; margin-bottom: 24px; padding: 16px 20px;
-    border: 0.5px solid rgba(40,36,28,0.12); border-radius: 12px; }
-  .totals .item { display: flex; flex-direction: column; gap: 4px; }
-  .totals .label { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
-    font-size: 11px; color: #6C675E; letter-spacing: 0.6px; text-transform: uppercase; font-weight: 700; }
-  .totals .v { font-family: "New York", Georgia, serif; font-size: 22px; font-weight: 500; }
-  .credit { color: #3F5A3E; }
-  table { width: 100%; border-collapse: collapse;
-    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif; }
-  thead th {
-    text-align: left; font-size: 10px; font-weight: 700; letter-spacing: 0.6px;
-    text-transform: uppercase; color: #6C675E;
-    padding: 8px 10px; border-bottom: 0.5px solid rgba(40,36,28,0.12);
-  }
-  tbody td { padding: 8px 10px; font-size: 12px; border-bottom: 0.5px solid rgba(40,36,28,0.06); }
-  .footer {
-    margin-top: 24px; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
-    font-size: 10px; color: #9C9589;
-  }
-</style>
-</head><body>
-<div class="meta">Murmur · ${escape(args.from)} → ${escape(args.to)}</div>
-<h1>Transactions</h1>
-<div class="totals">
-  <div class="item"><span class="label">Total expenses</span><span class="v">${escape(fmt(args.totalExpenses))}</span></div>
-  <div class="item"><span class="label">Total income</span><span class="v credit">+${escape(fmt(args.totalIncome).replace(/^[+\-]/, ''))}</span></div>
-  <div class="item"><span class="label">Transactions</span><span class="v">${args.transactions.length}</span></div>
-</div>
-<table>
-  <thead><tr><th>Date</th><th>Merchant</th><th>Category</th><th style="text-align:right">Amount</th></tr></thead>
-  <tbody>${rows}</tbody>
-</table>
-<div class="footer">Exported by Murmur · ${escape(new Date().toLocaleString(args.locale))} · ${args.transactions.length} transactions</div>
-</body></html>`
-}
-
-function escape(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
 }
 
 const styles: Record<string, React.CSSProperties> = {

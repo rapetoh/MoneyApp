@@ -10,9 +10,15 @@ import { Money } from '../../../components/Money'
 import { Icon } from '../../../components/Icons'
 import { PaywallGate } from '../../../components/PaywallGate'
 import { InsightsToolbarRight } from './InsightsToolbarRight'
+import { aggAmount } from '@voice-expense/shared'
 
 type Txn = {
   amount: number
+  /** FX snapshot — null on historical foreign-currency rows pending
+   *  backfill (migration 011). Aggregations use `aggAmount(t)` so
+   *  unconverted rows contribute 0 to the sum rather than mixing
+   *  currencies. */
+  amount_in_profile_currency: number | null
   direction: 'debit' | 'credit'
   merchant: string | null
   category_id: string | null
@@ -172,14 +178,17 @@ export default async function InsightsPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { isPlus } = resolvePlusStatus()
-
   const [profile, transactions, categories, budgets] = await Promise.all([
     getProfile(supabase, user.id),
     getTransactions(supabase, user.id),
     getCategories(supabase, user.id),
     getActiveBudgets(supabase, user.id),
   ])
+
+  // Resolve Plus from the now-loaded profile so `plus_status === 'active'`
+  // flips the gate in production. Dev hatches still apply when the
+  // column is null/free.
+  const { isPlus } = resolvePlusStatus(profile)
 
   if (!isPlus) {
     return (
@@ -214,7 +223,7 @@ export default async function InsightsPage() {
         const d = new Date(t.transacted_at)
         return t.direction === 'debit' && d >= start && d <= end
       })
-      .reduce((s, t) => s + t.amount, 0)
+      .reduce((s, t) => s + aggAmount(t), 0)
     monthlyTotals.push({
       label: ref.toLocaleDateString(locale, { month: 'short' }),
       total,
@@ -260,7 +269,7 @@ export default async function InsightsPage() {
     if (t.direction !== 'debit') continue
     if (new Date(t.transacted_at) < ninetyAgo) continue
     const m = t.merchant ?? 'Unnamed'
-    merchantTotals[m] = (merchantTotals[m] ?? 0) + t.amount
+    merchantTotals[m] = (merchantTotals[m] ?? 0) + aggAmount(t)
   }
   const topMerchants = Object.entries(merchantTotals)
     .sort(([, a], [, b]) => b - a)
@@ -277,7 +286,7 @@ export default async function InsightsPage() {
     if (t.direction !== 'debit') continue
     if (new Date(t.transacted_at) < ninetyAgo) continue
     const idx = new Date(t.transacted_at).getDay()
-    weekdaySums[idx] += t.amount
+    weekdaySums[idx] += aggAmount(t)
     weekdayCounts[idx] += 1
   }
   const weekdayAvg = weekdaySums.map((sum, i) => (weekdayCounts[i] > 0 ? sum / 12 : 0))
@@ -301,7 +310,7 @@ export default async function InsightsPage() {
     if (t.direction !== 'debit') continue
     if (new Date(t.transacted_at) < ninetyAgo) continue
     const name = t.category_id ? catMap[t.category_id]?.name ?? 'Other' : 'Uncategorized'
-    catTotals[name] = (catTotals[name] ?? 0) + t.amount
+    catTotals[name] = (catTotals[name] ?? 0) + aggAmount(t)
   }
   const ninetyTotal = Object.values(catTotals).reduce((s, v) => s + v, 0)
   const sortedCats = Object.entries(catTotals).sort(([, a], [, b]) => b - a)
@@ -343,7 +352,7 @@ export default async function InsightsPage() {
         break
       }
     }
-    if (bucket >= 0) matrix[dayIdx][bucket] += t.amount
+    if (bucket >= 0) matrix[dayIdx][bucket] += aggAmount(t)
   }
 
   return (

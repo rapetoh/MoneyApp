@@ -17,7 +17,7 @@ import { Money, MoneyLabel } from '../../src/components/Money'
 import { MiniBars } from '../../src/components/MiniBars'
 import { DayOneFirstLog } from '../../src/components/DayOneFirstLog'
 import { Colors, Typography, Spacing } from '../../src/theme'
-import { t } from '@voice-expense/shared'
+import { t, aggAmount } from '@voice-expense/shared'
 import type { Locale, Transaction } from '@voice-expense/shared'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -169,7 +169,7 @@ export default function TodayScreen() {
     const now = new Date()
     return transactions
       .filter((t) => !t.is_deleted && t.direction === 'debit' && isSameDay(new Date(t.transacted_at), now))
-      .reduce((sum, t) => sum + t.amount, 0)
+      .reduce((sum, t) => sum + aggAmount(t), 0)
   }, [transactions])
   const upcomingRecurring = useMemo(
     () => computeUpcomingRecurring(recurringRules, budget?.period),

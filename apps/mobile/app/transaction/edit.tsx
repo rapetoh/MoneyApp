@@ -53,7 +53,11 @@ export default function EditTransactionScreen() {
   const [note, setNote] = useState('')
   const [categoryId, setCategoryId] = useState<string | null>(null)
   const [direction, setDirection] = useState<TransactionDirection>('debit')
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash')
+  // null when the transaction has no payment method on record. The chip
+  // row leaves every chip inactive in that state so the user can choose
+  // — saving without picking preserves null rather than silently
+  // promoting the row to 'cash'.
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null)
   // Recurring state — initial values come from the transaction + any
   // existing rule linked via template_txn_id. If the transaction is flagged
   // recurring but no rule is found, we still show the toggle as ON so the
@@ -71,7 +75,7 @@ export default function EditTransactionScreen() {
         setNote(data.note ?? '')
         setCategoryId(data.category_id)
         setDirection(data.direction)
-        setPaymentMethod(data.payment_method ?? 'cash')
+        setPaymentMethod(data.payment_method)
         setIsRecurring(data.is_recurring ?? false)
         // Prefill frequency from the matching rule if one exists.
         const linkedRule = rules.find((r) => r.template_txn_id === data.id)
@@ -91,6 +95,40 @@ export default function EditTransactionScreen() {
     }
     if (!txn) return
 
+    // Look up the linked rule. Template txns (the original "this is
+    // recurring" entry) are found via `template_txn_id`. Server-cron-
+    // or catch-up-generated occurrences carry the rule's id on the
+    // row itself via `recurring_rule_id` — those won't match the
+    // template lookup, which is the LOGIC §3.3 bug. Try both.
+    const linkedRule =
+      (txn.recurring_rule_id
+        ? rules.find((r) => r.id === txn.recurring_rule_id)
+        : null) ?? rules.find((r) => r.template_txn_id === txn.id) ?? null
+
+    // For a generated occurrence with a linked rule, the user's
+    // intent when editing is ambiguous: "fix only this occurrence"
+    // (a typo, a one-time adjustment) versus "this is the new amount
+    // going forward" (a raise, a price change). Calendar apps prompt
+    // for scope on this exact case. We do the same.
+    const isGenerated =
+      txn.source === 'recurring_generated' && linkedRule != null && isRecurring
+
+    let applyToRule = false
+    if (isGenerated) {
+      applyToRule = await new Promise<boolean>((resolve) => {
+        Alert.alert(
+          t('recurring.edit_scope_title', locale),
+          t('recurring.edit_scope_body', locale),
+          [
+            { text: t('common.cancel', locale), style: 'cancel', onPress: () => resolve(false) },
+            { text: t('recurring.edit_scope_one', locale), onPress: () => resolve(false) },
+            { text: t('recurring.edit_scope_all_future', locale), onPress: () => resolve(true) },
+          ],
+          { cancelable: true, onDismiss: () => resolve(false) },
+        )
+      })
+    }
+
     setSaving(true)
     const { error } = await editTransaction(txn.id, {
       amount: parsedAmount,
@@ -102,20 +140,28 @@ export default function EditTransactionScreen() {
       is_recurring: isRecurring,
     })
 
-    // Reconcile the recurring_rules row based on how the toggle changed.
-    // Four cases, all keyed off whether we already had a rule for this txn:
-    //   off → off : no-op
-    //   on  → on  : update the rule to match the new values (amount, freq…)
-    //   off → on  : create a new rule linked to this txn
-    //   on  → off : delete the existing rule
-    // Rule match is by template_txn_id. Legacy transactions with
-    // is_recurring=true but no rule (the "ghost" case that caused the
-    // Recurring screen to look empty) will get a rule created on save.
-    const existingRule = rules.find((r) => r.template_txn_id === txn.id)
-    const was = !!existingRule
+    // Reconcile the recurring_rules row based on how the toggle and
+    // (if generated) the scope choice resolved.
+    //   off → off                : no-op
+    //   on  → on, no linked rule : create a new rule linked to this txn
+    //   on  → off                : delete the existing rule (only if
+    //                              this txn IS the template — never
+    //                              delete a rule just because the user
+    //                              toggled a single generated occurrence
+    //                              off; that would orphan every other
+    //                              future occurrence)
+    //   on  → on, generated      : update the rule iff the user chose
+    //                              "all future"; otherwise leave it
+    //                              alone (single-occurrence edit)
+    //   on  → on, template       : update the rule with the new values
+    //                              (legacy "ghost" case where the txn
+    //                              was flagged but no rule existed is
+    //                              also handled here)
+    const wasLinked = !!linkedRule
+    const isTemplate = linkedRule?.template_txn_id === txn.id
     const now = isRecurring
 
-    if (!error && !was && now) {
+    if (!error && !wasLinked && now) {
       await createRule({
         name: merchant.trim() || null,
         amount: parsedAmount,
@@ -127,10 +173,10 @@ export default function EditTransactionScreen() {
         frequency,
         template_txn_id: txn.id,
       })
-    } else if (!error && was && !now) {
-      await deleteRule(existingRule!.id)
-    } else if (!error && was && now) {
-      await updateRule(existingRule!.id, {
+    } else if (!error && wasLinked && !now && isTemplate) {
+      await deleteRule(linkedRule!.id)
+    } else if (!error && wasLinked && now && (isTemplate || applyToRule)) {
+      await updateRule(linkedRule!.id, {
         name: merchant.trim() || null,
         amount: parsedAmount,
         category_id: categoryId,

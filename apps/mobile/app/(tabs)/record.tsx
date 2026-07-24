@@ -191,7 +191,11 @@ export default function RecordScreen() {
       note: expense.note,
       category_id: expense.categoryId,
       merchant_domain: voice.parsedExpense?.merchant_domain ?? null,
-      payment_method: voice.parsedExpense?.payment_method ?? 'cash',
+      // null is the honest answer when the AI couldn't determine the
+      // payment method (a receipt that doesn't print the card type, or a
+      // voice line like "spent $5"). The prior 'cash' fallback silently
+      // mislabelled every card receipt as a cash transaction.
+      payment_method: voice.parsedExpense?.payment_method ?? null,
       source: transactionSource,
       raw_transcript: voice.transcript || null,
       ai_confidence: voice.parsedExpense?.confidence ?? null,

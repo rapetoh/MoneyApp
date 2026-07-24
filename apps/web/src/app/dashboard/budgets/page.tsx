@@ -8,6 +8,7 @@ import { Money } from '../../../components/Money'
 import { Chip } from '../../../components/Chip'
 import { Icon } from '../../../components/Icons'
 import type { BudgetPeriod } from '@voice-expense/shared'
+import { aggAmount } from '@voice-expense/shared'
 
 const PERIODS: { value: BudgetPeriod; label: string }[] = [
   { value: 'weekly', label: 'Weekly' },
@@ -18,7 +19,13 @@ const PERIODS: { value: BudgetPeriod; label: string }[] = [
 ]
 
 type Cat = { id: string; name: string }
-type Txn = { amount: number; direction: 'debit' | 'credit'; transacted_at: string; category_id: string | null }
+type Txn = {
+  amount: number
+  amount_in_profile_currency: number | null
+  direction: 'debit' | 'credit'
+  transacted_at: string
+  category_id: string | null
+}
 type Budget = {
   id: string
   amount: number
@@ -77,9 +84,12 @@ export default function BudgetsPage() {
         .eq('user_id', user.id)
         .eq('is_active', true)
         .order('created_at', { ascending: false }),
+      // `amount_in_profile_currency` is required — aggregations use it
+      // via `aggAmount(t)`. Without it the column comes back undefined
+      // and every total resolves to 0.
       supabase
         .from('transactions')
-        .select('amount, direction, transacted_at, category_id')
+        .select('amount, amount_in_profile_currency, direction, transacted_at, category_id')
         .eq('user_id', user.id)
         .eq('is_deleted', false),
       supabase.from('categories').select('id, name').eq('user_id', user.id).eq('is_archived', false),
@@ -94,6 +104,58 @@ export default function BudgetsPage() {
 
   useEffect(() => {
     load()
+  }, [])
+
+  // Realtime — re-fetch whenever the user's own transactions or
+  // budgets change. Without this, an expense logged on mobile leaves
+  // the desktop Budgets ring stuck on stale numbers until the user
+  // reloads the page (DESKTOP §4.4). The channel name is randomised
+  // so React Strict Mode's double-invoke never collides with itself,
+  // matching the mobile pattern in useTransactions.
+  useEffect(() => {
+    let cancelled = false
+    let cleanup: (() => void) | undefined
+
+    async function subscribe() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (cancelled || !user) return
+
+      const channelName = `web:budgets:${user.id}:${Math.random().toString(36).slice(2)}`
+      const channel = supabase
+        .channel(channelName)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'transactions',
+            filter: `user_id=eq.${user.id}`,
+          },
+          () => { void load() },
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'budgets',
+            filter: `user_id=eq.${user.id}`,
+          },
+          () => { void load() },
+        )
+        .subscribe()
+
+      cleanup = () => {
+        channel.unsubscribe()
+        supabase.removeChannel(channel)
+      }
+    }
+
+    void subscribe()
+    return () => {
+      cancelled = true
+      cleanup?.()
+    }
   }, [])
 
   async function handleSave() {
@@ -142,18 +204,26 @@ export default function BudgetsPage() {
   const catMap = Object.fromEntries(categories.map((c) => [c.id, c]))
 
   const overall = useMemo(() => {
+    // Prefer a monthly overall — that's the default shape — but fall
+    // back to any null-category budget the user set with a different
+    // period (weekly, biweekly, quarterly, yearly).
     return budgets.find((b) => b.category_id === null && b.period === 'monthly') ?? budgets.find((b) => b.category_id === null)
   }, [budgets])
 
-  const monthSpent = useMemo(() => {
-    const start = periodStart('monthly')
+  // Spend math must match the overall budget's period. Previously this
+  // was hardcoded to `periodStart('monthly')`, which meant a user with
+  // a weekly $500 budget compared their week's cap against a full
+  // calendar month of spending — the ring lit up at >100% almost
+  // immediately. The window now follows the budget itself.
+  const overallSpent = useMemo(() => {
+    const start = periodStart(overall?.period ?? 'monthly')
     return transactions
       .filter((t) => t.direction === 'debit' && new Date(t.transacted_at) >= start)
-      .reduce((s, t) => s + t.amount, 0)
-  }, [transactions])
+      .reduce((s, t) => s + aggAmount(t), 0)
+  }, [transactions, overall])
 
-  const overallPct = overall ? Math.min(monthSpent / overall.amount, 1) : 0
-  const overallRemaining = overall ? Math.max(0, overall.amount - monthSpent) : 0
+  const overallPct = overall ? Math.min(overallSpent / overall.amount, 1) : 0
+  const overallRemaining = overall ? Math.max(0, overall.amount - overallSpent) : 0
 
   // Buckets by status for the per-category list
   const perCat = useMemo(() => {
@@ -169,7 +239,7 @@ export default function BudgetsPage() {
               t.category_id === b.category_id &&
               new Date(t.transacted_at) >= start,
           )
-          .reduce((s, t) => s + t.amount, 0)
+          .reduce((s, t) => s + aggAmount(t), 0)
         const pct = spent / b.amount
         return { id: b.id, name: cName, period: b.period, cap: b.amount, spent, pct }
       })
@@ -230,13 +300,13 @@ export default function BudgetsPage() {
         >
           <div>
             <div style={{ fontFamily: font.serif, fontSize: 28, fontWeight: 500, color: colors.ink, letterSpacing: -0.6 }}>
-              {monthName(locale)} budgets
+              {periodTitle(overall?.period ?? 'monthly', locale)} budgets
             </div>
             <div style={{ fontSize: 13, color: colors.ink3, marginTop: 2 }}>
               {overall ? (
                 <>
-                  You've used <b style={{ color: colors.ink }}>{fmtShort(monthSpent)}</b> of{' '}
-                  <b style={{ color: colors.ink }}>{fmtShort(overall.amount)}</b> this month.
+                  You've used <b style={{ color: colors.ink }}>{fmtShort(overallSpent)}</b> of{' '}
+                  <b style={{ color: colors.ink }}>{fmtShort(overall.amount)}</b> {periodSuffix(overall.period)}.
                 </>
               ) : (
                 <>Set a monthly budget to start tracking.</>
@@ -340,7 +410,7 @@ export default function BudgetsPage() {
                 fontFamily={font.display}
                 fill={colors.ink}
               >
-                {fmtShort(monthSpent)}
+                {fmtShort(overallSpent)}
               </text>
               {overall && (
                 <text x="110" y="148" textAnchor="middle" fontSize="11" fill={colors.ink4} fontWeight="600">
@@ -354,11 +424,11 @@ export default function BudgetsPage() {
                   {overallPct > 1 ? (
                     <>
                       Over by{' '}
-                      <b style={{ color: '#A94646' }}>{fmtShort(monthSpent - overall.amount)}</b>.
+                      <b style={{ color: '#A94646' }}>{fmtShort(overallSpent - overall.amount)}</b>.
                     </>
                   ) : (
                     <>
-                      <b style={{ color: colors.accent }}>{fmtShort(overallRemaining)}</b> remaining this month.
+                      <b style={{ color: colors.accent }}>{fmtShort(overallRemaining)}</b> remaining {periodSuffix(overall.period)}.
                     </>
                   )}
                 </>
@@ -474,6 +544,30 @@ function Stat({ label, value, color }: { label: string; value: number; color: st
 
 function monthName(locale: string) {
   return new Date().toLocaleDateString(locale, { month: 'long' })
+}
+
+/** Title prefix for the page heading. Matches the overall budget's
+ *  period so a weekly/quarterly user doesn't see "April budgets"
+ *  for a window that has nothing to do with April. */
+function periodTitle(period: BudgetPeriod, locale: string): string {
+  switch (period) {
+    case 'weekly':    return 'This week\'s'
+    case 'biweekly':  return 'This fortnight\'s'
+    case 'quarterly': return 'This quarter\'s'
+    case 'yearly':    return 'This year\'s'
+    default:          return monthName(locale)
+  }
+}
+
+/** Body-copy suffix that follows "X of Y …" / "Z remaining …". */
+function periodSuffix(period: BudgetPeriod): string {
+  switch (period) {
+    case 'weekly':    return 'this week'
+    case 'biweekly':  return 'this fortnight'
+    case 'quarterly': return 'this quarter'
+    case 'yearly':    return 'this year'
+    default:          return 'this month'
+  }
 }
 
 const styles: Record<string, React.CSSProperties> = {

@@ -1,9 +1,16 @@
 // Shared types for the Overview lens components. The Overview page hands
 // each lens the same shape; lenses do their own slicing/aggregation off
 // this raw data.
+//
+// All aggregations should use `amount_in_profile_currency` (via
+// `aggAmount` from `@voice-expense/shared`) so multi-currency totals
+// stay coherent. The raw `amount` column is the transaction's own
+// currency and is the right field for rendering a single-row figure
+// (e.g. "$50 dinner") — never for summing.
 
 export type LensTxn = {
   amount: number
+  amount_in_profile_currency: number | null
   direction: 'debit' | 'credit'
   category_id: string | null
   category_name: string | null
@@ -79,7 +86,10 @@ export function groupByCategory(txns: LensTxn[]): Record<string, number> {
   const out: Record<string, number> = {}
   for (const t of txns) {
     const key = t.category_name ?? 'Uncategorized'
-    out[key] = (out[key] ?? 0) + (t.amount || 0)
+    // Use the FX snapshot column; null rows contribute 0 — see the
+    // file header for why summing `amount` blindly would mix
+    // currencies and produce nonsense totals.
+    out[key] = (out[key] ?? 0) + (t.amount_in_profile_currency ?? 0)
   }
   return out
 }

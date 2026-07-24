@@ -61,7 +61,7 @@ export default function IncomeScreen() {
     if (useIncome) {
       const sourceName = source.trim() || t('onboarding.income.default_name', locale)
 
-      await createTransaction({
+      const { id: txnId } = await createTransaction({
         amount: amountNum,
         direction: 'credit',
         currency_code: currency,
@@ -72,16 +72,24 @@ export default function IncomeScreen() {
         is_recurring: true,
       })
 
-      await createRule({
-        name: sourceName,
-        amount: amountNum,
-        currency_code: currency,
-        category_id: null,
-        direction: 'credit',
-        payment_method: 'bank_transfer',
-        note: t('onboarding.income.txn_note', locale),
-        frequency: 'monthly',
-      })
+      // Link the rule back to the txn so the transaction-detail screen's
+      // `rules.find(r => r.template_txn_id === txn.id)` lookup succeeds.
+      // Matches the voice + manual + edit flows; onboarding was the only
+      // path that left this orphan, producing the "ghost recurring" case
+      // for every user's very first income transaction.
+      if (txnId) {
+        await createRule({
+          name: sourceName,
+          amount: amountNum,
+          currency_code: currency,
+          category_id: null,
+          direction: 'credit',
+          payment_method: 'bank_transfer',
+          note: t('onboarding.income.txn_note', locale),
+          frequency: 'monthly',
+          template_txn_id: txnId,
+        })
+      }
     }
 
     setSaving(false)

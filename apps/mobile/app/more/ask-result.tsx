@@ -154,24 +154,13 @@ export default function AskResultScreen() {
           />
         </ScrollView>
 
-        {/* Follow-up input bar — non-functional placeholder, mirrors S_AskResult.
-            Wiring follow-ups would re-enter this screen with a new question; the
-            scope-trim for Phase E is single-turn. */}
-        <View style={styles.inputWrap}>
-          <View style={styles.inputBar}>
-            <Text style={styles.inputPlaceholder} numberOfLines={1}>
-              {t('ask.followup_placeholder', locale)}
-            </Text>
-            <Pressable
-              onPress={() => router.back()}
-              style={({ pressed }) => [styles.micButton, pressed && styles.pressed]}
-              hitSlop={6}
-              accessibilityLabel={t('ask.mic_label', locale)}
-            >
-              <Ionicons name="mic" size={20} color="#FFFFFF" />
-            </Pressable>
-          </View>
-        </View>
+        {/* Follow-up bar was a dead placeholder — it looked like a chat
+            input but the mic button only called router.back(). Users tap
+            the mic expecting "submit my follow-up" and get the opposite.
+            Removed until the multi-turn flow on this screen actually
+            ships (web already supports follow-ups via the conversation
+            thread on /dashboard/ask). Reintroduce wired-up when that
+            mobile work lands. */}
       </SafeAreaView>
     </>
   )
@@ -617,32 +606,4 @@ const styles = StyleSheet.create({
     fontFamily: Typography.fontFamily.sansBold,
   },
 
-  // Follow-up bar (visual only — non-functional in Phase E)
-  inputWrap: { paddingHorizontal: Spacing.base, paddingBottom: Spacing.sm },
-  inputBar: {
-    backgroundColor: Colors.surface,
-    borderRadius: 26,
-    paddingLeft: 18,
-    paddingRight: 8,
-    paddingVertical: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    borderWidth: Hairline.width,
-    borderColor: Hairline.color,
-  },
-  inputPlaceholder: {
-    flex: 1,
-    fontSize: 14.5,
-    color: Colors.ink4,
-    fontFamily: Typography.fontFamily.sans,
-  },
-  micButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: Colors.accent,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
 })

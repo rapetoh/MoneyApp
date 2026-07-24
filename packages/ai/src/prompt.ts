@@ -45,6 +45,7 @@ Return ONLY valid JSON:
   "merchant": string or null,
   "merchant_domain": string or null,
   "category_suggestion": string or null,
+  "payment_method": "cash"|"credit_card"|"debit_card"|"digital_wallet"|"bank_transfer"|"other"|null,
   "transacted_at": ISO 8601 date string,
   "confidence": float 0.0-1.0,
   "needs_clarification": boolean,
@@ -52,6 +53,15 @@ Return ONLY valid JSON:
   "is_recurring_suggestion": false,
   "recurring_frequency_suggestion": null
 }
+
+payment_method: read it off the receipt where possible. Common signals:
+- "VISA / MASTERCARD / AMEX / DISCOVER" with a last-4 or "CREDIT" or "DEBIT" label → "credit_card" or "debit_card" (use the label; if only the brand is shown without credit/debit, prefer "credit_card").
+- "DEBIT" / "CHECK CARD" / "EFTPOS" → "debit_card".
+- "CASH" / "CASH TENDERED" / "CHANGE DUE" → "cash".
+- "APPLE PAY" / "GOOGLE PAY" / "SAMSUNG PAY" / mobile-wallet logo → "digital_wallet".
+- ACH / wire / bank transfer language → "bank_transfer".
+- Anything else (gift card, store credit, EBT) → "other".
+- If the receipt does not show the payment method at all, return null. Do not guess "cash" — null is the honest answer.
 
 If the image is too blurry or not a receipt, set needs_clarification to true and explain in clarifying_question.`
   }
@@ -66,13 +76,18 @@ Return ONLY valid JSON:
   "merchant": string (employer name) or null,
   "merchant_domain": null,
   "category_suggestion": "Income",
+  "payment_method": "bank_transfer",
   "transacted_at": ISO 8601 date string (pay date),
   "confidence": float 0.0-1.0,
   "needs_clarification": boolean,
   "clarifying_question": string or null,
   "is_recurring_suggestion": true,
-  "recurring_frequency_suggestion": "biweekly"
+  "recurring_frequency_suggestion": "weekly"|"biweekly"|"monthly"|null
 }
+
+recurring_frequency_suggestion: determine the cadence from the pay-period dates on the stub. Two consecutive periods ~7 days apart → "weekly"; ~14 days → "biweekly"; once a calendar month → "monthly". Semimonthly paychecks (1st & 15th, or 15th & end-of-month) are common in the US but cannot be represented in the current enum — return null in that case so the user picks manually. Also return null when only one pay period is visible and you cannot infer cadence. Do not default to "biweekly" — the cadence varies widely by employer and country, and a wrong guess pre-fills the user's recurring rule with the wrong frequency.
+
+payment_method: paychecks land in the user's bank account via direct deposit, so default to "bank_transfer".
 
 If the image is too blurry or not a paycheck, set needs_clarification to true.`
 }

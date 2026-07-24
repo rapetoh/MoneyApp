@@ -1,6 +1,7 @@
 import { colors, font, cat as catTokens, type CategoryTint } from '../../lib/theme'
 import { tintFor } from '../../lib/categories'
 import { type LensProps, monthDebits, monthCredits, groupByCategory } from './types'
+import { aggAmount } from '@voice-expense/shared'
 
 // Sankey-style flow: income (left) -> categories (middle) -> top merchants
 // (right). Width of each ribbon is proportional to amount. We compute the
@@ -76,7 +77,7 @@ export function FlowLens({ props }: { props: LensProps }) {
 
   const credits = monthCredits(props)
   const debits = monthDebits(props)
-  const incomeTotal = credits.reduce((s, t) => s + t.amount, 0)
+  const incomeTotal = credits.reduce((s, t) => s + aggAmount(t), 0)
 
   // Income column — group by category name. If income has no category
   // ("salary deposits" not categorized), they all roll into "Income".
@@ -103,10 +104,11 @@ export function FlowLens({ props }: { props: LensProps }) {
   for (const t of debits) {
     const m = t.merchant ?? 'Other'
     const c = t.category_name ?? 'Uncategorized'
-    if (!merchTotals[m] || merchTotals[m].amt < t.amount) {
-      merchTotals[m] = { amt: (merchTotals[m]?.amt ?? 0) + t.amount, cat: c }
+    const amt = aggAmount(t)
+    if (!merchTotals[m] || merchTotals[m].amt < amt) {
+      merchTotals[m] = { amt: (merchTotals[m]?.amt ?? 0) + amt, cat: c }
     } else {
-      merchTotals[m].amt += t.amount
+      merchTotals[m].amt += amt
     }
   }
   const merchList = Object.entries(merchTotals)

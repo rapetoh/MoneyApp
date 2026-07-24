@@ -189,11 +189,31 @@ function createWindow(url: string) {
   mainWindow.once('ready-to-show', () => mainWindow?.show())
 
   mainWindow.webContents.setWindowOpenHandler(({ url: openUrl }) => {
+    // External http(s) URLs hand off to the OS browser — never load
+    // them inside the app shell (avoids navigating away from the
+    // embedded Next server and keeps OAuth-style flows in Safari /
+    // Chrome where the user expects them).
     if (openUrl.startsWith('http://') || openUrl.startsWith('https://')) {
       shell.openExternal(openUrl)
       return { action: 'deny' }
     }
-    return { action: 'deny' }
+    // Same-origin / about:blank popups are how the web app opens its
+    // own print-to-PDF preview from /dashboard/export. Returning
+    // 'deny' here (the prior default) made `window.open` return null
+    // and the Plus export silently broke in the packaged build.
+    // Allow these — they run in a child BrowserWindow with the same
+    // sandboxed webPreferences as the main window.
+    return {
+      action: 'allow',
+      overrideBrowserWindowOptions: {
+        webPreferences: {
+          contextIsolation: true,
+          nodeIntegration: false,
+          sandbox: true,
+          webSecurity: true,
+        },
+      },
+    }
   })
 
   mainWindow.on('closed', () => {

@@ -1,24 +1,27 @@
+import { isPlusFromProfile } from '@voice-expense/shared'
+import { useAuth } from './useAuth'
+import { useProfile } from './useProfile'
+
 /**
- * Single source of truth for Murmur Plus gating.
+ * Single source of truth for Murmur Plus gating on mobile.
  *
- * Until IAP / RevenueCat wiring lands and a `profile.plus_status` column is
- * populated by receipt validation:
+ * Resolution order:
+ *   1. `profile.plus_status === 'active'` — populated by IAP /
+ *      RevenueCat receipt validation. Production goes through this.
+ *   2. `__DEV__` — keeps the developer + QA loop open until IAP
+ *      lands; lets `isPlus` flip true on a debug build without
+ *      spinning up sandbox subscriptions.
+ *   3. Otherwise false — production users on a free profile see the
+ *      paywall on every gated surface.
  *
- *   - In `__DEV__` builds, every user is treated as Plus so the developer +
- *     internal QA can exercise the full Plus surface (Ask Murmur, auto
- *     recurring detection, export, eventual desktop) without spinning up
- *     sandbox subscriptions or env-var dances. The paywall is still
- *     reachable for visual review — Plus is just satisfied wherever the
- *     gate runs.
- *   - In production, `isPlus` is always false. Production users see the
- *     paywall on every Plus-gated entry. They will continue to until IAP
- *     wires real entitlements through this hook.
- *
- * When IAP lands, the dev override stays as a local-test hatch; production
- * paths read RC's `customerInfo.entitlements.active['plus']` (or the
- * mirrored Supabase column) instead of always-false.
+ * Returns `loading: true` while the profile fetch is in flight so
+ * Plus-gated screens can suppress flicker (showing the paywall for a
+ * frame then unlocking) once the profile resolves.
  */
 export function usePlusStatus(): { isPlus: boolean; loading: boolean } {
+  const { user } = useAuth()
+  const { profile, loading } = useProfile(user?.id)
   const isDev = typeof __DEV__ !== 'undefined' && __DEV__
-  return { isPlus: isDev, loading: false }
+  const fromProfile = isPlusFromProfile(profile)
+  return { isPlus: fromProfile || isDev, loading }
 }

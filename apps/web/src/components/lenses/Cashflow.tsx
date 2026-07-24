@@ -1,5 +1,6 @@
 import { colors, font } from '../../lib/theme'
 import { type LensProps, monthDebits, monthCredits } from './types'
+import { aggAmount } from '@voice-expense/shared'
 
 // Daily balance line over the month + per-day income / expense bars + a
 // right summary panel breaking down income, expenses, and net.
@@ -37,13 +38,13 @@ export function CashflowLens({ props }: { props: LensProps }) {
     for (const t of credits) {
       const dd = new Date(t.transacted_at)
       if (dd.getFullYear() === year && dd.getMonth() === monthIdx && dd.getDate() === d) {
-        inAmt += t.amount
+        inAmt += aggAmount(t)
       }
     }
     for (const t of debits) {
       const dd = new Date(t.transacted_at)
       if (dd.getFullYear() === year && dd.getMonth() === monthIdx && dd.getDate() === d) {
-        outAmt += t.amount
+        outAmt += aggAmount(t)
       }
     }
     bal += inAmt - outAmt

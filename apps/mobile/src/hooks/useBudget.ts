@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { DataEvents } from '../events/dataEvents'
+import { aggAmount } from '@voice-expense/shared'
 import type { Budget, BudgetPeriod } from '@voice-expense/shared'
 
 export function useActiveBudget(userId: string | undefined) {
@@ -71,7 +72,13 @@ export const useMonthlyBudget = useActiveBudget
  */
 export function usePeriodSpend(
   budget: Budget | null,
-  transactions: { amount: number; direction: string; transacted_at: string; is_deleted: boolean }[],
+  transactions: {
+    amount: number
+    amount_in_profile_currency: number | null
+    direction: string
+    transacted_at: string
+    is_deleted: boolean
+  }[],
 ) {
   if (!budget) return 0
 
@@ -100,5 +107,5 @@ export function usePeriodSpend(
         t.direction === 'debit' &&
         new Date(t.transacted_at) >= periodStart,
     )
-    .reduce((sum, t) => sum + t.amount, 0)
+    .reduce((sum, t) => sum + aggAmount(t), 0)
 }

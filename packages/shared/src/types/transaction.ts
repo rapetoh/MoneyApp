@@ -27,6 +27,20 @@ export interface Transaction {
   merchant_domain: string | null
   note: string | null
   payment_method: PaymentMethod | null
+  /** Amount converted to the user's profile currency using the FX
+   *  rate on `fx_rate_date`. Null on historical rows that pre-date
+   *  migration 011 and have foreign currencies awaiting backfill.
+   *  Aggregations should sum this column (and skip null rows) to
+   *  keep multi-currency totals coherent — summing `amount` blindly
+   *  across currencies is the original LOGIC §2.1 bug. */
+  amount_in_profile_currency: number | null
+  /** Ratio used to convert `amount` → `amount_in_profile_currency`.
+   *  1.0 when the transaction's currency matches the profile's. */
+  fx_rate_to_profile: number | null
+  /** Calendar date the rate above was retrieved for. Either the
+   *  transaction's date (write-time snapshot) or null for unfilled
+   *  rows. ISO YYYY-MM-DD. */
+  fx_rate_date: string | null
   transacted_at: string // ISO 8601
   source: TransactionSource
   raw_transcript: string | null

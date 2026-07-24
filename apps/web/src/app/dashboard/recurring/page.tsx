@@ -183,6 +183,43 @@ export default function RecurringPage() {
     load()
   }, [])
 
+  // Realtime. Without this, the user accepting a "new pattern detected"
+  // banner on mobile (or adding a rule from the edit screen there)
+  // leaves the desktop Recurring page showing yesterday's list until
+  // the user reloads — the page would also miss new transactions that
+  // feed the candidate detector. One channel covers both tables.
+  useEffect(() => {
+    let userId: string | null = null
+    let active = true
+    void (async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user || !active) return
+      userId = user.id
+      const channel = supabase
+        .channel(`web:recurring:${userId}:${Math.random().toString(36).slice(2)}`)
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'recurring_rules', filter: `user_id=eq.${userId}` },
+          () => { void load() },
+        )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'transactions', filter: `user_id=eq.${userId}` },
+          () => { void load() },
+        )
+        .subscribe()
+      return () => {
+        active = false
+        channel.unsubscribe()
+        void supabase.removeChannel(channel)
+      }
+    })()
+    return () => {
+      active = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const catMap = Object.fromEntries(categories.map((c) => [c.id, c]))
 
   const candidates = useMemo<RecurringPatternCandidate[]>(() => {

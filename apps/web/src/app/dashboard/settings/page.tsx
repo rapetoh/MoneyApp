@@ -6,6 +6,7 @@ import { colors, font, radius } from '../../../lib/theme'
 import { Toolbar } from '../../../components/Toolbar'
 import { Icon } from '../../../components/Icons'
 import { usePlus } from '../../../lib/plus'
+import { SUPPORT_EMAIL, SUPPORT_MAILTO } from '@voice-expense/shared'
 
 const CURRENCIES = ['USD', 'EUR', 'GBP', 'CAD', 'CHF', 'JPY', 'AUD', 'XAF', 'NGN', 'GHS']
 const LOCALES = [
@@ -52,11 +53,18 @@ export default function SettingsPage() {
   const [displayName, setDisplayName] = useState('')
   const [currency, setCurrency] = useState('USD')
   const [locale, setLocale] = useState('en')
+  // Stored as a string so the input behaves like a normal text field
+  // (empty allowed, no spinner artifacts). Parsed on save — empty
+  // string saves null so the user can clear their income.
+  const [monthlyIncomeInput, setMonthlyIncomeInput] = useState('')
 
-  // Anonymous-analytics + crash-reporting toggles — UI only for now;
-  // they don't yet wire to a backing setting on web.
+  // Privacy preferences — backed by `profiles.analytics_opt_in` +
+  // `profiles.crash_reports_opt_in` (migration 010). Defaults mirror the
+  // column defaults (analytics off, crash reports on). `saving*` keeps
+  // the toggle from echoing optimistic state if a write fails.
   const [analyticsOn, setAnalyticsOn] = useState(false)
   const [crashReportingOn, setCrashReportingOn] = useState(true)
+  const [deleting, setDeleting] = useState(false)
 
   const sectionRefs = useRef<Record<SectionKey, HTMLDivElement | null>>({
     account: null,
@@ -81,11 +89,133 @@ export default function SettingsPage() {
         setDisplayName(data.display_name ?? '')
         setCurrency(data.currency_code ?? 'USD')
         setLocale(data.locale ?? 'en')
+        setMonthlyIncomeInput(
+          data.monthly_income != null ? String(data.monthly_income) : '',
+        )
+        // Match migration 010's defaults if the column is missing in
+        // an older deployment (e.g. local Supabase that hasn't applied
+        // the migration yet) — analytics off, crash reports on.
+        setAnalyticsOn(data.analytics_opt_in ?? false)
+        setCrashReportingOn(data.crash_reports_opt_in ?? true)
       }
       setLoading(false)
     }
     load()
   }, [])
+
+  // Persist the privacy toggles optimistically, then write to Supabase.
+  // On failure we revert the local state so the UI doesn't lie about
+  // what's persisted.
+  async function persistPrivacyFlag(
+    column: 'analytics_opt_in' | 'crash_reports_opt_in',
+    next: boolean,
+  ) {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) return
+    const { error } = await supabase
+      .from('profiles')
+      .update({ [column]: next })
+      .eq('id', user.id)
+    if (error) {
+      // Roll back the optimistic flip — the toggle should reflect the
+      // database, not the user's most-recent click.
+      if (column === 'analytics_opt_in') setAnalyticsOn(!next)
+      else setCrashReportingOn(!next)
+      console.error('[settings] privacy flag write failed', error)
+    }
+  }
+
+  // GDPR right to erasure. Calls the server-side `delete-user` Edge
+  // Function (only path that can also remove the auth.users row), then
+  // signs out. Confirmation gate is a native `confirm()` — the page is
+  // small enough that wiring a full modal would be overkill, and the
+  // string sets the stakes clearly. If the user accidentally clicks
+  // away, nothing happens.
+  async function handleDeleteAll() {
+    if (deleting) return
+    const confirmed = window.confirm(
+      'Delete everything permanently?\n\nWe will remove every transaction, budget, recurring rule, category, and Ask conversation from your account, then sign you out. This cannot be undone.',
+    )
+    if (!confirmed) return
+    setDeleting(true)
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+      const token = session?.access_token
+      if (!token) throw new Error('Not authenticated')
+
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+      const res = await fetch(`${supabaseUrl}/functions/v1/delete-user`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      })
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string }
+        throw new Error(body.error ?? `HTTP ${res.status}`)
+      }
+      await supabase.auth.signOut()
+      if (typeof window !== 'undefined') window.location.href = '/login'
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      window.alert(`Could not delete your data: ${message}`)
+      setDeleting(false)
+    }
+  }
+
+  // GDPR right to data portability. Generates a complete JSON dump of
+  // the user's data and triggers a browser download. Not Plus-gated —
+  // privacy rights cannot be paywalled. Implemented inline rather than
+  // redirecting to /dashboard/export because that surface is Plus-only
+  // and the legal export must be free for every user.
+  async function handleExportAll() {
+    if (typeof window === 'undefined') return
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) return
+
+    const [{ data: transactions }, { data: categories }, { data: budgets }, { data: rules }] =
+      await Promise.all([
+        supabase.from('transactions').select('*').eq('user_id', user.id).order('transacted_at'),
+        supabase.from('categories').select('*').eq('user_id', user.id),
+        supabase.from('budgets').select('*').eq('user_id', user.id),
+        supabase.from('recurring_rules').select('*').eq('user_id', user.id),
+      ])
+
+    const exported_at = new Date().toISOString()
+    const blob = new Blob(
+      [
+        JSON.stringify(
+          {
+            app: 'Murmur',
+            version: 1,
+            exported_at,
+            profile,
+            transactions: transactions ?? [],
+            categories: categories ?? [],
+            budgets: budgets ?? [],
+            recurring_rules: rules ?? [],
+          },
+          null,
+          2,
+        ),
+      ],
+      { type: 'application/json' },
+    )
+
+    const stamp = exported_at.slice(0, 10)
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `murmur-${stamp}.json`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
 
   function pickSection(k: SectionKey) {
     setActive(k)
@@ -101,12 +231,25 @@ export default function SettingsPage() {
       data: { user },
     } = await supabase.auth.getUser()
     if (!user) return
+    // Parse the income input. Strip thousands separators + currency
+    // symbols the user might paste, then `Number()`. Anything that
+    // fails to parse saves as null (clear). Negative numbers are
+    // clamped to null too — income can't be negative.
+    const rawIncome = monthlyIncomeInput.trim()
+    let parsedIncome: number | null = null
+    if (rawIncome) {
+      const cleaned = rawIncome.replace(/[,\s$€£¥]/g, '')
+      const n = Number(cleaned)
+      parsedIncome = Number.isFinite(n) && n >= 0 ? n : null
+    }
+
     await supabase
       .from('profiles')
       .update({
         display_name: displayName.trim() || null,
         currency_code: currency,
         locale,
+        monthly_income: parsedIncome,
       })
       .eq('id', user.id)
     setSaving(false)
@@ -228,6 +371,25 @@ export default function SettingsPage() {
                     </select>
                   </div>
                 </div>
+                {/* Monthly income — fed to Ask Murmur for affordability
+                    reasoning. Same field that exists in mobile Settings →
+                    Preferences. Leaving it blank stores null (the column
+                    has always been nullable). */}
+                <div style={styles.field}>
+                  <label style={styles.label}>Monthly income ({currency})</label>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={monthlyIncomeInput}
+                    onChange={(e) => setMonthlyIncomeInput(e.target.value)}
+                    placeholder="Leave blank to skip"
+                    style={styles.input}
+                  />
+                  <div style={{ fontSize: 12, color: colors.ink3, marginTop: 6 }}>
+                    Used by Ask Murmur to reason about affordability and
+                    savings rate. Stays on your account; never shared.
+                  </div>
+                </div>
                 <div style={styles.actions}>
                   {success && <span style={styles.successMsg}>Saved.</span>}
                   <button type="submit" disabled={saving || loading} style={styles.saveBtn}>
@@ -258,7 +420,7 @@ export default function SettingsPage() {
                   fontFamily: font.sans,
                 }}
               >
-                End-to-end encrypted via your account. Murmur servers never see your transactions in plaintext.
+                Encrypted in transit and at rest, protected by row-level security tied to your account. Murmur stores your transactions but never connects to your bank.
               </div>
             </SettingsCard>
 
@@ -315,13 +477,49 @@ export default function SettingsPage() {
                 label="Anonymous usage analytics"
                 sub="Help us improve. No transaction data sent."
                 on={analyticsOn}
-                onToggle={() => setAnalyticsOn((v) => !v)}
+                onToggle={() => {
+                  const next = !analyticsOn
+                  setAnalyticsOn(next)
+                  void persistPrivacyFlag('analytics_opt_in', next)
+                }}
               />
               <SettingToggle
                 label="Crash reporting"
                 sub="Sends crash logs only — no personal data."
                 on={crashReportingOn}
-                onToggle={() => setCrashReportingOn((v) => !v)}
+                onToggle={() => {
+                  const next = !crashReportingOn
+                  setCrashReportingOn(next)
+                  void persistPrivacyFlag('crash_reports_opt_in', next)
+                }}
+              />
+              {/* GDPR-grade controls, mirrored to mobile Privacy.
+                  Export-all is free for every user (right to data
+                  portability — can't be paywalled). Delete-all calls
+                  the `delete-user` Edge Function which scrubs every
+                  table the user touches and removes their auth user. */}
+              <SettingRow
+                label="Export all my data"
+                sub="Download a complete JSON copy"
+                right={
+                  <button type="button" onClick={handleExportAll} style={styles.linkBtn}>
+                    Export
+                  </button>
+                }
+              />
+              <SettingRow
+                label="Delete everything permanently"
+                sub="Removes your account and all data. Cannot be undone."
+                right={
+                  <button
+                    type="button"
+                    onClick={handleDeleteAll}
+                    disabled={deleting}
+                    style={{ ...styles.linkBtn, color: colors.destructive ?? '#A94646' }}
+                  >
+                    {deleting ? 'Deleting…' : 'Delete'}
+                  </button>
+                }
               />
             </SettingsCard>
 
@@ -371,10 +569,10 @@ export default function SettingsPage() {
               />
               <SettingRow
                 label="Help & contact"
-                sub="hello@murmur.app"
+                sub={SUPPORT_EMAIL}
                 right={
                   <a
-                    href="mailto:hello@murmur.app"
+                    href={SUPPORT_MAILTO}
                     style={styles.linkBtn}
                   >
                     Email

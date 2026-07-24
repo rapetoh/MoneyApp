@@ -3,7 +3,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { useAuth } from '../../src/hooks/useAuth'
 import { useProfile } from '../../src/hooks/useProfile'
 import { Colors, Typography, Spacing, Radius, Text as TextStyles, Hairline } from '../../src/theme'
-import { t, type Locale } from '@voice-expense/shared'
+import { t, SUPPORT_EMAIL, SUPPORT_MAILTO, type Locale } from '@voice-expense/shared'
 
 // Phase B stub. Future iterations can expand to in-app FAQs, contact form,
 // and tutorials. For now it's a thin screen so the More row has a
@@ -21,10 +21,10 @@ export default function HelpScreen() {
         <View style={styles.card}>
           <Pressable
             style={({ pressed }) => [styles.row, pressed && { opacity: 0.6 }]}
-            onPress={() => Linking.openURL('mailto:rapetohsenyo@gmail.com?subject=Murmur%20feedback')}
+            onPress={() => Linking.openURL(SUPPORT_MAILTO)}
           >
             <Text style={styles.rowLabel}>{t('help.contact', locale)}</Text>
-            <Text style={styles.rowValue}>rapetohsenyo@gmail.com</Text>
+            <Text style={styles.rowValue}>{SUPPORT_EMAIL}</Text>
           </Pressable>
           <View style={styles.divider} />
           <View style={styles.row}>

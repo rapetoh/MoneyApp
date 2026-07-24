@@ -8,15 +8,25 @@
  *
  * This is the backup mechanism — the primary generator is a server-side
  * Supabase Edge Function (generate-recurring) running daily via pg_cron.
- * If the server already created the transaction, the sync upsert's
- * version check prevents duplicates.
+ *
+ * Duplicate prevention has two layers:
+ *   1. Migration 008's partial unique index
+ *      `(user_id, recurring_rule_id, transacted_at::date)` blocks any
+ *      occurrence the server already wrote. SyncManager catches the
+ *      23505 violation and drops the queue entry cleanly.
+ *   2. `last_generated` is persisted to Supabase after EACH occurrence
+ *      so an interrupted catch-up (app backgrounded, network drop) can
+ *      resume from the right point on next launch instead of replaying
+ *      from the previous synced value.
  */
 
 import { supabase } from '../lib/supabase'
-import { upsertTransaction } from './sync/transactionStore'
+import { upsertTransaction, hasRecurringOccurrence } from './sync/transactionStore'
 import { enqueue } from './sync/syncQueue'
 import { computeNextOccurrence } from '../hooks/useRecurringRules'
-import type { RecurringRule } from '@voice-expense/shared'
+import { getCurrentProfileCurrency } from './profileCurrency'
+import type { RecurringRule, Transaction } from '@voice-expense/shared'
+import { snapshotFx } from '@voice-expense/shared'
 import * as Crypto from 'expo-crypto'
 
 export async function runRecurringCatchUp(userId: string): Promise<number> {
@@ -41,10 +51,37 @@ export async function runRecurringCatchUp(userId: string): Promise<number> {
     while (next && next <= now && safetyLimit > 0) {
       safetyLimit--
 
+      // Skip occurrences that already exist locally — typically because
+      // `pullRemote` brought down the server cron's row before catch-up
+      // ran. Without this guard the upsert would hit the partial unique
+      // index `idx_txn_recurring_dedup` and fail.
+      const alreadyExists = await hasRecurringOccurrence(
+        userId,
+        rule.id,
+        next.toISOString(),
+      )
+      if (alreadyExists) {
+        rule.last_generated = next.toISOString()
+        await supabase
+          .from('recurring_rules')
+          .update({ last_generated: rule.last_generated })
+          .eq('id', rule.id)
+        next = computeNextOccurrence(rule)
+        continue
+      }
+
       const txnId = Crypto.randomUUID()
       const nowIso = now.toISOString()
+      const transactedAt = next.toISOString()
 
-      const txn = {
+      // FX snapshot for the generated occurrence (migration 011). The
+      // rate is dated to the txn's transacted_at, not today — a
+      // monthly bill generated today for last-month's date uses
+      // last-month's rate so the historical totals stay coherent.
+      const profileCurrency = getCurrentProfileCurrency()
+      const fx = await snapshotFx(transactedAt, rule.currency_code, profileCurrency, rule.amount)
+
+      const txn: Transaction = {
         id: txnId,
         user_id: userId,
         amount: rule.amount,
@@ -54,9 +91,12 @@ export async function runRecurringCatchUp(userId: string): Promise<number> {
         merchant: rule.name ?? null,
         merchant_domain: null,
         note: rule.note ?? null,
-        payment_method: rule.payment_method as any ?? 'other',
-        transacted_at: next.toISOString(),
-        source: 'recurring_generated' as const,
+        payment_method: rule.payment_method as Transaction['payment_method'],
+        amount_in_profile_currency: fx?.amount_in_profile_currency ?? null,
+        fx_rate_to_profile: fx?.fx_rate_to_profile ?? null,
+        fx_rate_date: fx?.fx_rate_date ?? null,
+        transacted_at: transactedAt,
+        source: 'recurring_generated',
         raw_transcript: null,
         ai_confidence: null,
         is_recurring: true,
@@ -78,19 +118,19 @@ export async function runRecurringCatchUp(userId: string): Promise<number> {
       await enqueue('create', txnId, txn)
 
       // Advance last_generated on the rule so the next iteration
-      // computes the following occurrence
+      // computes the following occurrence. Persist immediately so an
+      // interruption between occurrences doesn't replay this one on
+      // next launch (the unique index would catch it, but persisting
+      // here also avoids spamming the sync queue with rows that we
+      // know will lose the race).
       rule.last_generated = next.toISOString()
-
-      generated++
-      next = computeNextOccurrence(rule)
-    }
-
-    // Persist the advanced last_generated back to Supabase
-    if (generated > 0) {
       await supabase
         .from('recurring_rules')
         .update({ last_generated: rule.last_generated })
         .eq('id', rule.id)
+
+      generated++
+      next = computeNextOccurrence(rule)
     }
   }
 
