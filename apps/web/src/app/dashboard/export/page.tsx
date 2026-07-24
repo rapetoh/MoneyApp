@@ -14,6 +14,7 @@ type Txn = {
   id: string
   amount: number
   amount_in_profile_currency: number | null
+  currency_code: string | null
   direction: 'debit' | 'credit'
   merchant: string | null
   note: string | null
@@ -106,7 +107,7 @@ export default function ExportPage() {
         t.category_id ? catMap[t.category_id]?.name ?? '' : '',
         t.direction,
         t.amount.toFixed(2),
-        currency,
+        t.currency_code || currency,
         t.payment_method ?? '',
         t.source ?? '',
         t.note ?? '',
@@ -132,6 +133,7 @@ export default function ExportPage() {
         transactions: filtered.map((t) => ({
           id: t.id,
           amount: t.amount,
+          currency: t.currency_code || currency,
           direction: t.direction,
           merchant: t.merchant,
           category: t.category_id ? catMap[t.category_id]?.name ?? null : null,
@@ -219,7 +221,13 @@ export default function ExportPage() {
         body: filtered.map((t) => {
           const cat = t.category_id ? catMap[t.category_id]?.name ?? '' : ''
           const sign = t.direction === 'credit' ? '+' : '−'
-          const display = fmt(t.amount).replace(/^[+−\-]/, '')
+          // Rows keep their original currency — a €45 dinner must not
+          // print as $45 (same rule as the transactions table).
+          const rowCurrency = t.currency_code || currency
+          const display =
+            rowCurrency === currency
+              ? fmt(t.amount).replace(/^[+−\-]/, '')
+              : new Intl.NumberFormat(locale, { style: 'currency', currency: rowCurrency }).format(t.amount)
           return [t.transacted_at.slice(0, 10), t.merchant ?? '', cat, `${sign}${display}`]
         }),
         styles: { fontSize: 9, cellPadding: 6, lineColor: [225, 222, 213], lineWidth: 0.5 },

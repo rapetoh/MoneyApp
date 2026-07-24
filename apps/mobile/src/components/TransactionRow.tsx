@@ -106,7 +106,10 @@ export function TransactionRow({
           serif={false}
           sansWeight="700"
           color={amountColor}
-          sign={currencySymbolFor(currency)}
+          // Row amounts keep their original currency — a €45 dinner must
+          // not render as $45. Falls back to the profile currency for
+          // legacy rows without a currency_code.
+          sign={currencySymbolFor(transaction.currency_code || currency)}
         />
       </View>
     </Pressable>

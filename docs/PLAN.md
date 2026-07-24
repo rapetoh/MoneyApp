@@ -3321,6 +3321,37 @@ and destroyed through the `delete-user` function afterwards.
   needs a JRE — a portable one works; point JAVA_HOME at it). idb is
   blocked on this machine (Homebrew demands newer Xcode CLT).
 
+### Visual QA pass with seeded data (July 23, 2026 — same session)
+
+A second, deeper pass: seeded a realistic 3-month dataset (30
+transactions across 6 categories, income, 4 budgets, an active
+Netflix rule, and one EUR row awaiting FX backfill) for a disposable
+user and screenshotted **every** dashboard page and **all six
+Overview lenses**, cross-checking the rendered numbers against the
+seed by hand.
+
+- **Verified correct:** Mind map, Flow, Calendar (including
+  timezone-correct day bucketing), Treemap, Cashflow (52% savings
+  rate), Matrix (month × category totals), Budgets (ring + per-cat
+  bars), Recurring (Netflix active + rent auto-detected as a
+  pattern), Insights forecast math (projection = month-pace × days;
+  delta vs 6-mo avg), Export totals, Settings (income + privacy
+  toggles). **Ask Murmur answered a real question with the exact
+  right figure** ("You spent $299.27 on groceries this month" —
+  matches the seed to the cent) and persisted to history.
+- **Bug found + fixed: per-row amounts rendered in the profile
+  currency.** The seeded €45 Café de Flore row displayed as −$45.00.
+  Fixed at every row-level surface: web transactions table, CSV
+  Currency column, JSON export (now includes per-row `currency`),
+  PDF export rows, mobile TransactionRow, transaction detail hero +
+  undo toast, and the edit screens (web form label + mobile symbol).
+  Aggregations were already correct (they sum the FX snapshot).
+  Verified live: the row now renders **−€45.00**.
+- **Noted, not changed (product calls):** the Recurring page's
+  "potential savings" card happily suggests cancelling rent
+  ($16,800/yr); the Flow lens labels the income column by the income
+  transaction's category. Both worth a look eventually.
+
 ### Handoff — current state + remaining backlog (July 23, 2026)
 
 **Everything is committed and pushed.** The backend is live and

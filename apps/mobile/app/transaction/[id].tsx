@@ -19,7 +19,7 @@ import { DataEvents } from '../../src/events/dataEvents'
 import { MerchantAvatar } from '../../src/components/MerchantAvatar'
 import { Money } from '../../src/components/Money'
 import { Colors, Typography, Hairline } from '../../src/theme'
-import { formatCurrency, t } from '@voice-expense/shared'
+import { formatCurrency, currencySymbolFor, t } from '@voice-expense/shared'
 import type { Transaction, Locale } from '@voice-expense/shared'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -148,7 +148,7 @@ export default function TransactionDetailScreen() {
     if (!txn) return
     const snapshot = txn
     const merchantLabel = snapshot.merchant ?? t('transactions.unknown', locale)
-    const formatted = formatCurrency(snapshot.amount, currency)
+    const formatted = formatCurrency(snapshot.amount, snapshot.currency_code || currency)
 
     const deletedVersion = (snapshot.version ?? 1) + 1
     await softDeleteTransaction(snapshot.id)
@@ -267,6 +267,7 @@ export default function TransactionDetailScreen() {
                 value={amountSign * txn.amount}
                 size={56}
                 color={isCredit ? Colors.income : Colors.ink ?? Colors.text}
+                sign={currencySymbolFor(txn.currency_code || currency)}
               />
             </View>
             {categoryName && (

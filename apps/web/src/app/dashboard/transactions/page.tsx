@@ -108,6 +108,7 @@ export default function TransactionsPage() {
   const [fNewCatName, setFNewCatName] = useState('')
   const [fPayment, setFPayment] = useState('')
   const [fDate, setFDate] = useState('')
+  const [fCurrency, setFCurrency] = useState('USD')
   const [formError, setFormError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
@@ -211,6 +212,7 @@ export default function TransactionsPage() {
     setFNewCatName('')
     setFPayment('')
     setFDate(toLocalInputValue(new Date().toISOString()))
+    setFCurrency(profile?.currency_code ?? 'USD')
     setFormError(null)
     setShowForm(true)
   }
@@ -225,6 +227,7 @@ export default function TransactionsPage() {
     setFNewCatName('')
     setFPayment(t.payment_method ?? '')
     setFDate(toLocalInputValue(t.transacted_at))
+    setFCurrency(t.currency_code || (profile?.currency_code ?? 'USD'))
     setFormError(null)
     setShowForm(true)
   }
@@ -529,7 +532,7 @@ export default function TransactionsPage() {
             {formError && <div style={styles.formError}>{formError}</div>}
             <div style={styles.formRow}>
               <div style={styles.field}>
-                <label style={styles.label}>Amount ({profile?.currency_code ?? 'USD'})</label>
+                <label style={styles.label}>Amount ({fCurrency})</label>
                 <input
                   type="number"
                   min="0"
@@ -731,7 +734,7 @@ export default function TransactionsPage() {
                     <div style={{ textAlign: 'right' }}>
                       <Money
                         value={isIncome ? t.amount : -t.amount}
-                        currency={currency}
+                        currency={t.currency_code || currency}
                         locale={locale}
                         size={13}
                         serif={false}

@@ -236,7 +236,7 @@ export default function EditTransactionScreen() {
 
           {/* Amount */}
           <View style={styles.amountContainer}>
-            <Text style={styles.currencySymbol}>{currencySymbolFor(currency)}</Text>
+            <Text style={styles.currencySymbol}>{currencySymbolFor(txn?.currency_code || currency)}</Text>
             <TextInput
               style={styles.amountInput}
               value={amount}
