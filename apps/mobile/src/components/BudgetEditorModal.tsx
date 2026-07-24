@@ -10,7 +10,7 @@ import {
   Alert,
 } from 'react-native'
 import { Colors, Typography, Radius, Hairline } from '../theme'
-import { t, type Locale } from '@voice-expense/shared'
+import { t, currencySymbolFor, type Locale } from '@voice-expense/shared'
 import type { BudgetPeriod } from '@voice-expense/shared'
 
 const BUDGET_PERIODS: { value: BudgetPeriod; key: string }[] = [
@@ -92,7 +92,7 @@ export function BudgetEditorModal({
           <Text style={styles.modalHint}>{t('settings.budget_hint', locale)}</Text>
 
           <View style={styles.amountRow}>
-            <Text style={styles.currencySymbol}>{currency}</Text>
+            <Text style={styles.currencySymbol}>{currencySymbolFor(currency)}</Text>
             <TextInput
               style={styles.amountInput}
               value={amount}

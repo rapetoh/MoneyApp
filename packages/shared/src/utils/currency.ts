@@ -11,6 +11,36 @@ export function formatCurrency(
   }).format(amount)
 }
 
+/** Compact display symbol for a currency code — "$", "€", "₦" … Falls
+ *  back to the code itself (plus a space) for currencies without a
+ *  well-known single glyph. Every amount-entry surface uses this so a
+ *  EUR user sees "€" everywhere, never a bare "EUR" or a wrong "$"
+ *  (MOBILE_REVIEW §1.6 / CROSS §6.3). */
+export function currencySymbolFor(code: string): string {
+  switch (code) {
+    case 'USD':
+    case 'CAD':
+    case 'AUD':
+      return '$'
+    case 'EUR':
+      return '€'
+    case 'GBP':
+      return '£'
+    case 'JPY':
+      return '¥'
+    case 'CHF':
+      return 'CHF '
+    case 'NGN':
+      return '₦'
+    case 'GHS':
+      return '₵'
+    case 'XAF':
+      return 'CFA '
+    default:
+      return code + ' '
+  }
+}
+
 export function formatAmount(amount: number, locale: string = 'en'): string {
   return new Intl.NumberFormat(locale, {
     minimumFractionDigits: 2,

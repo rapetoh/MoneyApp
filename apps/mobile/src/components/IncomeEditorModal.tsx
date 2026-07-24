@@ -10,7 +10,7 @@ import {
   Platform,
 } from 'react-native'
 import { Colors, Typography, Hairline } from '../theme'
-import { t, type Locale } from '@voice-expense/shared'
+import { t, currencySymbolFor, type Locale } from '@voice-expense/shared'
 
 interface Props {
   visible: boolean
@@ -89,7 +89,7 @@ export function IncomeEditorModal({
                 {t('settings.income_amount', locale)}
               </Text>
               <View style={styles.amountRow}>
-                <Text style={styles.currencyGlyph}>$</Text>
+                <Text style={styles.currencyGlyph}>{currencySymbolFor(currency)}</Text>
                 <TextInput
                   value={amount}
                   onChangeText={(v) => setAmount(v.replace(/[^\d.]/g, ''))}

@@ -2,7 +2,7 @@ import React from 'react'
 import { View, Text, Pressable, StyleSheet } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import type { Transaction } from '@voice-expense/shared'
-import { t } from '@voice-expense/shared'
+import { t, currencySymbolFor } from '@voice-expense/shared'
 import type { Locale } from '@voice-expense/shared'
 import { MerchantAvatar } from './MerchantAvatar'
 import { Money } from './Money'
@@ -111,31 +111,6 @@ export function TransactionRow({
       </View>
     </Pressable>
   )
-}
-
-function currencySymbolFor(code: string): string {
-  switch (code) {
-    case 'USD':
-    case 'CAD':
-    case 'AUD':
-      return '$'
-    case 'EUR':
-      return '€'
-    case 'GBP':
-      return '£'
-    case 'JPY':
-      return '¥'
-    case 'CHF':
-      return 'CHF '
-    case 'NGN':
-      return '₦'
-    case 'GHS':
-      return '₵'
-    case 'XAF':
-      return 'CFA '
-    default:
-      return code + ' '
-  }
 }
 
 const styles = StyleSheet.create({

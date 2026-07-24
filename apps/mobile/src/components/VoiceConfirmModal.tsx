@@ -16,7 +16,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { RecurringToggle } from './RecurringToggle'
 import { AmountAdjustChips } from './AmountAdjustChips'
 import { Colors, Typography, Spacing, Radius } from '../theme'
-import { merchantColor, t } from '@voice-expense/shared'
+import { merchantColor, t, currencySymbolFor } from '@voice-expense/shared'
 import type { ParsedExpense, Locale, Category } from '@voice-expense/shared'
 import type { RecurringFrequency } from '@voice-expense/shared'
 
@@ -185,7 +185,7 @@ export function VoiceConfirmModal({
                     ))}
                   </View>
                   <View style={styles.amountRow}>
-                    <Text style={styles.currencySymbol}>{parsedExpense?.currency ?? 'USD'}</Text>
+                    <Text style={styles.currencySymbol}>{currencySymbolFor(parsedExpense?.currency ?? 'USD')}</Text>
                     <TextInput
                       style={styles.amountInput}
                       value={amount}

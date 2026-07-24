@@ -84,7 +84,7 @@ export default function TabsLayout() {
         options={{
           title: t('tabs.today', locale),
           tabBarIcon: ({ focused }) => (
-            <TabIcon focused={focused} name={focused ? 'menu' : 'menu-outline'} />
+            <TabIcon focused={focused} name={focused ? 'home' : 'home-outline'} />
           ),
         }}
       />
@@ -114,7 +114,7 @@ export default function TabsLayout() {
         options={{
           title: t('tabs.budgets', locale),
           tabBarIcon: ({ focused }) => (
-            <TabIcon focused={focused} name={focused ? 'time' : 'time-outline'} />
+            <TabIcon focused={focused} name={focused ? 'wallet' : 'wallet-outline'} />
           ),
         }}
       />

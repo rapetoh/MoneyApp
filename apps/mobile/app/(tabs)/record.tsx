@@ -29,7 +29,7 @@ import { Colors, Typography, Text as TextStyles, Spacing, Radius, Hairline } fro
 import { parseScan } from '@voice-expense/ai'
 import { supabase } from '../../src/lib/supabase'
 import { getApiUrl } from '../../src/hooks/useApiUrl'
-import { t } from '@voice-expense/shared'
+import { t, currencySymbolFor } from '@voice-expense/shared'
 import type { TransactionDirection, PaymentMethod, TransactionSource, Locale } from '@voice-expense/shared'
 import type { RecurringFrequency } from '@voice-expense/shared'
 
@@ -488,7 +488,7 @@ export default function RecordScreen() {
                 {amount}
               </Text>
             )}
-            <Text style={styles.amountHeroCurrency}>{userCurrency}</Text>
+            <Text style={styles.amountHeroCurrency}>{currencySymbolFor(userCurrency)}</Text>
           </View>
 
           {/* Quick fields — merchant + category, compact */}

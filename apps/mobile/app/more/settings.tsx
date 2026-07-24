@@ -14,6 +14,7 @@ import {
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import * as Linking from 'expo-linking'
+import Constants from 'expo-constants'
 import { useAuth, signOut } from '../../src/hooks/useAuth'
 import { useProfile } from '../../src/hooks/useProfile'
 import { useTransactions } from '../../src/hooks/useTransactions'
@@ -345,7 +346,7 @@ export default function SettingsScreen() {
             label={t('more.help', locale)}
             onPress={() => router.push('/more/help')}
           />
-          <SetRow label={t('settings.version', locale)} detail="1.0.0" chevron={false} last />
+          <SetRow label={t('settings.version', locale)} detail={Constants.expoConfig?.version ?? '—'} chevron={false} last />
         </SetGroup>
 
         {/* Sign out */}

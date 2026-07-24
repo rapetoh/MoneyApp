@@ -1,5 +1,6 @@
 import { View, Text, StyleSheet, ScrollView, Linking, Pressable } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import Constants from 'expo-constants'
 import { useAuth } from '../../src/hooks/useAuth'
 import { useProfile } from '../../src/hooks/useProfile'
 import { Colors, Typography, Spacing, Radius, Text as TextStyles, Hairline } from '../../src/theme'
@@ -29,7 +30,7 @@ export default function HelpScreen() {
           <View style={styles.divider} />
           <View style={styles.row}>
             <Text style={styles.rowLabel}>{t('help.version', locale)}</Text>
-            <Text style={styles.rowValue}>1.0.0</Text>
+            <Text style={styles.rowValue}>{Constants.expoConfig?.version ?? '—'}</Text>
           </View>
         </View>
       </ScrollView>

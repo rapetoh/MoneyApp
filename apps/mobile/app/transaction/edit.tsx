@@ -22,7 +22,7 @@ import { getTransactionById } from '../../src/services/sync/transactionStore'
 import { CategoryPicker } from '../../src/components/CategoryPicker'
 import { RecurringToggle } from '../../src/components/RecurringToggle'
 import { Colors, Typography, Spacing, Radius } from '../../src/theme'
-import { t } from '@voice-expense/shared'
+import { t, currencySymbolFor } from '@voice-expense/shared'
 import type { Transaction, TransactionDirection, PaymentMethod, Locale, RecurringFrequency } from '@voice-expense/shared'
 
 const PAYMENT_METHODS: { value: PaymentMethod; key: string }[] = [
@@ -236,7 +236,7 @@ export default function EditTransactionScreen() {
 
           {/* Amount */}
           <View style={styles.amountContainer}>
-            <Text style={styles.currencySymbol}>{currency}</Text>
+            <Text style={styles.currencySymbol}>{currencySymbolFor(currency)}</Text>
             <TextInput
               style={styles.amountInput}
               value={amount}
