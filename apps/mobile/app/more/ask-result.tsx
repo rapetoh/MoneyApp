@@ -18,7 +18,13 @@ import { useRecurringRules } from '../../src/hooks/useRecurringRules'
 import { getApiUrl } from '../../src/hooks/useApiUrl'
 import { supabase } from '../../src/lib/supabase'
 import { Colors, Typography, Hairline, Radius, Spacing } from '../../src/theme'
-import { t, type Locale } from '@voice-expense/shared'
+import {
+  t,
+  createConversation,
+  appendUserMessage,
+  appendAssistantMessage,
+  type Locale,
+} from '@voice-expense/shared'
 import {
   buildAskMurmurRequest,
   postAskMurmur,
@@ -69,6 +75,8 @@ export default function AskResultScreen() {
   // Once we've fired once, the `firedRef` guard prevents re-fires from list
   // refreshes (e.g. SyncManager landing a row mid-conversation).
   const firedRef = useRef(false)
+  // One persisted thread per screen visit, even across error→retry cycles.
+  const persistedRef = useRef(false)
 
   useEffect(() => {
     if (!question || !user?.id || firedRef.current) return
@@ -102,9 +110,27 @@ export default function AskResultScreen() {
       })
       const response = await postAskMurmur({ apiBaseUrl, authToken, request })
       setState({ kind: 'ok', response })
+      // Persist to the same ask_conversations / ask_messages tables the web
+      // thread uses, so this question shows up in the desktop history
+      // dropdown. Fire-and-forget — a persistence failure never blocks the
+      // rendered answer.
+      void persistAsk(response)
     } catch (err) {
       console.warn('[ask-result] request failed:', err)
       setState({ kind: 'error' })
+    }
+  }
+
+  async function persistAsk(response: AskMurmurResponse) {
+    if (persistedRef.current || !user?.id) return
+    persistedRef.current = true
+    try {
+      const conversation = await createConversation(supabase, user.id, question)
+      if (!conversation) return
+      await appendUserMessage(supabase, conversation.id, user.id, question)
+      await appendAssistantMessage(supabase, conversation.id, user.id, response)
+    } catch (err) {
+      console.warn('[ask-result] persist failed:', err)
     }
   }
 

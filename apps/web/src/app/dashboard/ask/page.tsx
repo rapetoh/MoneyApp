@@ -19,7 +19,7 @@ import {
   softDeleteConversation,
   type AskConversationRow,
   type AskMessageRow,
-} from '../../../lib/askMurmurStorage'
+} from '@voice-expense/shared'
 import type {
   AskMurmurRequest,
   AskMurmurResponse,

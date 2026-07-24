@@ -15,12 +15,14 @@
 //   "New conversation" -> setActiveConversation(null), local thread cleared,
 //                          next send creates a fresh row
 //
-// The mobile app uses its own one-shot result-card UX and doesn't need
-// conversation history yet. When mobile wants the same persistence we'll
-// move this layer into packages/shared and call into Supabase from RN.
+// Lives in packages/shared so web (conversation thread on /dashboard/ask)
+// and mobile (one-shot result card on more/ask-result) persist through the
+// exact same layer. The caller passes its own SupabaseClient — the import
+// below is type-only, so shared carries no runtime dependency on
+// supabase-js.
 
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { AskMurmurResponse } from '@voice-expense/shared'
+import type { AskMurmurResponse } from './types/ai'
 
 export interface AskConversationRow {
   id: string

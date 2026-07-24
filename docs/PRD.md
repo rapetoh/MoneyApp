@@ -324,7 +324,13 @@ Privacy is a core selling point, not a checkbox.
 - Users can delete all their data at any time (Settings → Delete Account triggers full cascade delete)
 - Privacy policy is specific and human-readable — no vague "we may share with partners" language
 - No advertising, no selling of user data, ever
-- Advisor conversations are never stored server-side
+- Ask Murmur conversations are stored in the user's own account
+  (`ask_conversations` / `ask_messages`, row-level security, soft-deletable)
+  so history follows the user across mobile and desktop. They are never used
+  for anything except rendering the user's own history, and account deletion
+  removes them with everything else. **[Updated May 2026 — supersedes the
+  v1.0 "never stored server-side" stance, which shipped alongside the
+  chat-style Advisor that no longer exists.]**
 
 ---
 
