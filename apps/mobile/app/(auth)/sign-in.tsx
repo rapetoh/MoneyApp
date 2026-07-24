@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   View,
   Text,
@@ -59,6 +59,9 @@ export default function WelcomeSignInScreen() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
+  // Return-key flow: "next" on the email field hands focus to the password
+  // field (it previously did nothing).
+  const passwordRef = useRef<TextInput>(null)
 
   // Apple auth is iOS-only; on Android the AppleAuthenticationButton renders
   // nothing and we surface SIWA via a styled button that hands off to the web
@@ -205,20 +208,28 @@ export default function WelcomeSignInScreen() {
                   placeholder={t('auth.email', locale)}
                   placeholderTextColor={Colors.ink4 ?? Colors.textMuted}
                   autoCapitalize="none"
+                  autoCorrect={false}
                   keyboardType="email-address"
                   autoComplete="email"
                   returnKeyType="next"
+                  onSubmitEditing={() => passwordRef.current?.focus()}
+                  testID="signin-email"
+                  accessibilityLabel={t('auth.email', locale)}
                 />
                 <TextInput
+                  ref={passwordRef}
                   style={styles.input}
                   value={password}
                   onChangeText={setPassword}
                   placeholder={t('auth.password', locale)}
                   placeholderTextColor={Colors.ink4 ?? Colors.textMuted}
                   secureTextEntry
+                  autoCorrect={false}
                   autoComplete="current-password"
                   returnKeyType="go"
                   onSubmitEditing={handleEmailSignIn}
+                  testID="signin-password"
+                  accessibilityLabel={t('auth.password', locale)}
                 />
                 <Pressable
                   style={({ pressed }) => [

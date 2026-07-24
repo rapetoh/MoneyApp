@@ -3261,6 +3261,66 @@ was "review everything, finish it up." What it found and shipped:
 **Verified:** typecheck 6/6, AI harness green, web production build
 passes.
 
+### Live E2E verification pass (July 23, 2026 — same session)
+
+Everything above was then verified by driving the real apps, not just
+typechecking them. Playwright driver lives in the session scratchpad
+(not the repo); disposable test users were created via the admin API
+and destroyed through the `delete-user` function afterwards.
+
+- **Web (local dev + production Vercel deploy, both):** full flow —
+  login → Transactions → Add transaction (new-category inline path +
+  credit_card) → row appears → click-row edit (amount change) →
+  Insights renders with **no paywall** → soft delete. All steps green
+  on `localhost` and on `money-app-web-w6su.vercel.app` (which also
+  proves the Vercel git integration deployed today's push). Zero
+  console errors in production.
+- **Database truth checked after the UI run:** the row carried
+  `amount_in_profile_currency` = amount, `fx_rate_to_profile` = 1.0,
+  `payment_method = 'credit_card'`, `version = 3` after
+  create→edit→delete, `is_deleted = true` + `deleted_at` set, and the
+  inline-created category existed.
+- **Ask persistence (the exact mobile code path):** the real
+  `packages/shared/src/askStorage.ts` module was exercised against
+  the live DB as the test user — createConversation, both message
+  appends, round-trip load. RLS negative check: an unauthenticated
+  client sees zero rows.
+- **GDPR delete:** `delete-user` returned 200 and a follow-up SQL
+  sweep found 0 rows across transactions / categories /
+  ask_conversations / ask_messages / profiles / auth.users.
+- **Desktop:** Electron dev entry (same main.ts as the packaged app)
+  launched under Playwright `_electron`; embedded standalone Next
+  server booted, userData `.env` loaded (8 keys), window screenshot
+  verified fully painted (no Chromium paint-bug regression) with the
+  corrected sidebar badges. Gotcha for future sessions: strip
+  `ELECTRON_RUN_AS_NODE` from the environment when launching
+  Electron from inside a VSCode-hosted shell, or the binary runs as
+  plain Node and `app` is undefined.
+- **Found + fixed during the pass:** stale PLUS badge on the sidebar
+  "Reports & forecast" row and the Settings upsell copy still listing
+  it as a Plus perk (`f5e6e2b`).
+- **Port gotcha:** `localhost:3000` on this machine may be occupied
+  by the user's other project (O'KILI); run Murmur web on another
+  port for local testing.
+- **Mobile (iOS simulator, driven with Maestro):** built the dev
+  client (`npx expo run:ios`), installed on a dedicated simulator
+  (iPhone 17 Pro Max — the booted 17 Pro belongs to the user's other
+  project), and drove the real app: email sign-in against the live
+  backend → onboarding (permissions → income skip) → tabs. Visually
+  confirmed on-device: Today tab shows the **home** icon, Budgets
+  shows the **wallet** icon, and the Record manual-entry hero shows
+  the currency **symbol** ("$"), not the "USD" code. Test user
+  destroyed via `delete-user` afterwards.
+- **Sign-in fixes found by the mobile run:** the auth fields had
+  autocorrect enabled (iOS mangled typed emails) and the email
+  field's "next" return key did nothing. Both fixed — autoCorrect
+  off on both fields, return key now hands focus email → password,
+  and both fields carry testIDs/accessibility labels for future
+  automation.
+- **Maestro is the mobile driver of choice** (`~/.maestro/bin`,
+  needs a JRE — a portable one works; point JAVA_HOME at it). idb is
+  blocked on this machine (Homebrew demands newer Xcode CLT).
+
 ### Handoff — current state + remaining backlog (July 23, 2026)
 
 **Everything is committed and pushed.** The backend is live and
