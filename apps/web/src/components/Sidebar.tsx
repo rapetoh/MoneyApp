@@ -36,7 +36,8 @@ const NAV: Array<{
   { key: 'budgets', label: 'Budgets', href: '/dashboard/budgets', icon: Icon.sparkle, group: 'plan' },
   { key: 'recurring', label: 'Recurring', href: '/dashboard/recurring', icon: Icon.refresh, group: 'plan', badgeKey: 'recurring' },
   { key: 'ask', label: 'Ask Murmur', href: '/dashboard/ask', icon: Icon.sparkle, group: 'plan', plus: true, aiPill: true },
-  { key: 'reports', label: 'Reports & forecast', href: '/dashboard/insights', icon: Icon.chart, group: 'analyze', plus: true },
+  // Insights is free on every platform (CROSS §4.2) — no plus flag.
+  { key: 'reports', label: 'Reports & forecast', href: '/dashboard/insights', icon: Icon.chart, group: 'analyze' },
   { key: 'export', label: 'Export', href: '/dashboard/export', icon: Icon.download, group: 'data', plus: true },
   { key: 'settings', label: 'Settings', href: '/dashboard/settings', icon: Icon.settings, group: 'data' },
 ]

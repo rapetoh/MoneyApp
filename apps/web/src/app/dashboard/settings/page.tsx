@@ -463,7 +463,7 @@ export default function SettingsPage() {
                     fontFamily: font.sans,
                   }}
                 >
-                  Murmur Plus unlocks Reports & forecast, Ask Murmur, recurring detection, and full export.
+                  Murmur Plus unlocks Ask Murmur, recurring detection, and full export.
                 </div>
               )}
             </SettingsCard>
