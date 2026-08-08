@@ -3420,4 +3420,22 @@ like any production beta. Standing decisions:
   GraphQL `builds.byId.logFiles` with the `expo-session` header from
   `~/.expo/state.json`; log files are **brotli-compressed**.
 
+### Committed requirement — remote push notifications (Aug 7, 2026)
+
+The user has stated push notifications are a required future feature.
+Current truth: the app is local-notifications-only (Day-2 reminder);
+nothing is server-sent. When this feature is built:
+
+1. Delete `apps/mobile/plugins/withoutRemotePush.js` and its entry in
+   app.config.js (it strips the aps-environment entitlement).
+2. EAS already holds (or will hold, if the user answered Yes at the
+   push prompt) the APNs key; the App ID needs the Push capability
+   synced + provisioning profile regenerated — happens on the next
+   credential-managed build.
+3. Build the actual feature: expo-notifications token registration on
+   sign-in, store tokens per device (new table), a Supabase Edge
+   Function sender (candidates: recurring-generated receipts, budget
+   threshold alerts), and a Settings toggle honoring
+   profiles.analytics-style opt-in.
+
 *End of Plan*
