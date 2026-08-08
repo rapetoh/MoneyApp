@@ -3390,4 +3390,34 @@ week of inactivity. If the app "stops working" after a break, check
 project status first — restore takes one click (or ask Claude to
 restore it via MCP).
 
+### Distribution decision — TestFlight is the channel (Aug 7, 2026)
+
+The user set the bar explicitly: the app is past prototype stage and
+must be testable on their physical iPhone **via TestFlight**, updated
+like any production beta. Standing decisions:
+
+- **Ad-hoc / internal-distribution builds are dead.** The May-July
+  `preview` profile route is not to be used for user-facing testing
+  again. (Its debugging wasn't wasted — the monorepo install fixes
+  and the entitlement strip apply to production builds identically.)
+- **Bundle ID stays `com.voiceexpense.app`** — decision taken on the
+  engineering side after the user delegated: invisible to users, the
+  store listing name is "Murmur" regardless, and changing it would
+  force redoing Apple Sign-In config for zero user-facing benefit.
+  Locked permanently the moment the ASC app record is created.
+- **Release pipeline**: `eas build --platform ios --profile
+  production --auto-submit` → TestFlight. First run is interactive
+  (Apple ID + 2FA, cert/profile defaults, ASC app creation + API
+  key) — after that, fully non-interactive and Claude-runnable.
+- EAS build debugging trail (three failures, all fixed in git):
+  Electron binary download (`ELECTRON_SKIP_BINARY_DOWNLOAD=1`),
+  sharp compiling against the worker's global libvips
+  (`SHARP_IGNORE_GLOBAL_LIBVIPS=1`), and the unused remote-push
+  entitlement vs. profile capability
+  (`plugins/withoutRemotePush.js`, registered FIRST because plugin
+  mods wrap middleware-style and the delete must run after
+  expo-notifications' add). Fetch EAS logs non-interactively via
+  GraphQL `builds.byId.logFiles` with the `expo-session` header from
+  `~/.expo/state.json`; log files are **brotli-compressed**.
+
 *End of Plan*
