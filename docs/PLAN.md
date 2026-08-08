@@ -3438,4 +3438,15 @@ nothing is server-sent. When this feature is built:
    threshold alerts), and a Settings toggle honoring
    profiles.analytics-style opt-in.
 
+### Brand decision — Coin & Wave (Aug 7, 2026)
+
+The user adopted logo direction 04 "Coin & Wave" from the Claude
+Design explorations (docs/money-app/project/Murmur Logos.html),
+replacing The Listening Drop. Applied everywhere in commit 944f631:
+mobile app icon / adaptive icon / splash / favicon (SVG sources +
+regenerated PNGs), both MurmurMark components (same APIs), a NEW web
+favicon (the web app had none), and the desktop icns/ico + reinstalled
+/Applications/Murmur.app. The rebranded TestFlight build ships via the
+now fully non-interactive pipeline (ascAppId pinned in eas.json).
+
 *End of Plan*
