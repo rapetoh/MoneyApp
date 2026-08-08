@@ -1,14 +1,20 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="192" height="192">
   <!--
-    Favicon. At ≤24px the inner pulse is dropped (brand sheet §01); 192px is
-    the favicon target so we keep the silhouette + center dot only.
+    Favicon — Coin & Wave (Aug 7, 2026). At favicon sizes the fine inner
+    rings and the faint second wave read as noise (same principle as the
+    old mark dropping its pulse ≤24px), so this keeps coin + primary wave
+    only, with a slightly heavier stroke.
   -->
+  <defs>
+    <radialGradient id="coin" cx="0.35" cy="0.3" r="0.9">
+      <stop offset="0%" stop-color="#5C7B5A"/>
+      <stop offset="100%" stop-color="#2D4530"/>
+    </radialGradient>
+  </defs>
   <rect width="192" height="192" fill="#FBFAF7"/>
   <g transform="translate(36 36) scale(0.75)">
-    <path d="M80 18 C 122 18, 142 50, 142 86 C 142 118, 116 142, 80 142
-             C 70 142, 60 140, 52 136 L 30 142 L 38 122
-             C 24 110, 18 96, 18 86 C 18 50, 38 18, 80 18 Z"
-          fill="#1B1915"/>
-    <circle cx="80" cy="80" r="6" fill="#FBFAF7"/>
+    <circle cx="80" cy="80" r="62" fill="url(#coin)"/>
+    <path d="M40 82 Q 55 66, 70 82 T 100 82 T 130 82" stroke="#FBFAF7" stroke-width="7"
+          fill="none" stroke-linecap="round" opacity="0.95"/>
   </g>
 </svg>

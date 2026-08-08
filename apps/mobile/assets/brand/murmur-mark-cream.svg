@@ -1,25 +1,28 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
   <!--
-    Murmur — The Listening Drop, default cream variant.
-    Source of truth: docs/money-app/project/Murmur Brand Sheet.html §02
-    "Default · Cream". The brand sheet's drop is on a 160-unit grid with
-    inner-pulse radii 6 / 16 / 28 (stroke widths 3.5 / 3, opacities 0.85 /
-    0.45). Scaled here to a 1024-unit canvas (multiplier 6.4) for App Store
-    rasterization. The 22% iOS corner mask is NOT pre-applied — iOS rounds
-    its own corners.
+    Murmur — Coin & Wave, default cream variant (adopted Aug 7, 2026,
+    replacing The Listening Drop at the user's direction).
+    Source of truth: docs/money-app/project/Murmur Logos.html direction
+    04 "Coin & Wave" — a coin with a soft wave engraved across it. The
+    hero mark is on a 160-unit grid (coin r=62 at 80,80; waves at y=80
+    and y=96). Same 1024-canvas wrapper as the previous mark so
+    rasterized sizing stays consistent. iOS rounds its own corners —
+    the 22% mask is NOT pre-applied.
   -->
+  <defs>
+    <radialGradient id="coin" cx="0.35" cy="0.3" r="0.9">
+      <stop offset="0%" stop-color="#5C7B5A"/>
+      <stop offset="100%" stop-color="#2D4530"/>
+    </radialGradient>
+  </defs>
   <rect width="1024" height="1024" fill="#FBFAF7"/>
   <g transform="translate(192 192) scale(4.25)">
-    <path d="M80 18 C 122 18, 142 50, 142 86 C 142 118, 116 142, 80 142
-             C 70 142, 60 140, 52 136 L 30 142 L 38 122
-             C 24 110, 18 96, 18 86 C 18 50, 38 18, 80 18 Z"
-          fill="#1B1915"/>
-    <circle cx="80" cy="80" r="6" fill="#FBFAF7"/>
-    <path d="M64 80 a16 16 0 0 1 32 0"
-          stroke="#FBFAF7" stroke-width="3.5" fill="none"
-          stroke-linecap="round" opacity="0.85"/>
-    <path d="M52 80 a28 28 0 0 1 56 0"
-          stroke="#FBFAF7" stroke-width="3" fill="none"
-          stroke-linecap="round" opacity="0.45"/>
+    <circle cx="80" cy="80" r="62" fill="url(#coin)"/>
+    <circle cx="80" cy="80" r="62" fill="none" stroke="#FBFAF7" stroke-width="1" opacity="0.18"/>
+    <circle cx="80" cy="80" r="50" fill="none" stroke="#FBFAF7" stroke-width="1" opacity="0.18"/>
+    <path d="M40 80 Q 55 64, 70 80 T 100 80 T 130 80" stroke="#FBFAF7" stroke-width="5"
+          fill="none" stroke-linecap="round" opacity="0.95"/>
+    <path d="M40 96 Q 55 86, 70 96 T 100 96 T 120 96" stroke="#FBFAF7" stroke-width="3"
+          fill="none" stroke-linecap="round" opacity="0.45"/>
   </g>
 </svg>

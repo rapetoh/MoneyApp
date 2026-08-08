@@ -1,27 +1,30 @@
-// The Listening Drop — Murmur brand mark. Mirrors
-// apps/mobile/src/components/MurmurMark.tsx and the brand sheet at
-// docs/money-app/project/Murmur Brand Sheet.html §02. The droplet sits on a
-// 160-unit grid with inner-pulse radii 6 / 16 / 28.
+// Coin & Wave — Murmur brand mark (adopted Aug 7, 2026, replacing The
+// Listening Drop at the user's direction). Mirrors
+// apps/mobile/src/components/MurmurMark.tsx and the exploration at
+// docs/money-app/project/Murmur Logos.html direction 04: a coin with a
+// soft wave engraved across it, on a 160-unit grid (coin r=62 at 80,80;
+// primary wave at y=80, faint secondary at y=96).
 import { colors } from '../lib/theme'
 
 type Variant = 'cream' | 'sage' | 'ink' | 'mono-ink' | 'mono-cream'
 
-const PALETTES: Record<Variant, { bg: string | null; ink: string; pulse: string }> = {
-  cream: { bg: '#FBFAF7', ink: '#1B1915', pulse: '#FBFAF7' },
-  sage: { bg: '#3F5A3E', ink: '#FBFAF7', pulse: '#3F5A3E' },
-  ink: { bg: '#1B1915', ink: '#FBFAF7', pulse: '#1B1915' },
-  'mono-ink': { bg: null, ink: '#1B1915', pulse: '#FBFAF7' },
-  'mono-cream': { bg: null, ink: '#FBFAF7', pulse: '#1B1915' },
+const PALETTES: Record<Variant, { bg: string | null; coin: string; wave: string }> = {
+  // 'gradient' coin is special-cased below — the cream tile carries the
+  // hero radial-gradient coin from the design sheet.
+  cream: { bg: '#FBFAF7', coin: 'gradient', wave: '#FBFAF7' },
+  sage: { bg: '#3F5A3E', coin: '#FBFAF7', wave: '#3F5A3E' },
+  ink: { bg: '#1B1915', coin: '#FBFAF7', wave: '#1B1915' },
+  'mono-ink': { bg: null, coin: '#1B1915', wave: '#FBFAF7' },
+  'mono-cream': { bg: null, coin: '#FBFAF7', wave: '#1B1915' },
 }
 
 export function MurmurMark({
   size = 32,
   variant = 'sage',
   rounded = true,
-  /** When true, the inner pulse arcs breathe on a 2.6s loop — the brand
-   *  sheet \u00a706 specifies this for active listening + save events. We use
-   *  it on Ask Murmur during the model's thinking state so the brand mark
-   *  is the loading affordance rather than a generic spinner. */
+  /** When true, the engraved waves breathe on a 2.6s loop — used on Ask
+   *  Murmur during the model's thinking state so the brand mark is the
+   *  loading affordance rather than a generic spinner. */
   animating = false,
 }: {
   size?: number
@@ -31,6 +34,8 @@ export function MurmurMark({
 }) {
   const p = PALETTES[variant]
   const radius = rounded ? size * 0.22 : 0
+  const gradientId = `murmur-coin-${variant}`
+  const coinFill = p.coin === 'gradient' ? `url(#${gradientId})` : p.coin
   return (
     <svg
       width={size}
@@ -39,34 +44,36 @@ export function MurmurMark({
       style={{ flexShrink: 0, display: 'block' }}
       aria-hidden="true"
     >
+      {p.coin === 'gradient' && (
+        <defs>
+          <radialGradient id={gradientId} cx="0.35" cy="0.3" r="0.9">
+            <stop offset="0%" stopColor="#5C7B5A" />
+            <stop offset="100%" stopColor="#2D4530" />
+          </radialGradient>
+        </defs>
+      )}
       {p.bg && (
         <rect width="160" height="160" rx={radius * (160 / size)} fill={p.bg} />
       )}
+      <circle cx="80" cy="80" r="62" fill={coinFill} />
+      {p.coin === 'gradient' && (
+        <>
+          <circle cx="80" cy="80" r="62" fill="none" stroke="#FBFAF7" strokeWidth="1" opacity="0.18" />
+          <circle cx="80" cy="80" r="50" fill="none" stroke="#FBFAF7" strokeWidth="1" opacity="0.18" />
+        </>
+      )}
       <path
-        d="M80 18 C 122 18, 142 50, 142 86 C 142 118, 116 142, 80 142
-           C 70 142, 60 140, 52 136 L 30 142 L 38 122
-           C 24 110, 18 96, 18 86 C 18 50, 38 18, 80 18 Z"
-        fill={p.ink}
-      />
-      <circle
-        cx="80"
-        cy="80"
-        r="6"
-        fill={p.pulse}
-        className={animating ? 'murmur-pulse-dot' : undefined}
-      />
-      <path
-        d="M64 80 a16 16 0 0 1 32 0"
-        stroke={p.pulse}
-        strokeWidth="3.5"
+        d="M40 80 Q 55 64, 70 80 T 100 80 T 130 80"
+        stroke={p.wave}
+        strokeWidth="5"
         fill="none"
         strokeLinecap="round"
-        opacity="0.85"
+        opacity="0.95"
         className={animating ? 'murmur-pulse-arc1' : undefined}
       />
       <path
-        d="M52 80 a28 28 0 0 1 56 0"
-        stroke={p.pulse}
+        d="M40 96 Q 55 86, 70 96 T 100 96 T 120 96"
+        stroke={p.wave}
         strokeWidth="3"
         fill="none"
         strokeLinecap="round"
