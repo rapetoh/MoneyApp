@@ -31,6 +31,13 @@ module.exports = {
       package: 'com.voiceexpense.app',
     },
     plugins: [
+      // First in the list so its entitlements mod runs LAST (plugins
+      // wrap like middleware — last-registered runs first): it must
+      // delete the remote-push entitlement AFTER expo-notifications
+      // adds it. Murmur is local-notifications-only; the ad-hoc
+      // provisioning profile has no Push Notifications capability and
+      // builds fail if the entitlement survives.
+      './plugins/withoutRemotePush.js',
       'expo-router',
       'expo-secure-store',
       ['expo-splash-screen', { backgroundColor: '#FBFAF7' }],
