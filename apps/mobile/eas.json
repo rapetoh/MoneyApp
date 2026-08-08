@@ -13,7 +13,8 @@
         "EXPO_PUBLIC_SUPABASE_URL": "https://ohaqhwampmyoeaopdybd.supabase.co",
         "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_HseSmiHYgNP-C3J5XvG6ag_UK6JbfDU",
         "EXPO_PUBLIC_API_BASE_URL": "https://money-app-web-w6su.vercel.app",
-        "ELECTRON_SKIP_BINARY_DOWNLOAD": "1"
+        "ELECTRON_SKIP_BINARY_DOWNLOAD": "1",
+        "SHARP_IGNORE_GLOBAL_LIBVIPS": "1"
       }
     },
     "development-simulator": {
@@ -26,7 +27,8 @@
         "EXPO_PUBLIC_SUPABASE_URL": "https://ohaqhwampmyoeaopdybd.supabase.co",
         "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_HseSmiHYgNP-C3J5XvG6ag_UK6JbfDU",
         "EXPO_PUBLIC_API_BASE_URL": "https://money-app-web-w6su.vercel.app",
-        "ELECTRON_SKIP_BINARY_DOWNLOAD": "1"
+        "ELECTRON_SKIP_BINARY_DOWNLOAD": "1",
+        "SHARP_IGNORE_GLOBAL_LIBVIPS": "1"
       }
     },
     "preview": {
@@ -35,7 +37,8 @@
         "EXPO_PUBLIC_SUPABASE_URL": "https://ohaqhwampmyoeaopdybd.supabase.co",
         "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_HseSmiHYgNP-C3J5XvG6ag_UK6JbfDU",
         "EXPO_PUBLIC_API_BASE_URL": "https://money-app-web-w6su.vercel.app",
-        "ELECTRON_SKIP_BINARY_DOWNLOAD": "1"
+        "ELECTRON_SKIP_BINARY_DOWNLOAD": "1",
+        "SHARP_IGNORE_GLOBAL_LIBVIPS": "1"
       }
     },
     "production": {
@@ -44,7 +47,8 @@
         "EXPO_PUBLIC_SUPABASE_URL": "https://ohaqhwampmyoeaopdybd.supabase.co",
         "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_HseSmiHYgNP-C3J5XvG6ag_UK6JbfDU",
         "EXPO_PUBLIC_API_BASE_URL": "https://money-app-web-w6su.vercel.app",
-        "ELECTRON_SKIP_BINARY_DOWNLOAD": "1"
+        "ELECTRON_SKIP_BINARY_DOWNLOAD": "1",
+        "SHARP_IGNORE_GLOBAL_LIBVIPS": "1"
       }
     }
   },
