@@ -236,7 +236,24 @@ async function bootstrap() {
   }
 }
 
+// Two live instances share one Chromium profile (userData); the loser
+// of the profile lock renders without its preload bridge, so the web
+// app misses `window.murmur` and drops the whole desktop layout —
+// looks like every desktop fix regressed at once. One instance only:
+// a second launch just focuses the existing window.
+const hasInstanceLock = app.requestSingleInstanceLock()
+if (!hasInstanceLock) {
+  app.quit()
+}
+app.on('second-instance', () => {
+  if (mainWindow) {
+    if (mainWindow.isMinimized()) mainWindow.restore()
+    mainWindow.focus()
+  }
+})
+
 app.whenReady().then(() => {
+  if (!hasInstanceLock) return
   bootstrap()
   if (process.platform === 'darwin') {
     Menu.setApplicationMenu(buildAppMenu())
