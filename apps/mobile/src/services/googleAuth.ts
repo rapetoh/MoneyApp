@@ -35,7 +35,6 @@ export async function signInWithGoogle() {
     scheme: 'voiceexpense',
     path: 'auth/callback',
   })
-  console.log('[googleAuth] redirectTo =', redirectTo)
 
   const { data: authUrl, error: urlError } = await supabase.auth.signInWithOAuth({
     provider: 'google',
@@ -46,10 +45,8 @@ export async function signInWithGoogle() {
   })
   if (urlError) throw urlError
   if (!authUrl?.url) throw new Error('Supabase did not return an OAuth URL')
-  console.log('[googleAuth] opening OAuth URL =', authUrl.url)
 
   const result = await WebBrowser.openAuthSessionAsync(authUrl.url, redirectTo)
-  console.log('[googleAuth] WebBrowser result type =', result.type)
 
   if (result.type === 'cancel' || result.type === 'dismiss') {
     throw new Error('Google sign-in cancelled')

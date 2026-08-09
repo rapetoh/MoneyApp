@@ -16,6 +16,8 @@ Everything we depend on outside our own code. Reviewed before Phase 0.
 
 **Our usage estimate**: Free tier covers us through development and early users. Upgrade to Pro before public launch.
 
+**Key usage**: The web/desktop server (`apps/web`) authenticates end users with the **anon key only** (`NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY`, build-inlined) — `validateToken` calls `auth.getUser(token)`, which needs no elevated privilege. No elevated, RLS-bypassing admin credential is used, shipped, or read anywhere in `apps/web` or `apps/desktop`; access control is RLS, not a bypass key. Removed by audit fix 0.4, which deleted `packages/supabase` and the desktop `<userData>/.env` mechanism that used to hold that admin credential on end users' machines. It is only ever used server-side, inside `supabase/functions/**` (Edge Functions).
+
 ---
 
 ## 2. OpenAI API — AI (Parsing, Scanning, Advisor)
@@ -40,6 +42,8 @@ Everything we depend on outside our own code. Reviewed before Phase 0.
 - `apps/web/src/app/api/ai/parse-expense/route.ts` — voice transcript parsing
 - `apps/web/src/app/api/ai/parse-scan/route.ts` — receipt + paycheck OCR (vision)
 - `apps/web/src/app/api/ai/ask-murmur/route.ts` — grounded Q&A over the user's transactions (Plus). Uses `gpt-4o-mini` by default (`AI_ASK_MODEL` override) with `response_format: json_object`, 800 max tokens, temperature 0.3. Per-call cost ~$0.001–0.005 depending on the user's transaction window (last 90 days, capped at 500 rows). The system prompt enforces grounded-only answers; out-of-scope questions are refused via `out_of_scope: true`.
+
+**Logging policy (all three AI routes)**: production logs carry non-identifying telemetry only — question length, transaction/tool-call counts, latency, outcome, and error `message`/`status` (never the raw SDK error object, which embeds the request body). Payload-bearing traces (question text, data overview, tool args/results, validator detail) require `AI_DEBUG_TRACE=1`, which stays unset in production. This mirrors migration 009's scrubbing of `raw_transcript` from the database.
 
 ---
 
@@ -201,4 +205,6 @@ Everything we depend on outside our own code. Reviewed before Phase 0.
 
 ---
 
-*Last updated: April 14, 2026 — replaced dead Clearbit Logo API with Google Favicon V2; updated Supabase key format (legacy JWT → publishable key)*
+*Last updated: Aug 9, 2026 — audit fix 0.4: removed the admin/bypass-RLS Supabase credential from the web/desktop surface (anon-key-only auth); noted that credential is now `supabase/functions/**`-only.*
+
+*Previously: April 14, 2026 — replaced dead Clearbit Logo API with Google Favicon V2; updated Supabase key format (legacy JWT → publishable key)*

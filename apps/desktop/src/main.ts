@@ -1,14 +1,27 @@
 import { app, BrowserWindow, shell, Menu, dialog, utilityProcess, type UtilityProcess } from 'electron'
 import { createServer } from 'node:net'
 import { join } from 'node:path'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync } from 'node:fs'
 import { setTimeout as delay } from 'node:timers/promises'
 import * as http from 'node:http'
+import * as https from 'node:https'
 
 const isDev = !app.isPackaged
 const HOSTNAME = '127.0.0.1'
 
+/**
+ * The hosted deployment that serves /api/ai/*. The desktop shell never
+ * runs the AI routes locally — OPENAI_API_KEY and the Supabase secrets
+ * stay on the server, exactly as mobile does via
+ * EXPO_PUBLIC_API_BASE_URL. This replaced the `<userData>/.env` loader,
+ * whose only working configuration put SUPABASE_SERVICE_ROLE_KEY in a
+ * plaintext file on the end user's machine.
+ */
+const HOSTED_API_ORIGIN = 'https://money-app-web-w6su.vercel.app'
+const HOSTED_API_PREFIX = '/api/ai/'
+
 let nextServer: UtilityProcess | null = null
+let gatewayServer: http.Server | null = null
 let mainWindow: BrowserWindow | null = null
 
 function findFreePort(): Promise<number> {
@@ -61,55 +74,82 @@ function resolveServerEntry(): string {
   return join(process.resourcesPath, 'web/apps/web/server.js')
 }
 
-/**
- * Parse a .env-style file (KEY=VALUE lines, # comments, blank lines).
- * No interpolation, no expansion — just the bare format. Strips
- * surrounding quotes when present.
- */
-function parseEnvFile(contents: string): Record<string, string> {
-  const env: Record<string, string> = {}
-  for (const rawLine of contents.split(/\r?\n/)) {
-    const line = rawLine.trim()
-    if (!line || line.startsWith('#')) continue
-    const eq = line.indexOf('=')
-    if (eq === -1) continue
-    const key = line.slice(0, eq).trim()
-    let value = line.slice(eq + 1).trim()
-    if (
-      (value.startsWith('"') && value.endsWith('"')) ||
-      (value.startsWith("'") && value.endsWith("'"))
-    ) {
-      value = value.slice(1, -1)
-    }
-    env[key] = value
+// Hop-by-hop headers are connection-scoped and must not be forwarded
+// (RFC 9110 §7.6.1). `host` is recomputed for each target.
+const NON_FORWARDED_HEADERS = new Set([
+  'connection',
+  'keep-alive',
+  'proxy-authenticate',
+  'proxy-authorization',
+  'te',
+  'trailer',
+  'transfer-encoding',
+  'upgrade',
+  'host',
+])
+
+function forwardableHeaders(headers: http.IncomingHttpHeaders): http.OutgoingHttpHeaders {
+  const out: http.OutgoingHttpHeaders = {}
+  for (const [name, value] of Object.entries(headers)) {
+    if (value !== undefined && !NON_FORWARDED_HEADERS.has(name)) out[name] = value
   }
-  return env
+  return out
+}
+
+function proxyTo(
+  target: { transport: typeof http | typeof https; hostname: string; port: number },
+  req: http.IncomingMessage,
+  res: http.ServerResponse,
+) {
+  const upstream = target.transport.request(
+    {
+      hostname: target.hostname,
+      port: target.port,
+      path: req.url,
+      method: req.method,
+      headers: forwardableHeaders(req.headers),
+    },
+    (upstreamRes) => {
+      res.writeHead(upstreamRes.statusCode ?? 502, forwardableHeaders(upstreamRes.headers))
+      upstreamRes.pipe(res)
+    },
+  )
+  upstream.on('error', (err) => {
+    // Path only — the query string can carry auth codes (/auth/callback?code=…).
+    console.error(`[murmur] proxy error for ${req.method} ${req.url?.split('?')[0]}`, err)
+    if (res.headersSent) {
+      res.destroy()
+    } else {
+      res.writeHead(502, { 'content-type': 'application/json' })
+      res.end(JSON.stringify({ error: 'Upstream unavailable' }))
+    }
+  })
+  // Renderer cancelled (or finished) — stop the upstream request too.
+  res.on('close', () => upstream.destroy())
+  req.pipe(upstream)
 }
 
 /**
- * Load the user's .env from `<userData>/.env`. The packaged app is
- * launched from Finder with a clean GUI environment that does not
- * inherit the user's shell vars, so the embedded Next server cannot
- * see OPENAI_API_KEY etc. unless we plant them here.
- *
- * On macOS this resolves to:
- *   ~/Library/Application Support/Murmur/.env
- *
- * Returns the merged env (process.env + file overrides). If the file
- * is missing, returns process.env unchanged so a developer running
- * `npm run dev` (which inherits the shell env) still works.
+ * One local origin for the renderer. UI traffic is piped to the
+ * embedded Next server; /api/ai/* is forwarded to the hosted
+ * deployment, so no server secret ever exists on the user's machine.
  */
-function loadEnvFile(): NodeJS.ProcessEnv {
-  const userDataEnv = join(app.getPath('userData'), '.env')
-  if (!existsSync(userDataEnv)) return { ...process.env }
-  try {
-    const parsed = parseEnvFile(readFileSync(userDataEnv, 'utf8'))
-    console.log(`[murmur] loaded env from ${userDataEnv} (${Object.keys(parsed).length} keys)`)
-    return { ...process.env, ...parsed }
-  } catch (err) {
-    console.error(`[murmur] failed to read ${userDataEnv}`, err)
-    return { ...process.env }
-  }
+async function startGateway(nextPort: number): Promise<number> {
+  const port = await findFreePort()
+  const hosted = new URL(HOSTED_API_ORIGIN)
+  const server = http.createServer((req, res) => {
+    if (req.url?.startsWith(HOSTED_API_PREFIX)) {
+      proxyTo({ transport: https, hostname: hosted.hostname, port: 443 }, req, res)
+    } else {
+      proxyTo({ transport: http, hostname: HOSTNAME, port: nextPort }, req, res)
+    }
+  })
+  await new Promise<void>((resolve, reject) => {
+    server.once('error', reject)
+    server.listen(port, HOSTNAME, () => resolve())
+  })
+  gatewayServer = server
+  return port
 }
 
 async function startEmbeddedServer(): Promise<number> {
@@ -122,7 +162,6 @@ async function startEmbeddedServer(): Promise<number> {
   }
 
   const port = await findFreePort()
-  const envFromFile = loadEnvFile()
 
   // utilityProcess.fork is Electron's purpose-built API for running
   // Node code as a managed child of the main process. Critically, it
@@ -134,7 +173,7 @@ async function startEmbeddedServer(): Promise<number> {
   nextServer = utilityProcess.fork(entry, [], {
     cwd: join(entry, '..'),
     env: {
-      ...envFromFile,
+      ...process.env,
       NODE_ENV: 'production',
       PORT: String(port),
       HOSTNAME,
@@ -160,10 +199,14 @@ async function startEmbeddedServer(): Promise<number> {
   return port
 }
 
-function killEmbeddedServer() {
+function stopServers() {
   if (nextServer) {
     nextServer.kill()
     nextServer = null
+  }
+  if (gatewayServer) {
+    gatewayServer.close()
+    gatewayServer = null
   }
 }
 
@@ -227,8 +270,9 @@ async function bootstrap() {
   app.setName('Murmur')
 
   try {
-    const port = await startEmbeddedServer()
-    createWindow(`http://${HOSTNAME}:${port}/`)
+    const nextPort = await startEmbeddedServer()
+    const gatewayPort = await startGateway(nextPort)
+    createWindow(`http://${HOSTNAME}:${gatewayPort}/`)
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     dialog.showErrorBox('Murmur failed to start', message)
@@ -267,12 +311,12 @@ app.whenReady().then(() => {
 })
 
 app.on('window-all-closed', () => {
-  killEmbeddedServer()
+  stopServers()
   if (process.platform !== 'darwin') app.quit()
 })
 
 app.on('before-quit', () => {
-  killEmbeddedServer()
+  stopServers()
 })
 
 function buildAppMenu(): Menu {

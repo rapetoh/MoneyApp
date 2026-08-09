@@ -8,7 +8,6 @@ module.exports = function (api) {
         {
           alias: {
             '@voice-expense/shared': '../../packages/shared/src/index.ts',
-            '@voice-expense/supabase': '../../packages/supabase/src/index.ts',
           },
         },
       ],

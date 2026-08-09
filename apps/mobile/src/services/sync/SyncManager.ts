@@ -30,6 +30,11 @@ class SyncManager {
   private listeners: Set<SyncListener> = new Set()
   private unsubscribeNetInfo: (() => void) | null = null
   private retryTimer: ReturnType<typeof setTimeout> | null = null
+  // Bumped by stop(). drainQueue() and pullRemote() capture the value on
+  // entry and re-check it after every await, so a stop() issued mid-flight
+  // (the sign-out teardown) halts them instead of letting the old
+  // account's queue entries fire or its rows merge back into a wiped DB.
+  private drainEpoch = 0
 
   static getInstance(): SyncManager {
     if (!SyncManager.instance) {
@@ -51,6 +56,7 @@ class SyncManager {
   stop(): void {
     this.unsubscribeNetInfo?.()
     this.unsubscribeNetInfo = null
+    this.drainEpoch += 1
     if (this.retryTimer) {
       clearTimeout(this.retryTimer)
       this.retryTimer = null
@@ -77,10 +83,11 @@ class SyncManager {
   async drainQueue(): Promise<void> {
     if (!this.isOnline || this.isSyncing) return
     this.isSyncing = true
+    const epoch = this.drainEpoch
 
     try {
       let hasMore = true
-      while (hasMore) {
+      while (hasMore && epoch === this.drainEpoch) {
         const entries = await getPendingEntries(10)
         if (entries.length === 0) {
           hasMore = false
@@ -90,6 +97,7 @@ class SyncManager {
         this.notify(true, entries.length)
 
         for (const entry of entries) {
+          if (epoch !== this.drainEpoch) return
           try {
             const payload = JSON.parse(entry.payload)
 
@@ -121,6 +129,11 @@ class SyncManager {
                 }
                 throw new Error(error.message)
               }
+
+              // A stop() during the network await means the local DB may
+              // just have been wiped — writing the synced copy back would
+              // resurrect the old account's row.
+              if (epoch !== this.drainEpoch) return
 
               // Mark as synced in local DB
               await upsertTransaction({ ...payload, synced_at: new Date().toISOString() })
@@ -155,6 +168,7 @@ class SyncManager {
    */
   async pullRemote(userId: string, since?: string): Promise<void> {
     if (!this.isOnline) return
+    const epoch = this.drainEpoch
 
     let query = supabase
       .from('transactions')
@@ -171,6 +185,10 @@ class SyncManager {
     if (error || !data) return
 
     for (const row of data) {
+      // A stop() (sign-out teardown) while the fetch or a prior upsert
+      // was in flight — do not merge the old account's rows back into a
+      // freshly wiped DB.
+      if (epoch !== this.drainEpoch) return
       await upsertTransaction(row as Transaction)
     }
   }

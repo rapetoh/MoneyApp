@@ -71,12 +71,22 @@ function nextOccurrence(rule: RecurringRule, fromDate?: Date): Date | null {
   return next
 }
 
-const DISMISS_KEY = 'murmur_recurring_dismissed_v1'
+// Pre-namespacing key: every account on a shared browser profile read and
+// wrote the same bucket, so account A's dismissals hid account B's real
+// candidates. Kept only so `readDismissed` can clear it out below — never
+// read from again, and unattributable to any one user so it cannot be
+// migrated.
+const LEGACY_DISMISS_KEY = 'murmur_recurring_dismissed_v1'
 
-function readDismissed(): Set<string> {
+function dismissKey(userId: string): string {
+  return `murmur_recurring_dismissed_v1:${userId}`
+}
+
+function readDismissed(userId: string): Set<string> {
   if (typeof window === 'undefined') return new Set()
   try {
-    const raw = localStorage.getItem(DISMISS_KEY)
+    localStorage.removeItem(LEGACY_DISMISS_KEY)
+    const raw = localStorage.getItem(dismissKey(userId))
     if (!raw) return new Set()
     return new Set(JSON.parse(raw) as string[])
   } catch {
@@ -84,10 +94,10 @@ function readDismissed(): Set<string> {
   }
 }
 
-function writeDismissed(s: Set<string>) {
+function writeDismissed(userId: string, s: Set<string>) {
   if (typeof window === 'undefined') return
   try {
-    localStorage.setItem(DISMISS_KEY, JSON.stringify(Array.from(s).slice(-100)))
+    localStorage.setItem(dismissKey(userId), JSON.stringify(Array.from(s).slice(-100)))
   } catch {
     // Ignore quota errors
   }
@@ -148,10 +158,13 @@ export default function RecurringPage() {
   const [loading, setLoading] = useState(true)
   const [dismissed, setDismissed] = useState<Set<string>>(new Set())
   const [profile, setProfile] = useState<{ currency_code?: string; locale?: string } | null>(null)
+  const [userId, setUserId] = useState<string | null>(null)
 
   async function load() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
+    setUserId(user.id)
+    setDismissed(readDismissed(user.id))
     const [r, t, c, p] = await Promise.all([
       supabase
         .from('recurring_rules')
@@ -179,7 +192,6 @@ export default function RecurringPage() {
   }
 
   useEffect(() => {
-    setDismissed(readDismissed())
     load()
   }, [])
 
@@ -287,10 +299,11 @@ export default function RecurringPage() {
   }
 
   function dismissCandidate(c: RecurringPatternCandidate) {
+    if (!userId) return
     const next = new Set(dismissed)
     next.add(c.key)
     setDismissed(next)
-    writeDismissed(next)
+    writeDismissed(userId, next)
   }
 
   async function toggleActive(rule: RecurringRule) {

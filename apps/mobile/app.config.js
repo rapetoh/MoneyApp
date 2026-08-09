@@ -18,9 +18,6 @@ module.exports = {
       bundleIdentifier: 'com.voiceexpense.app',
       usesAppleSignIn: true,
       infoPlist: {
-        NSAppTransportSecurity: {
-          NSAllowsArbitraryLoads: true,
-        },
         // Murmur implements no encryption of its own (OS TLS + data
         // protection only) — declaring exemption here means App Store
         // Connect never shows the "Missing Compliance" dialog again.

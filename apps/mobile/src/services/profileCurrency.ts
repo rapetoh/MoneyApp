@@ -14,8 +14,8 @@
  *   - Write paths read via `getCurrentProfileCurrency`. The default
  *     is 'USD' (matches the profile column default), so an early
  *     write before the profile loads still gets a sensible value.
- *   - Signing out resets to 'USD' via `useAuth`'s session listener
- *     (handled in app/_layout.tsx).
+ *   - Signing out resets to 'USD' via `resetLocalState` in
+ *     `src/hooks/useAuth.ts`.
  */
 
 let cached: string = 'USD'

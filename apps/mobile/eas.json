@@ -1,19 +1,17 @@
 {
   "cli": {
-    "version": ">= 18.0.0",
+    "version": ">= 18.5.0",
     "appVersionSource": "remote"
   },
   "build": {
     "development": {
       "developmentClient": true,
       "distribution": "internal",
+      "environment": "development",
       "ios": {
         "simulator": false
       },
       "env": {
-        "EXPO_PUBLIC_SUPABASE_URL": "https://ohaqhwampmyoeaopdybd.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_HseSmiHYgNP-C3J5XvG6ag_UK6JbfDU",
-        "EXPO_PUBLIC_API_BASE_URL": "https://money-app-web-w6su.vercel.app",
         "ELECTRON_SKIP_BINARY_DOWNLOAD": "1",
         "SHARP_IGNORE_GLOBAL_LIBVIPS": "1"
       }
@@ -21,29 +19,26 @@
     "development-simulator": {
       "developmentClient": true,
       "distribution": "internal",
+      "environment": "development",
       "ios": {
         "simulator": true
       },
       "env": {
-        "EXPO_PUBLIC_SUPABASE_URL": "https://ohaqhwampmyoeaopdybd.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_HseSmiHYgNP-C3J5XvG6ag_UK6JbfDU",
-        "EXPO_PUBLIC_API_BASE_URL": "https://money-app-web-w6su.vercel.app",
         "ELECTRON_SKIP_BINARY_DOWNLOAD": "1",
         "SHARP_IGNORE_GLOBAL_LIBVIPS": "1"
       }
     },
     "preview": {
       "distribution": "internal",
+      "environment": "preview",
       "env": {
-        "EXPO_PUBLIC_SUPABASE_URL": "https://ohaqhwampmyoeaopdybd.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_HseSmiHYgNP-C3J5XvG6ag_UK6JbfDU",
-        "EXPO_PUBLIC_API_BASE_URL": "https://money-app-web-w6su.vercel.app",
         "ELECTRON_SKIP_BINARY_DOWNLOAD": "1",
         "SHARP_IGNORE_GLOBAL_LIBVIPS": "1"
       }
     },
     "production": {
       "autoIncrement": true,
+      "environment": "production",
       "env": {
         "EXPO_PUBLIC_SUPABASE_URL": "https://ohaqhwampmyoeaopdybd.supabase.co",
         "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_HseSmiHYgNP-C3J5XvG6ag_UK6JbfDU",

@@ -18,6 +18,12 @@ import type { NextRequest } from 'next/server'
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! })
 const MODEL = process.env.AI_ASK_MODEL?.trim() || 'gpt-4o'
 
+// Payload-bearing traces (question text, data overview, tool args/results,
+// validator detail) log only under this flag, which stays unset in
+// production: Vercel retains logs, and this is the same class of data
+// migration 009 scrubs from the database.
+const DEBUG_TRACE = process.env.AI_DEBUG_TRACE === '1'
+
 // Defensive caps. The mobile client already trims, but we don't trust it.
 const MAX_TRANSACTIONS = 500
 const MAX_RECURRING = 50
@@ -113,14 +119,20 @@ export async function POST(req: NextRequest) {
   // model out when its verdict contradicts what the data actually
   // contains.
   const overview = buildDataOverview(ctx)
+  const startedAt = Date.now()
   console.log(
-    '[ask-murmur] question=',
-    JSON.stringify(askReq.question),
-    'today=',
-    askReq.today,
-    'overview=',
-    JSON.stringify(overview),
+    `[ask-murmur] request question_len=${askReq.question.length} transactions=${transactions.length} recurring=${recurring_rules.length} history_turns=${history.length}`,
   )
+  if (DEBUG_TRACE) {
+    console.log(
+      '[ask-murmur] trace question=',
+      JSON.stringify(askReq.question),
+      'today=',
+      askReq.today,
+      'overview=',
+      JSON.stringify(overview),
+    )
+  }
 
   try {
     const result = await runConversation(askReq, ctx, undefined, overview)
@@ -131,7 +143,11 @@ export async function POST(req: NextRequest) {
       askReq.monthly_income,
     )
     if (validation.soft_issues.length > 0) {
-      console.warn('[ask-murmur] soft issues:', validation.soft_issues.join(' | '))
+      // Soft-issue strings quote the untraced amounts themselves — count only.
+      console.warn(`[ask-murmur] soft_issues=${validation.soft_issues.length}`)
+      if (DEBUG_TRACE) {
+        console.warn('[ask-murmur] trace soft issues:', validation.soft_issues.join(' | '))
+      }
     }
 
     const verdictTrimmed = result.response.verdict.text.trim()
@@ -143,6 +159,9 @@ export async function POST(req: NextRequest) {
       !verdictTooShort &&
       !dataMismatch
     ) {
+      console.log(
+        `[ask-murmur] ok outcome=primary tool_calls=${result.calls.length} ms=${Date.now() - startedAt}`,
+      )
       return Response.json(result.response)
     }
 
@@ -158,10 +177,20 @@ export async function POST(req: NextRequest) {
     if (dataMismatch) {
       reasons.push(dataMismatch)
     }
-    console.warn('[ask-murmur] retrying once:', reasons.join(' | '))
+    // Retry reasons embed the verdict text and untraced amounts — log only
+    // which triggers fired.
+    console.warn(
+      `[ask-murmur] retrying once: direction_violations=${validation.comparison_direction_violations.length} empty_verdict=${verdictTooShort} data_mismatch=${dataMismatch !== null}`,
+    )
+    if (DEBUG_TRACE) {
+      console.warn('[ask-murmur] trace retry reasons:', reasons.join(' | '))
+    }
     const retry = await runConversation(askReq, ctx, reasons, overview)
     const retryVerdict = retry.response.verdict.text.trim()
     if (retryVerdict.length >= 8 || retry.response.out_of_scope) {
+      console.log(
+        `[ask-murmur] ok outcome=retry tool_calls=${retry.calls.length} ms=${Date.now() - startedAt}`,
+      )
       return Response.json(retry.response)
     }
 
@@ -169,14 +198,24 @@ export async function POST(req: NextRequest) {
     // summarize-fallback.
     console.error('[ask-murmur] retry also empty; using summarize fallback')
     const summary = await runSummarizeFallback(askReq, ctx)
+    console.log(`[ask-murmur] ok outcome=summarize_fallback ms=${Date.now() - startedAt}`)
     return Response.json(summary)
   } catch (err) {
-    console.error('[ask-murmur] primary attempt threw, using summarize fallback:', err)
+    // Message + status only — the raw OpenAI SDK error object embeds the
+    // request body, i.e. the user's question and transactions.
+    const e = err as { status?: number; message?: string }
+    console.error(
+      `[ask-murmur] primary attempt threw (status=${e?.status ?? 'n/a'}): ${e?.message ?? String(err)}; using summarize fallback`,
+    )
     try {
       const summary = await runSummarizeFallback(askReq, ctx)
+      console.log(`[ask-murmur] ok outcome=error_fallback ms=${Date.now() - startedAt}`)
       return Response.json(summary)
     } catch (fallbackErr) {
-      console.error('[ask-murmur] summarize fallback also threw:', fallbackErr)
+      const fe = fallbackErr as { status?: number; message?: string }
+      console.error(
+        `[ask-murmur] summarize fallback also threw (status=${fe?.status ?? 'n/a'}): ${fe?.message ?? String(fallbackErr)}`,
+      )
       return Response.json({ error: 'AI request failed' }, { status: 500 })
     }
   }
@@ -343,20 +382,20 @@ async function runConversation(
           ? { name, args, ok: true, result: resolved.result }
           : { name, args, ok: false, result: null, error: resolved.error }
         calls.push(record)
-        // Log every tool call so we can see what code the model wrote and
-        // what came back. The result is truncated for readability —
-        // the full result is in the runtime; this trace is just to spot
-        // buggy filters fast.
-        const argPreview =
-          name === 'run_query' && args && typeof args === 'object'
-            ? (args as { code?: string }).code?.slice(0, 240) ?? ''
-            : JSON.stringify(args).slice(0, 240)
-        const resultPreview = JSON.stringify(
-          resolved.ok ? resolved.result : { error: resolved.error },
-        ).slice(0, 240)
-        console.log(
-          `[ask-murmur] tool ${name} ok=${resolved.ok} args=${argPreview} result=${resultPreview}`,
-        )
+        // Args and results carry the user's amounts and merchants — the
+        // payload preview that spots buggy model-written filters logs only
+        // under the debug flag.
+        console.log(`[ask-murmur] tool ${name} ok=${resolved.ok}`)
+        if (DEBUG_TRACE) {
+          const argPreview =
+            name === 'run_query' && args && typeof args === 'object'
+              ? (args as { code?: string }).code?.slice(0, 240) ?? ''
+              : JSON.stringify(args).slice(0, 240)
+          const resultPreview = JSON.stringify(
+            resolved.ok ? resolved.result : { error: resolved.error },
+          ).slice(0, 240)
+          console.log(`[ask-murmur] trace args=${argPreview} result=${resultPreview}`)
+        }
         messages.push({
           role: 'tool',
           tool_call_id: tc.id,

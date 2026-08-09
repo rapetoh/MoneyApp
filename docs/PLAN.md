@@ -331,6 +331,21 @@ is_pending_ai   INTEGER DEFAULT 0  -- needs AI re-parse when online
 - On reconnect: drains queue chronologically
 - Retries with exponential backoff, max 5 attempts
 - Failed items → dead-letter queue surfaced in UI as "X items need attention"
+- `stop()` bumps a drain epoch so an in-flight drain halts between entries — required by the sign-out teardown so no queue entry written by the old account fires after its session is gone
+
+**Sign-out teardown** (`resetLocalState` in `apps/mobile/src/hooks/useAuth.ts`):
+runs on the auth `SIGNED_OUT` event (module-level listener — fires for
+sign-out from any screen *and* for an expired/unrefreshable session).
+Stops the SyncManager mid-drain, wipes all local SQLite rows
+(`transactions` + `sync_queue`, full wipe via `wipeLocalDatabase`), resets
+the in-memory profile-currency cache to `USD`, cancels the pending day-2
+notification, deletes the per-user SecureStore keys
+(`insights_unlocked_seen`, `api_base_url`, `day_two_permission_asked`,
+`day_two_user_opted_out`, `recurring_pattern_dismissed_v1`), then restarts
+the SyncManager for the next sign-in. `signOut()` uses
+`scope: 'local'` so signing out works offline and always emits
+`SIGNED_OUT`. Result: nothing account A wrote is readable — or replayable
+via the queue — in account B's session.
 
 ### Conflict Resolution (Edge Function: `sync-transaction`)
 Client submits payload + the `version` it started from. Server applies rules atomically:
@@ -545,18 +560,10 @@ Supabase migrated from legacy JWT-format API keys (`eyJ...`) to a new key format
 - Anon key: `sb_publishable_...` (previously `NEXT_PUBLIC_SUPABASE_ANON_KEY` with JWT value)
 - Service role key: `sb_secret_...` (previously `SUPABASE_SERVICE_ROLE_KEY` with JWT value)
 - Legacy keys were explicitly disabled in Supabase dashboard. All env files and `apps/mobile/eas.json` updated with new key format.
-- **Important**: There are two `eas.json` files in the repo. The **only** one that matters is `apps/mobile/eas.json`. The root `eas.json` is ignored by EAS CLI.
+- **Important**: `apps/mobile/eas.json` is the only `eas.json` in the repo. (A stale duplicate config tree at the repo root — `eas.json`, `app.json`, prebuilt `ios/`/`android/` — was deleted in the Aug 2026 hardening pass; see "Environment separation" below.)
 
-### iOS App Transport Security — ATS Exception (April 2026)
-iOS blocks all non-HTTPS requests from native app code by default. Required for local dev and any HTTP endpoint:
-```javascript
-// apps/mobile/app.config.js
-ios: {
-  infoPlist: {
-    NSAppTransportSecurity: { NSAllowsArbitraryLoads: true }
-  }
-}
-```
+### iOS App Transport Security — ATS Exception (April 2026) — **REMOVED Aug 2026**
+iOS blocks all non-HTTPS requests from native app code by default. An `NSAppTransportSecurity: { NSAllowsArbitraryLoads: true }` exception was added in April 2026 for local-dev HTTP endpoints — and shipped in every production build (audit finding 06-F21/07-F18). Removed from `apps/mobile/app.config.js` in the Aug 2026 hardening pass: every host the app talks to (Supabase, Vercel, frankfurter.app, gstatic) is HTTPS, so production needs no exception. Local `expo start` dev-clients are unaffected (Expo dev builds inject their own dev-server ATS handling). Do not re-add a blanket exception; if a specific HTTP host is ever genuinely needed in dev, scope it via `NSExceptionDomains` in a dev-only config branch.
 
 ### Google Sign-In — OAuth PKCE Redirect (April 18, 2026 — during Murmur Phase A)
 
@@ -690,7 +697,7 @@ The complete recurring transactions feature was implemented across mobile. Previ
 
 **`apps/mobile/app/(tabs)/settings.tsx`** — Added "Recurring Transactions" row in Preferences section → navigates to `/recurring`.
 
-**`supabase/functions/generate-recurring/index.ts`** — Edge Function. Fetches all active rules, generates a transaction for each rule whose next occurrence is ≤ now, advances `last_generated`. Deploy with `supabase functions deploy generate-recurring`. Schedule daily with pg_cron (SQL in file header comment).
+**`supabase/functions/generate-recurring/index.ts`** — Edge Function. Fetches all active rules, generates a transaction for each rule whose next occurrence is ≤ now, advances `last_generated`. Deploy with `supabase functions deploy generate-recurring`. Scheduled daily with pg_cron (SQL in migration `015_cron_schedule_vault.sql`).
 
 **i18n** — 17 new keys added to EN/FR/ES/PT locale files: `recurring.*` (title, toggle, all 6 frequencies, active, paused, next_due, empty, empty_sub, ai_detected, delete_confirm) + `settings.recurring`.
 
@@ -1308,7 +1315,7 @@ third requires `expo-notifications` + a prebuild and is committed separately.
 
 **Shipped (part 1 — Day-3 unlock + new-pattern banner):**
 
-- [apps/mobile/src/hooks/useInsightsUnlock.ts](../apps/mobile/src/hooks/useInsightsUnlock.ts) — single source of truth for the Day-3 Insights badge milestone. Returns `{ badge, showWelcome, markSeen }` driven by transaction count + a SecureStore flag (`insights_unlocked_seen`) that survives sign-out (it's a device-level UX milestone, not user-account data). Eligibility threshold: 3 non-deleted transactions.
+- [apps/mobile/src/hooks/useInsightsUnlock.ts](../apps/mobile/src/hooks/useInsightsUnlock.ts) — single source of truth for the Day-3 Insights badge milestone. Returns `{ badge, showWelcome, markSeen }` driven by transaction count + a SecureStore flag (`insights_unlocked_seen`). The flag is per-account: the sign-out teardown (`resetLocalState` in `useAuth.ts`) deletes it along with every other per-user SecureStore key, so the next account gets its own Day-3 milestone. Eligibility threshold: 3 non-deleted transactions.
 - Tab bar ([apps/mobile/app/(tabs)/_layout.tsx](../apps/mobile/app/(tabs)/_layout.tsx)) renders a small sage dot in the Insights tab icon's upper-right corner when `badge=true`. Vanishes the moment the user opens Insights for the first time.
 - Insights screen ([apps/mobile/app/(tabs)/insights.tsx](../apps/mobile/app/(tabs)/insights.tsx)) shows a sage-tinted welcome card on the first eligible visit ("Three logs in. Patterns ahead."). Dismiss button calls `markSeen()` so the card and the badge clear together. Captured into local state on mount so the card persists across the dismissal-→-rerender cycle.
 - [apps/mobile/src/services/recurringPatternDetector.ts](../apps/mobile/src/services/recurringPatternDetector.ts) — pure-logic detector. Scans transactions, groups by `(merchant lowercased, amount in cents)`, requires ≥2 occurrences over a ≥21-day spread, skips transactions already flagged `is_recurring` or covered by an existing active rule, skips credits, filters out user-dismissed keys. Frequency inferred from median inter-occurrence gap (≤9d weekly / ≤20 biweekly / ≤45 monthly / ≤95 quarterly / >95 yearly). Returns candidates sorted by `amount × occurrences` so the heaviest pattern surfaces first.
@@ -3448,5 +3455,129 @@ regenerated PNGs), both MurmurMark components (same APIs), a NEW web
 favicon (the web app had none), and the desktop icns/ico + reinstalled
 /Applications/Murmur.app. The rebranded TestFlight build ships via the
 now fully non-interactive pipeline (ascAppId pinned in eas.json).
+
+### Environment separation + endpoint-override hardening (Aug 2026 — audit items 0.3/0.9)
+
+Config hardening from the 2026-08-08 audit. Standing decisions:
+
+- **One config tree.** `apps/mobile/` is the Expo project: the only
+  `eas.json`, the only app config (`app.config.js`). The stale
+  repo-root duplicates (`app.json`, `eas.json`, prebuilt
+  `ios/`/`android/` trees) were deleted — they shared the same
+  `projectId` + bundle ID and would have shipped a credential-less,
+  differently-configured binary if a build was ever run from the
+  root. Never re-create an Expo config outside `apps/mobile/`.
+- **Env per EAS profile — standard Expo pattern.** The `production`
+  profile is the ONLY place in the repo carrying production values
+  (Supabase URL/anon key, Vercel API base), inline in its `env`
+  block. `development`, `development-simulator` and `preview` declare
+  `"environment": "development" | "preview"` and resolve their env
+  from EAS Environment Variables (expo.dev dashboard). Those are
+  EMPTY until a staging Supabase project + Vercel preview target
+  exist — fill them with staging values there (or inline), never
+  production's. Until then a `preview` build fails loudly at boot
+  (missing env throws) instead of silently writing into production
+  data. Local `expo start` reads `apps/mobile/.env` (template:
+  `apps/mobile/.env.example`).
+- **ATS exception removed** (see the April 2026 ATS section above —
+  marked REMOVED). Production Info.plist has no
+  `NSAllowsArbitraryLoads` key.
+- **Developer → AI server URL is dev-only.** The Settings row and its
+  modal render only when `__DEV__`; and `getApiUrl()` itself
+  validates any stored override on read (HTTPS + compiled-in host
+  allow-list in `apps/mobile/src/hooks/useApiUrl.ts`), so an
+  override already persisted on a TestFlight device is ignored, not
+  honored. In release builds `useApiUrl` also throws at import if
+  `EXPO_PUBLIC_API_BASE_URL` is missing rather than falling back to
+  `http://localhost:3000`.
+
+### Audit fix 0.4 — no server secret on end users' machines (Aug 9, 2026)
+
+The desktop `<userData>/.env` mechanism is gone. The old design
+(entries of May 4–10 above, now superseded) had exactly one working
+configuration: `SUPABASE_SERVICE_ROLE_KEY` + `OPENAI_API_KEY` in a
+plaintext file at `~/Library/Application Support/Murmur/.env`, which
+also carried the `MURMUR_DEV_PLUS=1` Plus unlock. Audit finding
+06-F3 (Critical): that key bypasses RLS for the whole project.
+
+New architecture in [apps/desktop/src/main.ts](../apps/desktop/src/main.ts):
+
+- `loadEnvFile()` / `parseEnvFile()` deleted; the embedded Next
+  server is forked with the plain process env only (UI needs no
+  secret — Supabase browser creds are `NEXT_PUBLIC_*`, inlined at
+  build time).
+- The renderer now loads a local **gateway** origin
+  (`http://127.0.0.1:<port>`): UI traffic is piped to the embedded
+  Next standalone server; `/api/ai/*` is forwarded to the hosted
+  Vercel deployment (`https://money-app-web-w6su.vercel.app`) — the
+  same origin mobile uses via `EXPO_PUBLIC_API_BASE_URL`. AI keys
+  and Supabase secrets stay server-side; the client's Supabase
+  access token still travels in the `Authorization` header, and the
+  hosted routes validate it.
+- [apps/desktop/electron-builder.yml](../apps/desktop/electron-builder.yml)
+  `extraResources` now excludes `**/.env*` so no env file can ever
+  ship inside Resources.
+
+Web-half companion changes under the same audit item, now also done:
+[apps/web/src/lib/auth.ts](../apps/web/src/lib/auth.ts)'s `validateToken`
+uses an anon-key client (`NEXT_PUBLIC_SUPABASE_URL` /
+`NEXT_PUBLIC_SUPABASE_ANON_KEY`) instead of a service-role admin
+client — `auth.getUser(token)` needs no elevated privilege.
+[apps/web/src/lib/plus.server.ts](../apps/web/src/lib/plus.server.ts)'s
+two env hatches (`MURMUR_DEV_PLUS=1`, `NODE_ENV !== 'production'`) are
+deleted; `resolvePlusStatus` has exactly one source,
+`profile.plus_status === 'active'`. The dead `packages/supabase`
+package (a second service-role factory reachable from the mobile
+dependency graph) is removed, along with its references in
+`apps/mobile/package.json`, `tsconfig.json`, and `babel.config.js`.
+`turbo.json`'s build `env` list no longer carries the now-unused
+unprefixed `SUPABASE_URL`. The admin/bypass-RLS Supabase credential no
+longer appears anywhere outside `supabase/functions/**`.
+
+### Audit fix 0.6 — versioned local SQLite migrations (Aug 9, 2026)
+
+Resolves audit 03-F3 / 06-F6: on the first launch after upgrading from
+any pre-`67b3858` build, the old `migrateSchema()` added the three FX
+columns and then rebuilt `transactions` from a hard-coded column list
+that omitted them — every write for the rest of that session failed.
+The sniff-on-every-launch design is gone, replaced in
+[apps/mobile/src/services/sync/localDb.ts](../apps/mobile/src/services/sync/localDb.ts)
+by two standing structures:
+
+- **Canonical column manifest.** `TRANSACTION_COLUMNS` is the single
+  source of truth for the local `transactions` schema. `initSchema`'s
+  CREATE TABLE, the migration table-rebuild (which copies the
+  *intersection* of manifest and live columns, named on both sides —
+  never positional, never a literal list), and `upsertTransaction`'s
+  INSERT list + bind values (typed `Record<TransactionColumnName, …>`,
+  so a manifest addition that the store doesn't supply fails
+  compilation) are all generated from it. A column can no longer exist
+  in one of those places and not the others.
+- **Numbered migration runner on `PRAGMA user_version`.**
+  `MIGRATIONS[v]` migrates version v → v+1; each step runs exactly
+  once, inside a transaction that also bumps `user_version`, so a
+  failed step rolls back wholesale and retries next launch.
+  `SCHEMA_VERSION = MIGRATIONS.length`. Fresh databases are built from
+  the manifest and stamped current — the chain never replays against
+  them. Step 0 (`consolidateLegacySchemaV1`) is the one deliberately
+  guarded step: it absorbs every pre-versioning field state (pre-FX,
+  post-defective-rebuild, hotfixed) — adds missing manifest columns,
+  sweeps recurring duplicates, drops `payment_method`'s legacy
+  `NOT NULL DEFAULT 'cash'` via manifest-driven rebuild, and builds the
+  narrowed dedup index. **Adding a column now means: append to the
+  manifest + append a MIGRATIONS step with the ALTER TABLE.**
+
+`getDb()` became a promise-based singleton: concurrent first callers
+await the same migration pass, and a failed open resets the promise
+instead of handing out a handle whose migrations never ran.
+
+Regression test (real `localDb.ts`/`transactionStore.ts` code driven
+through a node:sqlite shim; no test framework exists in the repo yet —
+adopt into the future harness as-is):
+`node apps/mobile/scripts/localdb-migration-test.mjs` — legacy fixture
+upgrade with row/column preservation asserted against the manifest,
+defective-rebuild recovery, fresh-install stamping, dedup-sweep and
+unique-index enforcement, and a same-session `upsertTransaction`
+round-trip carrying FX values and a null `payment_method`.
 
 *End of Plan*

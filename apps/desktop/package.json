@@ -3,7 +3,7 @@
   "productName": "Murmur",
   "version": "0.1.0",
   "private": true,
-  "description": "Murmur desktop app — Electron wrapper around the Next.js web UI with an embedded standalone server.",
+  "description": "Murmur desktop app — Electron shell serving the Next.js web UI from an embedded standalone server; /api/ai/* is forwarded to the hosted deployment so no server secret exists on the user's machine.",
   "main": "dist/main.js",
   "scripts": {
     "build:main": "tsc -p tsconfig.json",

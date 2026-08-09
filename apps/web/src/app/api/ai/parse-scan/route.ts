@@ -53,7 +53,12 @@ export async function POST(req: NextRequest) {
     const parsed = JSON.parse(text)
     return Response.json(parsed)
   } catch (err) {
-    console.error('[parse-scan] OpenAI error:', err)
+    // Message + status only — the raw OpenAI SDK error object embeds the
+    // request body, i.e. the user's scanned image.
+    const e = err as { status?: number; message?: string }
+    console.error(
+      `[parse-scan] OpenAI error (status=${e?.status ?? 'n/a'}): ${e?.message ?? String(err)}`,
+    )
     return Response.json({ error: 'Scan parsing failed' }, { status: 500 })
   }
 }

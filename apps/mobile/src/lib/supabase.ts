@@ -1,8 +1,19 @@
 import { createClient } from '@supabase/supabase-js'
 import * as SecureStore from 'expo-secure-store'
 
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL!
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!
+function requireEnv(name: 'EXPO_PUBLIC_SUPABASE_URL' | 'EXPO_PUBLIC_SUPABASE_ANON_KEY'): string {
+  const value = process.env[name]
+  // A misbuilt binary shipping without Supabase credentials must fail loudly
+  // at boot instead of the bare `!` assertion turning into an opaque
+  // "Invalid URL" thrown from deep inside supabase-js.
+  if (!value) {
+    throw new Error(`${name} is not set — this build profile is missing its env (see apps/mobile/eas.json)`)
+  }
+  return value
+}
+
+const supabaseUrl = requireEnv('EXPO_PUBLIC_SUPABASE_URL')
+const supabaseAnonKey = requireEnv('EXPO_PUBLIC_SUPABASE_ANON_KEY')
 
 // SecureStore on iOS has a 2048-byte limit per key.
 // The Supabase session object (tokens + user metadata) regularly exceeds this.
@@ -69,3 +80,20 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     flowType: 'pkce',
   },
 })
+
+// auth-js's default persistence key: `sb-<project ref>-auth-token`. Derived
+// from the URL rather than hardcoded so an environment switch can't strand a
+// session under a stale key.
+const AUTH_STORAGE_KEY = `sb-${new URL(supabaseUrl).hostname.split('.')[0]}-auth-token`
+
+/**
+ * Deletes the persisted auth session directly at the storage layer. Needed
+ * because `supabase.auth.signOut({ scope: 'local' })` POSTs to `/logout`
+ * before clearing local state, and on a network failure it returns without
+ * removing the stored session — leaving the account signed in on next
+ * launch. Storage-level removal is the only sign-out that cannot fail
+ * offline.
+ */
+export function removePersistedAuthSession(): Promise<void> {
+  return ExpoSecureStoreAdapter.removeItem(AUTH_STORAGE_KEY)
+}

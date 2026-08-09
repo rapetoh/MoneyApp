@@ -15,11 +15,16 @@ files:
   - dist/preload.js.map
   - package.json
 
+# No secret may ship in or be read from the packaged app: the embedded
+# Next server serves UI only, and /api/ai/* is forwarded to the hosted
+# deployment by src/main.ts. The .env exclusion keeps any stray env
+# file (e.g. copied into a future standalone build) out of Resources.
 extraResources:
   - from: dist/web
     to: web
     filter:
       - '**/*'
+      - '!**/.env*'
 
 mac:
   category: public.app-category.finance

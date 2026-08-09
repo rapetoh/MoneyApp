@@ -4,12 +4,16 @@
 // and advances last_generated on the rule.
 //
 // Deploy: supabase functions deploy generate-recurring
-// Schedule (run once in Supabase SQL editor):
-//   select cron.schedule('generate-recurring-daily', '0 6 * * *',
-//     $$select net.http_post(
-//       url := 'https://<project-ref>.supabase.co/functions/v1/generate-recurring',
-//       headers := '{"Authorization": "Bearer <service-role-key>"}'::jsonb
-//     )$$);
+//
+// Scheduling lives in supabase/migrations/015_cron_schedule_vault.sql — do
+// not hand-create the cron job. The scheduled command reads the secret key
+// from Supabase Vault at call time (vault.decrypted_secrets, name
+// 'generate_recurring_key'). NEVER paste a key literal into
+// cron.job.command: it persists in a system catalog, every logical backup,
+// and every support export. Provision or rotate the credential out of band
+// with a single statement:
+//   select vault.create_secret('<secret key>', 'generate_recurring_key');
+// The job picks up the new value on its next run; no cron change needed.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 

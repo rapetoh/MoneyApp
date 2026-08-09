@@ -49,7 +49,12 @@ export async function POST(req: NextRequest) {
     const parsed = JSON.parse(text)
     return Response.json(parsed)
   } catch (err) {
-    console.error('[parse-expense] OpenAI error:', err)
+    // Message + status only — the raw OpenAI SDK error object embeds the
+    // request body, i.e. the user's transcript.
+    const e = err as { status?: number; message?: string }
+    console.error(
+      `[parse-expense] OpenAI error (status=${e?.status ?? 'n/a'}): ${e?.message ?? String(err)}`,
+    )
     return Response.json({ error: 'AI parsing failed' }, { status: 500 })
   }
 }

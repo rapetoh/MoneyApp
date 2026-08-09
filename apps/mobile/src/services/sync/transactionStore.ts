@@ -3,7 +3,8 @@
  * This is the single source of truth — SQLite locally, Supabase via SyncManager.
  */
 import type { SQLiteBindValue } from 'expo-sqlite'
-import { getDb } from './localDb'
+import { getDb, TRANSACTION_COLUMN_NAMES } from './localDb'
+import type { TransactionColumnName } from './localDb'
 import type { Transaction } from '@voice-expense/shared'
 
 function rowToTransaction(row: Record<string, unknown>): Transaction {
@@ -50,14 +51,43 @@ export async function getTransactions(userId: string): Promise<Transaction[]> {
 
 export async function upsertTransaction(txn: Transaction): Promise<void> {
   const db = await getDb()
+  // Bind values keyed by manifest column name. The Record type fails
+  // compilation the moment the manifest gains a column this map does not
+  // supply, and the INSERT list below is generated from the same
+  // manifest — the write path cannot drift from the schema.
+  const row: Record<TransactionColumnName, SQLiteBindValue> = {
+    id: txn.id,
+    user_id: txn.user_id,
+    amount: txn.amount,
+    direction: txn.direction,
+    currency_code: txn.currency_code,
+    category_id: txn.category_id ?? null,
+    merchant: txn.merchant ?? null,
+    merchant_domain: txn.merchant_domain ?? null,
+    note: txn.note ?? null,
+    payment_method: txn.payment_method,
+    amount_in_profile_currency: txn.amount_in_profile_currency ?? null,
+    fx_rate_to_profile: txn.fx_rate_to_profile ?? null,
+    fx_rate_date: txn.fx_rate_date ?? null,
+    transacted_at: txn.transacted_at,
+    source: txn.source,
+    raw_transcript: txn.raw_transcript ?? null,
+    ai_confidence: txn.ai_confidence ?? null,
+    is_recurring: txn.is_recurring ? 1 : 0,
+    recurring_rule_id: txn.recurring_rule_id ?? null,
+    recurring_frequency: txn.recurring_frequency ?? null,
+    client_id: txn.client_id,
+    client_created_at: txn.client_created_at,
+    version: txn.version,
+    is_deleted: txn.is_deleted ? 1 : 0,
+    deleted_at: txn.deleted_at ?? null,
+    synced_at: txn.synced_at ?? null,
+    created_at: txn.created_at,
+    updated_at: txn.updated_at,
+  }
   await db.runAsync(
-    `INSERT INTO transactions (
-      id, user_id, amount, direction, currency_code, category_id, merchant, merchant_domain, note,
-      payment_method, amount_in_profile_currency, fx_rate_to_profile, fx_rate_date,
-      transacted_at, source, raw_transcript, ai_confidence,
-      is_recurring, recurring_rule_id, recurring_frequency, client_id, client_created_at, version,
-      is_deleted, deleted_at, synced_at, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO transactions (${TRANSACTION_COLUMN_NAMES.join(', ')})
+    VALUES (${TRANSACTION_COLUMN_NAMES.map(() => '?').join(', ')})
     ON CONFLICT(id) DO UPDATE SET
       amount = excluded.amount,
       direction = excluded.direction,
@@ -81,36 +111,7 @@ export async function upsertTransaction(txn: Transaction): Promise<void> {
       synced_at = excluded.synced_at,
       updated_at = excluded.updated_at
     WHERE excluded.version >= transactions.version`,
-    [
-      txn.id,
-      txn.user_id,
-      txn.amount,
-      txn.direction,
-      txn.currency_code,
-      txn.category_id ?? null,
-      txn.merchant ?? null,
-      txn.merchant_domain ?? null,
-      txn.note ?? null,
-      txn.payment_method,
-      txn.amount_in_profile_currency ?? null,
-      txn.fx_rate_to_profile ?? null,
-      txn.fx_rate_date ?? null,
-      txn.transacted_at,
-      txn.source,
-      txn.raw_transcript ?? null,
-      txn.ai_confidence ?? null,
-      txn.is_recurring ? 1 : 0,
-      txn.recurring_rule_id ?? null,
-      txn.recurring_frequency ?? null,
-      txn.client_id,
-      txn.client_created_at,
-      txn.version,
-      txn.is_deleted ? 1 : 0,
-      txn.deleted_at ?? null,
-      txn.synced_at ?? null,
-      txn.created_at,
-      txn.updated_at,
-    ],
+    TRANSACTION_COLUMN_NAMES.map((name) => row[name]),
   )
 }
 
@@ -125,7 +126,19 @@ export async function softDeleteTransaction(id: string): Promise<void> {
 
 export async function updateTransactionFields(
   id: string,
-  fields: Partial<Pick<Transaction, 'amount' | 'merchant' | 'note' | 'category_id' | 'payment_method' | 'direction' | 'is_recurring' | 'recurring_frequency'>>,
+  fields: Partial<
+    Pick<
+      Transaction,
+      | 'amount'
+      | 'merchant'
+      | 'note'
+      | 'category_id'
+      | 'payment_method'
+      | 'direction'
+      | 'is_recurring'
+      | 'recurring_frequency'
+    >
+  >,
 ): Promise<void> {
   const db = await getDb()
   const now = new Date().toISOString()
@@ -135,7 +148,7 @@ export async function updateTransactionFields(
   for (const [key, val] of Object.entries(fields)) {
     sets.push(`${key} = ?`)
     // SQLite binds booleans as 0/1; scalars and null pass through unchanged.
-    const coerced = typeof val === 'boolean' ? (val ? 1 : 0) : val ?? null
+    const coerced = typeof val === 'boolean' ? (val ? 1 : 0) : (val ?? null)
     values.push(coerced)
   }
   values.push(id)
@@ -159,10 +172,10 @@ export async function updateAmountSnapshot(
   amountInProfileCurrency: number,
 ): Promise<void> {
   const db = await getDb()
-  await db.runAsync(
-    'UPDATE transactions SET amount_in_profile_currency = ? WHERE id = ?',
-    [amountInProfileCurrency, id],
-  )
+  await db.runAsync('UPDATE transactions SET amount_in_profile_currency = ? WHERE id = ?', [
+    amountInProfileCurrency,
+    id,
+  ])
 }
 
 export async function getTransactionById(id: string): Promise<Transaction | null> {

@@ -327,18 +327,21 @@ export default function SettingsScreen() {
           />
         </SetGroup>
 
-        {/* Developer */}
-        <SetGroup label={t('settings.developer', locale)}>
-          <SetRow
-            label={t('settings.ai_server_url', locale)}
-            detail={apiUrl}
-            onPress={() => {
-              setApiUrlInput(apiUrl)
-              setApiUrlModal(true)
-            }}
-            last
-          />
-        </SetGroup>
+        {/* Developer — dev-client builds only. Never rendered in TestFlight or
+            App Store builds; getApiUrl() also rejects stored overrides there. */}
+        {__DEV__ && (
+          <SetGroup label={t('settings.developer', locale)}>
+            <SetRow
+              label={t('settings.ai_server_url', locale)}
+              detail={apiUrl}
+              onPress={() => {
+                setApiUrlInput(apiUrl)
+                setApiUrlModal(true)
+              }}
+              last
+            />
+          </SetGroup>
+        )}
 
         {/* About */}
         <SetGroup label={t('settings.about', locale)}>
@@ -477,58 +480,60 @@ export default function SettingsScreen() {
         </View>
       </Modal>
 
-      {/* API URL modal */}
-      <Modal visible={apiUrlModal} animationType="slide" presentationStyle="pageSheet">
-        <View style={styles.modal}>
-          <View style={styles.modalHeader}>
-            <Pressable onPress={() => setApiUrlModal(false)}>
-              <Text style={styles.modalCancel}>{t('common.cancel', locale)}</Text>
-            </Pressable>
-            <Text style={styles.modalTitle}>{t('settings.ai_server_url', locale)}</Text>
-            <Pressable
-              onPress={async () => {
-                await setApiUrl(apiUrlInput)
-                setApiUrlModal(false)
-              }}
-            >
-              <Text style={styles.modalDone}>{t('common.save', locale)}</Text>
-            </Pressable>
-          </View>
-          <View style={styles.modalBody}>
-            <Text style={styles.modalHint}>{t('settings.ai_url_hint', locale)}</Text>
-            <TextInput
-              style={styles.nameInput}
-              value={apiUrlInput}
-              onChangeText={setApiUrlInput}
-              placeholder={defaultUrl}
-              placeholderTextColor={Colors.ink4 ?? Colors.textMuted}
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType="url"
-              returnKeyType="done"
-              onSubmitEditing={async () => {
-                await setApiUrl(apiUrlInput)
-                setApiUrlModal(false)
-              }}
-            />
-            <Pressable
-              onPress={async () => {
-                await resetApiUrl()
-                setApiUrlModal(false)
-              }}
-            >
-              <Text
-                style={[
-                  styles.modalCancel,
-                  { color: Colors.accent ?? Colors.primary, textAlign: 'center', marginTop: 8 },
-                ]}
+      {/* API URL modal — dev-client builds only, like the Developer group above */}
+      {__DEV__ && (
+        <Modal visible={apiUrlModal} animationType="slide" presentationStyle="pageSheet">
+          <View style={styles.modal}>
+            <View style={styles.modalHeader}>
+              <Pressable onPress={() => setApiUrlModal(false)}>
+                <Text style={styles.modalCancel}>{t('common.cancel', locale)}</Text>
+              </Pressable>
+              <Text style={styles.modalTitle}>{t('settings.ai_server_url', locale)}</Text>
+              <Pressable
+                onPress={async () => {
+                  await setApiUrl(apiUrlInput)
+                  setApiUrlModal(false)
+                }}
               >
-                {t('settings.reset_default', locale)}
-              </Text>
-            </Pressable>
+                <Text style={styles.modalDone}>{t('common.save', locale)}</Text>
+              </Pressable>
+            </View>
+            <View style={styles.modalBody}>
+              <Text style={styles.modalHint}>{t('settings.ai_url_hint', locale)}</Text>
+              <TextInput
+                style={styles.nameInput}
+                value={apiUrlInput}
+                onChangeText={setApiUrlInput}
+                placeholder={defaultUrl}
+                placeholderTextColor={Colors.ink4 ?? Colors.textMuted}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="url"
+                returnKeyType="done"
+                onSubmitEditing={async () => {
+                  await setApiUrl(apiUrlInput)
+                  setApiUrlModal(false)
+                }}
+              />
+              <Pressable
+                onPress={async () => {
+                  await resetApiUrl()
+                  setApiUrlModal(false)
+                }}
+              >
+                <Text
+                  style={[
+                    styles.modalCancel,
+                    { color: Colors.accent ?? Colors.primary, textAlign: 'center', marginTop: 8 },
+                  ]}
+                >
+                  {t('settings.reset_default', locale)}
+                </Text>
+              </Pressable>
+            </View>
           </View>
-        </View>
-      </Modal>
+        </Modal>
+      )}
 
       {/* Name modal */}
       <Modal visible={nameModal} animationType="slide" presentationStyle="pageSheet">

@@ -1,54 +1,152 @@
-import * as SQLite from 'expo-sqlite'
+import type { SQLiteDatabase } from 'expo-sqlite'
 
-let db: SQLite.SQLiteDatabase | null = null
+/**
+ * The slice of the SQLite API the schema core is written against.
+ * `SQLiteDatabase` satisfies it structurally; so does the node:sqlite
+ * shim in `scripts/localdb-migration-test.mjs`, which is how the
+ * upgrade path is regression-tested off-device.
+ */
+export interface SchemaDb {
+  execAsync(source: string): Promise<void>
+  getFirstAsync<T>(source: string): Promise<T | null>
+  getAllAsync<T>(source: string): Promise<T[]>
+}
 
-export async function getDb(): Promise<SQLite.SQLiteDatabase> {
-  if (db) return db
-  db = await SQLite.openDatabaseAsync('voice_expense.db')
-  await initSchema(db)
+/**
+ * Canonical column manifest for `transactions` — the single source of
+ * truth for the local schema. `initSchema`'s CREATE TABLE, the migration
+ * table-rebuild, and `upsertTransaction`'s INSERT list are all generated
+ * from this list, so they cannot drift from one another. (A table
+ * rebuild with its own hard-coded column list once dropped the FX
+ * columns the same launch had just added — audit 03-F3/06-F6.)
+ *
+ * To add a column: append a spec here (fresh installs get it via the
+ * generated CREATE TABLE) and append a MIGRATIONS step with the matching
+ * ALTER TABLE ADD COLUMN (existing installs get it there).
+ */
+export const TRANSACTION_COLUMNS = [
+  { name: 'id', ddl: 'TEXT PRIMARY KEY' },
+  { name: 'user_id', ddl: 'TEXT NOT NULL' },
+  { name: 'amount', ddl: 'REAL NOT NULL' },
+  { name: 'direction', ddl: 'TEXT NOT NULL' },
+  { name: 'currency_code', ddl: "TEXT NOT NULL DEFAULT 'USD'" },
+  { name: 'category_id', ddl: 'TEXT' },
+  { name: 'merchant', ddl: 'TEXT' },
+  { name: 'merchant_domain', ddl: 'TEXT' },
+  { name: 'note', ddl: 'TEXT' },
+  { name: 'payment_method', ddl: 'TEXT' },
+  { name: 'amount_in_profile_currency', ddl: 'REAL' },
+  { name: 'fx_rate_to_profile', ddl: 'REAL' },
+  { name: 'fx_rate_date', ddl: 'TEXT' },
+  { name: 'transacted_at', ddl: 'TEXT NOT NULL' },
+  { name: 'source', ddl: "TEXT NOT NULL DEFAULT 'manual'" },
+  { name: 'raw_transcript', ddl: 'TEXT' },
+  { name: 'ai_confidence', ddl: 'REAL' },
+  { name: 'is_recurring', ddl: 'INTEGER NOT NULL DEFAULT 0' },
+  { name: 'recurring_rule_id', ddl: 'TEXT' },
+  { name: 'recurring_frequency', ddl: 'TEXT' },
+  { name: 'client_id', ddl: 'TEXT NOT NULL' },
+  { name: 'client_created_at', ddl: 'TEXT NOT NULL' },
+  { name: 'version', ddl: 'INTEGER NOT NULL DEFAULT 1' },
+  { name: 'is_deleted', ddl: 'INTEGER NOT NULL DEFAULT 0' },
+  { name: 'deleted_at', ddl: 'TEXT' },
+  { name: 'synced_at', ddl: 'TEXT' },
+  { name: 'created_at', ddl: 'TEXT NOT NULL' },
+  { name: 'updated_at', ddl: 'TEXT NOT NULL' },
+] as const
+
+export type TransactionColumnName = (typeof TRANSACTION_COLUMNS)[number]['name']
+
+export const TRANSACTION_COLUMN_NAMES: readonly TransactionColumnName[] = TRANSACTION_COLUMNS.map(
+  (c) => c.name,
+)
+
+function transactionsCreateSql(tableName: string): string {
+  const columns = TRANSACTION_COLUMNS.map((c) => `${c.name} ${c.ddl}`).join(',\n      ')
+  return `CREATE TABLE IF NOT EXISTS ${tableName} (\n      ${columns}\n    )`
+}
+
+const BASE_INDEXES_SQL = `
+  CREATE INDEX IF NOT EXISTS idx_txn_user_date ON transactions (user_id, transacted_at DESC);
+  CREATE INDEX IF NOT EXISTS idx_txn_user_deleted ON transactions (user_id, is_deleted);
+`
+
+// Partial unique index mirroring Supabase migration 013.
+// substr(transacted_at, 1, 10) takes the YYYY-MM-DD slice (ISO strings
+// stored as TEXT) — safe because all serializations go through
+// Date.toISOString(). Scoped to source='recurring_generated': since
+// migration 013 links user-entered template transactions to their rule
+// too, and a manually logged bill may legitimately share (rule, date)
+// with a generated occurrence, only engine-generated rows participate
+// in dedup.
+const RECURRING_DEDUP_INDEX_SQL = `
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_txn_recurring_dedup
+    ON transactions (user_id, recurring_rule_id, substr(transacted_at, 1, 10))
+    WHERE recurring_rule_id IS NOT NULL AND is_deleted = 0
+      AND source = 'recurring_generated'
+`
+
+let dbPromise: Promise<SQLiteDatabase> | null = null
+
+export function getDb(): Promise<SQLiteDatabase> {
+  // Promise-based singleton: concurrent first callers all await the same
+  // schema/migration pass instead of racing past it, and a failed open
+  // resets so the next call retries rather than returning a handle whose
+  // migrations never ran.
+  if (!dbPromise) {
+    dbPromise = openDatabase().catch((err) => {
+      dbPromise = null
+      throw err
+    })
+  }
+  return dbPromise
+}
+
+async function openDatabase(): Promise<SQLiteDatabase> {
+  // Imported lazily so this module loads off-device too — the migration
+  // regression test runs the schema core under Node with a node:sqlite
+  // shim standing in for expo-sqlite.
+  const { openDatabaseAsync } = await import('expo-sqlite')
+  const db = await openDatabaseAsync('voice_expense.db')
+  await initDatabase(db)
   return db
 }
 
-async function initSchema(db: SQLite.SQLiteDatabase): Promise<void> {
+/** Test seam: lets the regression test hand the store a shim handle. */
+export function __setDbForTests(handle: SQLiteDatabase | null): void {
+  dbPromise = handle ? Promise.resolve(handle) : null
+}
+
+/**
+ * Boot sequence for a database handle: ensure the base schema, then
+ * either stamp a fresh database as already-current or migrate an
+ * existing one forward step by step.
+ */
+export async function initDatabase(db: SchemaDb): Promise<void> {
+  const fresh = !(await transactionsTableExists(db))
+  await initSchema(db)
+  if (fresh) {
+    // Born on the current schema: no legacy duplicates can exist, so the
+    // dedup index is safe to build immediately, and the migration chain
+    // (written for upgrades) must never replay — stamp the version.
+    await db.execAsync(RECURRING_DEDUP_INDEX_SQL)
+    await db.execAsync(`PRAGMA user_version = ${SCHEMA_VERSION}`)
+  } else {
+    await runMigrations(db)
+  }
+}
+
+async function initSchema(db: SchemaDb): Promise<void> {
   await db.execAsync(`
     PRAGMA journal_mode = WAL;
 
-    CREATE TABLE IF NOT EXISTS transactions (
-      id TEXT PRIMARY KEY,
-      user_id TEXT NOT NULL,
-      amount REAL NOT NULL,
-      direction TEXT NOT NULL,
-      currency_code TEXT NOT NULL DEFAULT 'USD',
-      category_id TEXT,
-      merchant TEXT,
-      merchant_domain TEXT,
-      note TEXT,
-      payment_method TEXT,
-      amount_in_profile_currency REAL,
-      fx_rate_to_profile REAL,
-      fx_rate_date TEXT,
-      transacted_at TEXT NOT NULL,
-      source TEXT NOT NULL DEFAULT 'manual',
-      raw_transcript TEXT,
-      ai_confidence REAL,
-      is_recurring INTEGER NOT NULL DEFAULT 0,
-      recurring_rule_id TEXT,
-      recurring_frequency TEXT,
-      client_id TEXT NOT NULL,
-      client_created_at TEXT NOT NULL,
-      version INTEGER NOT NULL DEFAULT 1,
-      is_deleted INTEGER NOT NULL DEFAULT 0,
-      deleted_at TEXT,
-      synced_at TEXT,
-      created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
-    );
+    ${transactionsCreateSql('transactions')};
 
-    CREATE INDEX IF NOT EXISTS idx_txn_user_date ON transactions (user_id, transacted_at DESC);
-    CREATE INDEX IF NOT EXISTS idx_txn_user_deleted ON transactions (user_id, is_deleted);
-    -- idx_txn_recurring_dedup is created in migrateSchema(), AFTER the
-    -- dedup sweep — building it inline here would fail on existing
-    -- installs that already accumulated duplicates from prior races.
+    ${BASE_INDEXES_SQL}
+    -- idx_txn_recurring_dedup is deliberately not created here: on
+    -- existing installs it may only be built after the v0 -> v1 dedup
+    -- sweep. Fresh installs get it in initDatabase(); upgrades get it
+    -- in consolidateLegacySchemaV1().
 
     CREATE TABLE IF NOT EXISTS sync_queue (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -64,105 +162,84 @@ async function initSchema(db: SQLite.SQLiteDatabase): Promise<void> {
 
     CREATE INDEX IF NOT EXISTS idx_queue_entity ON sync_queue (entity_id);
   `)
-
-  // Migrations for existing databases
-  await migrateSchema(db)
 }
 
-async function migrateSchema(db: SQLite.SQLiteDatabase): Promise<void> {
-  const tableInfo = await db.getAllAsync<{ name: string; notnull: number; dflt_value: string | null }>(
-    'PRAGMA table_info(transactions)',
-  )
-  const hasColumn = tableInfo.some((col) => col.name === 'merchant_domain')
-  if (!hasColumn) {
-    await db.execAsync('ALTER TABLE transactions ADD COLUMN merchant_domain TEXT')
-  }
+/**
+ * MIGRATIONS[v] migrates a database at PRAGMA user_version v to v + 1.
+ * The runner applies each step exactly once, in order, inside a
+ * transaction that also bumps user_version — a failed step rolls back
+ * wholesale and is retried on the next launch. Steps from v1 onward may
+ * assume the canonical schema of their starting version; step 0 alone
+ * inherits the pre-versioning era, when migrations re-sniffed
+ * PRAGMA table_info on every launch, so it must tolerate every state
+ * that era left in the field and is written defensively.
+ */
+export const MIGRATIONS: ReadonlyArray<(db: SchemaDb) => Promise<void>> = [
+  consolidateLegacySchemaV1,
+]
 
-  // Migration 011 — FX snapshot columns. ADD COLUMN is safe on every
-  // SQLite version; the columns are nullable so existing rows just
-  // get NULL until the backfill sweep fills them in (same logic as
-  // Supabase migration 011, but here it runs in `fxBackfill` on the
-  // mobile side because we have profile.currency_code in app state).
-  for (const col of ['amount_in_profile_currency', 'fx_rate_to_profile', 'fx_rate_date']) {
-    if (!tableInfo.some((c) => c.name === col)) {
-      const colType = col === 'fx_rate_date' ? 'TEXT' : 'REAL'
-      await db.execAsync(`ALTER TABLE transactions ADD COLUMN ${col} ${colType}`)
+/** The version a fully-migrated database reports. Grows by appending to MIGRATIONS. */
+export const SCHEMA_VERSION = MIGRATIONS.length
+
+export async function runMigrations(db: SchemaDb): Promise<void> {
+  const row = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version')
+  for (let v = row?.user_version ?? 0; v < SCHEMA_VERSION; v++) {
+    await db.execAsync('BEGIN IMMEDIATE')
+    try {
+      await MIGRATIONS[v](db)
+      // Same transaction as the step itself: a migration either fully
+      // applies and is recorded, or leaves no trace.
+      await db.execAsync(`PRAGMA user_version = ${v + 1}`)
+      await db.execAsync('COMMIT')
+    } catch (err) {
+      await db.execAsync('ROLLBACK').catch(() => undefined)
+      throw err
+    }
+  }
+}
+
+type LiveColumn = { name: string; notnull: number; dflt_value: string | null }
+
+async function transactionsTableExists(db: SchemaDb): Promise<boolean> {
+  const row = await db.getFirstAsync<{ name: string }>(
+    "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'transactions'",
+  )
+  return row !== null
+}
+
+async function getLiveColumns(db: SchemaDb): Promise<LiveColumn[]> {
+  return db.getAllAsync<LiveColumn>('PRAGMA table_info(transactions)')
+}
+
+/**
+ * v0 -> v1: consolidate every pre-versioning database onto the canonical
+ * schema. Field states this must absorb:
+ *   - pre-FX installs — payment_method still NOT NULL DEFAULT 'cash',
+ *     some or all of merchant_domain / FX columns / recurring_frequency
+ *     missing;
+ *   - installs that ran the defective table rebuild, which dropped the
+ *     FX columns the same launch had just added (audit 03-F3/06-F6);
+ *   - hotfixed installs already carrying the full column set.
+ */
+async function consolidateLegacySchemaV1(db: SchemaDb): Promise<void> {
+  // 1 — Bring the column set up to the manifest, whatever subset this
+  // install's history produced. Only historically-nullable columns can
+  // be missing, so ADD COLUMN with the manifest DDL is always legal.
+  // FX snapshot columns stay NULL until the fxBackfill sweep fills them
+  // (mirror of Supabase migration 011).
+  const live = await getLiveColumns(db)
+  const liveNames = new Set(live.map((c) => c.name))
+  for (const col of TRANSACTION_COLUMNS) {
+    if (!liveNames.has(col.name)) {
+      await db.execAsync(`ALTER TABLE transactions ADD COLUMN ${col.name} ${col.ddl}`)
     }
   }
 
-  // Migration 013 mirror — the user's chosen recurring cadence lives on the
-  // transaction row so the server-side trigger can create/link the rule.
-  if (!tableInfo.some((c) => c.name === 'recurring_frequency')) {
-    await db.execAsync('ALTER TABLE transactions ADD COLUMN recurring_frequency TEXT')
-  }
-
-  // Step 1 — Drop the legacy `payment_method NOT NULL DEFAULT 'cash'`
-  // constraint from existing installs. SQLite has no DROP NOT NULL, so
-  // we table-swap: copy rows into a freshly-built table with the
-  // loosened column, then rename. Without this, an upsert with
-  // payment_method=null (now possible after the AI prompt fix) fails
-  // the NOT NULL check on any database created before this change.
-  // Done BEFORE the dedup + unique-index work because the DROP TABLE
-  // would otherwise also drop the new index.
-  const pm = tableInfo.find((col) => col.name === 'payment_method')
-  if (pm && (pm.notnull === 1 || pm.dflt_value !== null)) {
-    await db.execAsync(`
-      PRAGMA foreign_keys = OFF;
-      BEGIN TRANSACTION;
-      CREATE TABLE transactions_new (
-        id TEXT PRIMARY KEY,
-        user_id TEXT NOT NULL,
-        amount REAL NOT NULL,
-        direction TEXT NOT NULL,
-        currency_code TEXT NOT NULL DEFAULT 'USD',
-        category_id TEXT,
-        merchant TEXT,
-        merchant_domain TEXT,
-        note TEXT,
-        payment_method TEXT,
-        amount_in_profile_currency REAL,
-        fx_rate_to_profile REAL,
-        fx_rate_date TEXT,
-        transacted_at TEXT NOT NULL,
-        source TEXT NOT NULL DEFAULT 'manual',
-        raw_transcript TEXT,
-        ai_confidence REAL,
-        is_recurring INTEGER NOT NULL DEFAULT 0,
-        recurring_rule_id TEXT,
-        recurring_frequency TEXT,
-        client_id TEXT NOT NULL,
-        client_created_at TEXT NOT NULL,
-        version INTEGER NOT NULL DEFAULT 1,
-        is_deleted INTEGER NOT NULL DEFAULT 0,
-        deleted_at TEXT,
-        synced_at TEXT,
-        created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL
-      );
-      INSERT INTO transactions_new SELECT
-        id, user_id, amount, direction, currency_code, category_id,
-        merchant, merchant_domain, note, payment_method,
-        amount_in_profile_currency, fx_rate_to_profile, fx_rate_date,
-        transacted_at,
-        source, raw_transcript, ai_confidence, is_recurring,
-        recurring_rule_id, recurring_frequency, client_id, client_created_at, version,
-        is_deleted, deleted_at, synced_at, created_at, updated_at
-      FROM transactions;
-      DROP TABLE transactions;
-      ALTER TABLE transactions_new RENAME TO transactions;
-      CREATE INDEX IF NOT EXISTS idx_txn_user_date ON transactions (user_id, transacted_at DESC);
-      CREATE INDEX IF NOT EXISTS idx_txn_user_deleted ON transactions (user_id, is_deleted);
-      COMMIT;
-      PRAGMA foreign_keys = ON;
-    `)
-  }
-
-  // Step 2 — Soft-delete any local recurring duplicates from prior
-  // catch-up races. Keep the earliest row per (user, rule, date) —
-  // typically the server-cron row that arrived via pullRemote — and
-  // soft-mark the rest. Hard cleanup happens server-side via
-  // migration 008; this is the local mirror so the next step's
-  // unique-index build succeeds.
+  // 2 — Soft-delete recurring duplicates from prior catch-up races.
+  // Keep the earliest row per (user, rule, date) — typically the
+  // server-cron row that arrived via pullRemote — and soft-mark the
+  // rest. Hard cleanup happens server-side via migration 008; this is
+  // the local mirror, and it must precede any dedup-index build below.
   await db.execAsync(`
     UPDATE transactions
     SET is_deleted = 1,
@@ -185,27 +262,68 @@ async function migrateSchema(db: SQLite.SQLiteDatabase): Promise<void> {
     )
   `)
 
-  // Step 3 — Partial unique index, mirroring Supabase migration 013.
-  // Stops the mobile catch-up from inserting a duplicate locally even
-  // before the queued upsert hits Supabase. substr(transacted_at, 1, 10)
-  // takes the YYYY-MM-DD slice (ISO strings stored as TEXT) — safe
-  // because all serializations go through Date.toISOString().
-  // Scoped to source='recurring_generated': since migration 013 links
-  // user-entered template transactions to their rule too, and a manually
-  // logged bill may legitimately share (rule, date) with a generated
-  // occurrence, only engine-generated rows participate in dedup. The old
-  // broader index (mirror of 008) is dropped and rebuilt with the
-  // narrower predicate.
+  // 3 — Drop the legacy payment_method NOT NULL DEFAULT 'cash'. An
+  // upsert with payment_method = null (possible since the AI prompt
+  // fix) fails the NOT NULL check on any database created before the
+  // constraint was loosened, and SQLite has no DROP NOT NULL — so this
+  // is a full table rebuild.
+  const pm = live.find((c) => c.name === 'payment_method')
+  if (pm && (pm.notnull === 1 || pm.dflt_value !== null)) {
+    await rebuildTransactionsTable(db)
+  }
+
+  // 4 — Dedup index with the narrowed predicate. Replaces the broader
+  // mirror of Supabase migration 008 where one exists; the rebuild in
+  // step 3 already builds the narrow one, making this a no-op there.
   const dedupIdx = await db.getFirstAsync<{ sql: string | null }>(
     "SELECT sql FROM sqlite_master WHERE type = 'index' AND name = 'idx_txn_recurring_dedup'",
   )
   if (!dedupIdx?.sql?.includes('recurring_generated')) {
-    await db.execAsync(`
-      DROP INDEX IF EXISTS idx_txn_recurring_dedup;
-      CREATE UNIQUE INDEX idx_txn_recurring_dedup
-        ON transactions (user_id, recurring_rule_id, substr(transacted_at, 1, 10))
-        WHERE recurring_rule_id IS NOT NULL AND is_deleted = 0
-          AND source = 'recurring_generated'
-    `)
+    await db.execAsync('DROP INDEX IF EXISTS idx_txn_recurring_dedup')
+    await db.execAsync(RECURRING_DEDUP_INDEX_SQL)
   }
+}
+
+/**
+ * SQLite's table-rebuild pattern, for constraint changes ALTER cannot
+ * express: build a replacement from the manifest, copy rows across,
+ * swap names, recreate the indexes the DROP took down. The copy names
+ * its columns explicitly on both sides and copies exactly the columns
+ * the manifest and the live table share — a manifest column the live
+ * table lacks fills with its DDL default, and the only way to lose a
+ * column is to remove it from the manifest, never a stale list here.
+ * Callers must have already swept recurring duplicates: the unique
+ * dedup index is rebuilt as part of the swap. (No PRAGMA foreign_keys
+ * dance — this schema declares no foreign keys, and the runner's
+ * transaction owns atomicity.)
+ */
+async function rebuildTransactionsTable(db: SchemaDb): Promise<void> {
+  const liveNames = new Set((await getLiveColumns(db)).map((c) => c.name))
+  const copied = TRANSACTION_COLUMN_NAMES.filter((name) => liveNames.has(name)).join(', ')
+  await db.execAsync(`
+    DROP TABLE IF EXISTS transactions_new;
+    ${transactionsCreateSql('transactions_new')};
+    INSERT INTO transactions_new (${copied}) SELECT ${copied} FROM transactions;
+    DROP TABLE transactions;
+    ALTER TABLE transactions_new RENAME TO transactions;
+    ${BASE_INDEXES_SQL}
+    ${RECURRING_DEDUP_INDEX_SQL};
+  `)
+}
+
+/**
+ * Deletes every locally-stored row: all transactions and all queued sync
+ * operations. Called from the sign-out teardown (`resetLocalState` in
+ * useAuth) so nothing one account wrote is readable — or replayable via
+ * the queue — in the next account's session. A full wipe rather than a
+ * user-scoped DELETE: only one account is ever signed in at a time, and
+ * rows orphaned by accounts that signed out before this teardown existed
+ * must go too.
+ */
+export async function wipeLocalDatabase(): Promise<void> {
+  const db = await getDb()
+  await db.execAsync(`
+    DELETE FROM transactions;
+    DELETE FROM sync_queue;
+  `)
 }
