@@ -1,7 +1,10 @@
 import { useEffect, useState, useCallback } from 'react'
+import { getCalendars } from 'expo-localization'
+import * as Crypto from 'expo-crypto'
 import { supabase } from '../lib/supabase'
 import type { RecurringRule, RecurringFrequency } from '@voice-expense/shared'
 import type { BudgetPeriod } from '@voice-expense/shared'
+import { nextOccurrence as sharedNextOccurrence } from '@voice-expense/shared'
 
 // ─── Period bounds ────────────────────────────────────────────────────────────
 
@@ -38,25 +41,52 @@ function getPeriodBounds(period: BudgetPeriod | undefined, now: Date): { start: 
 }
 
 // ─── Next occurrence ──────────────────────────────────────────────────────────
+//
+// Delegates to the one recurrence engine (`packages/shared/src/domain/
+// recurrence.ts`, fix-plan 1.5 / audit 03-F8, 04-F2, 04-F3, 04-F20,
+// 06-F22, 07-F22) instead of mutating a `Date` with `setMonth`/
+// `setFullYear`, which overflowed instead of clamping at month ends —
+// a rule anchored on the 31st permanently drifted to the 3rd after the
+// first February. This file used to be one of three byte-for-byte
+// copies of that bug; it is now a thin adapter over the shared engine.
 
-export function computeNextOccurrence(rule: RecurringRule): Date | null {
-  const base = rule.last_generated
-    ? new Date(rule.last_generated)
-    : new Date(rule.starts_at)
-
-  const next = new Date(base)
-
-  switch (rule.frequency) {
-    case 'daily':     next.setDate(next.getDate() + rule.interval); break
-    case 'weekly':    next.setDate(next.getDate() + 7 * rule.interval); break
-    case 'biweekly':  next.setDate(next.getDate() + 14 * rule.interval); break
-    case 'monthly':   next.setMonth(next.getMonth() + rule.interval); break
-    case 'quarterly': next.setMonth(next.getMonth() + 3 * rule.interval); break
-    case 'yearly':    next.setFullYear(next.getFullYear() + rule.interval); break
+/** Best-effort device zone for the many existing call sites
+ *  (`recurringCatchUp.ts`, `app/recurring.tsx`, `app/transaction/
+ *  [id].tsx`, `app/(tabs)/{index,budgets}.tsx`) that predate the shared
+ *  engine and call `computeNextOccurrence`/`computeUpcomingRecurring`
+ *  with no zone — threading `profile.timezone` through every one of
+ *  them is fix-plan Stage 2 (this item's adoption is scoped to this
+ *  hook and its own two writers: `createRule`/detected-pattern accept).
+ *  Until then this preserves those call sites' previous behaviour
+ *  (device-local time, the same zone `Date`'s local mutators implicitly
+ *  used) while giving them the day-of-month clamp fix, which does not
+ *  need the *correct* zone to be correct — only *a* zone, consistently
+ *  applied. Mirrors `useProfile.ts`'s `captureDeviceTimezone` source. */
+function deviceTimeZone(): string {
+  try {
+    return getCalendars()[0]?.timeZone ?? 'UTC'
+  } catch {
+    return 'UTC'
   }
+}
 
-  if (rule.ends_at && next > new Date(rule.ends_at)) return null
-  return next
+/**
+ * The occurrence following `fromDate` (or, when omitted, the occurrence
+ * following the rule's own `last_generated` — `starts_at` itself when
+ * that is `null`, per 03-F32; every rule-creation path in the repo
+ * today always sets `last_generated` at creation, so that branch is
+ * latent, not yet observable, exactly as the audit found it). Pass an
+ * explicit `tz` at any call site that has the user's `profile.timezone`
+ * available; callers that don't fall back to the device zone.
+ */
+export function computeNextOccurrence(
+  rule: RecurringRule,
+  fromDate?: Date,
+  tz: string = deviceTimeZone(),
+): Date | null {
+  const after = fromDate ? fromDate.toISOString() : (rule.last_generated ?? null)
+  const occurrence = sharedNextOccurrence(rule, after, tz)
+  return occurrence ? new Date(occurrence.instant) : null
 }
 
 // ─── Upcoming amount for Safe to Spend ───────────────────────────────────────
@@ -116,6 +146,7 @@ export function useRecurringRules(userId: string | undefined) {
       .from('recurring_rules')
       .insert({
         user_id: userId,
+        client_id: Crypto.randomUUID(),
         name: params.name,
         amount: params.amount,
         currency_code: params.currency_code,
@@ -126,7 +157,21 @@ export function useRecurringRules(userId: string | undefined) {
         frequency: params.frequency,
         interval: 1,
         starts_at: new Date().toISOString(),
-        last_generated: new Date().toISOString(), // treat creation as first generation
+        // NOT the `last_generated: now()` workaround 03-F32 describes —
+        // the shared engine now correctly treats `starts_at` as the
+        // first occurrence when `last_generated` is null (`nextOccurrence
+        // (rule, null, tz) === starts_at`), so this line is no longer
+        // covering for a semantic gap. It stays because this call site
+        // is exclusively `acceptPattern` (above), which always carries a
+        // real `template_txn_id` — an already-logged transaction. Setting
+        // `last_generated: null` here would make `starts_at` (= now)
+        // immediately due, and the very next catch-up run would generate
+        // a *second* transaction for today on top of the one the pattern
+        // was detected from — 03-F12's back-generated-duplicate hazard,
+        // whose guard is a different, not-yet-landed item. Once that
+        // guard exists, this can become `last_generated: null` and stop
+        // silently skipping the cycle the rule was created in.
+        last_generated: new Date().toISOString(),
         template_txn_id: params.template_txn_id ?? null,
         is_active: true,
       })

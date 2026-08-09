@@ -1,4 +1,10 @@
 'use client'
+/* eslint-disable local/period-restrictions -- Stage 2 (2.4/2.14) migration
+ * pending: `shift()` and the 24-month dropdown build below still hand-roll
+ * calendar math in the browser's own local zone (fix-plan 2.4 owns this
+ * component's full surfaces-list entry, "MonthPicker.tsx:60-96") — only
+ * the `currentMonthIso(tz)` comparison item 1.3 touches directly is
+ * threaded through `period.ts`; the rest is unconverted debt. */
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
 import { colors, font } from '../lib/theme'
@@ -14,6 +20,7 @@ import { Icon } from './Icons'
 export function MonthPicker({
   selected,
   locale,
+  tz,
   clearable = false,
   cleared = false,
   clearLabel = 'All time',
@@ -21,6 +28,12 @@ export function MonthPicker({
   /** Format: "YYYY-MM". Anchor month. */
   selected: string
   locale: string
+  /** IANA zone (`profile.timezone`) — threaded through only for the
+   *  "is this the current month" check below (fix-plan 1.3's
+   *  `monthIso.ts` no longer has an implicit default). The rest of this
+   *  component's Date math (`shift`, the 24-month dropdown build) is
+   *  unconverted Stage 2 (2.4) debt — see `eslint.config.mjs`. */
+  tz: string
   /**
    * When true, the picker has a "clear" affordance that removes ?month=
    * entirely. Used on Transactions where the default view is all-time.
@@ -57,7 +70,7 @@ export function MonthPicker({
     // strips ?month= so URLs stay clean. Clearable pickers always write
     // ?month= when a specific month is chosen \u2014 the "clear" action is
     // the only path back to no-param.
-    if (!clearable && m === currentMonthIso()) params.delete('month')
+    if (!clearable && m === currentMonthIso(tz)) params.delete('month')
     else params.set('month', m)
     const qs = params.toString()
     router.push(qs ? `${pathname}?${qs}` : pathname)

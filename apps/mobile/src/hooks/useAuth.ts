@@ -6,6 +6,7 @@ import { syncManager } from '../services/sync/SyncManager'
 import { wipeLocalDatabase } from '../services/sync/localDb'
 import { setCurrentProfileCurrency } from '../services/profileCurrency'
 import { cancelDayTwo } from '../services/dayTwoDunning'
+import { clearParseCache } from '@voice-expense/ai'
 
 /**
  * Per-user SecureStore keys, mirrored from the modules that own them
@@ -37,6 +38,12 @@ export async function resetLocalState(): Promise<void> {
   syncManager.stop()
   await wipeLocalDatabase()
   setCurrentProfileCurrency('USD')
+  // The parse cache (packages/ai/src/parser.ts) is a module-level `Map`
+  // keyed in part on user id (fix-plan 1.7 / audit 02-F24) — clearing it
+  // here is belt-and-suspenders against any entry written before that key
+  // change reaches every build, and against the very first parse this
+  // session having run before sign-in resolved a `userId` to key on.
+  clearParseCache()
   // The day-2 nudge was scheduled for the old account; cancelling also
   // drops its persisted notification id.
   await cancelDayTwo()

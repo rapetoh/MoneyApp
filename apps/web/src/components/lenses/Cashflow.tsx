@@ -1,5 +1,5 @@
 import { colors, font } from '../../lib/theme'
-import { type LensProps, monthDebits, monthCredits } from './types'
+import { type LensProps, monthDebits, monthCredits, monthSummary } from './types'
 import { aggAmount } from '@voice-expense/shared'
 
 // Daily balance line over the month + per-day income / expense bars + a
@@ -29,11 +29,16 @@ export function CashflowLens({ props }: { props: LensProps }) {
   const monthIdx = props.anchorMonth
   const daysInMonth = new Date(year, monthIdx + 1, 0).getDate()
 
-  // Build per-day income/expense and a running "balance" relative to start.
+  // Build per-day inflow/outflow and a running "balance" relative to
+  // start. The balance line tracks literal cash movement — every
+  // credit and debit, transfers included, since a Savings & Investing
+  // transfer really does leave the checking balance — so it
+  // deliberately does NOT use `summarize()`'s spend-only `expense`.
+  // The Income/Expenses/Net *stats* below the chart do, via
+  // `monthSummary` (fix-plan 1.4), so they read the same numbers as
+  // the Overview header, MindMap and Treemap for the same month.
   const points: DayPoint[] = []
   let bal = 0
-  let totalIn = 0
-  let totalOut = 0
   for (let d = 1; d <= daysInMonth; d++) {
     let inAmt = 0
     let outAmt = 0
@@ -50,10 +55,13 @@ export function CashflowLens({ props }: { props: LensProps }) {
       }
     }
     bal += inAmt - outAmt
-    totalIn += inAmt
-    totalOut += outAmt
     points.push({ d, inAmt, outAmt, bal })
   }
+
+  const summary = monthSummary(props)
+  const totalIn = summary.income
+  const totalOut = summary.expense
+  const transfersTotal = summary.transfers
 
   const W = 1120
   const H = 460
@@ -69,7 +77,11 @@ export function CashflowLens({ props }: { props: LensProps }) {
   const balPath = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${x(p.d)},${y(p.bal)}`).join(' ')
   const balArea = `${balPath} L ${x(daysInMonth)},${y(0)} L ${x(1)},${y(0)} Z`
 
-  const net = totalIn - totalOut
+  // Same figure as `totalIn - totalOut` by construction, sourced
+  // directly from `summarize()` rather than re-derived so this can
+  // never drift a cent from the Overview header / MindMap / Treemap
+  // (fix-plan 1.4).
+  const net = summary.saved
   const savingsRate = totalIn > 0 ? Math.round((net / totalIn) * 100) : null
 
   return (
@@ -247,6 +259,22 @@ export function CashflowLens({ props }: { props: LensProps }) {
           currency={props.currency}
           locale={props.locale}
         />
+        {/* Money moved to a transfer-kind category (Savings & Investing)
+            never counts toward Expenses above, but it must never read
+            as if it vanished either (fix-plan 1.4 invariant: no screen
+            prints "$0 saved" beside a real transfer). */}
+        {transfersTotal > 0 && (
+          <>
+            <div style={{ height: 1, background: colors.line }} />
+            <Stat
+              label="Saved & invested"
+              value={transfersTotal}
+              color={colors.accent}
+              currency={props.currency}
+              locale={props.locale}
+            />
+          </>
+        )}
         <div style={{ height: 1, background: colors.line }} />
         <div>
           <div

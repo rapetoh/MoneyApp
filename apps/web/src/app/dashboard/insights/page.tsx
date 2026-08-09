@@ -1,3 +1,7 @@
+/* eslint-disable local/period-restrictions -- Stage 2 (2.4/2.14) migration
+ * pending: this page's month/window math hasn't been converted onto
+ * packages/shared/src/utils/period.ts yet (fix-plan 2.11 owns the
+ * Insights rewrite) — out of item 1.3's own named surfaces. */
 import { redirect } from 'next/navigation'
 import { createClient } from '../../../lib/supabase/server'
 import { getProfile, getTransactions, getCategories, getActiveBudgets } from '../../../lib/data'

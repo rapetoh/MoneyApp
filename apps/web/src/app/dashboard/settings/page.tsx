@@ -43,6 +43,7 @@ export default function SettingsPage() {
     currency_code?: string
     locale?: string
     monthly_income?: number | null
+    timezone?: string | null
   } | null>(null)
   const [email, setEmail] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -114,9 +115,14 @@ export default function SettingsPage() {
       data: { user },
     } = await supabase.auth.getUser()
     if (!user) return
+    // TS widens an object literal keyed by a union-typed variable to a
+    // generic `{ [x: string]: boolean }` index signature, which the
+    // strictly-typed client's exact-object `update()` then rejects (it
+    // can't confirm no other key sneaks in). The cast tells it what's
+    // already true: `column` is one of exactly the two known literals.
     const { error } = await supabase
       .from('profiles')
-      .update({ [column]: next })
+      .update({ [column]: next } as Record<'analytics_opt_in' | 'crash_reports_opt_in', boolean>)
       .eq('id', user.id)
     if (error) {
       // Roll back the optimistic flip — the toggle should reflect the
@@ -407,6 +413,16 @@ export default function SettingsPage() {
                 label="This device"
                 sub="Synced just now · web companion"
                 right={<Tag color={colors.accent} bg={colors.accentSoft}>THIS DEVICE</Tag>}
+              />
+              {/* Read-only — fix-plan 1.3 part 1. Captured automatically
+                  from the browser (see TimezoneSync in dashboard/layout.tsx)
+                  whenever it drifts from what's stored; there is nothing
+                  here for the user to set directly. Falls back to the
+                  browser's own resolved zone for the render before that
+                  capture has landed, so this never shows a stale 'UTC'. */}
+              <SettingRow
+                label="Time zone"
+                sub={profile?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone}
               />
               <div
                 style={{

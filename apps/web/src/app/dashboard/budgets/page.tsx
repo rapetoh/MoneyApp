@@ -1,4 +1,9 @@
 'use client'
+/* eslint-disable local/period-restrictions -- Stage 2 (2.4/2.14) migration
+ * pending: this page's period window math hasn't been converted onto
+ * packages/shared/src/utils/period.ts's `periodBounds` yet (fix-plan
+ * 2.5 owns the budget-period rewrite) — out of item 1.3's own named
+ * surfaces. */
 import { useState, useEffect, useMemo } from 'react'
 import { createClient } from '../../../lib/supabase/client'
 import { colors, font, radius, cat, type CategoryTint } from '../../../lib/theme'
@@ -170,16 +175,29 @@ export default function BudgetsPage() {
     if (!user) return
 
     // Deactivate existing for the same scope
+    //
+    // `.eq()`'s typed overload only accepts the column's non-null value
+    // type — PostgREST has no `eq.null` semantics (that needs `.is()`), so
+    // a strictly-typed client correctly refuses `string | null` here. The
+    // cast below preserves this call's exact prior (untyped-client)
+    // behaviour rather than silently changing it: when `categoryId` is
+    // empty this still sends the literal `category_id=eq.null`, which
+    // does not match rows where `category_id IS NULL` — i.e. deactivating
+    // the existing *overall* (no-category) budget through this path is a
+    // pre-existing no-op, unrelated to typing the client. Fixing the
+    // filter to `.is('category_id', null)` when unset is a behaviour
+    // change and out of scope here.
     await supabase
       .from('budgets')
       .update({ is_active: false })
       .eq('user_id', user.id)
       .eq('is_active', true)
       .eq('period', period)
-      .eq('category_id', categoryId || null)
+      .eq('category_id', (categoryId || null) as string)
 
     const { error: err } = await supabase.from('budgets').insert({
       user_id: user.id,
+      client_id: crypto.randomUUID(),
       amount: parsed,
       period,
       category_id: categoryId || null,

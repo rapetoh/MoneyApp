@@ -1,3 +1,4 @@
+import * as Crypto from 'expo-crypto'
 import { supabase } from '../lib/supabase'
 
 export async function seedDefaultCategories(userId: string) {
@@ -23,6 +24,7 @@ export async function seedDefaultCategories(userId: string) {
   await supabase.from('categories').insert(
     missing.map((cat) => ({
       user_id: userId,
+      client_id: Crypto.randomUUID(),
       name: cat.name,
       name_normalized: cat.name.toLowerCase(),
       color: cat.color,

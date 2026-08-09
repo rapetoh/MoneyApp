@@ -16,12 +16,17 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "verify": "npx --yes tsx src/__tests__/askMurmur.verify.ts"
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "golden:verify-live": "npx --yes tsx src/__tests__/goldenCorpus/liveVerify.ts"
   },
   "dependencies": {
     "@voice-expense/shared": "*"
   },
   "devDependencies": {
-    "typescript": "^5.7.3"
+    "typescript": "^5.7.3",
+    "vitest": "^4.1.10",
+    "openai": "^6.34.0"
   }
 }

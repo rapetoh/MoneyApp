@@ -1,5 +1,6 @@
 export { Colors } from './colors'
 export { Typography, Text } from './typography'
+export { TAB_BAR_HEIGHT, TAB_BAR_BOTTOM_OFFSET, useTabBarClearance } from './chrome'
 
 export const Spacing = {
   xs: 4,

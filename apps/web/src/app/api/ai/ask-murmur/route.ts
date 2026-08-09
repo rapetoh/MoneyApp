@@ -14,8 +14,9 @@ import {
 } from '@voice-expense/ai/server'
 import type { AskMurmurRequest, AskMurmurResponse } from '@voice-expense/shared'
 import type { NextRequest } from 'next/server'
+import { getOpenAIEnv } from '../../../../lib/env'
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! })
+const openai = new OpenAI({ apiKey: getOpenAIEnv().OPENAI_API_KEY })
 const MODEL = process.env.AI_ASK_MODEL?.trim() || 'gpt-4o'
 
 // Payload-bearing traces (question text, data overview, tool args/results,

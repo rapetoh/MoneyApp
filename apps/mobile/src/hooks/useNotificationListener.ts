@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { Platform } from 'react-native'
 import { NativeModulesProxy, EventEmitter } from 'expo-modules-core'
 import type { ParsedExpense } from '@voice-expense/shared'
+import { validateParsedExpense, isParseRejection, deriveDirectionFromFlowType } from '@voice-expense/ai'
 
 // Local Subscription shape — expo-modules-core stopped exporting this type in
 // recent SDKs. The only field we use is .remove(), so a minimal local type is
@@ -84,10 +85,16 @@ export function useNotificationListener(
     const sub = addPaymentNotificationListener((payload: NotificationPayload) => {
       if (payload.amount <= 0) return
 
-      const parsed: ParsedExpense = {
+      // A payment notification is always a plain outgoing expense — no
+      // signal here distinguishes a transfer/refund/reimbursement.
+      // `direction` derives from `flow_type` (fix-plan item 1.7); both
+      // are supplied so `validateParsedExpense` below doesn't reject this
+      // candidate for a missing `flow_type`.
+      const candidate = {
         amount: payload.amount,
         currency: payload.currency,
-        direction: 'debit',
+        direction: deriveDirectionFromFlowType('expense'),
+        flow_type: 'expense',
         merchant: payload.merchant || null,
         merchant_domain: null,
         note: null,
@@ -101,7 +108,16 @@ export function useNotificationListener(
         recurring_frequency_suggestion: null,
       }
 
-      onPayment(parsed)
+      // The typed parse boundary (fix-plan item 1.7) applies here too: the
+      // native module's heuristic extraction of a payment notification's
+      // amount/currency is no more trustworthy than a model's output —
+      // e.g. a foreign banking app's currency string that isn't a real
+      // ISO 4217 code would otherwise reach `createTransaction` and sync
+      // as a row that counts as $0 forever. An invalid extraction is
+      // dropped rather than surfaced half-formed.
+      const result = validateParsedExpense(candidate)
+      if (isParseRejection(result)) return
+      onPayment(result)
     })
 
     return () => sub.remove()

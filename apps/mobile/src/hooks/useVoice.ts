@@ -100,6 +100,7 @@ export function useVoice(
       try {
         const { data: sessionData } = await supabase.auth.getSession()
         const token = sessionData?.session?.access_token ?? ''
+        const userId = sessionData?.session?.user?.id
 
         const apiBaseUrl = await getApiUrl()
         const result = await parseExpense({
@@ -109,6 +110,7 @@ export function useVoice(
           categories: categoriesRef.current,
           apiBaseUrl,
           authToken: token,
+          userId,
         })
 
         setParsedExpense(result)

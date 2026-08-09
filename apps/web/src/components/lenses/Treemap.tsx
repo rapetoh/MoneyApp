@@ -1,7 +1,7 @@
 import { colors, font, cat as catTokens } from '../../lib/theme'
 import { tintFor } from '../../lib/categories'
-import { type LensProps, monthDebits, monthCredits, groupByCategory } from './types'
-import { aggAmount } from '@voice-expense/shared'
+import { type LensProps, monthDebits, monthSummary, groupByCategory } from './types'
+import { isSpend } from '@voice-expense/shared'
 
 // Treemap of category spend for the month. Saved & invested gets its own
 // row at the bottom (income - debits) so the whole money picture is one
@@ -82,13 +82,19 @@ function layoutCells(
 }
 
 export function TreemapLens({ props }: { props: LensProps }) {
-  const debits = monthDebits(props)
-  const credits = monthCredits(props)
-  const incomeTotal = credits.reduce((s, t) => s + aggAmount(t), 0)
-  const expenseTotal = debits.reduce((s, t) => s + aggAmount(t), 0)
-  const saved = Math.max(0, incomeTotal - expenseTotal)
+  // Fix-plan 1.4: `expenseTotal` and the bottom "Saved & invested" band
+  // now come from the same `summarize()` call, so a transfer-kind
+  // category (Savings & Investing) can never be double-homed — grouped
+  // as an ordinary spend tile above *and* silently absent from the
+  // band below, which is what let a real transfer count as consumption
+  // while the band showed an unrelated income-minus-all-debits residual
+  // (05-F2; see MindMap.tsx's header comment for the production case).
+  const summary = monthSummary(props)
+  const spendDebits = monthDebits(props).filter((t) => isSpend(t, t.category_kind))
+  const expenseTotal = summary.expense
+  const saved = summary.transfers
 
-  const debitsByCat = groupByCategory(debits)
+  const debitsByCat = groupByCategory(spendDebits)
   const items = Object.entries(debitsByCat).map(([name, amt]) => ({
     label: name,
     amt,
@@ -97,11 +103,12 @@ export function TreemapLens({ props }: { props: LensProps }) {
 
   const cells = layoutCells(items)
   // Reserve the bottom strip for "Saved & invested" only when the user
-  // actually saved this month; otherwise expenses fill the whole
-  // canvas. SAVED_BAND_PCT is the height of that strip as a fraction
-  // of the canvas (matches the 22% the layoutCells call leaves below
-  // y=78 when saved > 0; here we subtract the BAND so saved sits in
-  // its own row without colliding with the tail row).
+  // actually moved money into a transfer-kind category this month;
+  // otherwise expenses fill the whole canvas. SAVED_BAND_PCT is the
+  // height of that strip as a fraction of the canvas (matches the 22%
+  // the layoutCells call leaves below y=78 when saved > 0; here we
+  // subtract the BAND so saved sits in its own row without colliding
+  // with the tail row).
   const showSavedBand = saved > 0
   const totalFlow = expenseTotal + saved
 

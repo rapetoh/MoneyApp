@@ -4,8 +4,21 @@ import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { Money } from './Money'
 import { Colors, Typography, Hairline } from '../theme'
-import { t, type Locale } from '@voice-expense/shared'
+import { t, weekdayLabels, type Locale } from '@voice-expense/shared'
 import type { Transaction } from '@voice-expense/shared'
+
+/* eslint-disable local/period-restrictions -- Stage 2 (2.4/2.14) migration
+ * pending. Fix-plan 1.3's own surface for this file is the weekday-label
+ * row alone (`weekdayLabels()` below, already adopted — see that call
+ * site's comment). The month-grid layout (`monthParam`, `dailyTotals`,
+ * the `heatmapMonth` state and its prev/next stepping, `firstWeekday`/
+ * `daysInMonth`) still builds its civil-date math from device-local
+ * `Date` getters/setters rather than `period.ts`, matching every other
+ * calendar-grid rewrite parked at Stage 2 (2.4/2.14/2.15). Converting it
+ * needs a zone threaded into this component (it currently has none) plus
+ * the grid-building helpers rewritten on `period.ts`'s civil-day
+ * primitives — a bigger, riskier change than this item's own scope, so
+ * it's marked as debt here instead of migrated. */
 
 function monthParam(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
@@ -98,7 +111,13 @@ export function HistoryHeatmap({ transactions, locale }: Props) {
     setHeatmapMonth((m) => new Date(m.getFullYear(), m.getMonth() + 1, 1))
   }
 
-  const firstWeekday = new Date(year, month, 1).getDay()
+  // Monday=0..Sunday=6 (rotated from `Intl`/`Date#getDay()`'s Sunday=0),
+  // matching `weekdayLabels()`'s `WEEK_START` convention below — the grid
+  // padding and the header it sits under must agree on which column is
+  // "first" or every day lands under the wrong weekday name (audit
+  // 04-F10, the `WEEK_START` finding). The rest of this grid's math is
+  // still Stage 2 (2.4) debt — see the file-top `eslint-disable`.
+  const firstWeekday = (new Date(year, month, 1).getDay() + 6) % 7
   const daysInMonth = new Date(year, month + 1, 0).getDate()
   const gridCells: ({ day: number; amount: number } | null)[] = []
   for (let i = 0; i < firstWeekday; i++) gridCells.push(null)
@@ -106,7 +125,12 @@ export function HistoryHeatmap({ transactions, locale }: Props) {
     gridCells.push({ day: d, amount: heatmapDaily[d] ?? 0 })
   }
 
-  const weekdayLabels = t('history.weekday_labels', locale).split(',')
+  // Shared `weekdayLabels()` (fix-plan 1.3 part 2) — Monday-first
+  // (`WEEK_START`), locale-correct via `Intl.DateTimeFormat`, replacing
+  // the hardcoded Sunday-first `history.weekday_labels` string that was
+  // wrong for fr/es/pt (all Monday-first locales). That key is deleted
+  // from every locale JSON.
+  const weekdayLabelList = weekdayLabels(locale, 'narrow')
 
   function goToMonth(key: string) {
     router.push({ pathname: '/more/transactions', params: { month: key } })
@@ -163,7 +187,7 @@ export function HistoryHeatmap({ transactions, locale }: Props) {
           </View>
 
           <View style={styles.weekdayRow}>
-            {weekdayLabels.map((label, i) => (
+            {weekdayLabelList.map((label, i) => (
               <View key={i} style={styles.weekdayCell}>
                 <Text style={styles.weekdayText}>{label}</Text>
               </View>

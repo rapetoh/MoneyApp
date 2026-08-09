@@ -2,12 +2,29 @@
  * All reads and writes for transactions go through here.
  * This is the single source of truth — SQLite locally, Supabase via SyncManager.
  */
+import { getCalendars } from 'expo-localization'
 import type { SQLiteBindValue } from 'expo-sqlite'
 import { getDb, TRANSACTION_COLUMN_NAMES } from './localDb'
 import type { TransactionColumnName } from './localDb'
 import type { Transaction } from '@voice-expense/shared'
+import { localDay } from '@voice-expense/shared'
 
-function rowToTransaction(row: Record<string, unknown>): Transaction {
+/** Best-effort device zone — mirrors `useTransactions.ts`'s own
+ *  `getDeviceTimeZone` (fix-plan 1.3 part 1) and `useRecurringRules.ts`'s
+ *  `deviceTimeZone`. `local_day` (migration 017, NOT NULL) isn't part of
+ *  the local SQLite manifest yet (Stage 2 adoption — see
+ *  `upsertTransaction`'s note on `occurrence_date` for the same story one
+ *  column earlier), so every local read recomputes it from
+ *  `transacted_at` in this zone instead of a stored column. */
+function getDeviceTimeZone(): string {
+  try {
+    return getCalendars()[0]?.timeZone ?? 'UTC'
+  } catch {
+    return 'UTC'
+  }
+}
+
+function rowToTransaction(row: Record<string, unknown>, tz: string): Transaction {
   return {
     id: row.id as string,
     user_id: row.user_id as string,
@@ -23,6 +40,9 @@ function rowToTransaction(row: Record<string, unknown>): Transaction {
     fx_rate_to_profile: (row.fx_rate_to_profile as number) ?? null,
     fx_rate_date: (row.fx_rate_date as string) ?? null,
     transacted_at: row.transacted_at as string,
+    // Not a stored local column — see `getDeviceTimeZone`'s docstring above.
+    local_day: localDay(row.transacted_at as string, tz),
+    occurrence_date: (row.occurrence_date as string) ?? null,
     source: row.source as Transaction['source'],
     raw_transcript: (row.raw_transcript as string) ?? null,
     ai_confidence: (row.ai_confidence as number) ?? null,
@@ -46,7 +66,8 @@ export async function getTransactions(userId: string): Promise<Transaction[]> {
     'SELECT * FROM transactions WHERE user_id = ? AND is_deleted = 0 ORDER BY transacted_at DESC',
     [userId],
   )
-  return (rows as Record<string, unknown>[]).map(rowToTransaction)
+  const tz = getDeviceTimeZone()
+  return (rows as Record<string, unknown>[]).map((row) => rowToTransaction(row, tz))
 }
 
 export async function upsertTransaction(txn: Transaction): Promise<void> {
@@ -76,6 +97,15 @@ export async function upsertTransaction(txn: Transaction): Promise<void> {
     is_recurring: txn.is_recurring ? 1 : 0,
     recurring_rule_id: txn.recurring_rule_id ?? null,
     recurring_frequency: txn.recurring_frequency ?? null,
+    // `Transaction` (packages/shared) doesn't carry `occurrence_date`
+    // yet — threading the recurrence engine's real resolved civil day
+    // through every local writer is fix-plan Stage 2. Deriving it here
+    // from `transacted_at` keeps this identical to the value the old
+    // `substr(transacted_at, 1, 10)` dedup key used (fix-plan 1.5's
+    // `RECURRING_DEDUP_INDEX_SQL`), so this is a schema-shape change,
+    // not a behaviour change, for every writer that still goes through
+    // this function without supplying the real value.
+    occurrence_date: txn.transacted_at.slice(0, 10),
     client_id: txn.client_id,
     client_created_at: txn.client_created_at,
     version: txn.version,
@@ -88,9 +118,26 @@ export async function upsertTransaction(txn: Transaction): Promise<void> {
   await db.runAsync(
     `INSERT INTO transactions (${TRANSACTION_COLUMN_NAMES.join(', ')})
     VALUES (${TRANSACTION_COLUMN_NAMES.map(() => '?').join(', ')})
+    -- SET list generated against TRANSACTION_COLUMNS below, not
+    -- hand-maintained — every manifest column is accounted for here or in
+    -- the exclusion comment (fix-plan 1.6 point 6 / audit 06-F16). Columns
+    -- deliberately left out of SET:
+    --   id             — the conflict target itself, never rewritten.
+    --   user_id        — a row's owner cannot change via upsert.
+    --   currency_code  — was missing from this SET list entirely (06-F16):
+    --                    a synced echo of a row whose currency changed
+    --                    silently kept the stale code. Included below now.
+    --   raw_transcript — local-only (the Privacy screen's "voice not
+    --                    stored" promise); a synced-back server row must
+    --                    never overwrite the on-device transcript with the
+    --                    NULL the server always holds for this column.
+    --   client_id, client_created_at, created_at — identity/provenance
+    --                    fields fixed at creation; an upsert of the same
+    --                    logical row must not let them drift.
     ON CONFLICT(id) DO UPDATE SET
       amount = excluded.amount,
       direction = excluded.direction,
+      currency_code = excluded.currency_code,
       category_id = excluded.category_id,
       merchant = excluded.merchant,
       merchant_domain = excluded.merchant_domain,
@@ -105,6 +152,7 @@ export async function upsertTransaction(txn: Transaction): Promise<void> {
       is_recurring = excluded.is_recurring,
       recurring_rule_id = excluded.recurring_rule_id,
       recurring_frequency = excluded.recurring_frequency,
+      occurrence_date = excluded.occurrence_date,
       version = excluded.version,
       is_deleted = excluded.is_deleted,
       deleted_at = excluded.deleted_at,
@@ -182,7 +230,7 @@ export async function getTransactionById(id: string): Promise<Transaction | null
   const db = await getDb()
   const row = await db.getFirstAsync('SELECT * FROM transactions WHERE id = ?', [id])
   if (!row) return null
-  return rowToTransaction(row as Record<string, unknown>)
+  return rowToTransaction(row as Record<string, unknown>, getDeviceTimeZone())
 }
 
 /**
@@ -207,6 +255,16 @@ export async function wipeAllUserData(userId: string): Promise<void> {
  * skip occurrences that the server cron has already produced and
  * `pullRemote` has already brought into SQLite — without this check the
  * catch-up loop would hit the partial unique index on insert.
+ *
+ * Queries `occurrence_date` (fix-plan 1.5) rather than
+ * `substr(transacted_at, 1, 10)` — see `RECURRING_DEDUP_INDEX_SQL`'s
+ * docstring in `localDb.ts` for why a UTC-day slice can miss a same
+ * local-day duplicate or flag two legitimately distinct occurrences as
+ * one. `isoDate` is still sliced to its first 10 characters for the
+ * caller's convenience (today's only caller, `recurringCatchUp.ts`,
+ * passes a full ISO instant, not a bare date) — full precision requires
+ * that caller to pass the recurrence engine's own resolved
+ * `occurrenceDate` instead of an instant, which is fix-plan Stage 2.
  */
 export async function hasRecurringOccurrence(
   userId: string,
@@ -219,7 +277,7 @@ export async function hasRecurringOccurrence(
     `SELECT 1 FROM transactions
      WHERE user_id = ?
        AND recurring_rule_id = ?
-       AND substr(transacted_at, 1, 10) = ?
+       AND occurrence_date = ?
        AND is_deleted = 0
      LIMIT 1`,
     [userId, ruleId, day],

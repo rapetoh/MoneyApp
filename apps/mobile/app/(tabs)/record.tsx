@@ -25,7 +25,7 @@ import { VoiceConfirmModal, type ConfirmedExpense } from '../../src/components/V
 import { ListeningView } from '../../src/components/ListeningView'
 import { RecurringToggle } from '../../src/components/RecurringToggle'
 import { Colors, Typography, Text as TextStyles, Spacing, Radius, Hairline } from '../../src/theme'
-import { parseScan } from '@voice-expense/ai'
+import { parseScan, ISO_4217_CODES, PAYMENT_METHOD_VALUES, deriveDirectionFromFlowType } from '@voice-expense/ai'
 import { supabase } from '../../src/lib/supabase'
 import { getApiUrl } from '../../src/hooks/useApiUrl'
 import { t, currencySymbolFor } from '@voice-expense/shared'
@@ -107,20 +107,36 @@ export default function RecordScreen() {
   const [scanningType, setScanningType] = useState<'receipt' | 'paycheck' | null>(null)
   const [transactionSource, setTransactionSource] = useState<TransactionSource>('voice')
 
-  // Handle incoming iOS Shortcut deep link — pre-fill confirm modal
+  // Handle incoming iOS Shortcut deep link — pre-fill confirm modal.
+  // `shortcut_currency`/`shortcut_payment_method` are URL params, exactly
+  // as untrusted as a model's output — the typed parse boundary (fix-plan
+  // item 1.7) applies here too, not just to AI responses. An unchecked
+  // cast used to let an unrecognised value ride straight into
+  // `ParsedExpense`; `createTransaction`'s own boundary would still catch
+  // it at save time, but validating here means the confirm sheet shows
+  // the honest fallback instead of a value that only fails later.
   useEffect(() => {
     const amount = parseFloat(params.shortcut_amount ?? '')
     if (isNaN(amount) || amount <= 0) return
     setTransactionSource('shortcut')
+    const shortcutCurrency = params.shortcut_currency?.trim().toUpperCase()
+    const currency = shortcutCurrency && ISO_4217_CODES.has(shortcutCurrency) ? shortcutCurrency : userCurrency
+    const paymentMethod = PAYMENT_METHOD_VALUES.includes(params.shortcut_payment_method as PaymentMethod)
+      ? (params.shortcut_payment_method as PaymentMethod)
+      : 'digital_wallet'
     voice.injectParsed({
       amount,
-      currency: params.shortcut_currency || userCurrency,
-      direction: 'debit',
+      currency,
+      // A Shortcut has no notion of intent beyond "log this" — always a
+      // plain expense. `direction` derives from `flow_type` (fix-plan
+      // item 1.7), single-sourced the same way an AI parse is.
+      direction: deriveDirectionFromFlowType('expense'),
+      flow_type: 'expense',
       merchant: params.shortcut_merchant || null,
       merchant_domain: null,
       note: null,
       category_suggestion: null,
-      payment_method: (params.shortcut_payment_method as PaymentMethod) || 'digital_wallet',
+      payment_method: paymentMethod,
       transacted_at: new Date().toISOString(),
       confidence: 1.0,
       needs_clarification: false,
@@ -1024,6 +1040,10 @@ const styles = StyleSheet.create({
   field: { gap: Spacing.xs },
   label: {
     fontFamily: Typography.fontFamily.sansSemiBold,
+    // Explicit fontWeight pairing so the label survives a fallback where
+    // the named face doesn't resolve — see
+    // docs/audit-2026-08-08/01-mobile-ui-and-layout.md F5.
+    fontWeight: '600',
     fontSize: Typography.size.sm,
     color: Colors.text,
   },

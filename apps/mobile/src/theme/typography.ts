@@ -54,11 +54,16 @@ export const Typography = {
 export const Text = {
   navTitle: {
     fontFamily: Typography.fontFamily.sansSemiBold,
+    // Explicit fontWeight pairing (not just the *-SemiBold family name) so
+    // this survives any fallback to a system font that doesn't resolve the
+    // named face — see docs/audit-2026-08-08/01-mobile-ui-and-layout.md F5.
+    fontWeight: '600' as const,
     fontSize: 17,
     color: Colors.ink,
   },
   h1: {
     fontFamily: Typography.fontFamily.sansBold,
+    fontWeight: '700' as const,
     fontSize: 24,
     color: Colors.ink,
   },

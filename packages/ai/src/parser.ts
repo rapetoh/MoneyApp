@@ -1,5 +1,6 @@
-import type { ParsedExpense, Locale } from '@voice-expense/shared'
+import type { ParsedExpense, Locale, ParseFieldError } from '@voice-expense/shared'
 import { parseExpenseLocally } from './localParser'
+import { assertParsedExpense, ParseValidationError } from './validateParsedExpense'
 
 export interface ParseOptions {
   transcript: string
@@ -8,6 +9,13 @@ export interface ParseOptions {
   categories: string[]
   apiBaseUrl: string
   authToken: string
+  /** The signed-in user's id. Part of the cache key (see `cacheKey` below)
+   *  — without it, a second user on the same device could be served the
+   *  first user's cached parse (audit 02-F24). Optional only so
+   *  call sites mid-migration don't hard-fail; omitting it means the
+   *  cache is effectively unscoped, which `clearParseCache` on sign-out
+   *  still protects against for any single-session leak. */
+  userId?: string
 }
 
 // Simple in-memory LRU cache
@@ -15,8 +23,34 @@ const cache = new Map<string, { result: ParsedExpense; ts: number }>()
 const CACHE_TTL_MS = 30 * 60 * 1000 // 30 minutes
 const CACHE_MAX = 500
 
-function cacheKey(transcript: string, locale: string, currency: string): string {
-  return `${locale}:${currency}:${transcript.toLowerCase().trim()}`
+/** Included in the cache key so a cached result changes about once a day —
+ *  `transacted_at` defaults to "today" server-side (prompt.ts), so a
+ *  literal cache hit for the same transcript a day later would replay
+ *  yesterday's date. An epoch-day bucket, not a calendar-day string: this
+ *  is a cache-staleness bucket, not a user-facing date, so it doesn't need
+ *  (and must not pretend to have) the caller's timezone the way anything
+ *  in packages/shared/src/utils/period.ts does. */
+function epochDayBucket(): number {
+  return Math.floor(Date.now() / 86_400_000)
+}
+
+/** Cache key includes `userId`, the sorted category list, and the day
+ *  bucket — before this item the key was `locale:currency:transcript`,
+ *  which omitted all three (audit 02-F24: "serving stale suggestions").
+ *  A second user on the same device, a category added since the last
+ *  parse, or the same phrase parsed a day later must never share a cache
+ *  entry with the first. */
+function cacheKey(opts: Pick<ParseOptions, 'transcript' | 'locale' | 'currency' | 'categories' | 'userId'>): string {
+  const sortedCategories = [...opts.categories].sort().join(',')
+  return `${opts.userId ?? ''}:${opts.locale}:${opts.currency}:${sortedCategories}:${epochDayBucket()}:${opts.transcript.toLowerCase().trim()}`
+}
+
+/** Sign-out teardown (fix-plan item 1.7 / audit 02-F24's second half): a
+ *  module-level `Map` outlives `resetLocalState`'s per-user cleanup unless
+ *  something clears it explicitly. Called from
+ *  `apps/mobile/src/hooks/useAuth.ts`'s `resetLocalState`. */
+export function clearParseCache(): void {
+  cache.clear()
 }
 
 function getCached(key: string): ParsedExpense | null {
@@ -46,7 +80,7 @@ export async function parseExpense(opts: ParseOptions): Promise<ParsedExpense> {
   }
 
   // Tier 2: cache check
-  const key = cacheKey(opts.transcript, opts.locale, opts.currency)
+  const key = cacheKey(opts)
   const cached = getCached(key)
   if (cached) return cached
 
@@ -66,30 +100,31 @@ export async function parseExpense(opts: ParseOptions): Promise<ParsedExpense> {
   })
 
   if (!response.ok) {
+    if (response.status === 422) {
+      // The route already ran this same response through
+      // `validateParsedExpense` and rejected it — carry the field errors
+      // through as a typed throw rather than re-deriving them or falling
+      // back to a defaulted save.
+      let body: { errors?: ParseFieldError[] } = {}
+      try {
+        body = (await response.json()) as { errors?: ParseFieldError[] }
+      } catch {
+        // Malformed error body — fall through with an empty error list.
+      }
+      throw new ParseValidationError(body.errors ?? [])
+    }
     // Fallback: return local parse result even with low confidence
     if (localResult) return { ...localResult, currency: opts.currency }
     throw new Error(`AI parse failed: ${response.status}`)
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const raw = (await response.json()) as any
-  // Ensure all ParsedExpense fields have sensible defaults — AI may omit optional fields
-  const result: ParsedExpense = {
-    amount: raw.amount ?? 0,
-    currency: raw.currency ?? opts.currency,
-    direction: raw.direction ?? 'debit',
-    merchant: raw.merchant ?? null,
-    merchant_domain: raw.merchant_domain ?? null,
-    note: raw.note ?? null,
-    category_suggestion: raw.category_suggestion ?? null,
-    payment_method: raw.payment_method ?? null,
-    transacted_at: raw.transacted_at ?? new Date().toISOString(),
-    confidence: raw.confidence ?? 0.5,
-    needs_clarification: raw.needs_clarification ?? false,
-    clarifying_question: raw.clarifying_question ?? null,
-    is_recurring_suggestion: raw.is_recurring_suggestion ?? false,
-    recurring_frequency_suggestion: raw.recurring_frequency_suggestion ?? null,
-  }
+  const raw: unknown = await response.json()
+  // Second boundary (route already validated once): never trust a model
+  // response into a save path unchecked, even one the route already
+  // approved — a version-skewed or bypassed route must not become a
+  // defaulted local write. Throws ParseValidationError on any invalid
+  // field; never coerces one.
+  const result = assertParsedExpense(raw)
   setCached(key, result)
   return result
 }

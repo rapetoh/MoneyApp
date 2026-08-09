@@ -2,11 +2,21 @@
 // each lens the same shape; lenses do their own slicing/aggregation off
 // this raw data.
 //
-// All aggregations should use `amount_in_profile_currency` (via
-// `aggAmount` from `@voice-expense/shared`) so multi-currency totals
-// stay coherent. The raw `amount` column is the transaction's own
-// currency and is the right field for rendering a single-row figure
-// (e.g. "$50 dinner") — never for summing.
+// All aggregations should use `summarize()`/`monthSummary()` (below) —
+// or, for the ~14 sites Stage 2 hasn't migrated, `aggAmount` — from
+// `@voice-expense/shared` so multi-currency totals stay coherent and a
+// transfer-kind category (Savings & Investing) is never counted as
+// spend (fix-plan 1.4). The raw `amount` column is the transaction's
+// own currency and is the right field for rendering a single-row
+// figure (e.g. "$50 dinner") — never for summing.
+
+import {
+  summarize,
+  isFxPending,
+  type CategoryKind,
+  type MoneySummary,
+  type SummarizableTransaction,
+} from '@voice-expense/shared'
 
 export type LensTxn = {
   amount: number
@@ -14,6 +24,13 @@ export type LensTxn = {
   direction: 'debit' | 'credit'
   category_id: string | null
   category_name: string | null
+  /** Resolved `categories.kind` for this transaction's category, or
+   *  `null` when uncategorized — the signal `classifyFlow`/`isSpend`
+   *  need to tell a transfer (Savings & Investing) apart from ordinary
+   *  spend. Falls back to name-matching inside `classifyFlow` itself
+   *  when omitted; every lens should still pass it through once it has
+   *  it (fix-plan 1.4). */
+  category_kind: CategoryKind | null
   merchant: string | null
   merchant_domain: string | null
   transacted_at: string
@@ -23,6 +40,7 @@ export type LensTxn = {
 export type LensCategory = {
   id: string
   name: string
+  kind: CategoryKind
 }
 
 export type LensRecurring = {
@@ -92,15 +110,55 @@ export function monthCredits(p: LensProps): LensTxn[] {
   return out
 }
 
-/** Group transactions by category name (using "Uncategorized" for nulls). */
+/** Group transactions by category name (using "Uncategorized" for nulls).
+ *  Skips FX-pending rows entirely rather than folding a missing
+ *  snapshot in as `0` — the silent-zero pattern fix-plan 1.4 kills
+ *  (05-F12/06-F34/07-F8): a row awaiting conversion is invisible money,
+ *  not a real zero, so it must never quietly deflate a category total.
+ *  Callers that need to tell a user money is missing should check
+ *  `monthSummary(p).pendingCount` rather than infer it from a total
+ *  that's short. */
 export function groupByCategory(txns: LensTxn[]): Record<string, number> {
   const out: Record<string, number> = {}
   for (const t of txns) {
+    if (isFxPending(t)) continue
     const key = t.category_name ?? 'Uncategorized'
-    // Use the FX snapshot column; null rows contribute 0 — see the
-    // file header for why summing `amount` blindly would mix
-    // currencies and produce nonsense totals.
-    out[key] = (out[key] ?? 0) + (t.amount_in_profile_currency ?? 0)
+    out[key] = (out[key] ?? 0) + (t.amount_in_profile_currency as number)
   }
   return out
+}
+
+/** Maps a `LensTxn` onto the structural shape `summarize()` needs. */
+export function toSummarizable(t: LensTxn): SummarizableTransaction {
+  return {
+    amount_in_profile_currency: t.amount_in_profile_currency,
+    direction: t.direction,
+    transacted_at: t.transacted_at,
+    category_id: t.category_id,
+    category_name: t.category_name,
+    category_kind: t.category_kind,
+  }
+}
+
+/** Every transaction (both directions) within the anchor month —
+ *  inclusive of both bounds, matching `monthDebits`/`monthCredits`
+ *  below so `monthSummary`'s inputs are exactly their union. This is
+ *  the one filtered set every lens should run `summarize()` over. */
+export function monthTxns(p: LensProps): LensTxn[] {
+  const out: LensTxn[] = []
+  for (const t of p.transactions) {
+    const d = new Date(t.transacted_at)
+    if (d < p.monthStart || d > p.monthEnd) continue
+    out.push(t)
+  }
+  return out
+}
+
+/** The one summary every lens — and the Overview header — computes off.
+ *  Guarantees income/expense/transfers/saved never diverge between
+ *  surfaces (fix-plan 1.4's "Done when": the Overview header, MindMap,
+ *  Treemap and Cashflow all render the same four numbers for the same
+ *  month). */
+export function monthSummary(p: LensProps): MoneySummary {
+  return summarize(monthTxns(p).map(toSummarizable))
 }

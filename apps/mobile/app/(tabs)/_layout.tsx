@@ -1,5 +1,6 @@
 import { Tabs } from 'expo-router'
 import { View, StyleSheet } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { BlurView } from 'expo-blur'
 import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '../../src/hooks/useAuth'
@@ -7,7 +8,7 @@ import { useProfile } from '../../src/hooks/useProfile'
 import { useTransactions } from '../../src/hooks/useTransactions'
 import { useInsightsUnlock } from '../../src/hooks/useInsightsUnlock'
 import { useDayTwoDunning } from '../../src/hooks/useDayTwoDunning'
-import { Colors, Typography } from '../../src/theme'
+import { Colors, Typography, TAB_BAR_HEIGHT, TAB_BAR_BOTTOM_OFFSET } from '../../src/theme'
 import { t, type Locale } from '@voice-expense/shared'
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name']
@@ -46,6 +47,7 @@ export default function TabsLayout() {
   const { profile } = useProfile(user?.id)
   const { transactions } = useTransactions(user?.id)
   const locale = (profile?.locale ?? 'en') as Locale
+  const insets = useSafeAreaInsets()
 
   // Day-3 Insights unlock badge — sage dot on the Insights tab icon once the
   // user has 3+ transactions logged AND hasn't yet opened Insights to clear
@@ -62,7 +64,12 @@ export default function TabsLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarStyle: styles.tabBar,
+        // Bar's bottom edge floats `TAB_BAR_BOTTOM_OFFSET` above the safe
+        // area, not a fixed 14pt off the physical screen edge — on a
+        // Home-button device (insets.bottom === 0) that's 8pt; on a Face ID
+        // device (insets.bottom === 34) that's 42pt, clearing the home
+        // indicator band instead of crowding it. See F12.
+        tabBarStyle: [styles.tabBar, { bottom: insets.bottom + TAB_BAR_BOTTOM_OFFSET }],
         // Real iOS-style frosted glass via expo-blur. The bar's own
         // backgroundColor is set to transparent in styles.tabBar so the
         // blur + subtle tint show through. Falls back to a translucent
@@ -141,8 +148,12 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 16,
     right: 16,
-    bottom: 14,
-    height: 68,
+    // `bottom` is set dynamically per-insets in screenOptions.tabBarStyle
+    // above (F12) — not duplicated here.
+    // `minHeight`, not `height` — at large Dynamic Type scales the 10pt tab
+    // label (`tabLabel` below) needs more than 68pt to avoid clipping; a
+    // fixed `height` clips it instead of letting the pill grow (F24).
+    minHeight: TAB_BAR_HEIGHT,
     borderRadius: 34,
     // Transparent so the BlurView behind shows through. NOTE: no
     // overflow:hidden here — it would clip the record FAB (which

@@ -45,6 +45,13 @@ export const TRANSACTION_COLUMNS = [
   { name: 'is_recurring', ddl: 'INTEGER NOT NULL DEFAULT 0' },
   { name: 'recurring_rule_id', ddl: 'TEXT' },
   { name: 'recurring_frequency', ddl: 'TEXT' },
+  // The recurrence engine's resolved civil day (fix-plan 1.5 / Supabase
+  // migration 020) — the dedup key `idx_txn_recurring_dedup` below now
+  // uses, superseding the UTC-day `substr(transacted_at, 1, 10)` key a
+  // cross-timezone/DST pair of writers could disagree on. See
+  // `upsertTransaction`'s note on why this is derived rather than read
+  // straight from `txn` until every local writer supplies it.
+  { name: 'occurrence_date', ddl: 'TEXT' },
   { name: 'client_id', ddl: 'TEXT NOT NULL' },
   { name: 'client_created_at', ddl: 'TEXT NOT NULL' },
   { name: 'version', ddl: 'INTEGER NOT NULL DEFAULT 1' },
@@ -61,9 +68,91 @@ export const TRANSACTION_COLUMN_NAMES: readonly TransactionColumnName[] = TRANSA
   (c) => c.name,
 )
 
+/**
+ * Column manifest for a table sharing the sync contract every entity in
+ * `sync_operations.entity_type` is meant to have: `client_id`, `version`,
+ * `is_deleted`, `synced_at` on top of its own domain columns (fix-plan 1.6
+ * point 6, "All four entities"). Mirrors the Postgres row shape each table
+ * gains in migration 018 — `id` is the client-generated UUID (matches the
+ * `transactions` convention), so a fresh row's `id` and `client_id` start
+ * out identical.
+ */
+const SYNC_CONTRACT_COLUMNS = [
+  { name: 'client_id', ddl: 'TEXT NOT NULL' },
+  { name: 'version', ddl: 'INTEGER NOT NULL DEFAULT 1' },
+  { name: 'is_deleted', ddl: 'INTEGER NOT NULL DEFAULT 0' },
+  { name: 'synced_at', ddl: 'TEXT' },
+] as const
+
+export const CATEGORY_COLUMNS = [
+  { name: 'id', ddl: 'TEXT PRIMARY KEY' },
+  { name: 'user_id', ddl: 'TEXT NOT NULL' },
+  { name: 'name', ddl: 'TEXT NOT NULL' },
+  { name: 'name_normalized', ddl: 'TEXT NOT NULL' },
+  { name: 'color', ddl: 'TEXT' },
+  { name: 'icon', ddl: 'TEXT' },
+  { name: 'parent_id', ddl: 'TEXT' },
+  { name: 'is_archived', ddl: 'INTEGER NOT NULL DEFAULT 0' },
+  ...SYNC_CONTRACT_COLUMNS,
+  { name: 'created_at', ddl: 'TEXT NOT NULL' },
+  { name: 'updated_at', ddl: 'TEXT NOT NULL' },
+] as const
+export type CategoryColumnName = (typeof CATEGORY_COLUMNS)[number]['name']
+export const CATEGORY_COLUMN_NAMES: readonly CategoryColumnName[] = CATEGORY_COLUMNS.map((c) => c.name)
+
+export const BUDGET_COLUMNS = [
+  { name: 'id', ddl: 'TEXT PRIMARY KEY' },
+  { name: 'user_id', ddl: 'TEXT NOT NULL' },
+  { name: 'category_id', ddl: 'TEXT' },
+  { name: 'amount', ddl: 'REAL NOT NULL' },
+  { name: 'period', ddl: 'TEXT NOT NULL' },
+  { name: 'currency_code', ddl: "TEXT NOT NULL DEFAULT 'USD'" },
+  { name: 'starts_at', ddl: 'TEXT NOT NULL' },
+  { name: 'is_active', ddl: 'INTEGER NOT NULL DEFAULT 1' },
+  ...SYNC_CONTRACT_COLUMNS,
+  { name: 'created_at', ddl: 'TEXT NOT NULL' },
+  { name: 'updated_at', ddl: 'TEXT NOT NULL' },
+] as const
+export type BudgetColumnName = (typeof BUDGET_COLUMNS)[number]['name']
+export const BUDGET_COLUMN_NAMES: readonly BudgetColumnName[] = BUDGET_COLUMNS.map((c) => c.name)
+
+export const RECURRING_RULE_COLUMNS = [
+  { name: 'id', ddl: 'TEXT PRIMARY KEY' },
+  { name: 'user_id', ddl: 'TEXT NOT NULL' },
+  { name: 'template_txn_id', ddl: 'TEXT' },
+  { name: 'name', ddl: 'TEXT' },
+  { name: 'amount', ddl: 'REAL NOT NULL' },
+  { name: 'currency_code', ddl: "TEXT NOT NULL DEFAULT 'USD'" },
+  { name: 'category_id', ddl: 'TEXT' },
+  { name: 'frequency', ddl: 'TEXT NOT NULL' },
+  { name: 'interval', ddl: 'INTEGER NOT NULL DEFAULT 1' },
+  { name: 'starts_at', ddl: 'TEXT NOT NULL' },
+  { name: 'ends_at', ddl: 'TEXT' },
+  { name: 'last_generated', ddl: 'TEXT' },
+  { name: 'is_active', ddl: 'INTEGER NOT NULL DEFAULT 1' },
+  { name: 'direction', ddl: "TEXT NOT NULL DEFAULT 'debit'" },
+  { name: 'payment_method', ddl: 'TEXT' },
+  { name: 'note', ddl: 'TEXT' },
+  ...SYNC_CONTRACT_COLUMNS,
+  { name: 'created_at', ddl: 'TEXT NOT NULL' },
+  { name: 'updated_at', ddl: 'TEXT NOT NULL' },
+] as const
+export type RecurringRuleColumnName = (typeof RECURRING_RULE_COLUMNS)[number]['name']
+export const RECURRING_RULE_COLUMN_NAMES: readonly RecurringRuleColumnName[] = RECURRING_RULE_COLUMNS.map(
+  (c) => c.name,
+)
+
+/** Shared by every table's fresh-install CREATE and the rebuild helper below. */
+function buildCreateTableSql(
+  tableName: string,
+  columns: ReadonlyArray<{ name: string; ddl: string }>,
+): string {
+  const cols = columns.map((c) => `${c.name} ${c.ddl}`).join(',\n      ')
+  return `CREATE TABLE IF NOT EXISTS ${tableName} (\n      ${cols}\n    )`
+}
+
 function transactionsCreateSql(tableName: string): string {
-  const columns = TRANSACTION_COLUMNS.map((c) => `${c.name} ${c.ddl}`).join(',\n      ')
-  return `CREATE TABLE IF NOT EXISTS ${tableName} (\n      ${columns}\n    )`
+  return buildCreateTableSql(tableName, TRANSACTION_COLUMNS)
 }
 
 const BASE_INDEXES_SQL = `
@@ -71,17 +160,21 @@ const BASE_INDEXES_SQL = `
   CREATE INDEX IF NOT EXISTS idx_txn_user_deleted ON transactions (user_id, is_deleted);
 `
 
-// Partial unique index mirroring Supabase migration 013.
-// substr(transacted_at, 1, 10) takes the YYYY-MM-DD slice (ISO strings
-// stored as TEXT) — safe because all serializations go through
-// Date.toISOString(). Scoped to source='recurring_generated': since
-// migration 013 links user-entered template transactions to their rule
-// too, and a manually logged bill may legitimately share (rule, date)
-// with a generated occurrence, only engine-generated rows participate
-// in dedup.
+// Partial unique index mirroring Supabase migration 020 (superseding
+// migration 013's redefinition of migration 008's original). Keyed on
+// `occurrence_date` — the recurrence engine's resolved civil day
+// (fix-plan 1.5) — rather than `substr(transacted_at, 1, 10)`, the UTC
+// calendar day: the Edge Function (UTC) and the mobile catch-up (device
+// zone) can resolve the same rule's occurrence to instants that land on
+// different UTC days across a DST transition, which is exactly the
+// class of duplicate this index exists to block (audit 03-F16/04-F21).
+// Scoped to source='recurring_generated': since migration 013 links
+// user-entered template transactions to their rule too, and a manually
+// logged bill may legitimately share (rule, date) with a generated
+// occurrence, only engine-generated rows participate in dedup.
 const RECURRING_DEDUP_INDEX_SQL = `
   CREATE UNIQUE INDEX IF NOT EXISTS idx_txn_recurring_dedup
-    ON transactions (user_id, recurring_rule_id, substr(transacted_at, 1, 10))
+    ON transactions (user_id, recurring_rule_id, occurrence_date)
     WHERE recurring_rule_id IS NOT NULL AND is_deleted = 0
       AND source = 'recurring_generated'
 `
@@ -127,9 +220,11 @@ export async function initDatabase(db: SchemaDb): Promise<void> {
   await initSchema(db)
   if (fresh) {
     // Born on the current schema: no legacy duplicates can exist, so the
-    // dedup index is safe to build immediately, and the migration chain
+    // dedup index is safe to build immediately, sync_queue already has
+    // `status` (it was created with it above), and the migration chain
     // (written for upgrades) must never replay — stamp the version.
     await db.execAsync(RECURRING_DEDUP_INDEX_SQL)
+    await db.execAsync('CREATE INDEX IF NOT EXISTS idx_queue_status_id ON sync_queue (status, id)')
     await db.execAsync(`PRAGMA user_version = ${SCHEMA_VERSION}`)
   } else {
     await runMigrations(db)
@@ -148,6 +243,15 @@ async function initSchema(db: SchemaDb): Promise<void> {
     -- sweep. Fresh installs get it in initDatabase(); upgrades get it
     -- in consolidateLegacySchemaV1().
 
+    ${buildCreateTableSql('categories', CATEGORY_COLUMNS)};
+    CREATE INDEX IF NOT EXISTS idx_categories_user ON categories (user_id, is_deleted);
+
+    ${buildCreateTableSql('budgets', BUDGET_COLUMNS)};
+    CREATE INDEX IF NOT EXISTS idx_budgets_user ON budgets (user_id, is_deleted);
+
+    ${buildCreateTableSql('recurring_rules', RECURRING_RULE_COLUMNS)};
+    CREATE INDEX IF NOT EXISTS idx_recurring_rules_user ON recurring_rules (user_id, is_deleted);
+
     CREATE TABLE IF NOT EXISTS sync_queue (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       operation TEXT NOT NULL,
@@ -157,10 +261,33 @@ async function initSchema(db: SchemaDb): Promise<void> {
       client_timestamp TEXT NOT NULL,
       retry_count INTEGER NOT NULL DEFAULT 0,
       last_error TEXT,
+      -- 'pending' | 'dead'. Replaces the old retry_count >= 5 threshold
+      -- for dead-lettering (fix-plan 1.6 point 2) — a dead entry is now
+      -- an explicit state a poisoned entry moves into immediately on a
+      -- permanent error, instead of something the drain loop has to
+      -- infer from a counter.
+      status TEXT NOT NULL DEFAULT 'pending',
+      -- Backoff schedule for transient failures (fix-plan 1.6 point 3).
+      -- NULL means "eligible now".
+      next_attempt_at TEXT,
       created_at TEXT NOT NULL
     );
 
     CREATE INDEX IF NOT EXISTS idx_queue_entity ON sync_queue (entity_id);
+    -- idx_queue_status_id is deliberately not created here: on an
+    -- existing install this statement batch runs against the OLD
+    -- sync_queue shape (CREATE TABLE IF NOT EXISTS is a no-op there), and
+    -- the status column does not exist on it until addSyncContractV2's
+    -- ALTER TABLE runs. Fresh installs get it in initDatabase(); upgrades
+    -- get it in addSyncContractV2() — same split as idx_txn_recurring_dedup above.
+
+    -- Persisted key/value cursor store. A per-hook React ref cannot be a
+    -- sync cursor when eleven hook instances exist (fix-plan 1.6 point 5)
+    -- — each entity's pull high-water mark lives here instead.
+    CREATE TABLE IF NOT EXISTS sync_meta (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
   `)
 }
 
@@ -176,6 +303,8 @@ async function initSchema(db: SchemaDb): Promise<void> {
  */
 export const MIGRATIONS: ReadonlyArray<(db: SchemaDb) => Promise<void>> = [
   consolidateLegacySchemaV1,
+  addSyncContractV2,
+  addOccurrenceDateColumnV3,
 ]
 
 /** The version a fully-migrated database reports. Grows by appending to MIGRATIONS. */
@@ -312,6 +441,98 @@ async function rebuildTransactionsTable(db: SchemaDb): Promise<void> {
 }
 
 /**
+ * v1 -> v2: the sync outbox rebuild (fix-plan 1.6).
+ *   - `sync_queue` gains `status` ('pending' | 'dead') and
+ *     `next_attempt_at`, replacing the old `retry_count >= 5` threshold
+ *     for dead-lettering and adding a real backoff schedule. Anything
+ *     already stuck under the old threshold is carried forward as
+ *     'dead' so it does not silently re-block the queue the moment this
+ *     migration runs.
+ *   - `categories`, `budgets` and `recurring_rules` get local tables with
+ *     the same sync contract as `transactions` (`client_id`, `version`,
+ *     `is_deleted`, `synced_at`) — `sync_operations.entity_type` has
+ *     always listed all four; only `transaction` was wired end to end.
+ *   - `sync_meta` is a small key/value table for persisted pull cursors.
+ */
+async function addSyncContractV2(db: SchemaDb): Promise<void> {
+  const queueCols = await db.getAllAsync<{ name: string }>('PRAGMA table_info(sync_queue)')
+  const queueColNames = new Set(queueCols.map((c) => c.name))
+  if (!queueColNames.has('status')) {
+    await db.execAsync("ALTER TABLE sync_queue ADD COLUMN status TEXT NOT NULL DEFAULT 'pending'")
+  }
+  if (!queueColNames.has('next_attempt_at')) {
+    await db.execAsync('ALTER TABLE sync_queue ADD COLUMN next_attempt_at TEXT')
+  }
+  await db.execAsync(
+    "UPDATE sync_queue SET status = 'dead' WHERE retry_count >= 5 AND status = 'pending'",
+  )
+  await db.execAsync('CREATE INDEX IF NOT EXISTS idx_queue_status_id ON sync_queue (status, id)')
+
+  await db.execAsync(`
+    CREATE TABLE IF NOT EXISTS sync_meta (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
+  `)
+
+  await db.execAsync(buildCreateTableSql('categories', CATEGORY_COLUMNS))
+  await db.execAsync('CREATE INDEX IF NOT EXISTS idx_categories_user ON categories (user_id, is_deleted)')
+
+  await db.execAsync(buildCreateTableSql('budgets', BUDGET_COLUMNS))
+  await db.execAsync('CREATE INDEX IF NOT EXISTS idx_budgets_user ON budgets (user_id, is_deleted)')
+
+  await db.execAsync(buildCreateTableSql('recurring_rules', RECURRING_RULE_COLUMNS))
+  await db.execAsync(
+    'CREATE INDEX IF NOT EXISTS idx_recurring_rules_user ON recurring_rules (user_id, is_deleted)',
+  )
+}
+
+/**
+ * v2 -> v3: `occurrence_date`, the explicit civil-day dedup key
+ * (fix-plan 1.5 / audit 03-F16, 04-F21 — see `RECURRING_DEDUP_INDEX_SQL`'s
+ * docstring). A device already on v2 predates this column existing in
+ * the manifest at all, so — unlike `occurrence_date`'s sibling columns,
+ * which `consolidateLegacySchemaV1`'s generic per-column loop already
+ * covers for any device still on v0 — this step must add it explicitly
+ * rather than assume an earlier step already did.
+ *
+ * Backfilled from `substr(transacted_at, 1, 10)`: the same UTC-day
+ * value the old index derived, so this migration changes the *shape*
+ * of the invariant (an explicit column instead of a `substr`
+ * expression) without changing its *value* for any row generated by
+ * today's writers — the writers that resolve a true civil day
+ * (`packages/shared/src/domain/recurrence.ts`) are adopted at the two
+ * server-controlled surfaces this fix-plan item owns (the Edge
+ * Function, `upsertTransaction` below); `recurringCatchUp.ts` adopting
+ * it too is fix-plan Stage 2.
+ *
+ * The index is dropped and unconditionally rebuilt here rather than
+ * left to `consolidateLegacySchemaV1`'s conditional rebuild (step 4,
+ * which only rebuilds when the *predicate* doesn't yet say
+ * 'recurring_generated') — a device that already ran that step under
+ * the old `RECURRING_DEDUP_INDEX_SQL` has a predicate that already
+ * matches, so that check alone would never pick up the new column.
+ */
+async function addOccurrenceDateColumnV3(db: SchemaDb): Promise<void> {
+  const live = await db.getAllAsync<{ name: string }>('PRAGMA table_info(transactions)')
+  if (!live.some((c) => c.name === 'occurrence_date')) {
+    await db.execAsync('ALTER TABLE transactions ADD COLUMN occurrence_date TEXT')
+  }
+  // Drop first: rebuilding a live unique index's key column via UPDATE
+  // while the OLD index definition is still attached is safe here (no
+  // two live recurring rows share a UTC day post-dedup-sweep), but
+  // dropping first removes any doubt and matches the rebuild pattern
+  // used everywhere else in this file.
+  await db.execAsync('DROP INDEX IF EXISTS idx_txn_recurring_dedup')
+  await db.execAsync(`
+    UPDATE transactions
+    SET occurrence_date = substr(transacted_at, 1, 10)
+    WHERE recurring_rule_id IS NOT NULL AND occurrence_date IS NULL
+  `)
+  await db.execAsync(RECURRING_DEDUP_INDEX_SQL)
+}
+
+/**
  * Deletes every locally-stored row: all transactions and all queued sync
  * operations. Called from the sign-out teardown (`resetLocalState` in
  * useAuth) so nothing one account wrote is readable — or replayable via
@@ -324,6 +545,35 @@ export async function wipeLocalDatabase(): Promise<void> {
   const db = await getDb()
   await db.execAsync(`
     DELETE FROM transactions;
+    DELETE FROM categories;
+    DELETE FROM budgets;
+    DELETE FROM recurring_rules;
     DELETE FROM sync_queue;
+    DELETE FROM sync_meta;
   `)
+}
+
+/**
+ * Persisted pull cursor per entity type (fix-plan 1.6 point 5) — a
+ * per-hook React ref cannot be the source of truth when eleven `useX()`
+ * instances can mount, and it evaporates on every relaunch. Stored in
+ * `sync_meta` under `cursor:<entityType>`; cleared by `wipeLocalDatabase`
+ * on sign-out so the next account starts a fresh cold pull rather than
+ * inheriting the previous account's high-water mark.
+ */
+export async function getSyncCursor(entityType: string): Promise<string | undefined> {
+  const db = await getDb()
+  const row = await db.getFirstAsync<{ value: string }>('SELECT value FROM sync_meta WHERE key = ?', [
+    `cursor:${entityType}`,
+  ])
+  return row?.value ?? undefined
+}
+
+export async function setSyncCursor(entityType: string, value: string): Promise<void> {
+  const db = await getDb()
+  await db.runAsync(
+    `INSERT INTO sync_meta (key, value) VALUES (?, ?)
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+    [`cursor:${entityType}`, value],
+  )
 }

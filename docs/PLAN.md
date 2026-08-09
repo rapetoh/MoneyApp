@@ -1891,7 +1891,10 @@ removes the model's ability to fail on standard windows entirely.
   from European decimal-comma (1\u20132 digit tail).
 
 **Verification:**
-- New script at [packages/ai/src/__tests__/askMurmur.verify.ts](../packages/ai/src/__tests__/askMurmur.verify.ts).
+- New script at `packages/ai/src/__tests__/askMurmur.verify.ts`. *(Aug 9
+  2026 — ported into [packages/ai/src/__tests__/askMurmur.test.ts](../packages/ai/src/__tests__/askMurmur.test.ts)
+  as part of fix-plan item 1.1's vitest harness; the standalone script no
+  longer exists. Same assertions, now `npm test` instead of `npx tsx`.)*
 - Drives the actual sandbox via \`resolveToolCall('run_query', \u2026)\`
   on a synthetic dataset shaped like the real user's data (April 2026
   expenses + older entries + 2024 entry for a year-range edge case).
@@ -3579,5 +3582,1451 @@ upgrade with row/column preservation asserted against the manifest,
 defective-rebuild recovery, fresh-install stamping, dedup-sweep and
 unique-index enforcement, and a same-session `upsertTransaction`
 round-trip carrying FX values and a null `payment_method`.
+
+*(Aug 9 2026 — adopted, as promised above: ported into
+[apps/mobile/src/services/sync/__tests__/localDb.migration.test.ts](../apps/mobile/src/services/sync/__tests__/localDb.migration.test.ts)
+under the vitest harness fix-plan item 1.1 added. The standalone
+`.mjs` script is deleted — same fixtures, same assertions, now
+`npm test` / `turbo test`. See "Test harness + lint scaffolding" below.)*
+
+### Test harness + lint scaffolding (fix-plan item 1.1, Aug 9 2026)
+
+Resolves `02-F27` and stands up the precondition every later fix-plan
+item's "Regression test" line depends on: before this, `grep vitest|jest`
+across the workspace was empty and `turbo.json` declared no `test` task.
+
+- **Runner:** vitest, one config per package/app that owns tests today
+  (`packages/ai`, `packages/shared`, `apps/mobile`) plus a scaffold-only
+  config for `apps/web` (`passWithNoTests`, since Stage 1.1 builds the
+  harness — it doesn't do the broad adoption sweep that's Stage 2).
+  `npm test` at the repo root runs `turbo test`, which fans out to each
+  package's own `test` script; `turbo.json` gained a `test` task.
+- **Ported:** `packages/ai/src/__tests__/askMurmur.verify.ts` →
+  `askMurmur.test.ts` (same 29 assertions, `describe`/`it`/`expect`
+  instead of a hand-rolled checker). `apps/mobile/scripts/
+  localdb-migration-test.mjs` → `apps/mobile/src/services/sync/__tests__/
+  localDb.migration.test.ts` (same fixtures; `describe.skipIf` guards the
+  `node:sqlite` dependency so `npm test` stays green on any Node
+  satisfying the repo's `>=20` floor, while the CI `test` job pins Node
+  22 so the suite actually runs there).
+- **Golden corpus:** `packages/ai/src/__tests__/goldenCorpus/` — 60
+  utterances (en/fr/es/pt) with expected `direction`/`amount`/
+  `is_recurring_suggestion`, replayed through the real `parseExpense()`
+  with `fetch` mocked to a per-row recorded/simulated model response
+  (`corpus.ts`'s `rawResponse`). Two headline rows pin fixes already at
+  HEAD (`02-F1`'s direction worked-example, `02-F7`'s `note` field); two
+  more (`02-F5`'s divide-by-100 heuristic, `02-F30`'s recurring
+  lean-TRUE clause) are still open and encoded with vitest's
+  `test.fails` — the suite is green today, and the moment either prompt
+  bug is actually fixed, `test.fails` itself starts failing until the
+  row is flipped to a normal assertion. `02-F3` and `02-F9` (the other
+  two of the four user-reported parse bugs) live in mobile UI code the
+  corpus can't exercise from `packages/ai`; they're `it.todo` markers
+  in `goldenCorpus.test.ts` instead of corpus rows, with a comment
+  explaining why. `liveVerify.ts` calls the real model
+  (`OPENAI_API_KEY`-gated, not part of `turbo test`) and diffs against
+  the checked-in fixtures — `npm run golden:verify-live -w
+  @voice-expense/ai`.
+- **Lint scaffolding:** new root `eslint.config.mjs` (flat config,
+  ESLint had zero config anywhere before this). Every audit-tracking
+  `no-restricted-syntax` rule (multi-arg `Date`, raw `getMonth`/etc.
+  outside `period.ts`, `.toISOString().slice(0,10)`, a bare `.amount`
+  inside a reduce/`+=` in `apps/**`, `Date` in a `'use client'` prop
+  type, `paddingBottom >= 100`, a string literal as `<Text>` children)
+  ships at severity `'off'` — validated by temporarily flipping each to
+  `'warn'` and confirming real hits across the codebase (280 of them),
+  then reverted. They turn on one at a time as the fix-plan item that
+  owns the primitive lands (1.3, 1.4, 1.8, 2.4, Stage 4) — flipping one
+  early means it fails on every call site that item hasn't replaced
+  yet. `turbo lint` is wired for real now (`eslint .` added to
+  `packages/ai`, `packages/shared`, `apps/mobile`, `apps/web`) and is
+  clean today (0 errors — only pre-existing `eslint-disable` comments
+  for plugins that are now registered but not enabled, which is
+  expected).
+- **Also added:** `knip.json` + `npm run knip`, wired into a new CI
+  step as report-only (`continue-on-error: true` — ~60 pre-existing
+  unreferenced-export/file/dependency findings are a separate cleanup,
+  not this item's job). A hand-rolled duplicate-JSON-key parser
+  (`packages/shared/src/i18n/localeIntegrity.ts`) checked against all
+  four locale files — it caught a real, live bug while being built:
+  `"detail.recurring"` was duplicated (same value both times, so
+  behaviorally inert, but exactly the kind of key that goes stale
+  silently) in `en.json`/`fr.json`/`es.json`/`pt.json`; the stray
+  duplicate is removed in all four.
+- **CI:** `.github/workflows/ci.yml` gained a `test` job (Node 22, `npx
+  turbo test` + the knip report step) and an `eslint` job (Node 20, `npx
+  turbo lint`) alongside the existing `typecheck` and `lint` (Prettier)
+  jobs.
+
+`turbo test` / `npm test` run green: 4 test files across 3 packages
+(`apps/web` has the scaffold but no tests yet), 103 tests total — 99
+passing, 2 `test.fails` intentionally-failing-until-fixed (F5, F30), 2
+`it.todo` (F3, F9).
+
+### One money and aggregation module (fix-plan item 1.4, Aug 9 2026)
+
+Resolves `05-F2`, `05-F12`, `05-F29`, `05-F32`, `07-F8`, `07-F28`,
+`07-F29`, `07-F30`, `06-F34`, `08-F13`, `02-F17` — the *foundation*
+half only. This item builds and tests the module; wiring the ~25
+inline call sites (Overview header, MindMap, Treemap, Cashflow,
+Insights, Budgets, Export, Ask Murmur) onto it is the Stage 2 adoption
+sweep and has not happened yet — those surfaces still compute their
+own "spend"/"saved" inline today.
+
+- **New `packages/shared/src/domain/money.ts`** — one `summarize(txns,
+  window?)` returning `{ income, expense, transfers, saved, net,
+  transactionCount, pendingCount, byCategory }`. `expense` excludes
+  transfers; `saved` is unfloored with the sign rendered explicitly
+  (the audit found six divergent "saved" formulas across five live
+  surfaces plus dead code — `max(0, in−out)` in three places, raw
+  `income−expense` in a fourth, a savings-rate variant in a fifth, a
+  sixth in dead code; all six collapse to this one number). `net` is
+  exported as the *same value* as `saved`, not a second formula —
+  Overview called this figure "saved" and MindMap called it "net";
+  rather than pick a winner and force every call site to rename during
+  Stage 2 adoption, both keys carry the identical number. `byCategory`
+  is the **full** per-category map, never truncated — truncating and
+  then labelling a sum over the truncated set "Total" was `05-F36`
+  (mobile Insights) and `05-F37` (web Matrix); truncation is now
+  provably a rendering decision, since `Object.values(byCategory)`
+  always has the complete set.
+- **The transfer/Savings & Investing classification rule:**
+  `classifyFlow(txn, categoryKind?)` — a `'transfer'` category kind
+  overrides `direction`, so a Savings & Investing debit is neither
+  income nor consumption. The FIX-PLAN's own migration for
+  `categories.kind` (a real DB column + category-editor field) is
+  Stage 2 work and out of this item's file ownership, so
+  `resolveCategoryKind(categoryName, explicitKind?)` provides the
+  bridge today: an explicit kind wins when a caller has one (forward
+  compatible with the eventual column), otherwise falls back to
+  `DEFAULT_TRANSFER_CATEGORY_NAMES` (currently just `'Savings &
+  Investing'`, matching `default_categories` row 18). Once the
+  migration lands, callers that join `category_kind` in get the real
+  answer for free; callers that don't yet still get the one seeded
+  transfer category classified correctly.
+- **FX-pending is never silent:** `aggAmount`'s bare `?? 0` is why a
+  transaction awaiting FX backfill vanished from every total with no
+  signal (`07-F8`/`06-F34`/`05-F12` — `isFxPending` existed with zero
+  callers). `summarize()` now excludes pending rows from every
+  monetary field and returns `pendingCount` instead of folding them in
+  as 0. `packages/shared/src/utils/fx.ts` gained
+  `sumInProfileCurrency(txns) → { total, pendingCount }` as the
+  pending-aware replacement for a hand-rolled `reduce(aggAmount)` at
+  call sites that only need a flat total (no flow/category split).
+  `aggAmount`/`isFxPending` themselves are unchanged (both are still
+  imported at ~14 and 0 call sites respectively) but now carry
+  `@deprecated` pointers to the new module.
+- **One formatter, locale required:**
+  `packages/shared/src/utils/currency.ts` gained `formatMoney(value,
+  currencyCode, locale, {precision})` and `formatMoneyParts(value,
+  currencyCode, locale)` (structural parts — sign/symbol/
+  symbolFirst/integer/decimal/fraction — built on
+  `Intl.NumberFormat(...).formatToParts()`, so symbol placement follows
+  the locale rather than a hand-rolled table like `07-F29`'s
+  second, shorter currency-symbol switch in
+  `apps/mobile/app/(tabs)/index.tsx`). `locale` has no default —
+  `formatCurrency`'s old `locale: string = 'en'` silently formatted
+  eleven non-English call sites in English grouping (`07-F30`);
+  `formatCurrency` itself is kept as a thin `@deprecated` wrapper
+  delegating to `formatMoney(v, c, 'en')` so the six call sites Stage 2
+  hasn't migrated yet keep compiling — it was **not** given a required
+  `locale` parameter in this item, because doing so would be a breaking
+  change at call sites outside this item's file ownership (screens are
+  Stage 2's job). `formatAmount` (zero callers, confirmed by grep) is
+  deleted outright. `roundCents(n)` rounds half-away-from-zero — not
+  plain `Math.round`, which rounds negative halves toward +Infinity
+  (`Math.round(-0.5) === -0`) rather than away from zero like
+  `toFixed`/`Intl` do (`05-F32`).
+- **Integer-cents internally:** `summarize()` accumulates every bucket
+  (income/expense/transfers/per-category) in `Math.round(amount * 100)`
+  integer cents and divides back once at the end, so a long series of
+  2-decimal amounts cannot drift off a float rounding boundary; every
+  returned figure is additionally passed through `roundCents()` as a
+  boundary backstop.
+- **Not touched at the time this section was written (Stage 2):** the
+  `categories.kind` migration and category-editor field; the ~25
+  consumer call sites listed in the fix-plan item text
+  (`dashboard/page.tsx`, the six `lenses/*`,
+  `useBudget`/`useTransactions`/`useRecurringRules`,
+  `HistoryHeatmap.tsx`, `exportData.ts`, `askMurmurTools.ts`); the
+  `Money.tsx` component rewrite on both platforms (`07-F28`). The
+  `categories.kind` migration and the four item-named surfaces
+  (Overview header, MindMap, Treemap, Cashflow) landed in the adoption
+  pass below.
+
+**Tests** (`packages/shared/src/domain/__tests__/money.test.ts`,
+`packages/shared/src/utils/__tests__/{currency,fx}.test.ts`, 44 new
+vitest cases, all green): the audit's pinned scenario — Starbucks −50 +
+Xtream −42 + Schwab −300 (Savings & Investing) ⇒ `expense=92` (not
+392), `transfers=300`; the FIX-PLAN's done-when fixture (credit 1000 +
+debit 100 Food + debit 300 Savings & Investing ⇒
+`expense=100, transfers=300, saved=900, net=900`); a null
+`amount_in_profile_currency` row excluded from every total with
+`pendingCount===1`; `byCategory` full-map + no-truncation + sums to
+`expense` exactly; half-open window bounds
+(`[start, endExclusive)`); a 1000-row integer-cents drift check;
+`roundCents`'s negative-half-cent asymmetry fix (using `0.125`, which
+is exactly representable in IEEE-754 double, rather than a "natural"
+literal like `1.005`, which the audit itself flagged as not exactly
+representable and therefore unreliable as a rounding-mode fixture).
+Run with `npx vitest run` from `packages/shared`, or `turbo test
+--filter=@voice-expense/shared`.
+
+### One money and aggregation module — adoption at the item-named surfaces (fix-plan item 1.4, Aug 9 2026)
+
+Closes the gap the section above left open: `summarize()`/`classifyFlow()`/
+`isSpend()` existed but had zero callers at the four surfaces the item
+names (Overview header, MindMap, Treemap, Cashflow), and
+`categories.kind` was a forward-declared type with no column behind
+it.
+
+- **New migration `022_category_kind.sql`** — `categories.kind text
+  NOT NULL DEFAULT 'spend' CHECK (kind IN ('spend','income','transfer'))`,
+  same on `default_categories`, with `'Savings & Investing'` set to
+  `'transfer'` on both tables (the literals match `CategoryKind` in
+  `money.ts` exactly, by construction). `database.types.ts` and
+  `packages/shared/src/types/category.ts` updated to carry the new
+  column through. **Known gap, out of this item's file ownership:**
+  `apps/mobile/src/services/seedCategories.ts` (the sign-up seeding
+  path) selects `name, color, icon` from `default_categories` and does
+  not copy `kind` — a newly-onboarded user's "Savings & Investing"
+  category is created with the column default (`'spend'`) until that
+  file is updated to select and insert it too. Not a regression (no
+  code read `kind` before this item), but it means the DB fix alone
+  does not reach new users without that follow-up.
+- **Root cause of the production defect** (verified against
+  `docs/audit-2026-08-08/05-money-math-and-forecasts.md` finding
+  `05-F2`, the audit's own pinned scenario): `MindMap.tsx:56-58`
+  computed `incomeTotal`/`expenseTotal` as `Σ aggAmount()` split purely
+  by `direction`, with no concept of a transfer. The $300 Schwab debit
+  (`category='Savings & Investing'`) landed in `expenseTotal` exactly
+  like the Starbucks $50 and Xtream $42 debits — turning the true $92
+  spend figure into $392 — while the adjacent "Saved & invested" branch
+  computed `max(0, income − expense)` (`MindMap.tsx:58`), a residual
+  with **zero connection** to the Savings & Investing rows, so it
+  showed $0 instead of the $300 that actually moved to savings. Fixed
+  by classifying every transaction through `classifyFlow()`/`isSpend()`
+  off `categories.kind`: a transfer-kind transaction is now excluded
+  from the Expenses grouping entirely, and its total
+  (`summary.transfers`) populates the Saved & invested branch and its
+  own category/merchant breakdown instead — so Expenses now totals $92
+  (Starbucks + Xtream) and Saved & invested totals $300 (Schwab), on
+  the same page load, matching the regression fixture already checked
+  into `money.test.ts`.
+- **`apps/web/src/components/lenses/types.ts`** — added `monthTxns(p)`
+  (both directions, month-bounded), `toSummarizable(t)`, and
+  `monthSummary(p) = summarize(monthTxns(p).map(toSummarizable))`: the
+  one call every lens and the Overview header now make, so
+  income/expense/transfers/saved can't diverge between surfaces.
+  `groupByCategory` no longer folds an FX-pending row in as `(amt ?? 0)`
+  (the `types.ts:103` silent-zero this item's file-ownership list
+  named directly) — it skips pending rows via `isFxPending`, same rule
+  `summarize()` uses internally. `LensTxn` gained `category_kind`,
+  `LensCategory` gained `kind`, both threaded from the DB column in
+  `dashboard/page.tsx` rather than relying solely on the name-fallback
+  in `resolveCategoryKind`.
+- **`dashboard/page.tsx`** — the KPI line's `monthIn`/`monthOut`/`saved`
+  now come from `monthSummary(lensProps)` instead of a hand-rolled
+  `aggAmount` loop; `saved` is rendered unfloored (`Intl` already
+  prefixes the sign, so no separate clamp), and a "N transactions
+  awaiting conversion" line appears under the KPI row when
+  `pendingCount > 0`.
+- **`MindMap.tsx`** — `buildBranches` now splits by `classifyFlow`
+  instead of raw `direction`: `spendDebits` (Expenses),
+  `incomeCredits` (Income) and `transferTxns` (Saved & invested) are
+  three disjoint sets. The "Saved & invested" branch's total is
+  `summary.transfers` (falling back to the unfloored `saved` only when
+  there were no transfer-kind transactions this month) with its own
+  category/merchant leaf breakdown (`categorySubs`, factored out of the
+  old expense-only merchant loop so both branches share it); a
+  secondary "Net saved" sub-node keeps the old income-minus-expense
+  figure visible with its sign shown explicitly rather than hidden
+  behind a `> 0` gate. The centre node's "net" is `monthSummary().saved`.
+- **`Treemap.tsx`** — the top grid's cells and `expenseTotal` now come
+  from `spendDebits` (transfer-kind excluded), and the bottom "Saved &
+  invested" band is `summary.transfers` — a real, category-attributable
+  figure — replacing the disconnected `max(0, income − expense)`
+  residual. "Total flow" (`expenseTotal + saved`) is now `expense +
+  transfers`, cash that actually left checking either as spend or as a
+  transfer, rather than a hybrid of spend and an unrelated leftover
+  number.
+- **`Cashflow.tsx`** — the daily balance line still sums every credit
+  and debit (transfers included — money physically leaves the checking
+  balance either way, so the chart shape is deliberately unchanged);
+  the Income/Expenses/Net *stats* panel now reads `monthSummary(props)`
+  so its numbers match the other three surfaces, and a "Saved &
+  invested" stat row appears when `transfersTotal > 0` so a transfer
+  is never simply absent from the summary (fix-plan invariant: no
+  screen prints "$0 saved" beside a real transfer).
+- **`supabase/functions/fx-backfill/index.ts`** (new) + migration
+  `023_fx_backfill_cron.sql` — the FX backfill sweep
+  (`apps/mobile/src/services/fxBackfill.ts`) only ran on mobile app
+  launch, so a web-only user's foreign-currency historical rows stayed
+  NULL forever and were silently excluded from every total with no
+  client ever running to fix it. The new function sweeps
+  `idx_txn_needs_fx_backfill` (migration 011) server-side across all
+  users, batched at 200 rows/tick, scheduled every 15 minutes via the
+  same Vault-secret cron pattern migration 015 established
+  (`fx_backfill_key`, provisioned out of band — never committed). Repo
+  artifact only; the orchestrator deploys the function and provisions
+  the secret.
+- **Deliberately not touched (still Stage 2), confirmed by this item's
+  file-ownership boundary:** `insights/page.tsx`, `budgets/page.tsx`,
+  `export/page.tsx`; `Flow.tsx`, `Calendar.tsx`, `Matrix.tsx` (the
+  other three lenses — `groupByCategory`'s fix benefits them for free,
+  but their `aggAmount`/direction-only totals are untouched); the
+  mobile hooks/screens and `askMurmurTools.ts` the fix-plan item text
+  also lists; the category-editor UI field for `kind`.
+
+### Mobile presentation primitives (fix-plan item 1.8, Aug 9 2026)
+
+Resolves `01-F5`, `01-F12`, `01-F13`, `01-F14`, `01-F15`, `01-F16`,
+`01-F18`, `01-F24`, `01-F26`, `01-F31`, `01-F33`, `01-F37` — the
+*foundation* half only, per the fix-plan's own item text: build the
+primitives, wire the two places already coupled to them
+(`app/_layout.tsx`'s splash gate and `app/(tabs)/_layout.tsx`'s own
+geometry), and fix the one regression the primitive change itself
+would otherwise have caused (`UndoSnackbar`). Adopting the primitives
+at the other ~25 remaining call sites (14 clearance sites, 8 Modals,
+CategoryPicker, the settings pickers, VoiceConfirmModal, the record
+More-options sheet, IncomeEditorModal, the Insights month picker) is
+Stage 2 — tracked as item 2.14, which depends on this one.
+
+- **Fonts are now real.** `apps/mobile/assets/fonts/` gained five OFL
+  files — Plus Jakarta Sans Regular/SemiBold/Bold from
+  `tokotype/PlusJakartaSans` (the font's actual source repo; the
+  fix-plan text pointed at `googlefonts/PlusJakartaSans`, which
+  doesn't exist) and DM Mono Regular/Medium from `google/fonts`'
+  mirror. **DM Mono ships no Bold weight upstream** — Medium is
+  registered under the `DMMonoBold` key as the closest available
+  weight for the one consumer (`Text.amountChip`); it is not a true
+  bold. `app/_layout.tsx` calls `useFonts()` with a key map matching
+  `Typography.fontFamily`'s values exactly, and the splash-hide gate
+  (`ready`) now additionally waits on `fontsLoaded || fontError` — a
+  font load failure resolves to the system-font fallback rather than
+  an infinite splash. Six styles that named a bold/semibold family
+  with no `fontWeight` (the audit's named casualties: `typography.ts`
+  `h1`/`navTitle`, `VoiceConfirmModal.tsx` `title` +
+  `saveButtonText`, `CategoryPicker.tsx` `modalTitle`, `record.tsx`
+  and `edit.tsx`'s `label`) now pair `fontWeight` alongside
+  `fontFamily` so they survive any fallback. Verified by grep that
+  all 307 `fontFamily:` rules in `apps/mobile` trace back to
+  `Typography.fontFamily.*` — none is a stray literal. **Not
+  verified:** whether `'New York'` actually resolves for serif money
+  amounts on a physical iOS device — the fix-plan asked for an
+  on-device check this environment can't perform; the `Platform.select`
+  fallback to `'serif'` is correct either way. `app.config.js` was
+  evaluated and deliberately left unchanged — `expo-font`'s config
+  plugin does native static-linking under the font's *own* PostScript
+  name, which for Plus Jakarta Sans's Regular weight is
+  `PlusJakartaSans-Regular`, not the bare `PlusJakartaSans` key this
+  codebase's `Typography.fontFamily.sans` already uses everywhere;
+  adding the plugin would register a second, unreferenced face rather
+  than fix anything, since `useFonts()`'s JS-side keys are already
+  decoupled from the file's internal name.
+- **New `src/theme/chrome.ts`** — `TAB_BAR_HEIGHT` (68),
+  `TAB_BAR_BOTTOM_OFFSET` (8), and `useTabBarClearance()` = height +
+  offset + `insets.bottom`, replacing what were three independent
+  copies of the tab bar's geometry (`_layout.tsx`'s own style, and the
+  14 clearance sites `01-F13` enumerates). Wired at the two sites this
+  item owns: `app/(tabs)/_layout.tsx` now reads
+  `useSafeAreaInsets()` and builds `tabBarStyle` as
+  `[styles.tabBar, { bottom: insets.bottom + TAB_BAR_BOTTOM_OFFSET }]`
+  instead of the constant `bottom: 14` (`01-F12`) — the bar's own
+  `height: 68` also became `minHeight: 68` so its 10pt label doesn't
+  clip at large Dynamic Type scales (`01-F24`, the one of the audit's
+  eight fixed-height sites this item owns). **This is a load-bearing
+  change for `UndoSnackbar`**, which independently hard-coded
+  `bottom: 14 + 68 + Spacing.sm` (`01-F33`) — once the tab bar's real
+  bottom offset became inset-aware, that hard-coded copy would have
+  sat *behind* the tab bar on every Face-ID iPhone (bar's new top edge
+  at `insets.bottom + 76pt` vs. the snackbar's stale `90pt`, i.e.
+  overlapping by ~20pt on a 34pt-inset device). Fixed by switching
+  `UndoSnackbar` to `useTabBarClearance() + Spacing.sm`, the direct
+  analog of the old formula. The remaining 13 clearance sites and the
+  "no tab bar present → `insets.bottom + 24`" fallback are Stage 2.
+- **New `src/components/BottomSheet.tsx`** — the one bottom-sheet
+  primitive: backdrop, handle, header (Cancel / title / right slot),
+  `flexShrink: 1` scroll body, optional pinned footer,
+  `useSafeAreaInsets().bottom` padding, and `onRequestClose` wired to
+  the same `onClose` as the backdrop press and header Cancel so the
+  three routes can't diverge (`01-F14`, `01-F18`). Keyboard handling
+  measures the sheet's real on-screen frame via `measureInWindow()` on
+  every `keyboardWillChangeFrame` (iOS) / `keyboardDidShow` (Android)
+  and translates the sheet up by the overlap, rather than nesting a
+  `KeyboardAvoidingView` inside the sheet — RN's KAV computes its lift
+  from a *parent-relative* `onLayout` frame against a *screen-space*
+  keyboard frame, so one mounted at sheet depth under-lifts by the
+  sheet's own top offset (`01-F37`). Not yet adopted anywhere — the
+  four existing sheets (`VoiceConfirmModal`, the record More-options
+  sheet, `IncomeEditorModal`, the Insights month picker) and the eight
+  bare `<Modal>`s (`01-F14`), `CategoryPicker` (`01-F15`) and the
+  settings pickers (`01-F16`) still have their own implementations;
+  moving them onto this component is item 2.14, which depends on this
+  item finishing first.
+- **New `src/components/NumericAccessory.tsx`** — a shared iOS
+  `InputAccessoryView` Done bar keyed by `NUMERIC_ACCESSORY_ID`, for
+  the "decimal pad has no dismiss key" class. Not yet referenced by
+  any numeric `TextInput` — adoption is Stage 2.
+- **New `src/components/ScaledText.tsx`** — `ScaledText` /
+  `ScaledTextInput`, thin wrappers defaulting
+  `maxFontSizeMultiplier={1.4}` (`01-F24`). **Not** implemented as
+  `Text.defaultProps.maxFontSizeMultiplier` as the fix-plan text
+  suggested: RN 0.81's `Text`/`TextInput` are React 19 function
+  components declared with the new `component` type syntax and accept
+  `ref` as a plain prop rather than being `forwardRef`-wrapped, and
+  React 19 dropped `defaultProps` support for function components
+  entirely — setting it compiles but is silently a no-op at render
+  time in this stack (verified against the installed
+  `react-native/Libraries/Text/Text.js`). Adopting the wrappers —
+  swapping `import { Text } from 'react-native'` app-wide — is Stage 2.
+- **`apps/mobile/src/theme/assets.d.ts`** (new) — ambient
+  `declare module '*.ttf'`/`'*.otf'` so `tsc --noEmit` resolves the
+  `require()` calls `useFonts()` needs; there was no precedent for a
+  binary asset `require()` anywhere in this TS codebase before.
+- **Not touched (Stage 2 — item 2.14, depends on this item):** the 13
+  remaining tab-bar clearance sites and the tab-less-screen fallback;
+  the 8 bare `<Modal>`s' `onRequestClose`; `CategoryPicker`'s keyboard
+  coverage; the settings pickers' scroll containers; all four sheets'
+  migration onto `<BottomSheet>`; `NumericAccessory`/`ScaledText`
+  adoption at any call site; the touch-target fixes in
+  `SettingsList`/`RecurringPatternBanner`/`record.tsx` (`01-F26`); the
+  `SafeAreaView` `edges` convention across 20 screens (`01-F31`).
+  `apps/mobile/src/components/Money.tsx` was deliberately left
+  unchanged — its font references were already correct, and the
+  `sign`→`currencyCode`/`locale` API break onto 1.4's
+  `formatMoneyParts` is item 2.6's explicit ownership (`Depends on:
+  1.4, 1.8`), not this one's.
+- **Lint scaffold:** `eslint.config.mjs`'s `MOBILE_PRESENTATION_
+  RESTRICTIONS` (added by item 1.1) stays `'off'` — its single
+  severity switch covers both the `paddingBottom >= 100` selector
+  (needs the Stage 2 sweep this item didn't do) and the Stage 4
+  `<Text>`-literal selector, and flat-config merges `no-restricted-
+  syntax` by rule key, not by selector, so the two can't be flipped
+  independently without giving one its own rule name.
+
+**Tests**
+(`apps/mobile/src/theme/__tests__/typography.fonts.test.ts`, 14 new
+vitest cases): walks `typography.ts`'s `fontFamily` map and
+`_layout.tsx`'s `FONT_MAP` as source text (importing either directly
+pulls in Flow syntax from `react-native` or a binary `.ttf` `require`,
+neither of which survives a plain Node import — see
+`vitest.config.mts`'s node-only scope) and asserts every declared face
+is registered, every registered file exists on disk, and there are no
+orphaned registrations; mutation-tested by temporarily renaming a
+`FONT_MAP` key and confirming the suite fails. Run with `npx vitest
+run` from `apps/mobile`, or `turbo test --filter=@voice-expense/mobile`.
+
+### One recurrence engine (fix-plan item 1.5, Aug 9 2026)
+
+Resolves `04-F2`, `04-F3`, `04-F20`, `04-F21`, `03-F8`, `03-F15`,
+`03-F16`, `03-F23`, `03-F32`, `06-F22`, `07-F22`. "Next occurrence" was
+implemented three times — the mobile hook, the web Recurring page, the
+`generate-recurring` Edge Function — all mutating a `Date` with
+`setMonth`/`setDate`/`setFullYear`, which overflows instead of
+clamping at month ends (a rule anchored on the 31st permanently
+drifted to the 3rd after the first February) and runs each writer's
+arithmetic in whatever zone its runtime happens to be in, so the same
+rule resolves to different UTC instants on mobile vs. the cron and both
+insert past the UTC-day dedup index.
+
+- **New `packages/shared/src/domain/recurrence.ts`** — the one
+  implementation. `nextOccurrence(rule, afterInstant, tz)` builds the
+  target as a zoned civil date (via `packages/shared/src/utils/
+  period.ts`, gaining three small additive exports for this:
+  `addDays`, `daysBetween`, `civilDateTimeToInstant`) and converts to
+  an instant exactly once; the day-of-month clamp always uses the
+  rule's resolved `anchor_day`, never a previously *emitted*
+  occurrence's day, which is what lets a 31st-anchored rule clamp to
+  the 28th in February and *return* to the 31st in March rather than
+  drifting to the 3rd forever. `afterInstant === null` returns
+  `starts_at` unchanged (`03-F32` — `starts_at` **is** the first
+  occurrence) rather than `starts_at + one interval`. Also exports
+  `firstOccurrenceOnOrAfter` (closed-form, not an iterate-from-`starts_at`
+  scan — incidentally also fixes `03-F25`, not in this item's resolves
+  list, for free), `occurrencesInWindow`, `occurrencesDue` (the bounded
+  catch-up loop `03-F15` asked for — the Edge Function generated at
+  most one occurrence per rule per run before this), `chargesInWindow`
+  (rule+occurrence pairs across multiple rules, flattened/sorted), and
+  `monthlyEquivalent`/`annualEquivalent` (`03-F23` — honours `interval`,
+  which the date math always did and the three cost normalizers never
+  did).
+- **New `packages/shared/src/domain/recurringPatternDetector.ts`** —
+  merges the mobile/web copy-paste pair (the web file's own header
+  admitted the drift: *"If the mobile detector is updated, copy the
+  change over here"*). **Cadence inference changed**, not just
+  relocated: the old bucketing had an open-ended top band (`>95 days ⇒
+  "likely yearly"`), so two charges six months apart (~182 days) were
+  reported as yearly — a real cadence (semiannual) this app has no
+  frequency for, misreported as a different one. Cadence bands are now
+  tolerance windows around each canonical cadence (7/14/~30/~91/~365
+  days); a gap that lands in a gap *between* bands (which a ~182-day
+  gap does) returns `null` and the candidate is dropped rather than
+  mislabeled. `apps/mobile/src/services/recurringPatternDetector.ts`
+  and `apps/web/src/lib/recurringPatternDetector.ts` are now one-line
+  re-exports.
+- **Migration `020_recurrence_anchors.sql`** (numbered around item
+  1.6's already-landed `018_sync_contract.sql`/
+  `019_realtime_publication.sql` — not applied to production, repo-only
+  per this stage's rule). Adds `recurring_rules.anchor_day` /
+  `anchor_weekday` / `anchor_time` (nullable — no write path populates
+  them yet; the engine derives them from `starts_at` when absent, so a
+  `NOT NULL` constraint would only reject un-adopted inserts, not make
+  them more precise) and `transactions.occurrence_date` (also nullable,
+  same reasoning), then re-keys `idx_txn_recurring_dedup` off
+  `occurrence_date` instead of `(transacted_at AT TIME ZONE
+  'UTC')::date`.
+- **Adopted at:** `apps/mobile/src/hooks/useRecurringRules.ts`
+  (`computeNextOccurrence`/`computeUpcomingRecurring` now delegate to
+  the engine; kept their exact existing signatures so the five
+  unowned call sites — `recurringCatchUp.ts`, `app/recurring.tsx`,
+  `app/transaction/[id].tsx`, `app/(tabs)/{index,budgets}.tsx` — keep
+  compiling unmodified, falling back to the device zone via
+  `expo-localization` when no `tz` is passed); `apps/web/src/app/
+  dashboard/recurring/page.tsx` (`nextOccurrence`/`chargesIn30Days` now
+  take an explicit `tz`, resolved from the browser's own
+  `Intl.DateTimeFormat().resolvedOptions().timeZone` rather than
+  `profile.timezone` — nothing writes that column from web yet, item
+  1.3's device-zone capture landed mobile-only so far, so it would read
+  the schema default `'UTC'` for nearly every user); `supabase/
+  functions/generate-recurring/index.ts` (now loops `occurrencesDue`
+  per rule instead of generating one occurrence per run, resolves each
+  user's `profiles.timezone`, and writes `occurrence_date` on every
+  inserted row — **deploy-order dependency documented in the function's
+  own header**: redeploying it before migration 020 is applied is a
+  full outage of daily generation, not a degraded one); `apps/mobile/
+  src/services/sync/{localDb.ts,transactionStore.ts}` (new
+  `occurrence_date` local column + migration step `addOccurrenceDateColumnV3`,
+  `idx_txn_recurring_dedup` re-keyed to match the server index shape;
+  `upsertTransaction` derives `occurrence_date` from
+  `transacted_at.slice(0,10)` when the caller doesn't supply it — same
+  value the old index used, so this is a schema-shape change, not a
+  behaviour change, until `recurringCatchUp.ts` adopts the engine's real
+  `occurrenceDate` in Stage 2).
+- **Deliberately not adopted:** the `last_generated: new Date().toISOString()`
+  write at `useRecurringRules.ts`'s `createRule` (the accept-detected-
+  pattern path) is **not** removed even though the engine now correctly
+  supports `last_generated: null`. That call site always carries a real
+  `template_txn_id` — an already-logged transaction — so setting
+  `last_generated: null` would make `starts_at` (= now) immediately due
+  and the next catch-up run would generate a *second* transaction for
+  today on top of the one the pattern was detected from (`03-F12`'s
+  back-generated-duplicate hazard). `03-F12`'s guard is a different,
+  not-yet-landed item; a comment at the call site explains the
+  dependency. `apps/mobile/src/services/recurringCatchUp.ts`,
+  `app/recurring.tsx`, `app/transaction/[id].tsx`, `app/(tabs)/
+  {index,budgets}.tsx` are unmodified (not this item's listed adoption
+  surfaces — Stage 2).
+- **Deno vendoring:** no import map exists for `supabase/functions/`, so
+  `supabase/functions/_shared/recurrence.ts` is a marked
+  `REGENERATED-FROM` port of the subset `generate-recurring` needs
+  (`nextOccurrence`, `occurrencesDue`, and the civil-date primitives
+  they're built on) rather than a live import — per the fix-plan item's
+  own text, which anticipates this.
+
+**Known pre-existing failure, not from this item — RESOLVED by 1.6
+(Aug 9 2026, same day, later pass):** this section originally reported
+`npx turbo test` failing 3 mobile tests (`localDb.migration.test.ts`
+x2, `localDb.syncContract.test.ts` x1) with `no such column: status`,
+traced to `initSchema()` unconditionally re-running the `sync_queue`
+`CREATE TABLE IF NOT EXISTS` + a `status`-referencing index against a
+pre-existing database before that database's migration chain had added
+the column. Item 1.6's own landed fix: `initSchema()`'s SQL no longer
+builds `idx_queue_status_id` unconditionally — a fresh install gets it
+from `initDatabase()` (right after `initSchema()`, on the `fresh`
+branch), an upgrading install gets it from `addSyncContractV2()` (the
+v1→v2 migration step, alongside the `status`/`next_attempt_at`
+columns themselves), and `initSchema()`'s own copy is gone. All three
+previously-failing tests, and the full mobile suite, are green as of
+1.6 landing — see that item's own section below for the actual fix and
+its regression coverage.
+
+**Tests** (`packages/shared/src/domain/__tests__/{recurrence,
+recurringPatternDetector}.test.ts`, 29 new vitest cases): the
+audit-pinned Jan-31-monthly walk (Feb 28 → Mar 31 → Apr 30, never Mar
+3) both as a 4-step and a 6-step sequence; quarterly and leap-year
+yearly clamping; `interval > 1` honoured in the date math; `starts_at`
+as first occurrence; a weekly DST-crossing rule keeping local 09:00 on
+both sides of the March 2026 spring-forward while the UTC instant
+shifts; a same-rule-different-`tz`-parameter determinism check *and* a
+`process.env.TZ` independence check (the architecture no longer reads
+the ambient runtime zone at all, so both had to be re-thought against
+what F2's fix actually changed rather than reusing its literal "TZ=UTC
+vs TZ=America/Chicago" framing, which described the old bug's
+symptom, not the new contract); weekly stepping across a month
+boundary; the local-vs-UTC-day dedup-window asymmetry from both
+directions (`Asia/Tokyo`, no DST, isolates the day-boundary effect);
+`occurrencesDue` bounded catch-up (six months behind ⇒ six
+occurrences in one call, plus a `limit` respected); `firstOccurrenceOnOrAfter`/
+`occurrencesInWindow` fast-forwarding a >1-year-overdue daily rule
+straight to a 30-day window; `chargesInWindow` sort/flatten;
+`monthlyEquivalent`/`annualEquivalent` honouring `interval`; and the
+detector's cadence-consistency fix — a ~181-day gap yields zero
+candidates (not "likely yearly"), while genuine monthly/quarterly/yearly
+gaps still resolve correctly and a ~60-day ("bimonthly") gap also drops
+rather than mislabels. Run with `npx vitest run` from `packages/shared`,
+or `turbo test --filter=@voice-expense/shared`.
+
+### An outbox that can report failure, and an entity-complete offline layer (fix-plan item 1.6, Aug 9 2026)
+
+Resolves `07-F4`, `07-F5`, `07-F13`, `07-F32`, `07-F35`, `07-F36`,
+`07-F43`, `07-F44`, `07-F45`, `06-F5`, `06-F9`, `06-F10`, `06-F12`,
+`06-F13`, `06-F14`, `06-F15`, `06-F16`, `06-F17`, `06-F19`, `06-F28`,
+`06-F31`, `05-F20`, `08-F24`, `08-F50`, `03-F27`, `04-F22`, `04-F23`.
+`createTransaction`/`editTransaction`/`deleteTransaction` used to
+return `{ error: null }` unconditionally — this item makes success and
+silent failure distinguishable for the first time, which every later
+fix-plan item that writes data depends on to be verifiable at all.
+
+- **A truthful return contract.** `MutationResult { id, status:
+  'synced' | 'queued' | 'rejected', error }` from all three mutations.
+  `SyncManager.awaitOutcome(entityId, timeoutMs=5000)` kicks a drain
+  immediately and polls the queue for up to 5s so the caller can tell
+  "reached the server" from "queued, will sync once online" from "the
+  server permanently rejected this" — the queue's own `last_error`
+  (written, never read before this item) is now the source of the
+  returned `error` string.
+- **Error classification and isolation** (`retryPolicy.ts`, new,
+  dependency-free/pure so it's trivially unit-tested). Postgres SQLSTATE
+  class `23`/`42` → dead-letter immediately (`markDeadLetter`); a
+  `23505` on `idx_txn_recurring_dedup` specifically → the local row
+  soft-deletes and the queue entry drops without dead-lettering (another
+  writer already produced the same recurring occurrence — a resolved
+  conflict, not a failure); every other unique violation is a hard
+  failure that dead-letters rather than silently deleting the user's
+  row; anything else (network/5xx/401, no SQLSTATE) → transient, retried
+  with backoff. `syncQueue.getReadyBatch(afterId, limit, dueBy)` orders
+  by `id ASC` (autoincrement, monotonic) instead of `created_at` (a
+  client clock, not monotonic — `06-F19`) and pages with an `id > cursor`
+  predicate so a poisoned or currently-backed-off entry can never make
+  the drain loop re-fetch the same head forever.
+- **A real retry scheduler.** `computeBackoffMs(retryCount)` =
+  `min(30s·2^n, 15min)` + up to 20% jitter. `SyncManager.retryTimer` —
+  declared in the pre-1.6 code and never assigned — is now actually set
+  from `getNextScheduledAttempt()` after every drain pass, cleared on
+  the next successful drain, and also triggers on `AppState → active`.
+  The unconditional `resetDeadLetterEntries()` call is deleted from
+  `start()` (`06-F9` — it used to re-arm every poisoned entry on every
+  launch); the function still exists, exported, for an explicit
+  one-time repair path if one is ever needed.
+- **A failure surface.** New `src/components/SyncFailureBanner.tsx`,
+  mounted once in `app/_layout.tsx`: renders nothing while
+  `getDeadCount() === 0`, otherwise a dismissible pill wired to
+  `getDeadLetterEntries`/`retryDeadLetterEntry`/`clearDeadLetterEntry`
+  (all three existed with zero callers before this item — `07-F36`)
+  showing each entry's `last_error` with per-entry Retry/Discard and a
+  Retry-all when more than one is dead. `SyncManager.notify()` now
+  reports real `getPendingCount()`/`getDeadCount()` instead of the old
+  `notify(false, 0)`. The fuller "sync health" row in Settings
+  (`apps/mobile/app/more/settings.tsx`) is explicitly out of this
+  item's file ownership and not built here.
+- **Complete pull.** `pagination.ts`'s `paginateAscending` — ascending
+  by `updated_at`, a `cursor` param and `.gt()` predicate, paging past
+  `PULL_PAGE_SIZE` (500) until a short page ends the loop. Replaces the
+  old `ORDER BY updated_at DESC LIMIT 200` with no cursor, which was
+  lossy the moment a user had more than 200 rows (`05-F20`/`08-F24`).
+  The high-water mark is persisted **in SQLite** (`localDb.ts`'s new
+  `sync_meta` key/value table, `getSyncCursor`/`setSyncCursor`) rather
+  than a React ref, which cannot be a cursor across eleven possible hook
+  instances. `pullRemote` returns `{ ok }` and the cursor only advances
+  past a page that both landed cleanly and was fully merged locally —
+  a failed page can never be silently skipped on the next pull.
+- **All four entities.** New `entityRegistry.ts` (`ENTITY_HANDLERS`,
+  keyed by `SyncEntityType`) and `genericLocalStore.ts` (one CRUD
+  factory for the three entities that share `transactions`' sync
+  contract but have no per-column write behaviour of their own).
+  `localDb.ts` gained local `categories`/`budgets`/`recurring_rules`
+  tables (column manifests `CATEGORY_COLUMNS`/`BUDGET_COLUMNS`/
+  `RECURRING_RULE_COLUMNS`, same pattern as `TRANSACTION_COLUMNS`) with
+  the shared sync contract (`client_id`, `version`, `is_deleted`,
+  `synced_at`). `drainQueue`/`processEntry` dispatch on `entry.entity_type`
+  through the registry instead of hard-coding `.from('transactions')`,
+  and drain in one pass across all four entity types, in `id` order —
+  which is what makes item 2.2 (recurring rules end to end) possible.
+  **Not adopted in this item:** `useCategories`/`useBudget`/
+  `useRecurringRules` never call `enqueue()` yet, so categories/budgets/
+  recurring_rules only ever arrive locally via `pullRemote`/realtime,
+  never get pushed from a mobile-side write — wiring those three hooks
+  to actually enqueue is Stage 2, explicitly out of this item's file
+  ownership.
+- **`upsertTransaction`'s `ON CONFLICT` SET list is now complete.**
+  `currency_code`, `source`, `ai_confidence`, `is_recurring`,
+  `recurring_rule_id` — all five columns `06-F16` found silently
+  missing — are in the SET list now, generated against the same
+  `TRANSACTION_COLUMNS` manifest 0.6 introduced, with a one-line comment
+  on each deliberate exclusion (`id`, `user_id`, `client_id`/
+  `client_created_at`/`created_at` as identity/provenance fields;
+  `raw_transcript` because the Privacy screen's "voice not stored"
+  promise means a synced-back server row's NULL must never overwrite
+  the on-device transcript).
+- **Version guards on the server** — new migrations `018_sync_contract.sql`
+  and `019_realtime_publication.sql` (repo files only; **not** applied to
+  production, per this stage's rules). 018: `sync_upsert_transaction(payload
+  jsonb)` RPC doing `ON CONFLICT (user_id, client_id) DO UPDATE … WHERE
+  EXCLUDED.version > transactions.version RETURNING *`, returning the
+  winning row so a losing client can detect the loss and re-pull instead
+  of believing a stale write landed; the same version-guard predicate on
+  the delete branch (`versionGuardedDelete`, shared by all four
+  entities' `pushDelete`). `transactions_client_id_unique` (global,
+  `06-F28`) is dropped and replaced by `transactions_user_client_unique
+  UNIQUE (user_id, client_id)` — the constraint the RPC's `ON CONFLICT`
+  actually targets, so the documented idempotency key is finally the
+  real one. `synced_at` becomes a server-stamped `DEFAULT now()` +
+  `BEFORE INSERT OR UPDATE` trigger on all four tables (`06-F10`/
+  `04-F23` — a device's own clock can never claim to know when the
+  server accepted a write) and is stripped from every outbound payload
+  in `SyncManager.processEntry`, the same way `raw_transcript` already
+  was. `categories`/`budgets`/`recurring_rules` gain the same four sync-
+  contract columns server-side; `recurring_rules` also gains the
+  `updated_at` column every other `001_initial_schema.sql` table already
+  had (nothing needed it until this item gave the table a client write
+  path to guard with it). 019: `ALTER PUBLICATION supabase_realtime ADD
+  TABLE public.transactions, public.categories, public.budgets,
+  public.recurring_rules`, guarded by a `pg_publication_tables`
+  existence check per table (idempotent pre-PG15, safe to apply to a
+  project where a table was already added by hand) — every
+  `postgres_changes` handler this codebase has ever registered
+  (`06-F5`/`08-F50`) was listening to a publication containing zero
+  tables until this migration is applied.
+- **One store, one channel** (`07-F45`). `SyncManager.startRealtime(userId)`
+  opens one realtime channel per signed-in user covering all four
+  entities, idempotent per user (a second call with the same `userId`
+  is a no-op) — replacing the old one-channel-per-`useTransactions()`-
+  mount pattern with a random name suffix. `pullRemote(userId)` gained
+  an in-flight-promise map (`pullInFlight`, keyed by `userId`) so
+  concurrent calls for the same user — which is exactly what happens
+  when several screens mount `useTransactions()` around the same
+  render pass — share one pull pass instead of each independently
+  walking the full entity list; the realtime dedup alone did not cover
+  this half of "one pull" until this pass. `DataEvents`
+  (`src/events/dataEvents.ts`) is **not** deleted, unlike the fix-plan
+  text's literal "delete the DataEvents fan-out" — it is a distinct
+  mechanism from realtime multiplexing (cross-screen *local* SQLite-
+  write notification, with zero network involved) that the "one
+  channel" fix doesn't obsolete; collapsing every `useTransactions()`
+  call site onto one shared Context provider, which is what would
+  actually make it redundant, is the literal Stage 2 shape of "one
+  store" and is out of this item's file ownership (`useCategories`,
+  `useBudget`, `useRecurringRules`, `useProfile`, and every screen
+  beyond `_layout.tsx` are untouched).
+- **`deleteTransaction` no longer drops the enqueue** (`07-F32`). The
+  old inline version read the row to delete from the calling hook
+  instance's `transactions` React state — this render's stale closure —
+  and silently skipped the `enqueue()` call when the row wasn't in it
+  (a different screen's instance, or a row that arrived after the last
+  `loadLocal`): the row was soft-deleted in SQLite but the delete never
+  reached the outbox. Extracted to a new plain (non-hook) exported
+  function, `deleteTransactionAndEnqueue(userId, id)`, that always
+  re-reads the row from SQLite — the single local source of truth —
+  after the soft-delete, the same pattern `editTransaction` already
+  used; `useTransactions()`'s `deleteTransaction` is now a thin wrapper
+  that also does the React-specific `loadLocal`/`DataEvents` bits. This
+  also removes a second, redundant `version` increment the old code
+  computed from the stale closure on top of the one
+  `softDeleteTransaction` already applies in SQLite. `transaction/
+  [id].tsx`'s own separate delete implementation (which was already
+  correct — it reads through `getTransactionById`, not list state) is
+  unchanged; consolidating every delete call site onto the hook's fixed
+  version is Stage 2, out of this item's file ownership.
+- **Not touched, explicitly out of this item's file ownership per the
+  fix-plan text's own surfaces list vs. this item's narrower scope
+  grant:** `apps/mobile/app/transaction/[id].tsx`,
+  `apps/mobile/src/services/fxBackfill.ts`,
+  `apps/mobile/src/services/recurringCatchUp.ts`,
+  `apps/mobile/app/more/settings.tsx`'s sync-health row,
+  `apps/web/src/app/dashboard/transactions/page.tsx`. All three still
+  call `syncQueue.enqueue(operation, entityId, payload)` using the old
+  three-argument form — `entityType` is a trailing optional parameter
+  defaulting to `'transaction'` specifically so these call sites keep
+  compiling and behaving correctly unchanged (they only ever enqueue
+  transactions) rather than being broken by this item's entity-generic
+  rebuild.
+
+**Tests** (7 new/expanded files, 65 mobile tests total —
+`retryPolicy.test.ts`, `pagination.test.ts`, `syncQueue.test.ts`,
+`SyncManager.test.ts`, `localDb.syncContract.test.ts`,
+`realtimePublication.test.ts`, `hooks/__tests__/useTransactions.test.ts`;
+`localDb.migration.test.ts` unchanged but now passing — see the
+correction above): the fix-plan's own done-when scenario verbatim
+(enqueue three entries where the middle one 23514s — entries 1 and 3
+reach the mocked server, entry 2 dead-letters with `last_error`
+populated, pending count accurate, a second drain does not resurrect
+it); a transient failure continuing past instead of aborting the whole
+drain; the recurring-dedup 23505 soft-delete carve-out vs. a real
+unique violation on a different constraint dead-lettering instead;
+strict `id`-order draining across a batch boundary larger than the page
+size; `awaitOutcome` reporting `rejected`/`synced` correctly; a real
+fake-timers backoff retry firing within its window on a continuously-
+online device; the 450-row pagination done-when (seed 450, cold-start
+pull, assert 450 local and zero transferred on a second pull); three
+concurrently-mounted transaction-consuming screens issuing exactly one
+`pullRemote` pass and one channel subscription; the `019` migration
+publishing every table `REALTIME_TABLES` subscribes to (a text-level
+assertion against the migration SQL — there is no local-Postgres
+harness in this repo to literally query `pg_publication_tables`, see
+`vitest.config.mts`'s "component tests need RN/jsdom mocking that
+Stage 2 will set up separately", which the same gap falls under); and
+`deleteTransactionAndEnqueue` enqueueing unconditionally for a row that
+was never loaded into any component's state, a permanent rejection
+reported truthfully, and a not-found id being a genuine no-op. Run with
+`npx vitest run` from `apps/mobile`, or `turbo test --filter=@voice-expense/mobile`.
+
+### A typed parse boundary (fix-plan item 1.7, Aug 9 2026)
+
+Resolves `02-F2`, `02-F7` (the contract half), `02-F11`, `02-F12`,
+`02-F19`, `02-F20`, `02-F21`, `02-F22`, `02-F24`, `02-F26`, `02-F35`,
+`07-F24`. `validateParsedExpense`/`assertParsedExpense`
+(`packages/ai/src/validateParsedExpense.ts`) already existed going into
+this pass — wired at the route boundary and the `parser.ts`/
+`scanParser.ts` client boundary — but the item's third boundary
+(`createTransaction`) and the rest of the "Change" text (determinism,
+trust boundaries on the input side, rate limiting, cache-key isolation)
+were not yet built. This session closes those.
+
+- **The third boundary.** New `validateTransactionWriteFields` in the
+  same file, sharing `checkAmount`/`checkDirection`/`checkCurrency`/
+  `checkPaymentMethod` with `validateParsedExpense` itself (extracted
+  from what used to be four inline blocks) so the two boundaries can
+  never describe two different definitions of "valid". Wired into
+  `useTransactions.ts`'s `createTransaction`, before the FX snapshot and
+  before anything touches SQLite — regardless of `source` (AI parse,
+  manual entry, a shortcut deep link, the notification listener, or a
+  future call site that skips the first two boundaries by construction).
+  A rejection returns `{ status: 'rejected', error }` through the same
+  `MutationResult` contract 1.6 built; nothing is written.
+- **Two more model-adjacent inputs now go through the same validator.**
+  The Android notification listener's heuristic extraction
+  (`useNotificationListener.ts`) is exactly as untrusted as a model's
+  JSON — a foreign banking app's currency string is now rejected instead
+  of syncing as a permanent $0 row. The iOS Shortcuts deep link
+  (`record.tsx`'s `shortcut_currency`/`shortcut_payment_method` URL
+  params) used an unchecked cast to `PaymentMethod`; it now validates
+  against `ISO_4217_CODES`/`PAYMENT_METHOD_VALUES` and falls back
+  honestly instead of producing a value that only fails at save time.
+- **`response_format: json_schema`.** New
+  `packages/ai/src/parsedExpenseSchema.ts` builds the schema from the
+  exact same `PAYMENT_METHOD_VALUES`/`TRANSACTION_DIRECTION_VALUES`/
+  `RECURRING_FREQUENCY_VALUES` the validator checks against (now
+  exported), so the schema and the validator can't describe two
+  different enums. This narrows the model's *shape* mistakes at the API
+  level; `validateParsedExpense` still runs after it and is still what
+  catches an in-range-shape-but-wrong-value response (an out-of-bounds
+  `confidence`, a >1e9 `amount`) — the schema is additive, not a
+  replacement.
+- **Determinism.** Both parse routes: `temperature: 0` (already present)
+  plus `seed: 42`; the model pinned to a dated snapshot
+  (`gpt-4o-mini-2024-07-18`) instead of the floating `gpt-4o-mini` alias,
+  still overridable per-environment via `AI_PARSE_MODEL`/`AI_SCAN_MODEL`.
+  New `apps/web/src/lib/aiCompletion.ts`'s `createJsonCompletionWithRetry`
+  checks `finish_reason` before `JSON.parse`-ing anything — a
+  `'length'` response is truncated JSON by definition, so retrying it
+  through the parser only produces a worse error message. It retries
+  once with `max_tokens` raised (capped at 1200) instead. `max_tokens`
+  itself raised 320→500 (parse) and 300→400 (scan) as the primary
+  mitigation; the retry is the backstop.
+- **Trust boundary on the input side.** New
+  `apps/web/src/lib/parseGuards.ts`: `isSupportedLocale`/
+  `isSupportedCurrency`/`isSupportedScanType` reject a request outright
+  (400) rather than silently substituting a default for a value that
+  *was* sent but isn't one either route actually supports — a silent
+  substitution here just moves the same bug one line down.
+  `contentLengthExceeds` rejects an oversized body before `req.json()`
+  buffers it into memory. `MAX_TRANSCRIPT_LENGTH` (4000 chars) bounds the
+  token cost and prompt-injection surface of a single request.
+  `prompt.ts`'s `sanitizeCategoryNames` caps each client-supplied
+  category name to 40 characters, strips control characters *and* angle
+  brackets (so a name can't spoof `</user_categories>` and break out of
+  the block early — pinned by `prompt.test.ts`), and the sanitized list
+  is now rendered as a fenced `<user_categories>` data block instead of
+  woven into the rule prose. The scan route's `getScanPrompt` output
+  moved to the `system` role, with the (now schema-validated) image
+  alone in the `user` turn — audit 02-F22's "instructions and the
+  untrusted image share one turn" is closed.
+- **Rate limiting.** New `apps/web/src/lib/rateLimit.ts`: an in-memory,
+  per-`(route, userId)` fixed-window counter — 60 parses/hr, 20 scans/hr
+  — keyed only on the already-validated `userId`, never on an
+  unauthenticated IP. Explicitly not billing-grade/multi-instance-exact;
+  the goal stated in the fix-plan text is "a buggy or compromised client
+  can't run up an unbounded OpenAI bill", which a single-process counter
+  satisfies for this project's one long-lived Vercel Node function.
+- **Cache-key isolation** (audit 02-F24). `parser.ts`'s `cacheKey` used
+  to be `locale:currency:transcript` — omitting the user id, the
+  category list, and the date. It now includes all three: `userId` (so
+  a second user on the same device can never be served the first user's
+  cached parse), the sorted category list (so a category added since the
+  last parse isn't hidden by a stale hit), and an epoch-day bucket (so
+  `transacted_at`'s "defaults to today" doesn't replay yesterday's date
+  on a literal cache hit — deliberately *not* `.toISOString().slice(0,10)`
+  or any local-calendar getter, since this is a staleness bucket, not a
+  user-facing date, and doesn't need the caller's timezone the way
+  anything in `period.ts` does). New `clearParseCache()`, called from
+  `useAuth.ts`'s `resetLocalState` (0.7) as an explicit belt-and-suspenders
+  alongside the key change. `useVoice.ts` now threads the session's
+  `userId` through to `parseExpense`.
+- **Migration `021_currency_code_check.sql`** (repo file only, not
+  applied to production per this stage's rules): `CHECK (currency_code ~
+  '^[A-Z]{3}$')` on `transactions`. Scoped to `transactions` only — the
+  same column on `profiles`/`recurring_rules`/`budgets` is 2.7's currency-
+  migration territory, not this item's.
+- **Not touched, explicitly out of this item's file ownership:**
+  `VoiceConfirmModal.tsx`'s confidence-based UI gating (the fix-plan
+  text's 3-tier ≥0.85/0.6–0.85/<0.6 policy) — that file isn't in 1.7's
+  surfaces list, and building it reaches into the confirm sheet's
+  field-locking behavior, which is a bigger, separate change. Persisting
+  a transcript locally the instant it's finalized so a failed parse is
+  retryable (rather than lost) is also not built here — it's a mobile
+  resilience/UX flow change (`useVoice.ts`'s error path, `record.tsx`'s
+  retry affordance), not a boundary-enforcement one, and belongs with
+  Stage 2's broader adoption sweep. Recording the model id alongside
+  `ai_confidence` is not built here either — it would need a new
+  `transactions` column and a write-path change beyond this item's
+  surfaces; noted as a known gap for whoever picks up that thread.
+
+**Tests** (7 new files across 3 packages): `validateParsedExpense.test.ts`
+gained a `validateTransactionWriteFields` suite replaying the fix-plan's
+own four worked rejection cases against the write boundary specifically
+(direction/payment_method/currency/amount, individually and all at
+once). New `prompt.test.ts` (category sanitization + the delimited-block
+escape case). New `apps/web/src/lib/__tests__/{rateLimit,parseGuards,
+aiCompletion}.test.ts` — the first tests to land in `apps/web`, so
+`vitest.config.mts`'s `passWithNoTests: true` placeholder is removed
+per its own comment. `aiCompletion.test.ts` pins the retry-once-on-
+truncation behavior including the "still truncated after retry" case
+(no infinite retry loop) and the `max_tokens` cap. Run with `npx vitest
+run` from `packages/ai` / `apps/web`, or `turbo test` from the repo
+root for all five packages.
+
+### Mobile presentation primitives — adoption at the item-named surfaces (fix-plan item 1.8, Aug 9 2026)
+
+Closes the gap the section above left open. `BottomSheet`/`NumericAccessory`
+existed with zero callers; the fix-plan's own item text names
+`VoiceConfirmModal` as `<BottomSheet>`'s flagship intended consumer
+("have `VoiceConfirmModal`, the record More-options sheet,
+`IncomeEditorModal` and the Insights month picker all render through
+it" — `BottomSheet.tsx`'s own doc comment) and names both
+`VoiceConfirmModal.tsx:195-196` and `edit.tsx:246-247` directly in
+`01-F8`'s exhaustive decimal-pad inventory as the two "not
+acceptable"/"poor" `NumericAccessory` sites outside `income.tsx`. This
+pass wires those two — full item-2.14-style adoption across the other
+~23 call sites the audit lists is still Stage 2, unchanged from the
+section above.
+
+- **`VoiceConfirmModal.tsx` now renders through `<BottomSheet>`.** The
+  file's own hand-rolled `Modal`/backdrop-`Pressable`/`KeyboardAvoidingView`/
+  `SafeAreaView` stack (the exact structure `01-F1`'s root-cause section
+  diagrammed) is gone; `BottomSheet` owns backdrop, handle,
+  `onRequestClose`, and the `measureInWindow`-based keyboard lift that
+  fixes `01-F37`'s under-lift-by-the-sheet's-own-offset defect the old
+  KAV had. The header keeps its original look (title centered, only an
+  X button dismisses) rather than gaining `BottomSheet`'s default
+  "Cancel" text: `cancelLabel=""` renders an empty, still-functional
+  left slot so the three-way `onClose` wiring (backdrop / header / hardware
+  back) stays intact without changing the design. The amount
+  `TextInput` (`decimal-pad`) now carries `inputAccessoryViewID={NUMERIC_ACCESSORY_ID}`
+  and a `<NumericAccessory>` is rendered in the sheet body — `01-F8`'s
+  "Save button is below the keyboard in the footer... not acceptable"
+  case is closed. Six now-dead style keys (`backdrop`, `sheet`, `shrink`,
+  `handle`, `header`, `title`, `footer`) were removed rather than left
+  orphaned.
+- **`app/transaction/edit.tsx`** is a Stack screen with its own native
+  header, not a modal sheet, so it does **not** render through
+  `<BottomSheet>` — wrapping a full-screen route in the sheet primitive
+  would misrepresent its navigation semantics. Instead: `01-F23`'s fix
+  text applied literally — `autoFocus` dropped from the (already
+  pre-filled) amount field, and the Save button moved out of the
+  `ScrollView` into a pinned footer sibling ("the pattern
+  `VoiceConfirmModal` intends," per that finding's own wording), so Save
+  can no longer land below the fold once the keyboard is up. The footer
+  does not add its own `insets.bottom` — the screen's existing
+  `SafeAreaView edges={['bottom']}` already reserves it, and stacking a
+  second one is exactly the double-count `01-F23`'s own "refuted
+  sub-claim" paragraph warned against re-introducing. The amount field
+  also gained `inputAccessoryViewID={NUMERIC_ACCESSORY_ID}` and a
+  `<NumericAccessory>` — `01-F8`'s "recoverable via drag-dismiss, but
+  poor" case is closed.
+- **Not touched, still Stage 2 (item 2.14):** the other four sheets
+  (`record.tsx`'s More-options sheet, `IncomeEditorModal`, the Insights
+  month picker, `CategoryPicker`), the eight bare `<Modal>`s
+  `01-F14` lists (five in `settings.tsx`, `insights.tsx`,
+  `BudgetEditorModal.tsx`, `CategoryPicker.tsx`), the 13 remaining
+  tab-bar clearance sites, and every other `decimal-pad`/`numeric`
+  `TextInput` in the app besides these two.
+
+**Tests** (`apps/mobile/src/components/__tests__/BottomSheet.test.ts`,
+4 new vitest cases): the `01-F14` regression test the finding itself
+specifies — "fire `BackHandler` … assert `visible` flips to false" —
+against the shared primitive directly rather than against
+`VoiceConfirmModal` (RN's `Modal` has no separate `BackHandler` hook of
+its own on this path; `onRequestClose` **is** the mechanism, per
+`01-F14`'s own root-cause paragraph, so driving that prop is the literal
+test). Since `vitest.config.mts` is deliberately node-only and no
+RN/jsdom component-test harness existed yet (`01-F8`'s own PLAN section
+above notes this gap explicitly), this pass adds one: `react-test-renderer`
++ `@types/react-test-renderer` (pinned `19.1.0`, matching the workspace's
+`react`) as new mobile devDependencies, plus a minimal hand-rolled
+`react-native`/`react-native-safe-area-context` mock (host-passthrough
+components, no native modules — the same shape as the existing
+`vi.mock('react-native', …)` calls in `services/sync/__tests__`, just
+enough surface for `BottomSheet` to mount without touching a real
+native bridge). Cases: the `Modal` renders with `onRequestClose` wired;
+firing it flips `visible` false; pressing the backdrop closes it;
+pressing the header Cancel closes it via the same `onClose`. Run with
+`npx vitest run` from `apps/mobile`, or `turbo test --filter=@voice-expense/mobile`.
+
+### An outbox that can report failure — Settings sync-health row, plus item 1.3's Time Zone row (fix-plan item 1.6, Aug 9 2026)
+
+Closes the one gap the section above named explicitly as deferred: "The
+fuller 'sync health' row in Settings (`apps/mobile/app/more/settings.tsx`)
+is explicitly out of this item's file ownership and not built here."
+Also adds item 1.3's read-only "Time Zone" row to the mobile Settings
+screen — `apps/mobile/app/more/settings.tsx` is this item's file, not
+1.3's, and 1.3's device-zone *capture* (`useProfile.ts`'s
+`getDeviceTimeZone`/`captureDeviceTimezone`) already landed separately.
+
+- **New "Sync" `SetGroup`** (between Data/export and Reminders): a
+  "Pending" row reading live `pendingCount` and a "Sync Issues" row
+  reading live `deadCount`, both from `syncManager.addListener` — the
+  same channel `SyncFailureBanner` already subscribes to, so the two
+  surfaces can never disagree. Persistent by design (not gated on
+  `deadCount > 0`) — the fix-plan text's "a persistent sync-health row"
+  — so a user can confirm the outbox is clean, not only be told when it
+  isn't.
+- **New Sync Issues modal**, opened from the row: lists every
+  dead-lettered entry (`operation · entity_type`, `last_error` or a
+  localized "Unknown error" fallback) with per-entry Retry/Discard wired
+  to `retryDeadLetterEntry`/`clearDeadLetterEntry` (zero callers before
+  `SyncFailureBanner` and this row — `07-F36`) and a "Retry All" when
+  more than one entry is dead; Retry additionally kicks
+  `syncManager.drainQueue()` so a retried entry doesn't wait for the
+  next network/foreground event. Matches this screen's own established
+  modal chrome (`presentationStyle="pageSheet"`, `styles.modal`/
+  `modalHeader`/`modalCancel`/`modalTitle`) rather than reusing
+  `SyncFailureBanner`'s bespoke pill styling. Given `onRequestClose`
+  from the start, since it's a new modal authored in this pass — the
+  five pre-existing `settings.tsx` modals `01-F14` lists as missing it
+  are untouched, out of this item's scope (that sweep is item 2.14).
+- **New read-only "Time Zone" row** in the Account group, showing
+  `Intl.DateTimeFormat().resolvedOptions().timeZone` directly — the
+  device's current zone, computed independently of `profiles.timezone`
+  (which reads the schema default until the device has relaunched at
+  least once since 1.3's capture landed) so the row can never show a
+  stale value the way the six 'UTC' production profiles did before that
+  capture existed.
+- **i18n.** Ten new keys (`settings.timezone`, `settings.sync*`) added
+  to all four locale files (en/fr/es/pt) — verified no locale is missing
+  a key `en.json` has (the drift 1.1's duplicate-key/missing-key check
+  is meant to catch).
+- **Not touched, still out of this item's file ownership:** the five
+  pre-existing `settings.tsx` modals' `onRequestClose` (`01-F14`,
+  item 2.14); `useCategories`/`useBudget`/`useRecurringRules` still
+  don't call `enqueue()` (noted as a gap in the section above, unchanged
+  here); `apps/web`'s Settings screen equivalent of the Time Zone row
+  (item 1.3's own web surface, a different file).
+
+### One recurrence engine — vendored-copy drift coverage (fix-plan item 1.5, Aug 9 2026)
+
+Closes the one gap the section above left open: `supabase/functions/
+_shared/recurrence.ts` (the Deno-vendored port of `nextOccurrence`/
+`occurrencesDue`, kept because this project has no import map letting
+Edge Functions resolve the `@voice-expense/shared` workspace package)
+had zero test coverage of its own — nothing enforced that a future edit
+to one copy without the other would be caught before it shipped, which
+is exactly the "copy the change over here" defect class fix-plan 1.5
+exists to close in the first place.
+
+- **New `packages/shared/src/domain/__tests__/recurrence.vendored.test.ts`**
+  (25 new vitest cases). Imports the vendored file directly via a
+  relative path (`../../../../../supabase/functions/_shared/recurrence`)
+  — it's plain TS with no Deno globals, so it needs no shimming. Two
+  layers: (1) the vendored copy's two exports run through the same
+  Jan-31-clamp/six-occurrence-walk/quarterly/leap-year/`interval`/DST/
+  `starts_at`-is-first-occurrence/dedup-window/bounded-catch-up fixtures
+  `recurrence.test.ts` asserts against the real module, same expected
+  values, so a regression in the vendored copy alone fails even if
+  nobody thought to update this file; (2) a cross-parity sweep that
+  imports **both** modules side by side and diffs their outputs against
+  *each other* over one shared table of cases — this is the layer that
+  actually catches drift with no fixture value to keep in sync by hand,
+  since it fails the moment the two copies disagree regardless of which
+  one is "right." One case in that table (a mid-month, non-clamping
+  anchor day) was added specifically because the Jan-31-style fixtures
+  everywhere else in both suites clamp identically whether or not a
+  day-of-month off-by-one is present — verified by hand-injecting a
+  `Math.min(d, days)` → `Math.min(d + 1, days)` drift into the vendored
+  copy: the original 24 mirrored-fixture cases all still passed (every
+  one of them month-end-anchored), and only the new unclamped-anchor
+  cross-parity case caught it. Reverted after confirming.
+- **Not touched:** the vendored file's own logic (already correct, per
+  the section above) and its `REGENERATED-FROM`/`DO NOT HAND-EDIT`
+  header, which already documents the keep-in-sync obligation this test
+  now enforces mechanically.
+
+**Tests** — this section's own addition is the test file described
+above. Run with `npx vitest run` from `packages/shared`, or
+`turbo test --filter=@voice-expense/shared`.
+
+### A typed Supabase client — Deno vendoring, edge functions, and env.ts (fix-plan item 1.2, Aug 9 2026)
+
+Resolves `06-F26`, `06-F33`, `07-F31`. The web/mobile clients were
+already parameterised with `<Database>` going into this pass (`apps/web/
+src/lib/{auth.ts,supabase/{client,server}.ts}`, `apps/mobile/src/lib/
+supabase.ts`) — what remained was the two Deno Edge Functions (typed
+`any` end to end) and the `env.ts` per app the item's own "Change" text
+calls for.
+
+- **Vendored `Database` type for Deno.** New `supabase/functions/_shared/
+  database.types.ts`, a `REGENERATED-FROM packages/shared/src/types/
+  database.types.ts` copy (same pattern as `_shared/recurrence.ts` —
+  Deno has no workspace resolution and no import map here). It is a
+  **patched**, not byte-for-byte, copy: the upstream file's own header
+  still claims parity with migrations 001-016, predating 017
+  (`local_day`, `NOT NULL`) and 020 (`occurrence_date`,
+  `anchor_day`/`anchor_weekday`/`anchor_time`) — both of which
+  `generate-recurring/index.ts` already writes to or needs. Every added
+  column is marked `// PATCHED` with the source migration, and the file
+  header explains the reconciliation: once `packages/shared`'s copy is
+  regenerated against the live schema (CI job `db-types`, currently
+  report-only pending `SUPABASE_ACCESS_TOKEN`), a fresh copy over this
+  file makes it a true byte-for-byte vendor again.
+- **`generate-recurring/index.ts` and `delete-user/index.ts` now
+  `createClient<Database>(...)`.** This caught a real, live bug the
+  untyped client was masking: the insert into `transactions` never set
+  `local_day` (migration 017, `NOT NULL`, no default) — every
+  recurring-generated row would have failed with a `23502` the moment a
+  real recurring rule existed (production has zero rules today, per the
+  audit, which is the only reason this hasn't fired yet). Fixed by
+  setting `local_day: occurrence.occurrenceDate` — the same civil day
+  `occurrence_date` uses, per migration 020's own comment that the two
+  mean the same thing. The local `RecurringRule` interface in
+  `generate-recurring/index.ts` is now `Omit<Database[...]['recurring_
+  rules']['Row'], 'direction' | 'frequency'> & {...narrowed enums...}`
+  — an alias of the generated row, not a hand-retyped duplicate, so a
+  column rename is a compile error here too (the same pattern
+  `packages/shared`'s hand-written domain types already use). The
+  profile-fetch's manual `as { currency_code?: string }` casts in
+  `generate-recurring/index.ts` are gone, not just hidden — the typed
+  `.select('currency_code, timezone').single()` already returns that
+  shape. `delete-user/index.ts`'s per-table delete loop was split into a
+  `user_id`-keyed loop plus a separate `profiles` (`id`-keyed) call
+  rather than one loop over a `table` × `column` union — a strongly-typed
+  `.eq()` checks its column argument against one specific table's row
+  shape, and a shared loop body can only offer the union of all seven
+  tables' columns at once, which doesn't type-check (verified with a
+  scratch `tsc --strict` run against the real `@supabase/supabase-js`
+  package before committing to the split; Deno itself has no local
+  `deno check` step in this repo to gate on).
+- **New `apps/web/src/lib/env.ts`.** Two getters, not one flat
+  validator: `getSupabaseEnv()` (`NEXT_PUBLIC_SUPABASE_URL`/
+  `NEXT_PUBLIC_SUPABASE_ANON_KEY`) is safe to import from a `'use
+  client'` module since Next.js inlines `NEXT_PUBLIC_*` into the browser
+  bundle by design; `getOpenAIEnv()` (`OPENAI_API_KEY`) is server-only
+  and must never be imported by client code, or Next.js would replace
+  the reference with `undefined` in the browser bundle and the module
+  would throw on every page load instead of the secret being (correctly)
+  absent there. Each throws a named `MissingEnvError` listing every
+  missing key, not just the first, and caches its validated result so
+  the check only runs once per client-construction site. Wired into
+  every bare `process.env.X!` in `apps/web/src/lib/**` and the AI API
+  routes: `supabase/{client,server}.ts`, `auth.ts` (whose module-scope
+  construction is what the fix-plan text calls out — a missing variable
+  used to take down all three AI routes with an opaque 500, since they
+  all import it for `validateToken`), and the three `apps/web/src/app/
+  api/ai/*/route.ts` files' `new OpenAI({ apiKey: ... })`. Mobile's
+  existing `requireEnv` (`apps/mobile/src/lib/supabase.ts:5-14`) already
+  does the same job with named errors — left in place per the item's own
+  "only if trivial, else leave" text; extracting it touches files outside
+  this item's ownership for no functional gain.
+- **Not touched:** `packages/shared/src/types/database.types.ts` itself
+  (regenerating it needs a Management API token this session doesn't
+  have, and the file is outside this item's file ownership) — the
+  `local_day`/`occurrence_date`/anchor-column staleness is real and
+  tracked by CI's `db-types` job; the Deno vendored copy's `// PATCHED`
+  markers are the interim fix for the two Edge Functions specifically,
+  not a substitute for regenerating the source.
+
+**Tests**: no new test file — the Edge Functions have no Deno test
+runner wired into this repo (`deno check`/`deno test` isn't part of any
+CI job), so correctness here was verified by copying the final files
+into a scratch `tsc --strict` check against the real
+`@supabase/supabase-js` npm package (same v2 API surface the `esm.sh`
+import resolves to) before applying the edits, then deleting the
+scratch files. `apps/web`'s existing suites plus the new
+`src/lib/__tests__/env.test.ts` (7 cases: both-set, missing-one,
+missing-both naming every key, caching, and `getOpenAIEnv`/
+`getSupabaseEnv` independence) run with `npx vitest run` from
+`apps/web`, or `turbo test`/`turbo typecheck` from the repo root.
+
+### A typed parse boundary — flow_type, and closing the remaining item 1.7 gaps (fix-plan item 1.7, Aug 9 2026)
+
+Audited the prior session's item-1.7 pass (section above) against the
+item's full text and closed what it explicitly left open or hadn't
+started. Confirmed already correct and unchanged: the third boundary in
+`createTransaction`, `response_format: json_schema`, the `finish_reason
+=== 'length'` retry, the pinned-model-with-env-override pattern, 60/20
+per-hour rate limiting on the parse/scan routes, migration
+`021_currency_code_check.sql`, and `clearParseCache()` (exported from
+`packages/ai`, wired into `useAuth.ts`'s `resetLocalState`).
+
+- **`flow_type` — the one part-1 sub-item not yet started.** New
+  `FlowType` union in `packages/shared/src/types/ai.ts`:
+  `'expense' | 'income' | 'transfer_out' | 'transfer_in' | 'refund' |
+  'reimbursement'`. `ParsedExpense.direction` is now **derived**, never
+  read from the model — `validateParsedExpense` no longer checks a raw
+  `direction` field at all; it checks `flow_type` against the six-value
+  enum and calls the new exported `deriveDirectionFromFlowType` (one
+  `Record<FlowType, TransactionDirection>` lookup:
+  expense/transfer_out → debit, income/transfer_in/refund/reimbursement
+  → credit). `parsedExpenseSchema.ts`'s `response_format` schema drops
+  `direction` entirely and requires `flow_type` instead, built from the
+  same `FLOW_TYPE_VALUES` the validator checks against — the model has
+  no field left to get inconsistent with its own classification.
+  `prompt.ts`'s direction rule became a `flow_type` rule (the Schwab
+  investing worked example now reads "→ flow_type 'transfer_out'"); both
+  scan-prompt JSON templates (receipt/paycheck) swapped their hardcoded
+  `"direction"` line for `"flow_type": "expense"`/`"income"`.
+  `localParser.ts` (the non-AI tier-1 path) and the two non-AI
+  `ParsedExpense` producers outside this item's file ownership but
+  directly broken by the type becoming required —
+  `apps/mobile/app/(tabs)/record.tsx`'s Shortcuts deep-link injection and
+  `apps/mobile/src/hooks/useNotificationListener.ts`'s notification
+  candidate — now set `flow_type: 'expense'` and derive `direction` from
+  it via the same exported function, rather than hand-picking `'debit'`
+  next to a hardcoded `flow_type` and risking the two drifting apart.
+  Both are minimal, mechanical additions (one field each); left
+  unmodified otherwise since they're outside this item's ownership.
+  Third boundary (`validateTransactionWriteFields`) is unchanged — it
+  validates an already-resolved `direction` on a `Transaction` write, not
+  a raw model response, so it has no `flow_type` concept and needs none.
+- **Golden corpus wiring** (`packages/ai/src/__tests__/goldenCorpus/
+  corpus.ts`, item 1.1's fixture, not this item's file ownership but
+  directly affected): its own header previously said `flow_type` was
+  "Stage 2 work, not 1.1's" and deliberately unasserted, written before
+  this item added the field. `passingRow`'s generated `rawResponse` now
+  sets `flow_type` (from a row's explicit `expected.flowType`, else
+  defaulted from `direction`: credit→income, debit→expense);
+  `goldenCorpus.test.ts`'s `runRow` asserts `result.flow_type` wherever
+  a row names one explicitly (currently `f1-schwab-direction` and
+  `f7-schwab-note`, both `transfer_out`). `liveVerify.ts` (the manual,
+  not-CI on-demand live-model check) compared `raw.direction` against
+  `expected.direction`, which would always fail once the prompt stopped
+  asking for `direction` — it now derives direction from the live
+  response's `flow_type` via the same `deriveDirectionFromFlowType`
+  production uses, plus a direct `flow_type` comparison where a row
+  names one.
+- **`packages/ai/src/index.ts`** now also exports
+  `deriveDirectionFromFlowType` and `FLOW_TYPE_VALUES` — needed by the
+  two mobile call sites above and by `packages/ai/src/localParser.ts`.
+
+**Tests**: `validateParsedExpense.test.ts` — the old `direction`-enum
+regression cases were rewritten for the field they actually gate now
+(`flow_type: 'expensive'` replaces `direction: 'expense'` as "the
+plausible-looking-but-wrong enum value"; a new case confirms a raw
+`direction` the model returns is read by nothing and produces no
+`direction`-field error, only a missing-`flow_type` one). New
+`deriveDirectionFromFlowType`/`flow_type → direction derivation`
+describe blocks: all six flow types table-tested end to end through
+`validateParsedExpense`, a rejected out-of-enum value, and the Schwab
+transfer_out/"sold $300 of my S&P 500 index fund" transfer_in worked
+examples. 154 passed | 1 expected fail (the still-open F30 row,
+unrelated) | 2 todo, run with `npx vitest run` from `packages/ai`. Full
+monorepo `turbo test` (4 packages, 5 with desktop's no-op) and `turbo
+typecheck` (5 packages) both clean after these changes.
+
+### Items 1.2 + 1.7 verification pass, and the one remaining gap (Aug 9 2026)
+
+Re-audited both items' full text end to end against the two prior
+sessions' entries above (Deno vendoring/env.ts for 1.2; flow_type for
+1.7). Everything both entries claim was independently re-verified by
+reading the actual files, not just the changelog: `_shared/
+database.types.ts`'s `PATCHED` columns match what `generate-recurring/
+index.ts`'s insert call actually writes; `generate-recurring` and
+`delete-user` both construct `createClient<Database>(...)`;
+`apps/web/src/lib/env.ts` is imported by every module-scope Supabase/
+OpenAI client construction in `apps/web/src/lib/**` and the three AI
+routes, with zero bare `process.env.X!` remaining in that surface;
+`validateTransactionWriteFields` runs as the third boundary in
+`useTransactions.ts`'s `createTransaction`; `response_format:
+json_schema` and the `finish_reason === 'length'` retry
+(`aiCompletion.ts`) are wired into both parse routes; both routes read
+their model id from an env var with an explicit pinned-version default
+(`AI_PARSE_MODEL`/`AI_SCAN_MODEL` ?? `gpt-4o-mini-2024-07-18`);
+per-user rate limiting is live at 60/hr (parse) and 20/hr (scan), the
+two routes item 1.7's own "Surfaces to update" list names (the item's
+prose also mentions "30 asks/hr" for `ask-murmur`, but that route isn't
+in 1.7's surfaces list or its own item's — 2.10 — either; left alone
+as out of both items' scope rather than added speculatively);
+`clearParseCache` is exported from `packages/ai`'s barrel and called
+from `useAuth.ts`'s `resetLocalState` on sign-out; migration
+`021_currency_code_check.sql` already exists (numbers 021-023 were
+claimed by this and two other items — category `kind` and the
+FX-backfill cron — landing in the same window, so "next free number"
+by the time of this pass was already spoken for). `packages/ai`'s
+`npx vitest run` is unaffected (154 passed | 1 expected fail | 2 todo,
+same as the prior entry) and `flow_type` derivation already has
+exhaustive table-driven coverage — no test gap to extend.
+
+- **The one part of 1.7's text neither prior pass closed:** "pin the
+  model to an explicit version... **and record the model id alongside
+  ai_confidence**." Nothing logged the two together. Added one
+  `console.log` on the success path of `parse-expense/route.ts` and
+  `parse-scan/route.ts` each, right after `validateParsedExpense`
+  passes: `model=${MODEL} confidence=${result.confidence}
+  retried=${completion.retried}`. Log line only, no new DB column — no
+  consumer reads a model id at query time, this is an observability
+  trail for tracing a classification drift back to a model version
+  change, and no migration in either item's file list makes room for a
+  persisted column.
+
+**Tests**: `apps/web`'s `npx tsc --noEmit` clean after the two log-line
+edits. No behavioral change, so no new test.
+
+### Items 1.8 + 1.6 + 1.5 verification pass — no gap survived (Aug 9 2026)
+
+Re-audited all three items' full text against the prior sessions' entries
+above ("Mobile presentation primitives — adoption...", "An outbox that
+can report failure — Settings sync-health row...", "One recurrence
+engine — vendored-copy drift coverage") by reading the actual files, not
+the changelog, and running both suites.
+
+- **1.8.** `VoiceConfirmModal.tsx` renders through `<BottomSheet>`
+  (backdrop/handle/header/`onRequestClose` all owned by the primitive)
+  and its amount field carries `inputAccessoryViewID={NUMERIC_ACCESSORY_ID}`
+  with a `<NumericAccessory>` in the sheet body; `transaction/edit.tsx`'s
+  amount field is wired the same way, footer pinned outside the
+  `ScrollView` per `01-F23`. `components/__tests__/BottomSheet.test.ts`'s
+  four cases (`Modal` renders with `onRequestClose` wired; firing it
+  flips `visible` false; backdrop press closes; header Cancel closes) is
+  `01-F14`'s own specified regression test, run against the primitive.
+- **1.6.** `settings.tsx` has the "Sync" `SetGroup` (live `pendingCount`/
+  `deadCount` off `syncManager.addListener`, matching `SyncManager.notify`'s
+  actual `(syncing, pendingCount, deadCount)` callback shape) and the
+  Sync Issues modal with per-entry retry/discard wired to
+  `retryDeadLetterEntry`/`clearDeadLetterEntry`, plus the read-only
+  "Time Zone" row reading `Intl.DateTimeFormat().resolvedOptions().timeZone`
+  directly. All ten `settings.timezone`/`settings.sync*` i18n keys
+  present in all four locale files.
+- **1.5.** `packages/shared/src/domain/__tests__/recurrence.vendored.test.ts`
+  imports `supabase/functions/_shared/recurrence.ts` by relative path and
+  runs the Jan-31-clamp/six-occurrence-walk/quarterly/leap-year/interval/
+  DST/dedup-window/bounded-catch-up fixtures against it, plus a
+  cross-parity sweep diffing the vendored and real modules against each
+  other over one shared case table.
+- **Considered and deliberately left alone:** `settings.tsx`'s five
+  pre-existing bare `<Modal>`s still lack `onRequestClose` (`01-F14`).
+  Both prior entries above name this exact gap and defer it to item
+  2.14 by design (`settings.tsx`, `insights.tsx`, `BudgetEditorModal.tsx`
+  and `CategoryPicker.tsx` get the same treatment together, not
+  `settings.tsx` alone out of turn) — patched it in this pass to
+  double-check the "no workaround" call, then reverted rather than
+  create a mixed state (this file done "the raw-prop way" while the
+  other three files in the same finding wait for "the primitive way")
+  ahead of 2.14's actual sweep.
+
+**Tests**: `apps/mobile` — `npx vitest run` 69/69 passed (10 files),
+`npx tsc --noEmit -p tsconfig.json` clean. `packages/shared` —
+`npx vitest run` 133/133 passed (9 files, including the 25-case
+vendored-copy suite). No code change from this pass — everything both
+items' "Done when" and regression-test text asks for was already
+landed and green.
+
+### One definition of "a day", "a week" and "a month" — adoption at the item-named surfaces (fix-plan item 1.3, Aug 9 2026)
+
+`period.ts` itself (Stage 1) was already solid; this pass verified and
+closed the adoption gap at every surface this item names, file by file
+against the plan's own "Change" and "Surfaces to update" text.
+
+**Already correctly adopted (verified, not re-done):**
+- **Web timezone capture** — `apps/web/src/components/TimezoneSync.tsx`,
+  mounted from `dashboard/layout.tsx`, writes `Intl.DateTimeFormat().
+  resolvedOptions().timeZone` to `profiles.timezone` via the same plain
+  `supabase.from('profiles').update(...)` path every other web Settings
+  save uses (there is no separate "profile update" abstraction on web to
+  route through — this *is* that path) whenever it drifts from what's
+  stored, fire-and-forget, on every authenticated dashboard load.
+- **Web Settings "Time zone" row** — `dashboard/settings/page.tsx:418-426`,
+  read-only, falls back to the browser's own resolved zone for the one
+  render before `TimezoneSync`'s capture lands so it never shows a stale
+  `'UTC'`.
+- **`transactions.local_day` written at insert time by both client
+  writers** — `apps/mobile/src/hooks/useTransactions.ts`'s
+  `createTransaction` (`localDay(now, getDeviceTimeZone())`, carried on
+  the sync-outbox payload since the local SQLite `Transaction` shape
+  doesn't have the column yet — Stage 2 reads) and
+  `apps/web/src/app/dashboard/transactions/page.tsx`'s manual-add insert
+  (`localDay(transactedAt, tz)`, `tz = profile?.timezone || 'UTC'`).
+- **`period.ts` adoption at the named web surfaces** —
+  `apps/web/src/lib/monthIso.ts` is a thin, tz-required wrapper over
+  `currentMonthIso`/parsing, no local `Date` math left; `dashboard/
+  page.tsx` and `dashboard/transactions/page.tsx` both compute month
+  windows via `monthBounds(monthIso, tz)` and derive `monthStart`/
+  `monthEnd` from the half-open bounds — the `new Date(anchorY,
+  anchorM+1, 0, 23,59,59,999)` pattern is gone (only survives in a
+  comment explaining what it replaced).
+- **`HistoryHeatmap.tsx` weekday labels** — `weekdayLabels(locale,
+  'narrow')` replaces the hardcoded Sunday-first `history.weekday_labels`
+  string; that key is gone from all four locale JSONs (`en`/`es`/`fr`/
+  `pt`) and nothing else references it.
+
+**Gaps actually closed this pass** (found by re-running `npx eslint`
+across this item's ownership — the module was solid, but two of its own
+named surfaces were left with real, unexempted rule violations, meaning
+a plain lint run failed before this pass):
+- **`fx.ts:79` tz threading (part 2 of the item, "thread tz from
+  callers")** — `apps/mobile/src/hooks/useTransactions.ts`'s
+  `createTransaction` called `snapshotFx(now, ..., fields.amount)` with
+  no `tz`, so the FX rate date fell back to a bare UTC slice one line
+  above the exact civil-day `local_day` value computed with
+  `getDeviceTimeZone()`. Hoisted that zone lookup into one `const tz`
+  reused by both calls, so the FX snapshot's rate date and the stored
+  `local_day` can no longer disagree about which day a transaction
+  belongs to.
+- **`local/period-restrictions` severity is `'error'` for
+  `apps/mobile/**` and `apps/web/**` (part of item 7), but two files this
+  item owns still had live, un-exempted violations** —
+  `apps/mobile/src/components/HistoryHeatmap.tsx`'s month-grid layout
+  math (`monthParam`, `dailyTotals`, the `heatmapMonth` state and its
+  prev/next stepping, `firstWeekday`/`daysInMonth` — genuine Stage 2
+  debt: this component has no `tz` threaded into it, and the grid math
+  is a bigger rewrite than this item's own scope) and
+  `useTransactions.ts`'s `useMonthSummary` (dead export, zero callers
+  anywhere in the app, still `new Date(now.getFullYear(), ...)`). Neither
+  file had the exemption `eslint.config.mjs`'s own header promises for
+  files this item owns ("own file: an inline eslint-disable at the top")
+  — `HistoryHeatmap.tsx` even had a comment pointing at
+  `eslint.config.mjs` for an exemption that was never actually added
+  there or anywhere. Added a file-top `/* eslint-disable
+  local/period-restrictions */` in `HistoryHeatmap.tsx` (the debt spans
+  most of the file) and a scoped `eslint-disable-next-line` on the one
+  `useMonthSummary` line in `useTransactions.ts` (kept scoped, not
+  file-level, since the rest of that file — the `local_day` write — is
+  genuinely migrated and should stay linted). Both marked "Stage 2
+  (2.4/2.14) migration pending" per this item's own convention.
+- Verified clean, no changes needed: `apps/web/src/components/
+  MonthPicker.tsx` and every non-lens file under `apps/web/src/**` this
+  item owns — `npx eslint apps/web/src apps/mobile/src apps/mobile/app
+  packages` now reports **0 errors** (14 pre-existing warnings, all
+  `react-hooks/exhaustive-deps`/`no-img-element`/`no-control-regex`
+  directives unrelated to this item).
+
+**Deliberately not touched, confirmed out of this item's file
+ownership:** `apps/mobile/src/services/recurringCatchUp.ts` and
+`apps/mobile/src/services/fxBackfill.ts`'s own `snapshotFx` calls (same
+missing-`tz` shape as the one fixed here, but neither file is
+`apps/web/src/**` or one of this item's two named mobile files); the
+mobile Settings "Time zone" row (added under the "1.8 + 1.6 + 1.5
+verification pass" entry above, by the agent that owns that file);
+`apps/mobile/src/components/MiniBars.tsx` (named in the item's full
+surfaces list but not in this item's file-ownership grant); the full
+HistoryHeatmap.tsx grid rewrite and the web calendar/budgets/export/Ask
+Murmur windows (2.3/2.4/2.5/2.10/2.11/2.14/2.15, per
+`eslint.config.mjs`'s Stage-2 override block).
+
+**Tests**: `apps/mobile`'s `npx vitest run src/hooks/__tests__/
+useTransactions.test.ts` → 3 passed (unaffected by the `tz` hoist —
+the test's only transaction is same-currency, which short-circuits
+`snapshotFx` before the rate-date argument matters). `npx tsc --noEmit
+-p apps/mobile/tsconfig.json` clean. No new test added: both fixes are
+either a values-already-computed reuse (`tz`) or a lint-only exemption,
+neither changes runtime behavior.
 
 *End of Plan*

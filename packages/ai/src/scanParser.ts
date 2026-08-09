@@ -1,4 +1,5 @@
-import type { ParsedExpense } from '@voice-expense/shared'
+import type { ParsedExpense, ParseFieldError } from '@voice-expense/shared'
+import { assertParsedExpense, ParseValidationError } from './validateParsedExpense'
 
 export type ScanType = 'receipt' | 'paycheck'
 
@@ -25,8 +26,23 @@ export async function parseScan(opts: ScanOptions): Promise<ParsedExpense> {
   })
 
   if (!response.ok) {
+    if (response.status === 422) {
+      // The route already ran this response through `validateParsedExpense`
+      // and rejected it — carry the field errors through as a typed throw.
+      let body: { errors?: ParseFieldError[] } = {}
+      try {
+        body = (await response.json()) as { errors?: ParseFieldError[] }
+      } catch {
+        // Malformed error body — fall through with an empty error list.
+      }
+      throw new ParseValidationError(body.errors ?? [])
+    }
     throw new Error(`Scan parse failed: ${response.status}`)
   }
 
-  return response.json() as Promise<ParsedExpense>
+  const raw: unknown = await response.json()
+  // Second boundary, same reasoning as parser.ts: never trust a model
+  // response into a save path unchecked, even one the route already
+  // approved.
+  return assertParsedExpense(raw)
 }

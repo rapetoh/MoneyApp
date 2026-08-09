@@ -4,11 +4,14 @@ import { colors, font, cat as catTokens, type CategoryTint } from '../../lib/the
 import { tintFor } from '../../lib/categories'
 import {
   type LensProps,
+  type LensTxn,
   monthDebits,
   monthCredits,
+  monthTxns,
+  monthSummary,
   groupByCategory,
 } from './types'
-import { aggAmount } from '@voice-expense/shared'
+import { isFxPending, isSpend, classifyFlow } from '@voice-expense/shared'
 
 // XMind-style radial diagram of the user's whole financial month.
 // Center node = the user; four branches = Income / Expenses / Saved &
@@ -19,6 +22,23 @@ import { aggAmount } from '@voice-expense/shared'
 // any empty area of the dotted background and zooms with the trackpad
 // or mouse wheel — same model as Figma / tldraw / Stitch / Claude
 // Design. Clicking a node never starts a pan.
+//
+// ROOT CAUSE (fix-plan 1.4, audit finding 05-F2, production defect
+// reported 2026-08-08): `buildBranches` computed `expenseTotal`/
+// `expenseByCat` as `Σ aggAmount()` over every `debit`, with no concept
+// of a transfer. The owner's $300 Charles Schwab debit
+// (category "Savings & Investing") landed in `expenseTotal` exactly
+// like the Starbucks $50 and Xtream $42 debits — turning the true $92
+// month-to-date spend into $392 — while the adjacent "Saved & invested"
+// branch computed `max(0, income - allDebits)`, a residual with **zero
+// connection** to the Savings & Investing rows, so it showed $0 instead
+// of the $300 that actually moved to savings. Fixed below by
+// classifying every transaction through `classifyFlow()`/`isSpend()`
+// off `categories.kind`: a transfer-kind transaction is now excluded
+// from the Expenses grouping entirely and its total instead populates
+// the Saved & invested branch and its own category/merchant breakdown,
+// so Expenses correctly totals $92 (Starbucks + Xtream) and Saved &
+// invested correctly totals $300 (Schwab).
 
 interface Branch {
   label: string
@@ -50,36 +70,27 @@ function clamp(v: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, v))
 }
 
-function buildBranches(p: LensProps, displayName: string): Branch[] {
-  const debits = monthDebits(p)
-  const credits = monthCredits(p)
-  const incomeTotal = credits.reduce((s, t) => s + aggAmount(t), 0)
-  const expenseTotal = debits.reduce((s, t) => s + aggAmount(t), 0)
-  const saved = Math.max(0, incomeTotal - expenseTotal)
-
-  const fmt = (v: number) => fmtMoney(v, p.currency, p.locale)
-
-  const incomeByCat = groupByCategory(credits)
-  const incomeSubs = topN(
-    Object.entries(incomeByCat).map(([name, amt]) => ({ name, amt })),
+/** Category+merchant breakdown for a flow-classified slice of `txns` —
+ *  shared shape for the Expenses and Saved & invested branches so a
+ *  transfer-kind category gets the exact same leaf structure an
+ *  ordinary spend category gets, just under a different branch. */
+function categorySubs(
+  txns: LensTxn[],
+  fmt: (v: number) => string,
+  n: number,
+): Array<{ label: string; leaves: string[] }> {
+  const byCat = groupByCategory(txns)
+  return topN(
+    Object.entries(byCat).map(([name, amt]) => ({ name, amt })),
     (x) => x.amt,
-    3,
-  ).map((s) => ({
-    label: `${s.name} · ${fmt(s.amt)}`,
-    leaves: [],
-  }))
-
-  const expenseByCat = groupByCategory(debits)
-  const expenseSubs = topN(
-    Object.entries(expenseByCat).map(([name, amt]) => ({ name, amt })),
-    (x) => x.amt,
-    4,
+    n,
   ).map((s) => {
     const merchTotals: Record<string, number> = {}
-    for (const t of debits) {
+    for (const t of txns) {
       if ((t.category_name ?? 'Uncategorized') !== s.name) continue
+      if (isFxPending(t)) continue
       const m = t.merchant ?? 'Other'
-      merchTotals[m] = (merchTotals[m] ?? 0) + aggAmount(t)
+      merchTotals[m] = (merchTotals[m] ?? 0) + (t.amount_in_profile_currency as number)
     }
     // Keep up to 25 merchants per category — enough to see a real
     // distribution at "show all" without exploding the canvas. The
@@ -92,12 +103,52 @@ function buildBranches(p: LensProps, displayName: string): Branch[] {
     ).map((m) => `${m.m} · ${fmt(m.a)}`)
     return { label: `${s.name} · ${fmt(s.amt)}`, leaves: sorted }
   })
+}
+
+function buildBranches(p: LensProps, displayName: string): Branch[] {
+  const summary = monthSummary(p)
+  const fmt = (v: number) => fmtMoney(v, p.currency, p.locale)
+
+  // Split by classified flow (fix-plan 1.4), not raw direction — a
+  // transfer-kind category (Savings & Investing) is neither spend nor
+  // income, so it must never appear in either of these two lists. See
+  // this file's header comment for the production defect this fixes.
+  const spendDebits = monthDebits(p).filter((t) => isSpend(t, t.category_kind))
+  const incomeCredits = monthCredits(p).filter(
+    (t) => classifyFlow(t, t.category_kind) === 'income',
+  )
+  const transferTxns = monthTxns(p).filter(
+    (t) => classifyFlow(t, t.category_kind) === 'transfer',
+  )
+
+  const incomeTotal = summary.income
+  const expenseTotal = summary.expense
+  const transferTotal = summary.transfers
+  const netSaved = summary.saved
+
+  const incomeSubs = categorySubs(incomeCredits, fmt, 3).map((s) => ({
+    label: s.label,
+    leaves: [],
+  }))
+  const expenseSubs = categorySubs(spendDebits, fmt, 4)
+  const transferSubs = categorySubs(transferTxns, fmt, 4)
 
   const recurringMonthly = p.recurring
     .filter((r) => r.frequency === 'monthly')
     .reduce((s, r) => s + r.amount, 0)
-  const savedSubs: Array<{ label: string; leaves: string[] }> = []
-  if (saved > 0) savedSubs.push({ label: `Net saved · ${fmt(saved)}`, leaves: [] })
+  // Transfer-kind categories (the real money moved to savings/
+  // investing this month) lead the branch; "Net saved" is the
+  // secondary, unfloored income-minus-expense figure — a different
+  // number by definition (money.ts's `saved` doesn't subtract
+  // transfers), kept here because it's still useful context, with its
+  // sign rendered explicitly rather than hidden by a `> 0` clamp.
+  const savedSubs: Array<{ label: string; leaves: string[] }> = [...transferSubs]
+  if (netSaved !== 0) {
+    savedSubs.push({
+      label: `Net saved · ${netSaved >= 0 ? fmt(netSaved) : `−${fmt(Math.abs(netSaved))}`}`,
+      leaves: [],
+    })
+  }
   if (recurringMonthly > 0) {
     savedSubs.push({
       label: `Recurring outflow · ${fmt(recurringMonthly)}/mo`,
@@ -134,7 +185,7 @@ function buildBranches(p: LensProps, displayName: string): Branch[] {
       side: 'right',
       y: 1,
       color: colors.accent,
-      total: saved > 0 ? saved : null,
+      total: transferTotal > 0 ? transferTotal : netSaved > 0 ? netSaved : null,
       subs: savedSubs,
     },
     {
@@ -299,9 +350,7 @@ export function MindMapLens({ props, displayName }: { props: LensProps; displayN
     })
   }
 
-  const incomeTotal = monthCredits(props).reduce((s, t) => s + aggAmount(t), 0)
-  const expenseTotal = monthDebits(props).reduce((s, t) => s + aggAmount(t), 0)
-  const net = incomeTotal - expenseTotal
+  const net = monthSummary(props).saved
 
   const branchEnd = (b: Branch): [number, number] => {
     const x = b.side === 'left' ? 460 : CANVAS_W - 460

@@ -208,6 +208,10 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     fontFamily: Typography.fontFamily.sansBold,
+    // Explicit fontWeight pairing so the title survives a fallback where
+    // the named face doesn't resolve — see
+    // docs/audit-2026-08-08/01-mobile-ui-and-layout.md F5.
+    fontWeight: '700',
     fontSize: Typography.size.md,
     color: Colors.text,
   },

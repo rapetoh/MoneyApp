@@ -2,7 +2,8 @@
 import { useState, useMemo, useEffect, useCallback } from 'react'
 import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
-import { snapshotFx } from '@voice-expense/shared'
+import { snapshotFx, localDay, monthBounds } from '@voice-expense/shared'
+import type { Database } from '@voice-expense/shared'
 import { createClient } from '../../../lib/supabase/client'
 import { colors, font, radius } from '../../../lib/theme'
 import { Toolbar } from '../../../components/Toolbar'
@@ -11,7 +12,7 @@ import { Chip } from '../../../components/Chip'
 import { Money } from '../../../components/Money'
 import { Icon } from '../../../components/Icons'
 import { MonthPicker } from '../../../components/MonthPicker'
-import { currentMonthIso, parseMonthIso } from '../../../lib/monthIso'
+import { currentMonthIso } from '../../../lib/monthIso'
 
 type Txn = {
   id: string
@@ -44,10 +45,19 @@ const PAYMENT_METHODS: Array<{ value: string; label: string }> = [
 
 const NEW_CATEGORY = '__new__'
 
-/** transacted_at ISO → value for a datetime-local input, in local time. */
+/** transacted_at ISO → value for a datetime-local input, in local time.
+ *  Deliberately the browser's own local time, not `profile.timezone`:
+ *  the native `datetime-local` control has no concept of a zone and
+ *  always displays/edits in whatever zone the device itself is in, so
+ *  matching that (rather than routing through period.ts) is the correct
+ *  behaviour here, not unconverted debt — this is a form round-trip, not
+ *  a canonical "which day does this transaction belong to" read. Still
+ *  flagged by the blunt AST rule below since it can't see that intent.
+ */
 function toLocalInputValue(iso: string): string {
   const d = new Date(iso)
   const pad = (n: number) => String(n).padStart(2, '0')
+  // eslint-disable-next-line local/period-restrictions -- Stage 2 (2.4/2.14) migration pending; see the doc comment above for why this one is a deliberate exception, not debt.
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
@@ -95,15 +105,18 @@ export default function TransactionsPage() {
   const initialQ = searchParams.get('q') ?? ''
   const filterParam = (searchParams.get('filter') as FilterKey) || 'all'
   const monthParam = searchParams.get('month') ?? null
-  const monthIso = monthParam && /^\d{4}-\d{2}$/.test(monthParam) ? monthParam : currentMonthIso()
+  const [transactions, setTransactions] = useState<Txn[]>([])
+  const [categories, setCategories] = useState<Cat[]>([])
+  const [profile, setProfile] = useState<{ currency_code?: string; locale?: string; timezone?: string | null } | null>(null)
+  // profiles.timezone (fix-plan 1.3 part 1) — see TimezoneSync in
+  // dashboard/layout.tsx. 'UTC' matches the column default for the
+  // render(s) before `profile` has loaded or that capture has landed.
+  const tz = profile?.timezone || 'UTC'
+  const monthIso = monthParam && /^\d{4}-\d{2}$/.test(monthParam) ? monthParam : currentMonthIso(tz)
   // "All time" mode = no ?month=. Picking a month from the picker writes
   // ?month=YYYY-MM; the trash/clear button removes it. We check the raw
   // param so the default view is "All time" rather than "current month".
   const monthFilterActive = !!monthParam && /^\d{4}-\d{2}$/.test(monthParam)
-  const { year: monthY, month: monthM } = parseMonthIso(monthParam ?? undefined)
-  const [transactions, setTransactions] = useState<Txn[]>([])
-  const [categories, setCategories] = useState<Cat[]>([])
-  const [profile, setProfile] = useState<{ currency_code?: string; locale?: string } | null>(null)
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState(initialQ)
   const [filter, setFilter] = useState<FilterKey>(filterParam)
@@ -149,7 +162,7 @@ export default function TransactionsPage() {
         .select('id, name, color')
         .eq('user_id', user.id)
         .eq('is_archived', false),
-      supabase.from('profiles').select('currency_code, locale').eq('id', user.id).single(),
+      supabase.from('profiles').select('currency_code, locale, timezone').eq('id', user.id).single(),
     ])
     setTransactions((txns.data ?? []) as Txn[])
     setCategories((cats.data ?? []) as Cat[])
@@ -262,7 +275,7 @@ export default function TransactionsPage() {
     if (existing) return { id: existing.id, error: null }
     const { data, error } = await supabase
       .from('categories')
-      .insert({ user_id: userId, name, name_normalized: normalized })
+      .insert({ user_id: userId, client_id: crypto.randomUUID(), name, name_normalized: normalized })
       .select('id')
       .single()
     if (error || !data) return { id: null, error: error?.message ?? 'Could not create category' }
@@ -329,11 +342,25 @@ export default function TransactionsPage() {
       const id = crypto.randomUUID()
       const now = new Date().toISOString()
       const currency = profile?.currency_code ?? 'USD'
+      // profiles.timezone (fix-plan 1.3 part 1) — see TimezoneSync in
+      // dashboard/layout.tsx for how it gets kept current. 'UTC' matches
+      // the column default for the rare render before that capture lands.
+      const tz = profile?.timezone || 'UTC'
       // Same-currency short-circuits to rate 1.0 without a network
       // call; the manual web form always enters amounts in the
       // profile currency, so this never blocks the save.
-      const fx = await snapshotFx(transactedAt, currency, currency, parsed)
-      const { error } = await supabase.from('transactions').insert({
+      const fx = await snapshotFx(transactedAt, currency, currency, parsed, tz)
+      // `database.types.ts` still reflects migration 016 (its own header
+      // comment explains why — regeneration needs the Supabase CLI + a
+      // live project token, outside this item's reach) and hasn't caught
+      // up to column 017's `local_day` yet, so the typed `.insert()`
+      // below doesn't know about it. The cast targets the *real* `Insert`
+      // shape (not `any`) — every other field is still checked structurally
+      // against it; only the not-yet-generated column is exempted.
+      // Regenerating `database.types.ts` once 017+ are applied removes
+      // the need for this cast (same posture as `apps/mobile/src/services/
+      // sync/untypedClient.ts`'s equivalent gap).
+      const payload = {
         id,
         user_id: user.id,
         ...shared,
@@ -343,11 +370,19 @@ export default function TransactionsPage() {
         amount_in_profile_currency: fx?.amount_in_profile_currency ?? null,
         fx_rate_to_profile: fx?.fx_rate_to_profile ?? null,
         fx_rate_date: fx?.fx_rate_date ?? null,
+        // transactions.local_day (migration 017, NOT NULL) — the civil
+        // day this transaction belongs to in the profile's zone, written
+        // once at create time (fix-plan 1.3 part 3). Never recomputed by
+        // a reader.
+        local_day: localDay(transactedAt, tz),
         client_id: id,
         client_created_at: now,
         version: 1,
         is_deleted: false,
-      })
+      }
+      const { error } = await supabase
+        .from('transactions')
+        .insert(payload as Database['public']['Tables']['transactions']['Insert'])
       setSaving(false)
       if (error) {
         setFormError(error.message)
@@ -386,11 +421,15 @@ export default function TransactionsPage() {
     await load()
   }
 
-  const monthStart = useMemo(() => new Date(monthY, monthM, 1, 0, 0, 0, 0), [monthY, monthM])
-  const monthEnd = useMemo(
-    () => new Date(monthY, monthM + 1, 0, 23, 59, 59, 999),
-    [monthY, monthM],
-  )
+  // Half-open UTC bounds from period.ts (fix-plan 1.3) — replaces the old
+  // `new Date(monthY, monthM+1, 0, 23,59,59,999)` pattern, which built the
+  // month's end in the browser's own local zone rather than the profile's
+  // (audit 04-F5/04-F6). `monthEnd` stays the *inclusive* last instant of
+  // the month, matching every `d <= monthEnd`/`d > monthEnd` comparison
+  // below — one ms behind period.ts's half-open exclusive bound.
+  const bounds = useMemo(() => monthBounds(monthIso, tz), [monthIso, tz])
+  const monthStart = useMemo(() => new Date(bounds.start), [bounds])
+  const monthEnd = useMemo(() => new Date(new Date(bounds.endExclusive).getTime() - 1), [bounds])
 
   // Filter / search
   const filtered = useMemo(() => {
@@ -447,7 +486,7 @@ export default function TransactionsPage() {
   // Subtitle label — "April 2026" when filtering by a month, "All time"
   // otherwise.
   const subtitleLabel = monthFilterActive
-    ? monthStart.toLocaleDateString(locale, { month: 'long', year: 'numeric' })
+    ? monthStart.toLocaleDateString(locale, { month: 'long', year: 'numeric', timeZone: tz })
     : 'All time'
 
   return (
@@ -460,6 +499,7 @@ export default function TransactionsPage() {
             <MonthPicker
               selected={monthIso}
               locale={locale}
+              tz={tz}
               clearable
               cleared={!monthFilterActive}
               clearLabel="All time"

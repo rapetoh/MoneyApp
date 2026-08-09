@@ -1,4 +1,9 @@
 'use client'
+/* eslint-disable local/period-restrictions -- Stage 2 (2.4/2.14) migration
+ * pending: this page's occurrence/window math hasn't been converted onto
+ * packages/shared/src/domain/recurrence.ts + period.ts yet (fix-plan 2.3
+ * owns the recurring-rules rewrite) — out of item 1.3's own named
+ * surfaces. */
 import { useState, useEffect, useMemo } from 'react'
 import { createClient } from '../../../lib/supabase/client'
 import { colors, font, radius } from '../../../lib/theme'
@@ -12,6 +17,11 @@ import {
 } from '../../../lib/recurringPatternDetector'
 import { usePlus } from '../../../lib/plus'
 import type { RecurringRule, RecurringFrequency } from '@voice-expense/shared'
+import {
+  nextOccurrence as sharedNextOccurrence,
+  monthlyEquivalent,
+  annualEquivalent,
+} from '@voice-expense/shared'
 
 type Txn = {
   id: string
@@ -40,35 +50,22 @@ function freqLabel(f: RecurringFrequency): string {
   )
 }
 
-function nextOccurrence(rule: RecurringRule, fromDate?: Date): Date | null {
-  const base = fromDate
-    ? new Date(fromDate)
-    : rule.last_generated
-      ? new Date(rule.last_generated)
-      : new Date(rule.starts_at)
-  const next = new Date(base)
-  switch (rule.frequency) {
-    case 'daily':
-      next.setDate(next.getDate() + rule.interval)
-      break
-    case 'weekly':
-      next.setDate(next.getDate() + 7 * rule.interval)
-      break
-    case 'biweekly':
-      next.setDate(next.getDate() + 14 * rule.interval)
-      break
-    case 'monthly':
-      next.setMonth(next.getMonth() + rule.interval)
-      break
-    case 'quarterly':
-      next.setMonth(next.getMonth() + 3 * rule.interval)
-      break
-    case 'yearly':
-      next.setFullYear(next.getFullYear() + rule.interval)
-      break
-  }
-  if (rule.ends_at && next > new Date(rule.ends_at)) return null
-  return next
+// Thin adapter over the one recurrence engine (`packages/shared/src/
+// domain/recurrence.ts`, fix-plan 1.5 / audit 03-F8, 04-F2, 04-F3,
+// 04-F20, 06-F22, 07-F22). This used to be the third byte-for-byte copy
+// of a `setMonth`/`setFullYear` overflow bug — a rule anchored on the
+// 31st permanently drifted to the 3rd after the first February. `tz`
+// is the browser's own zone (`Intl.DateTimeFormat().resolvedOptions()
+// .timeZone`, resolved once per render below) rather than
+// `profile.timezone`: nothing writes that column from web yet
+// (fix-plan 1.3's device-zone capture is mobile-only so far), so it
+// reads the schema default `'UTC'` for every profile and would be
+// wrong for most users — the browser's own zone is the more accurate
+// signal available on this page today.
+function nextOccurrence(rule: RecurringRule, tz: string, fromDate?: Date): Date | null {
+  const after = fromDate ? fromDate.toISOString() : (rule.last_generated ?? null)
+  const occurrence = sharedNextOccurrence(rule, after, tz)
+  return occurrence ? new Date(occurrence.instant) : null
 }
 
 // Pre-namespacing key: every account on a shared browser profile read and
@@ -103,31 +100,12 @@ function writeDismissed(userId: string, s: Set<string>) {
   }
 }
 
-// Convert a rule to its monthly equivalent so we can sum across frequencies.
-function monthlyEquivalent(r: RecurringRule): number {
-  switch (r.frequency) {
-    case 'daily':
-      return r.amount * 30
-    case 'weekly':
-      return r.amount * 4.33
-    case 'biweekly':
-      return r.amount * 2.17
-    case 'monthly':
-      return r.amount
-    case 'quarterly':
-      return r.amount / 3
-    case 'yearly':
-      return r.amount / 12
-  }
-  return r.amount
-}
-
-function annualEquivalent(r: RecurringRule): number {
-  return monthlyEquivalent(r) * 12
-}
+// `monthlyEquivalent`/`annualEquivalent` (cost normalizers, honouring
+// `interval` — 03-F23) are imported directly from the shared module
+// above; this file no longer carries its own copy.
 
 // Walk forward N days from `from`, emitting every charge from each rule.
-function chargesIn30Days(rules: RecurringRule[]): Array<{ day: number; rule: RecurringRule }> {
+function chargesIn30Days(rules: RecurringRule[], tz: string): Array<{ day: number; rule: RecurringRule }> {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   const horizon = new Date(today)
@@ -135,14 +113,14 @@ function chargesIn30Days(rules: RecurringRule[]): Array<{ day: number; rule: Rec
   const out: Array<{ day: number; rule: RecurringRule }> = []
   for (const r of rules) {
     if (!r.is_active) continue
-    let nxt = nextOccurrence(r)
+    let nxt = nextOccurrence(r, tz)
     let safety = 0
     while (nxt && nxt <= horizon && safety < 60) {
       if (nxt >= today) {
         const dayOffset = Math.round((nxt.getTime() - today.getTime()) / 86_400_000)
         out.push({ day: dayOffset + 1, rule: r })
       }
-      nxt = nextOccurrence(r, nxt)
+      nxt = nextOccurrence(r, tz, nxt)
       safety += 1
     }
   }
@@ -159,6 +137,15 @@ export default function RecurringPage() {
   const [dismissed, setDismissed] = useState<Set<string>>(new Set())
   const [profile, setProfile] = useState<{ currency_code?: string; locale?: string } | null>(null)
   const [userId, setUserId] = useState<string | null>(null)
+  // See the `nextOccurrence` docstring above for why this is the
+  // browser's zone rather than `profile.timezone`.
+  const tz = useMemo(() => {
+    try {
+      return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+    } catch {
+      return 'UTC'
+    }
+  }, [])
 
   async function load() {
     const { data: { user } } = await supabase.auth.getUser()
@@ -249,6 +236,7 @@ export default function RecurringPage() {
     const startsAt = new Date().toISOString()
     const { error } = await supabase.from('recurring_rules').insert({
       user_id: user.id,
+      client_id: crypto.randomUUID(),
       name: c.merchant,
       amount: c.amount,
       currency_code: c.currency_code,
@@ -326,14 +314,14 @@ export default function RecurringPage() {
   // Sorted active rules by next-charge date.
   const sortedActive = useMemo(() => {
     return [...active].sort((a, b) => {
-      const an = nextOccurrence(a)?.getTime() ?? Number.MAX_SAFE_INTEGER
-      const bn = nextOccurrence(b)?.getTime() ?? Number.MAX_SAFE_INTEGER
+      const an = nextOccurrence(a, tz)?.getTime() ?? Number.MAX_SAFE_INTEGER
+      const bn = nextOccurrence(b, tz)?.getTime() ?? Number.MAX_SAFE_INTEGER
       return an - bn
     })
-  }, [active])
+  }, [active, tz])
 
   // Charges in next 30 days (each entry = a day-offset 1..30 with a rule).
-  const charges = useMemo(() => chargesIn30Days(active), [active])
+  const charges = useMemo(() => chargesIn30Days(active, tz), [active, tz])
   const chargesByDay = useMemo(() => {
     const m: Record<number, Array<RecurringRule>> = {}
     for (const c of charges) {
@@ -489,7 +477,7 @@ export default function RecurringPage() {
               ) : (
                 <>
                   {sortedActive.map((r, i) => {
-                    const next = nextOccurrence(r)
+                    const next = nextOccurrence(r, tz)
                     const catName = r.category_id ? catMap[r.category_id]?.name ?? null : null
                     return (
                       <div

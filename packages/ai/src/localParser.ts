@@ -1,4 +1,5 @@
 import type { ParsedExpense } from '@voice-expense/shared'
+import { deriveDirectionFromFlowType } from './validateParsedExpense'
 
 // Patterns that match simple expense inputs without needing AI
 // Handles English, French, Spanish, Portuguese number conventions
@@ -52,10 +53,16 @@ export function parseExpenseLocally(transcript: string): {
   // Bare amount without merchant — low confidence, will go to AI
   if (confidence < 0.85) return { result: null, confidence }
 
+  // Bare amount, no merchant — treated as a plain one-off expense; there's
+  // no signal here to classify it as anything else (fix-plan item 1.7:
+  // `direction` is derived from `flow_type`, single-sourced, even for this
+  // non-AI path).
+  const flowType = 'expense' as const
   const result: ParsedExpense = {
     amount,
     currency: 'USD', // Will be overridden by user's currency setting
-    direction: 'debit',
+    direction: deriveDirectionFromFlowType(flowType),
+    flow_type: flowType,
     merchant,
     merchant_domain: null,
     note: null,

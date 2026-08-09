@@ -5,6 +5,7 @@ import { Sidebar } from '../../components/Sidebar'
 import { colors } from '../../lib/theme'
 import { PlusProvider } from '../../lib/plus'
 import { resolvePlusStatus } from '../../lib/plus.server'
+import { TimezoneSync } from '../../components/TimezoneSync'
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient()
@@ -28,6 +29,11 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   return (
     <PlusProvider isPlus={isPlus}>
+      {/* Fire-and-forget: corrects `profiles.timezone` from the browser's
+          own resolved zone whenever it drifts from what's stored (fix-plan
+          1.3 part 1) — see the component for why this can't run server-side
+          (Vercel's zone is not the visitor's). Renders nothing. */}
+      <TimezoneSync userId={user.id} storedTimezone={profile?.timezone} />
       {/* The whole dashboard occupies one screen — sidebar + main are
           locked to viewport height (minus the macOS title strip in
           Electron). Only `<main>` is allowed to scroll, and only when

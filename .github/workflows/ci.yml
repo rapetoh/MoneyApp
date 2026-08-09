@@ -40,3 +40,83 @@ jobs:
 
       - name: Check formatting
         run: npx prettier --check "packages/**/*.{ts,tsx}" "apps/**/*.{ts,tsx}"
+
+  test:
+    name: Test (vitest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Node 22 (not the 20 the other jobs use): the ported localDb
+      # migration suite (apps/mobile) uses `node:sqlite`, unflagged from
+      # 22.x onward. It skips gracefully on older Node either way — see
+      # apps/mobile/src/services/sync/__tests__/localDb.migration.test.ts
+      # — so this floor only affects whether that suite actually runs.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run test suite
+        run: npx turbo test
+
+      - name: Unreferenced exports (knip) — report only, not a gate
+        # fix-plan item 1.1: wired into CI for visibility now; several
+        # pre-existing findings remain from before this job existed, and
+        # cleaning those up is separate work. Flip continue-on-error off
+        # once that backlog is clear.
+        continue-on-error: true
+        run: npx knip
+
+  db-types:
+    name: DB types in sync with schema
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Regenerate database.types.ts and diff against committed copy
+        # fix-plan 1.2. Needs a Management API access token (never the
+        # anon or service-role key) — see
+        # packages/shared/scripts/gen-db-types.sh. Report-only until
+        # SUPABASE_ACCESS_TOKEN is provisioned as a repo secret, same
+        # pattern as the knip step in the `test` job above.
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          if [ -z "$SUPABASE_ACCESS_TOKEN" ]; then
+            echo "SUPABASE_ACCESS_TOKEN not set — skipping until provisioned."
+            exit 0
+          fi
+          npm run -w @voice-expense/shared gen:types
+          git diff --exit-code -- packages/shared/src/types/database.types.ts
+
+  eslint:
+    name: ESLint (no-restricted-syntax scaffolding)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        # Every audit-tracking rule in eslint.config.mjs ships at 'off'
+        # until the fix-plan item that owns it lands (see the file's
+        # header comment) — this job is expected to be clean today.
+        run: npx turbo lint

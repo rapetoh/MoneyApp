@@ -1,33 +1,24 @@
 import type { Locale } from '../i18n'
+import type { Database } from './database.types'
 export type { Locale }
 
-export interface Profile {
-  id: string
-  display_name: string | null
-  currency_code: string
+type ProfileRow = Database['public']['Tables']['profiles']['Row']
+
+/** `locale` and `plus_status` carry CHECK constraints the generated type
+ *  can't see (codegen reads column types, not constraints) — narrowed to
+ *  their literal unions here. Every other column, including the
+ *  `voice_language` / `monthly_income_source` / `onboarding_completed_at` /
+ *  `analytics_opt_in` / `crash_reports_opt_in` fields this used to spell
+ *  out by hand, flows straight from the generated Row: see
+ *  database.types.ts for the column list this is derived from. */
+export type Profile = Omit<ProfileRow, 'locale' | 'plus_status'> & {
   locale: Locale
-  voice_language: string // BCP-47 e.g. 'en-US', 'fr-FR'
-  timezone: string
-  monthly_income: number | null
-  /** Employer / income source — used by MerchantAvatar to fetch a logo. */
-  monthly_income_source: string | null
-  /** Null until the user finishes (or skips) the onboarding flow. */
-  onboarding_completed_at: string | null
-  /** True when the user has opted in to anonymous usage analytics.
-   *  Default false: we collect nothing unless asked. */
-  analytics_opt_in: boolean
-  /** True when the user allows pseudonymous crash logs (default).
-   *  Operationally necessary to ship a stable native app; the user can
-   *  turn it off from Settings → Privacy. */
-  crash_reports_opt_in: boolean
   /** Plus entitlement state. `'active'` is the only value that
    *  unlocks gated surfaces; `'lapsed'` / `'free'` / NULL are all
    *  treated as free. Populated by IAP / RevenueCat receipt
    *  validation when that wires up; until then the column is NULL
    *  and per-platform dev hatches govern unlock. */
   plus_status: 'active' | 'lapsed' | 'free' | null
-  created_at: string
-  updated_at: string
 }
 
 export type ProfileUpdate = Partial<Omit<Profile, 'id' | 'created_at' | 'updated_at'>>

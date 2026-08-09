@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { Animated, View, Text, Pressable, StyleSheet, Easing } from 'react-native'
-import { Colors, Typography, Spacing, Radius } from '../theme'
+import { Colors, Typography, Spacing, Radius, useTabBarClearance } from '../theme'
 
 interface Props {
   message: string
@@ -28,6 +28,13 @@ export function UndoSnackbar({
 }: Props) {
   const progress = useRef(new Animated.Value(0)).current
   const dismissed = useRef(false)
+  // Was a third independent copy of the tab-bar's `14 + 68` constants
+  // (audit 01-F33); now derived from the one primitive those constants
+  // live in (src/theme/chrome.ts, added by item 1.8) so the snackbar
+  // tracks the bar's real position instead of drifting from it — the bar's
+  // own bottom offset is insets-aware as of F12, so a hardcoded copy here
+  // would sit *under* the bar on any device with a home indicator.
+  const tabBarClearance = useTabBarClearance()
 
   useEffect(() => {
     Animated.timing(progress, {
@@ -58,7 +65,10 @@ export function UndoSnackbar({
   })
 
   return (
-    <View style={styles.container} pointerEvents="box-none">
+    <View
+      style={[styles.container, { bottom: tabBarClearance + Spacing.sm }]}
+      pointerEvents="box-none"
+    >
       <View style={styles.pill}>
         <Text style={styles.message} numberOfLines={1}>
           {message}
@@ -73,12 +83,12 @@ export function UndoSnackbar({
 }
 
 const styles = StyleSheet.create({
-  // Floats above the tab bar (tab bar bottom = 14, height = 68 → clear above).
+  // Floats above the tab bar — `bottom` is set per-instance above from
+  // `useTabBarClearance()`, not duplicated here.
   container: {
     position: 'absolute',
     left: Spacing.base,
     right: Spacing.base,
-    bottom: 14 + 68 + Spacing.sm,
     borderRadius: Radius.xl,
     overflow: 'hidden',
     shadowColor: '#000',

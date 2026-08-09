@@ -1,9 +1,27 @@
 import type { PaymentMethod, TransactionDirection } from './transaction'
 
+/** The model's classification of *intent* — fix-plan item 1.7, part 1:
+ *  "the model classifies intent; code decides the sign." Before this
+ *  field, the model returned `direction` directly, which conflated two
+ *  different judgments: what kind of money movement this is, and which
+ *  way it flows for accounting purposes. "Investing $300 at Schwab" and
+ *  "selling $300 of stock" are both squarely about a brokerage transfer,
+ *  but one is debit and one is credit — a model that gets the intent
+ *  right but the sign wrong (or vice versa) used to be indistinguishable
+ *  from one that got both right. `direction` is now *derived* from
+ *  `flow_type` in code (`deriveDirectionFromFlowType`,
+ *  packages/ai/src/validateParsedExpense.ts) — the model is never
+ *  trusted to state the sign itself. */
+export type FlowType = 'expense' | 'income' | 'transfer_out' | 'transfer_in' | 'refund' | 'reimbursement'
+
 export interface ParsedExpense {
   amount: number
   currency: string
+  /** Derived from `flow_type`, never taken directly from the model — see
+   *  `FlowType`'s doc comment. Still the field every consumer reads
+   *  (createTransaction, the confirm sheet, the recurring-rule trigger). */
   direction: TransactionDirection
+  flow_type: FlowType
   merchant: string | null
   merchant_domain: string | null
   /** Residual detail from the transcript/image that no other field captures
@@ -19,6 +37,36 @@ export interface ParsedExpense {
   // Recurring intelligence — AI guesses based on merchant/category context
   is_recurring_suggestion: boolean
   recurring_frequency_suggestion: 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'quarterly' | 'yearly' | null
+}
+
+// ─── Typed parse boundary (fix-plan item 1.7) ───────────────────────────────
+//
+// Every model response bound for `ParsedExpense` must pass through
+// `validateParsedExpense` (packages/ai/src/validateParsedExpense.ts) before
+// it reaches a save path. A response that fails the contract — an enum
+// value outside the DB's CHECK constraints, a non-finite amount, an
+// unparseable date — is never coerced into a defaulted row; it comes back
+// as a `ParseRejection` the UI can surface instead. The same module's
+// `validateTransactionWriteFields` is the narrower third boundary: it runs
+// inside `createTransaction` itself on every write regardless of source
+// (AI parse, manual entry, a shortcut deep link, the notification
+// listener), so a bad `currency_code`/`payment_method`/`direction`/
+// `amount` is refused before a single row reaches SQLite.
+
+/** One field-level failure from `validateParsedExpense`. `field` names the
+ *  `ParsedExpense` key (or `"root"` when the response wasn't even a JSON
+ *  object); `message` is human-readable and safe to log or display. */
+export interface ParseFieldError {
+  field: string
+  message: string
+}
+
+/** The typed-rejection half of `validateParsedExpense`'s return union. The
+ *  `rejected: true` discriminant is what a caller checks — never present on
+ *  a valid `ParsedExpense`. */
+export interface ParseRejection {
+  rejected: true
+  errors: ParseFieldError[]
 }
 
 export interface AdvisorContext {

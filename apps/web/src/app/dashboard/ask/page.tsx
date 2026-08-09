@@ -1,4 +1,8 @@
 'use client'
+/* eslint-disable local/period-restrictions -- Stage 2 (2.4/2.14) migration
+ * pending: this page's window math hasn't been converted onto
+ * packages/shared/src/utils/period.ts yet (fix-plan 2.10 owns Ask
+ * Murmur's window handling) — out of item 1.3's own named surfaces. */
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { createClient } from '../../../lib/supabase/client'
 import { colors, font, radius } from '../../../lib/theme'
@@ -162,7 +166,20 @@ export default function AskMurmurPage() {
         loadMostRecentConversation(supabase, user.id),
         listConversations(supabase, user.id, 30),
       ])
-      setProfile(p.data)
+      // `locale` carries a CHECK constraint (`en`/`fr`/`es`/`pt`) that the
+      // generated Database row type can't see — codegen only reads column
+      // types — so it comes back as a bare `string`. Narrowed to `Locale`
+      // here, same as every other CHECK-constrained column in
+      // packages/shared/src/types/*.ts.
+      setProfile(
+        p.data
+          ? {
+              currency_code: p.data.currency_code,
+              locale: p.data.locale as Locale,
+              monthly_income: p.data.monthly_income,
+            }
+          : null,
+      )
       setTransactions((t.data ?? []) as Transaction[])
       setRules((r.data ?? []) as RecurringRule[])
       setCategories((c.data ?? []) as Category[])

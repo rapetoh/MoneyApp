@@ -20,14 +20,26 @@
  *      from the previous synced value.
  */
 
+import { getCalendars } from 'expo-localization'
 import { supabase } from '../lib/supabase'
 import { upsertTransaction, hasRecurringOccurrence } from './sync/transactionStore'
 import { enqueue } from './sync/syncQueue'
 import { computeNextOccurrence } from '../hooks/useRecurringRules'
 import { getCurrentProfileCurrency } from './profileCurrency'
 import type { RecurringRule, Transaction } from '@voice-expense/shared'
-import { snapshotFx } from '@voice-expense/shared'
+import { snapshotFx, localDay } from '@voice-expense/shared'
 import * as Crypto from 'expo-crypto'
+
+/** Best-effort device zone — mirrors `useTransactions.ts`'s own
+ *  `getDeviceTimeZone` (fix-plan 1.3 part 1). Used to resolve
+ *  `local_day` for each generated occurrence below. */
+function getDeviceTimeZone(): string {
+  try {
+    return getCalendars()[0]?.timeZone ?? 'UTC'
+  } catch {
+    return 'UTC'
+  }
+}
 
 export async function runRecurringCatchUp(userId: string): Promise<number> {
   // Fetch all active rules for this user
@@ -40,6 +52,7 @@ export async function runRecurringCatchUp(userId: string): Promise<number> {
   if (error || !rules?.length) return 0
 
   const now = new Date()
+  const tz = getDeviceTimeZone()
   let generated = 0
 
   for (const rule of rules as RecurringRule[]) {
@@ -97,6 +110,12 @@ export async function runRecurringCatchUp(userId: string): Promise<number> {
           fx_rate_to_profile: fx?.fx_rate_to_profile ?? null,
           fx_rate_date: fx?.fx_rate_date ?? null,
           transacted_at: transactedAt,
+          // transactions.local_day (migration 017, NOT NULL) — resolved
+          // once here at generation time, same as `useTransactions.ts`'s
+          // `createTransaction`.
+          local_day: localDay(transactedAt, tz),
+          // Resolved by `upsertTransaction` from `transacted_at` on write.
+          occurrence_date: null,
           source: 'recurring_generated',
           raw_transcript: null,
           ai_confidence: null,

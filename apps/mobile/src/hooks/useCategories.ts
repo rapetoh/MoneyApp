@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
+import * as Crypto from 'expo-crypto'
 import { supabase } from '../lib/supabase'
 import type { Category } from '@voice-expense/shared'
 
@@ -28,6 +29,7 @@ export function useCategories(userId: string | undefined) {
       .from('categories')
       .insert({
         user_id: userId,
+        client_id: Crypto.randomUUID(),
         name: name.trim(),
         name_normalized: name.trim().toLowerCase(),
         color: color ?? null,

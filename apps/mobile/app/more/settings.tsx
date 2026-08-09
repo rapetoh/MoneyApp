@@ -32,6 +32,13 @@ import {
 import { exportAndShare, type ExportFormat } from '../../src/services/exportData'
 import { useCategories } from '../../src/hooks/useCategories'
 import { usePlusStatus } from '../../src/hooks/usePlusStatus'
+import { syncManager } from '../../src/services/sync/SyncManager'
+import {
+  getDeadLetterEntries,
+  clearDeadLetterEntry,
+  retryDeadLetterEntry,
+  type QueueEntry,
+} from '../../src/services/sync/syncQueue'
 import { Colors, Typography, Radius, Hairline } from '../../src/theme'
 import { t, type Locale } from '@voice-expense/shared'
 import type { BudgetPeriod } from '@voice-expense/shared'
@@ -84,6 +91,56 @@ export default function SettingsScreen() {
   const locale = (profile?.locale ?? 'en') as Locale
   const currency = profile?.currency_code ?? 'USD'
   const localeName = LOCALES.find((l) => l.value === locale)?.label ?? 'English'
+
+  // Fix-plan 1.3: read-only display of the device's own zone (distinct from
+  // `profiles.timezone`, which `useProfile.ts` captures and writes through
+  // on launch) — `Intl` reads it directly with no async dependency, so this
+  // row can never show a stale value the way the six 'UTC' production
+  // profiles did before the capture existed.
+  const deviceTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone
+
+  // Fix-plan 1.6 point 4: the sync-health row. `SyncFailureBanner` already
+  // covers the always-visible failure pill; this is the fuller Settings
+  // surface that banner's own doc comment defers here — pending/dead
+  // counts from the same `syncManager.addListener` channel, plus per-entry
+  // `last_error`, retry and discard wired to the outbox's own recovery API.
+  const [pendingCount, setPendingCount] = useState(0)
+  const [deadCount, setDeadCount] = useState(0)
+  const [syncIssuesModal, setSyncIssuesModal] = useState(false)
+  const [deadEntries, setDeadEntries] = useState<QueueEntry[]>([])
+
+  useEffect(() => {
+    return syncManager.addListener((_syncing, pending, dead) => {
+      setPendingCount(pending)
+      setDeadCount(dead)
+    })
+  }, [])
+
+  const refreshDeadEntries = useCallback(async () => {
+    setDeadEntries(await getDeadLetterEntries())
+  }, [])
+
+  function openSyncIssues() {
+    refreshDeadEntries()
+    setSyncIssuesModal(true)
+  }
+
+  async function handleRetryEntry(id: number) {
+    await retryDeadLetterEntry(id)
+    await refreshDeadEntries()
+    syncManager.drainQueue()
+  }
+
+  async function handleRetryAllEntries() {
+    await Promise.all(deadEntries.map((entry) => retryDeadLetterEntry(entry.id)))
+    await refreshDeadEntries()
+    syncManager.drainQueue()
+  }
+
+  async function handleDiscardEntry(id: number) {
+    await clearDeadLetterEntry(id)
+    await refreshDeadEntries()
+  }
 
   // Day-2 dunning toggle. Reads from SecureStore on mount; writes back +
   // cancels the pending notification on opt-out, re-prompts permission and
@@ -229,6 +286,11 @@ export default function SettingsScreen() {
               setNameInput(profile?.display_name ?? '')
               setNameModal(true)
             }}
+          />
+          <SetRow
+            label={t('settings.timezone', locale)}
+            detail={deviceTimeZone}
+            chevron={false}
             last
           />
         </SetGroup>
@@ -302,6 +364,23 @@ export default function SettingsScreen() {
                 : t('settings.export_detail_free', locale)
             }
             onPress={openExport}
+            last
+          />
+        </SetGroup>
+
+        {/* Sync — outbox health (fix-plan 1.6 point 4). Persistent (not
+            gated on deadCount > 0) so a user can confirm the outbox is
+            clean, not just be told when it isn't. */}
+        <SetGroup label={t('settings.sync', locale)}>
+          <SetRow
+            label={t('settings.sync_pending', locale)}
+            detail={`${pendingCount} ${t('settings.sync_queued_suffix', locale)}`}
+            chevron={false}
+          />
+          <SetRow
+            label={t('settings.sync_issues', locale)}
+            detail={deadCount === 0 ? t('common.none', locale) : `${deadCount} ${t('settings.sync_failed_suffix', locale)}`}
+            onPress={openSyncIssues}
             last
           />
         </SetGroup>
@@ -561,6 +640,63 @@ export default function SettingsScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Sync issues modal — fix-plan 1.6 point 4: per-entry `last_error`
+          with retry/discard wired to the outbox's own recovery API
+          (`retryDeadLetterEntry`/`clearDeadLetterEntry`), which had zero
+          callers before `SyncFailureBanner` and this row. */}
+      <Modal
+        visible={syncIssuesModal}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setSyncIssuesModal(false)}
+      >
+        <View style={styles.modal}>
+          <View style={styles.modalHeader}>
+            <Pressable onPress={() => setSyncIssuesModal(false)}>
+              <Text style={styles.modalCancel}>{t('common.cancel', locale)}</Text>
+            </Pressable>
+            <Text style={styles.modalTitle}>{t('settings.sync_issues', locale)}</Text>
+            <View style={{ width: 60 }} />
+          </View>
+          <ScrollView contentContainerStyle={styles.modalBody}>
+            {deadEntries.length === 0 ? (
+              <Text style={styles.modalHint}>{t('settings.sync_issues_empty', locale)}</Text>
+            ) : (
+              <>
+                {deadEntries.map((entry, i) => (
+                  <View key={entry.id}>
+                    {i > 0 && <View style={styles.rowDivider} />}
+                    <View style={styles.syncIssueRow}>
+                      <Text style={styles.syncIssueTitle} numberOfLines={1}>
+                        {entry.operation} · {entry.entity_type}
+                      </Text>
+                      <Text style={styles.syncIssueError} numberOfLines={3}>
+                        {entry.last_error ?? t('settings.sync_unknown_error', locale)}
+                      </Text>
+                      <View style={styles.syncIssueActions}>
+                        <Pressable onPress={() => handleRetryEntry(entry.id)} hitSlop={8}>
+                          <Text style={styles.modalDone}>{t('common.retry', locale)}</Text>
+                        </Pressable>
+                        <Pressable onPress={() => handleDiscardEntry(entry.id)} hitSlop={8}>
+                          <Text style={[styles.modalDone, styles.syncIssueDiscard]}>
+                            {t('settings.sync_discard', locale)}
+                          </Text>
+                        </Pressable>
+                      </View>
+                    </View>
+                  </View>
+                ))}
+                {deadEntries.length > 1 && (
+                  <Pressable onPress={handleRetryAllEntries} style={styles.syncRetryAll}>
+                    <Text style={styles.modalDone}>{t('settings.sync_retry_all', locale)}</Text>
+                  </Pressable>
+                )}
+              </>
+            )}
+          </ScrollView>
+        </View>
+      </Modal>
     </SafeAreaView>
   )
 }
@@ -768,5 +904,35 @@ const styles = StyleSheet.create({
     color: Colors.accent ?? Colors.primary,
     fontFamily: Typography.fontFamily.sansBold,
     fontSize: 16,
+  },
+
+  // Sync issues modal
+  syncIssueRow: {
+    paddingVertical: 12,
+    gap: 4,
+  },
+  syncIssueTitle: {
+    fontFamily: Typography.fontFamily.sansSemiBold,
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.ink ?? Colors.text,
+    textTransform: 'capitalize',
+  },
+  syncIssueError: {
+    fontFamily: Typography.fontFamily.sans,
+    fontSize: 13,
+    color: Colors.ink3 ?? Colors.textSecondary,
+  },
+  syncIssueActions: {
+    flexDirection: 'row',
+    gap: 20,
+    marginTop: 4,
+  },
+  syncIssueDiscard: {
+    color: Colors.destructive ?? '#A94646',
+  },
+  syncRetryAll: {
+    alignItems: 'center',
+    paddingVertical: 14,
   },
 })

@@ -2,17 +2,16 @@ import { useState, useEffect } from 'react'
 import {
   View,
   Text,
-  Modal,
   Pressable,
   TextInput,
   ScrollView,
   StyleSheet,
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
+  Keyboard,
 } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
+import { BottomSheet } from './BottomSheet'
+import { NumericAccessory, NUMERIC_ACCESSORY_ID } from './NumericAccessory'
 import { RecurringToggle } from './RecurringToggle'
 import { AmountAdjustChips } from './AmountAdjustChips'
 import { Colors, Typography, Spacing, Radius } from '../theme'
@@ -136,220 +135,175 @@ export function VoiceConfirmModal({
   const canSave = amount.length > 0 && !isNaN(parseFloat(amount.replace(',', '.')))
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onDismiss}>
-      <Pressable style={styles.backdrop} onPress={onDismiss}>
-        <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-            style={styles.shrink}
-          >
-            <SafeAreaView edges={['bottom']} style={styles.shrink}>
-              <View style={styles.handle} />
-
-              <View style={styles.header}>
-                <Text style={styles.title}>{t('voice.parsed_expense', locale)}</Text>
-                <Pressable onPress={onDismiss} style={styles.closeBtn} hitSlop={8}>
-                  <Ionicons name="close" size={18} color={Colors.text} />
-                </Pressable>
-              </View>
-
-              <ScrollView
-                contentContainerStyle={styles.content}
-                showsVerticalScrollIndicator={false}
-                keyboardShouldPersistTaps="handled"
-              >
-                {parsedExpense?.needs_clarification && parsedExpense.clarifying_question && (
-                  <View style={styles.clarifyCard}>
-                    <Text style={styles.clarifyQuestion}>{parsedExpense.clarifying_question}</Text>
-                  </View>
-                )}
-
-                {/* Direction + Amount combined */}
-                <View style={styles.amountCard}>
-                  <View style={styles.directionRow}>
-                    {DIRECTION_OPTIONS.map((opt) => (
-                      <Pressable
-                        key={opt.value}
-                        style={[
-                          styles.directionBtn,
-                          direction === opt.value &&
-                            (opt.value === 'debit' ? styles.directionDebitActive : styles.directionCreditActive),
-                        ]}
-                        onPress={() => setDirection(opt.value)}
-                      >
-                        <Text
-                          style={[
-                            styles.directionLabel,
-                            direction === opt.value && styles.directionLabelActive,
-                          ]}
-                        >
-                          {t(opt.key, locale)}
-                        </Text>
-                      </Pressable>
-                    ))}
-                  </View>
-                  <View style={styles.amountRow}>
-                    <Text style={styles.currencySymbol}>{currencySymbolFor(parsedExpense?.currency ?? 'USD')}</Text>
-                    <TextInput
-                      style={styles.amountInput}
-                      value={amount}
-                      onChangeText={setAmount}
-                      placeholder="0.00"
-                      placeholderTextColor={Colors.textMuted}
-                      keyboardType="decimal-pad"
-                      autoFocus={!parsedExpense?.amount}
-                    />
-                  </View>
-                  <AmountAdjustChips value={amount} onChange={setAmount} />
-                </View>
-
-                {/* Merchant */}
-                <View style={styles.field}>
-                  <Text style={styles.label}>{t('voice.merchant_source', locale)}</Text>
-                  <TextInput
-                    style={styles.input}
-                    value={merchant}
-                    onChangeText={setMerchant}
-                    placeholder={t('voice.merchant_placeholder', locale)}
-                    placeholderTextColor={Colors.textMuted}
-                  />
-                </View>
-
-                {/* Category — inline horizontal chip scroller */}
-                <View style={styles.field}>
-                  <Text style={styles.label}>{t('voice.category', locale)}</Text>
-                  <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.chipsRow}
-                    keyboardShouldPersistTaps="handled"
-                  >
-                    {[...categories].sort((a, b) => {
-                      if (a.id === categoryId) return -1
-                      if (b.id === categoryId) return 1
-                      return 0
-                    }).map((c) => {
-                      const color = c.color ?? merchantColor(c.name)
-                      const selected = categoryId === c.id
-                      return (
-                        <Pressable
-                          key={c.id}
-                          onPress={() => setCategoryId(selected ? null : c.id)}
-                          style={[
-                            styles.chip,
-                            selected && { backgroundColor: color + '22', borderColor: color },
-                          ]}
-                        >
-                          <View style={[styles.chipDot, { backgroundColor: color }]} />
-                          <Text
-                            style={[
-                              styles.chipLabel,
-                              selected && { color, fontFamily: Typography.fontFamily.sansSemiBold },
-                            ]}
-                          >
-                            {c.name}
-                          </Text>
-                        </Pressable>
-                      )
-                    })}
-                  </ScrollView>
-                  {!categoryId && parsedExpense?.category_suggestion && (
-                    <Text style={styles.aiSuggestion}>
-                      {t('voice.ai_suggests', locale)} {parsedExpense.category_suggestion}
-                    </Text>
-                  )}
-                </View>
-
-                {/* Note */}
-                <View style={styles.field}>
-                  <Text style={styles.label}>{t('voice.note', locale)}</Text>
-                  <TextInput
-                    style={styles.input}
-                    value={note}
-                    onChangeText={setNote}
-                    placeholder={t('voice.note_placeholder', locale)}
-                    placeholderTextColor={Colors.textMuted}
-                  />
-                </View>
-
-                <RecurringToggle
-                  isRecurring={isRecurring}
-                  frequency={recurringFrequency}
-                  aiDetected={aiDetectedRecurring}
-                  onToggle={setIsRecurring}
-                  onFrequencyChange={setRecurringFrequency}
-                  locale={locale}
-                />
-
-                {parsedExpense && parsedExpense.confidence < 0.75 && (
-                  <Text style={styles.lowConfidence}>{t('voice.low_confidence', locale)}</Text>
-                )}
-              </ScrollView>
-
-              <View style={styles.footer}>
-                <Pressable
-                  style={[styles.saveButton, (!canSave || saving) && styles.saveButtonDisabled]}
-                  onPress={handleConfirm}
-                  disabled={!canSave || saving}
-                >
-                  {saving ? (
-                    <ActivityIndicator color={Colors.white} />
-                  ) : (
-                    <Text style={styles.saveButtonText}>{t('voice.save', locale)}</Text>
-                  )}
-                </Pressable>
-              </View>
-            </SafeAreaView>
-          </KeyboardAvoidingView>
+    <BottomSheet
+      visible={visible}
+      onClose={onDismiss}
+      title={t('voice.parsed_expense', locale)}
+      // The design has no left "Cancel" label — an empty cancelLabel keeps
+      // the header's Cancel/title/right three-way layout (and its single
+      // onClose wiring, see BottomSheet.tsx / F14) while rendering nothing
+      // visible on the left, so the X button on the right is the only
+      // apparent dismiss affordance, matching the original design.
+      cancelLabel=""
+      headerRight={
+        <Pressable onPress={onDismiss} style={styles.closeBtn} hitSlop={8}>
+          <Ionicons name="close" size={18} color={Colors.text} />
         </Pressable>
-      </Pressable>
-    </Modal>
+      }
+      scrollViewProps={{ showsVerticalScrollIndicator: false }}
+      contentContainerStyle={styles.content}
+      footer={
+        <Pressable
+          style={[styles.saveButton, (!canSave || saving) && styles.saveButtonDisabled]}
+          onPress={handleConfirm}
+          disabled={!canSave || saving}
+        >
+          {saving ? (
+            <ActivityIndicator color={Colors.white} />
+          ) : (
+            <Text style={styles.saveButtonText}>{t('voice.save', locale)}</Text>
+          )}
+        </Pressable>
+      }
+      testID="voice-confirm-sheet"
+    >
+      {parsedExpense?.needs_clarification && parsedExpense.clarifying_question && (
+        <View style={styles.clarifyCard}>
+          <Text style={styles.clarifyQuestion}>{parsedExpense.clarifying_question}</Text>
+        </View>
+      )}
+
+      {/* Direction + Amount combined */}
+      <View style={styles.amountCard}>
+        <View style={styles.directionRow}>
+          {DIRECTION_OPTIONS.map((opt) => (
+            <Pressable
+              key={opt.value}
+              style={[
+                styles.directionBtn,
+                direction === opt.value &&
+                  (opt.value === 'debit' ? styles.directionDebitActive : styles.directionCreditActive),
+              ]}
+              onPress={() => setDirection(opt.value)}
+            >
+              <Text
+                style={[
+                  styles.directionLabel,
+                  direction === opt.value && styles.directionLabelActive,
+                ]}
+              >
+                {t(opt.key, locale)}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+        <View style={styles.amountRow}>
+          <Text style={styles.currencySymbol}>{currencySymbolFor(parsedExpense?.currency ?? 'USD')}</Text>
+          <TextInput
+            style={styles.amountInput}
+            value={amount}
+            onChangeText={setAmount}
+            placeholder="0.00"
+            placeholderTextColor={Colors.textMuted}
+            keyboardType="decimal-pad"
+            autoFocus={!parsedExpense?.amount}
+            inputAccessoryViewID={NUMERIC_ACCESSORY_ID}
+          />
+        </View>
+        <AmountAdjustChips value={amount} onChange={setAmount} />
+      </View>
+
+      {/* Merchant */}
+      <View style={styles.field}>
+        <Text style={styles.label}>{t('voice.merchant_source', locale)}</Text>
+        <TextInput
+          style={styles.input}
+          value={merchant}
+          onChangeText={setMerchant}
+          placeholder={t('voice.merchant_placeholder', locale)}
+          placeholderTextColor={Colors.textMuted}
+        />
+      </View>
+
+      {/* Category — inline horizontal chip scroller */}
+      <View style={styles.field}>
+        <Text style={styles.label}>{t('voice.category', locale)}</Text>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.chipsRow}
+          keyboardShouldPersistTaps="handled"
+        >
+          {[...categories].sort((a, b) => {
+            if (a.id === categoryId) return -1
+            if (b.id === categoryId) return 1
+            return 0
+          }).map((c) => {
+            const color = c.color ?? merchantColor(c.name)
+            const selected = categoryId === c.id
+            return (
+              <Pressable
+                key={c.id}
+                onPress={() => setCategoryId(selected ? null : c.id)}
+                style={[
+                  styles.chip,
+                  selected && { backgroundColor: color + '22', borderColor: color },
+                ]}
+              >
+                <View style={[styles.chipDot, { backgroundColor: color }]} />
+                <Text
+                  style={[
+                    styles.chipLabel,
+                    selected && { color, fontFamily: Typography.fontFamily.sansSemiBold },
+                  ]}
+                >
+                  {c.name}
+                </Text>
+              </Pressable>
+            )
+          })}
+        </ScrollView>
+        {!categoryId && parsedExpense?.category_suggestion && (
+          <Text style={styles.aiSuggestion}>
+            {t('voice.ai_suggests', locale)} {parsedExpense.category_suggestion}
+          </Text>
+        )}
+      </View>
+
+      {/* Note */}
+      <View style={styles.field}>
+        <Text style={styles.label}>{t('voice.note', locale)}</Text>
+        <TextInput
+          style={styles.input}
+          value={note}
+          onChangeText={setNote}
+          placeholder={t('voice.note_placeholder', locale)}
+          placeholderTextColor={Colors.textMuted}
+        />
+      </View>
+
+      <RecurringToggle
+        isRecurring={isRecurring}
+        frequency={recurringFrequency}
+        aiDetected={aiDetectedRecurring}
+        onToggle={setIsRecurring}
+        onFrequencyChange={setRecurringFrequency}
+        locale={locale}
+      />
+
+      {parsedExpense && parsedExpense.confidence < 0.75 && (
+        <Text style={styles.lowConfidence}>{t('voice.low_confidence', locale)}</Text>
+      )}
+
+      {/* Shared Done bar for the amount field's decimal-pad — see F8:
+          "iOS decimal pad cannot be dismissed" — closed here and at
+          transaction/edit.tsx by the one InputAccessoryView. */}
+      <NumericAccessory onDone={() => Keyboard.dismiss()} />
+    </BottomSheet>
   )
 }
 
 const styles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    justifyContent: 'flex-end',
-  },
-  sheet: {
-    backgroundColor: Colors.background,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    maxHeight: '72%',
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 12,
-  },
-  // Yoga only clamps a subtree to an ancestor's maxHeight if every wrapper in
-  // between can shrink; without this the sheet's content column overflows past
-  // the screen bottom and the Save footer lands under the home indicator.
-  shrink: { flexShrink: 1 },
-  handle: {
-    alignSelf: 'center',
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: Colors.border,
-    marginTop: 8,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Spacing.base,
-    paddingTop: Spacing.sm,
-    paddingBottom: Spacing.xs,
-  },
-  title: {
-    fontFamily: Typography.fontFamily.sansBold,
-    fontSize: Typography.size.base,
-    color: Colors.text,
-  },
   closeBtn: {
     width: 28,
     height: 28,
@@ -363,14 +317,6 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.sm,
     paddingBottom: Spacing.base,
     gap: Spacing.md,
-  },
-  footer: {
-    paddingHorizontal: Spacing.base,
-    paddingTop: Spacing.sm,
-    paddingBottom: Spacing.lg,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
-    backgroundColor: Colors.background,
   },
   clarifyCard: {
     backgroundColor: '#FFF8E7',
@@ -503,6 +449,7 @@ const styles = StyleSheet.create({
   saveButtonDisabled: { opacity: 0.5 },
   saveButtonText: {
     fontFamily: Typography.fontFamily.sansBold,
+    fontWeight: '700',
     fontSize: Typography.size.base,
     color: Colors.white,
   },

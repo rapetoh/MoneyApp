@@ -15,8 +15,14 @@
 // the user's access token, clears local SQLite, then signs out.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import type { Database } from '../_shared/database.types.ts'
 
-const supabaseAdmin = createClient(
+// Typed client (fix-plan 1.2): every `.from(table).delete()` below is
+// checked against the generated schema — a table name typo'd here would
+// otherwise silently no-op (PostgREST 404s on an unknown table, which
+// this loop already logs, but a typed client rejects it at deploy time
+// instead of relying on someone reading the log line).
+const supabaseAdmin = createClient<Database>(
   Deno.env.get('SUPABASE_URL')!,
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
   { auth: { autoRefreshToken: false, persistSession: false } },
@@ -50,29 +56,38 @@ Deno.serve(async (req) => {
   // Application-level rows. Order matters where FKs would otherwise
   // block: ask_messages depends on ask_conversations (CASCADE handles
   // it), transactions reference recurring_rules (ON DELETE SET NULL —
-  // safe in either order), budgets and categories are standalone.
-  // We delete each one explicitly rather than relying on a single
-  // CASCADE from auth.users because some tables historically lacked
-  // the CASCADE rule and re-adding it would require a migration.
-  const tables = [
+  // safe in either order), budgets and categories are standalone,
+  // profiles last. We delete each one explicitly rather than relying on
+  // a single CASCADE from auth.users because some tables historically
+  // lacked the CASCADE rule and re-adding it would require a migration.
+  //
+  // Split into two calls rather than one loop over a `table` ∪ `column`
+  // pair (fix-plan 1.2): a typed client's `.eq()` checks its column
+  // argument against the specific table's row shape, and a shared loop
+  // body can only offer the union of all seven tables' columns at once
+  // — 'id' | 'user_id' isn't a valid column of any single one of them.
+  const USER_ID_TABLES = [
     'ask_messages',
     'ask_conversations',
     'transactions',
     'recurring_rules',
     'budgets',
     'categories',
-    'profiles',
   ] as const
 
-  for (const table of tables) {
-    // profiles uses `id` as the user-scoped key; everything else uses
-    // `user_id`.
-    const column = table === 'profiles' ? 'id' : 'user_id'
-    const { error } = await supabaseAdmin.from(table).delete().eq(column, userId)
+  for (const table of USER_ID_TABLES) {
+    const { error } = await supabaseAdmin.from(table).delete().eq('user_id', userId)
     if (error) {
       console.error(`[delete-user] Failed to clear ${table} for ${userId}:`, error.message)
       return json({ error: `Failed to clear ${table}: ${error.message}` }, 500)
     }
+  }
+
+  // profiles uses `id` as the user-scoped key, not `user_id`.
+  const { error: profilesError } = await supabaseAdmin.from('profiles').delete().eq('id', userId)
+  if (profilesError) {
+    console.error(`[delete-user] Failed to clear profiles for ${userId}:`, profilesError.message)
+    return json({ error: `Failed to clear profiles: ${profilesError.message}` }, 500)
   }
 
   // Finally, the auth user. This invalidates every session token and

@@ -19,15 +19,17 @@
  * No persistence — a fresh process re-fetches.
  */
 
+import { localDay } from './period'
+
 /**
- * The single canonical "what number do I sum?" accessor for any
- * aggregation across transactions. Reads the FX snapshot column —
- * `amount_in_profile_currency` — and returns 0 when the row hasn't
- * been backfilled yet so the sum stays coherent. Rows pending
- * backfill are effectively excluded, which is the right call: a
- * `€50 + $1000 = 1050` sum was the original bug. A `$1000 + (skipped
- * €50, will appear once converted)` sum is honest. UI surfaces that
- * care can count `null` rows separately and prompt the user.
+ * @deprecated Bare accessor with no pending-amount signal — this is
+ * exactly the 07-F8/06-F34/05-F12 defect: a row awaiting FX backfill
+ * silently contributes `0` and a caller has no way to know money went
+ * missing from the total. Prefer `summarize()`
+ * (`packages/shared/src/domain/money.ts`) for anything that reports a
+ * total to a user, or `sumInProfileCurrency()` below for a flat sum
+ * that still needs the pending count. Kept for the ~14 call sites
+ * Stage 2 hasn't migrated yet.
  *
  * Pass through a structurally-typed param so this works for the
  * Supabase row shape, the local SQLite shape, and the export DTOs
@@ -43,12 +45,44 @@ export function aggAmount(t: {
  * True when a transaction is awaiting an FX snapshot (historical
  * foreign-currency row before backfill, or a write where the FX
  * provider was unreachable). Callers can count these to surface a
- * "N transactions pending conversion" hint.
+ * "N transactions pending conversion" hint. Used internally by
+ * `summarize()` in `packages/shared/src/domain/money.ts`, which is
+ * this predicate's first real caller (07-F8: it had zero before).
  */
 export function isFxPending(t: {
   amount_in_profile_currency?: number | null
 }): boolean {
   return t.amount_in_profile_currency == null
+}
+
+/**
+ * Sums `amount_in_profile_currency` across a flat list of
+ * transactions — the direct, pending-aware replacement for a
+ * hand-rolled `reduce((s, t) => s + aggAmount(t), 0)`. Accumulates in
+ * integer cents so a long series can't drift off a rounding boundary
+ * (05-F32), and never lets a null (FX-pending) row silently collapse
+ * into the total: it's counted in `pendingCount` and excluded from
+ * `total`, so a caller can render "N transactions awaiting
+ * conversion" instead of a total that's quietly short.
+ *
+ * For anything richer than a flat total — income vs. expense,
+ * transfers, a per-category breakdown — use `summarize()` in
+ * `packages/shared/src/domain/money.ts` instead, which does this same
+ * pending-aware accumulation per bucket.
+ */
+export function sumInProfileCurrency(
+  txns: readonly { amount_in_profile_currency?: number | null }[],
+): { total: number; pendingCount: number } {
+  let cents = 0
+  let pendingCount = 0
+  for (const t of txns) {
+    if (isFxPending(t)) {
+      pendingCount++
+      continue
+    }
+    cents += Math.round((t.amount_in_profile_currency as number) * 100)
+  }
+  return { total: cents / 100, pendingCount }
 }
 
 const RATE_CACHE = new Map<string, number>()
@@ -70,13 +104,23 @@ export interface FxSnapshot {
  * circuits with rate=1 and never hits the network. Throws on network
  * failure or unexpected response shape so callers can decide whether
  * to fall back (e.g. mobile save path retries on next online).
+ *
+ * `tz` (fix-plan 1.3 part 2 adoption): the rate should be dated to the
+ * *civil* day the transaction belongs to in the user's zone, not
+ * whatever UTC day a bare slice of the instant happens to land on — a
+ * Chicago transaction at `2026-09-01T01:00:00Z` belongs to Aug 31
+ * locally, so it should snapshot Aug 31's rate, not Sept 1's. Optional
+ * and additive: omitting it keeps today's UTC-slice behaviour for the
+ * call sites `eslint.config.mjs`'s `PERIOD_RESTRICTIONS` still marks as
+ * Stage 2 debt, rather than breaking them with a newly-required param.
  */
 export async function fetchFxRate(
   isoDateOrTimestamp: string,
   from: string,
   to: string,
+  tz?: string,
 ): Promise<FxSnapshot> {
-  const date = isoDateOrTimestamp.slice(0, 10)
+  const date = tz ? localDay(isoDateOrTimestamp, tz) : isoDateOrTimestamp.slice(0, 10)
   if (from === to) return { rate: 1, date }
 
   const key = cacheKey(date, from, to)
@@ -105,19 +149,23 @@ export async function fetchFxRate(
  * the caller can persist the row without the snapshot — the row will
  * be picked up by the backfill sweep later instead of blocking the
  * save.
+ *
+ * `tz`: see `fetchFxRate` — threaded straight through, same optional/
+ * additive contract.
  */
 export async function snapshotFx(
   isoDateOrTimestamp: string,
   fromCurrency: string,
   toCurrency: string,
   amount: number,
+  tz?: string,
 ): Promise<{
   amount_in_profile_currency: number
   fx_rate_to_profile: number
   fx_rate_date: string
 } | null> {
   try {
-    const { rate, date } = await fetchFxRate(isoDateOrTimestamp, fromCurrency, toCurrency)
+    const { rate, date } = await fetchFxRate(isoDateOrTimestamp, fromCurrency, toCurrency, tz)
     return {
       // Keep two decimals on the converted amount — matches the
       // numeric(14, 2) column type and avoids `0.1 + 0.2` noise when

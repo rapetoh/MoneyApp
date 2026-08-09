@@ -1,4 +1,8 @@
 'use client'
+/* eslint-disable local/period-restrictions -- Stage 2 (2.4/2.14) migration
+ * pending: this page's date-range math hasn't been converted onto
+ * packages/shared/src/utils/period.ts yet (fix-plan 2.15 owns the
+ * export rewrite) — out of item 1.3's own named surfaces. */
 import { useState, useEffect, useMemo } from 'react'
 import { createClient } from '../../../lib/supabase/client'
 import { colors, font, radius } from '../../../lib/theme'

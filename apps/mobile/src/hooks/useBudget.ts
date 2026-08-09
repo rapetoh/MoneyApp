@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
+import * as Crypto from 'expo-crypto'
 import { supabase } from '../lib/supabase'
 import { DataEvents } from '../events/dataEvents'
 import { aggAmount } from '@voice-expense/shared'
@@ -46,6 +47,7 @@ export function useActiveBudget(userId: string | undefined) {
 
     const { error } = await supabase.from('budgets').insert({
       user_id: userId,
+      client_id: Crypto.randomUUID(),
       amount,
       period,
       currency_code: currency,

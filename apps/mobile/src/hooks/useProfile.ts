@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
+import { getCalendars } from 'expo-localization'
 import { supabase } from '../lib/supabase'
 import { DataEvents } from '../events/dataEvents'
 import { setCurrentProfileCurrency } from '../services/profileCurrency'
@@ -13,6 +14,42 @@ import type { Profile, ProfileUpdate } from '@voice-expense/shared'
 // until we see a row or hit the budget.
 const PROFILE_RETRY_INTERVAL_MS = 250
 const PROFILE_RETRY_BUDGET_MS = 5_000
+
+/** IANA zone the device is currently in, e.g. "America/Chicago". Null on
+ *  a platform/runtime that can't answer (web fallback, simulator quirk) —
+ *  callers must treat that as "don't know", never coerce to UTC. */
+function getDeviceTimeZone(): string | null {
+  try {
+    return getCalendars()[0]?.timeZone ?? null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * `profiles.timezone` (fix-plan 1.3, part 1) — declared in the schema
+ * since migration 001, written by nothing until now, so every
+ * production profile reads the column default 'UTC' regardless of
+ * where the user actually is (audit 04-F4). Zones change when people
+ * travel, so this runs on every authenticated launch, not just once at
+ * sign-up: a silent, fire-and-forget correction, never blocking the
+ * profile read path it rides in on. A transient failure just means the
+ * next launch tries again — there is nothing here worth retrying
+ * eagerly or surfacing to the user.
+ */
+function captureDeviceTimezone(userId: string, storedTimezone: string): void {
+  const deviceTz = getDeviceTimeZone()
+  if (!deviceTz || deviceTz === storedTimezone) return
+  supabase
+    .from('profiles')
+    .update({ timezone: deviceTz })
+    .eq('id', userId)
+    .then(({ error }) => {
+      if (error) {
+        console.warn('[useProfile] failed to capture device timezone', error.message)
+      }
+    })
+}
 
 export function useProfile(userId: string | undefined) {
   const [profile, setProfile] = useState<Profile | null>(null)
@@ -40,6 +77,7 @@ export function useProfile(userId: string | undefined) {
         clearTimeout(retryTimerRef.current)
         retryTimerRef.current = null
       }
+      captureDeviceTimezone(userId, (data as Profile).timezone)
       return
     }
 

@@ -1,4 +1,5 @@
 import type { RecurringFrequency } from './recurring'
+import type { Database } from './database.types'
 
 export type PaymentMethod =
   | 'cash'
@@ -18,52 +19,47 @@ export type TransactionSource =
 
 export type TransactionDirection = 'debit' | 'credit'
 
-export interface Transaction {
-  id: string
-  user_id: string
-  amount: number
+// The columns below carry a Postgres CHECK constraint that `supabase gen
+// types` cannot see (it only reads column types) — the generated Row/Insert/
+// Update shapes type them as bare `string`. Narrowing them back to the
+// app's literal unions here, on top of the generated shape rather than
+// instead of it, is what keeps this file a real derivative of the schema:
+// rename or drop `transactions.direction` in the DB and this type stops
+// compiling, exactly like every other column.
+type NarrowedTransactionColumns = {
   direction: TransactionDirection
-  currency_code: string
-  category_id: string | null
-  merchant: string | null
-  merchant_domain: string | null
-  note: string | null
-  payment_method: PaymentMethod | null
-  /** Amount converted to the user's profile currency using the FX
-   *  rate on `fx_rate_date`. Null on historical rows that pre-date
-   *  migration 011 and have foreign currencies awaiting backfill.
-   *  Aggregations should sum this column (and skip null rows) to
-   *  keep multi-currency totals coherent — summing `amount` blindly
-   *  across currencies is the original LOGIC §2.1 bug. */
-  amount_in_profile_currency: number | null
-  /** Ratio used to convert `amount` → `amount_in_profile_currency`.
-   *  1.0 when the transaction's currency matches the profile's. */
-  fx_rate_to_profile: number | null
-  /** Calendar date the rate above was retrieved for. Either the
-   *  transaction's date (write-time snapshot) or null for unfilled
-   *  rows. ISO YYYY-MM-DD. */
-  fx_rate_date: string | null
-  transacted_at: string // ISO 8601
   source: TransactionSource
-  raw_transcript: string | null
-  ai_confidence: number | null
-  is_recurring: boolean
-  recurring_rule_id: string | null
-  /** The cadence the user chose when marking this transaction recurring.
-   *  Durable carrier of intent: the server-side trigger reads it to create
-   *  or link the recurring_rules row. Null when is_recurring is false or
-   *  for rows generated FROM a rule. */
+  payment_method: PaymentMethod | null
   recurring_frequency: RecurringFrequency | null
-  // Sync fields
-  client_id: string
-  client_created_at: string
-  version: number
-  is_deleted: boolean
-  deleted_at: string | null
-  synced_at: string | null
-  created_at: string
-  updated_at: string
 }
 
-export type TransactionInsert = Omit<Transaction, 'created_at' | 'updated_at'>
-export type TransactionUpdate = Partial<TransactionInsert> & { id: string }
+type TransactionRow = Database['public']['Tables']['transactions']['Row']
+type TransactionInsertRow = Database['public']['Tables']['transactions']['Insert']
+type TransactionUpdateRow = Database['public']['Tables']['transactions']['Update']
+
+/** `Transaction` documents each field inline for readers of this file —
+ *  see the generated `TransactionRow` (database.types.ts) for the raw
+ *  column list this is derived from. */
+export type Transaction = Omit<TransactionRow, keyof NarrowedTransactionColumns> &
+  NarrowedTransactionColumns & {
+    /** Amount converted to the user's profile currency using the FX
+     *  rate on `fx_rate_date`. Null on historical rows that pre-date
+     *  migration 011 and have foreign currencies awaiting backfill.
+     *  Aggregations should sum this column (and skip null rows) to
+     *  keep multi-currency totals coherent — summing `amount` blindly
+     *  across currencies is the original LOGIC §2.1 bug. */
+    amount_in_profile_currency: number | null
+    /** Ratio used to convert `amount` → `amount_in_profile_currency`.
+     *  1.0 when the transaction's currency matches the profile's. */
+    fx_rate_to_profile: number | null
+    /** Calendar date the rate above was retrieved for. Either the
+     *  transaction's date (write-time snapshot) or null for unfilled
+     *  rows. ISO YYYY-MM-DD. */
+    fx_rate_date: string | null
+  }
+
+export type TransactionInsert = Omit<TransactionInsertRow, keyof NarrowedTransactionColumns> &
+  Partial<Pick<NarrowedTransactionColumns, 'payment_method' | 'recurring_frequency'>> &
+  Pick<NarrowedTransactionColumns, 'direction' | 'source'>
+export type TransactionUpdate = Partial<Omit<TransactionUpdateRow, keyof NarrowedTransactionColumns>> &
+  Partial<NarrowedTransactionColumns> & { id: string }

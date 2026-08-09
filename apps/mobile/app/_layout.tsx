@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { Stack, useRouter, useSegments } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import * as SplashScreen from 'expo-splash-screen'
+import { useFonts } from 'expo-font'
 import { useAuth } from '../src/hooks/useAuth'
 import { useProfile } from '../src/hooks/useProfile'
 import { syncManager } from '../src/services/sync/SyncManager'
@@ -10,10 +11,28 @@ import { seedDefaultCategories } from '../src/services/seedCategories'
 import { runRecurringCatchUp } from '../src/services/recurringCatchUp'
 import { runFxBackfill } from '../src/services/fxBackfill'
 import { UndoProvider } from '../src/hooks/useUndo'
+import { SyncFailureBanner } from '../src/components/SyncFailureBanner'
 import { t } from '@voice-expense/shared'
 import type { Locale } from '@voice-expense/shared'
 
 SplashScreen.preventAutoHideAsync()
+
+// Registers every face named by `Typography.fontFamily` (src/theme/typography.ts).
+// Keys here ARE the `fontFamily` strings used app-wide — expo-font maps this
+// key, not the font's internal PostScript name, to the loaded asset, so it
+// stays decoupled from whatever name the .ttf embeds. Plus Jakarta Sans and
+// DM Mono are both OFL-licensed (see apps/mobile/assets/fonts/OFL-*.txt).
+//
+// DM Mono ships no Bold face upstream (Regular/Medium/Light only) — Medium
+// is registered under the `DMMonoBold` key as the closest available weight
+// for the one consumer (Text.amountChip); it is not a true bold.
+const FONT_MAP = {
+  PlusJakartaSans: require('../assets/fonts/PlusJakartaSans-Regular.ttf'),
+  'PlusJakartaSans-SemiBold': require('../assets/fonts/PlusJakartaSans-SemiBold.ttf'),
+  'PlusJakartaSans-Bold': require('../assets/fonts/PlusJakartaSans-Bold.ttf'),
+  DMMonoRegular: require('../assets/fonts/DMMono-Regular.ttf'),
+  DMMonoBold: require('../assets/fonts/DMMono-Medium.ttf'),
+}
 
 export default function RootLayout() {
   const { session, loading } = useAuth()
@@ -21,16 +40,17 @@ export default function RootLayout() {
   const segments = useSegments()
   const router = useRouter()
   const locale = (profile?.locale ?? 'en') as Locale
+  const [fontsLoaded, fontError] = useFonts(FONT_MAP)
 
-  // Splash stays up until we have enough data to route. That means:
-  // - auth has finished loading, AND
-  // - if there's a session, profile has also loaded (so we know whether
-  //   to send the user to onboarding or straight to /(tabs)).
-  // Without this check, the Stack renders its default child (usually
-  // /(tabs)) for one frame between auth resolving and profile arriving,
-  // producing a visible flash of the Today screen before onboarding
-  // kicks in.
-  const ready = !loading && (!session || !profileLoading)
+  // Splash stays up until we have enough data to route AND the custom
+  // faces are registered. Without the font gate, the first frame(s) render
+  // with San Francisco/Roboto fallback before RN swaps to Plus Jakarta
+  // Sans/DM Mono, which is visible as a layout "pop" on every cold start
+  // (see docs/audit-2026-08-08/01-mobile-ui-and-layout.md F5). `fontError`
+  // still counts as resolved — better a system-font fallback than an
+  // infinite splash if font loading ever fails on a device.
+  const fontsReady = fontsLoaded || !!fontError
+  const ready = fontsReady && !loading && (!session || !profileLoading)
 
   // Handles voiceexpense://shortcut?amount=XX&merchant=... deep links from iOS Shortcuts
   useShortcutHandler()
@@ -211,6 +231,9 @@ export default function RootLayout() {
           }}
         />
       </Stack>
+      {/* App-wide failure surface for the sync outbox (fix-plan 1.6 point
+          4) — renders nothing unless something is dead-lettered. */}
+      <SyncFailureBanner />
     </UndoProvider>
   )
 }

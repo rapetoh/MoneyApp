@@ -1,17 +1,17 @@
+import type { Database } from './database.types'
+
 export type BudgetPeriod = 'weekly' | 'biweekly' | 'monthly' | 'quarterly' | 'yearly'
 
-export interface Budget {
-  id: string
-  user_id: string
-  category_id: string | null
-  amount: number
+// `period` carries a CHECK constraint the generated type can't see (it
+// comes back as a bare `string`) — narrowed to BudgetPeriod here. Every
+// other column is re-exported as generated: see database.types.ts.
+export type Budget = Omit<Database['public']['Tables']['budgets']['Row'], 'period'> & {
   period: BudgetPeriod
-  currency_code: string
-  starts_at: string // date
-  is_active: boolean
-  created_at: string
-  updated_at: string
 }
-
-export type BudgetInsert = Omit<Budget, 'created_at' | 'updated_at'>
-export type BudgetUpdate = Partial<BudgetInsert> & { id: string }
+export type BudgetInsert = Omit<Database['public']['Tables']['budgets']['Insert'], 'period'> & {
+  period: BudgetPeriod
+}
+export type BudgetUpdate = Omit<Database['public']['Tables']['budgets']['Update'], 'period'> & {
+  period?: BudgetPeriod
+  id: string
+}

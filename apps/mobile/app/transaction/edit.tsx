@@ -8,6 +8,7 @@ import {
   StyleSheet,
   Alert,
   ActivityIndicator,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native'
@@ -21,6 +22,7 @@ import { useRecurringRules } from '../../src/hooks/useRecurringRules'
 import { getTransactionById } from '../../src/services/sync/transactionStore'
 import { CategoryPicker } from '../../src/components/CategoryPicker'
 import { RecurringToggle } from '../../src/components/RecurringToggle'
+import { NumericAccessory, NUMERIC_ACCESSORY_ID } from '../../src/components/NumericAccessory'
 import { Colors, Typography, Spacing, Radius } from '../../src/theme'
 import { t, currencySymbolFor } from '@voice-expense/shared'
 import type { Transaction, TransactionDirection, PaymentMethod, Locale, RecurringFrequency } from '@voice-expense/shared'
@@ -187,9 +189,11 @@ export default function EditTransactionScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <ScrollView
+          style={styles.scroll}
           contentContainerStyle={styles.content}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
         >
           {/* Direction toggle */}
           <View style={styles.directionRow}>
@@ -221,7 +225,7 @@ export default function EditTransactionScreen() {
               placeholder="0.00"
               placeholderTextColor={Colors.textMuted}
               keyboardType="decimal-pad"
-              autoFocus
+              inputAccessoryViewID={NUMERIC_ACCESSORY_ID}
             />
           </View>
 
@@ -289,7 +293,13 @@ export default function EditTransactionScreen() {
               locale={locale}
             />
           </View>
+        </ScrollView>
 
+        {/* Pinned outside the ScrollView — see F23: Save was the last child
+            of a long scroll and landed below the fold once the keyboard was
+            up. `SafeAreaView edges={['bottom']}` above already reserves the
+            home-indicator inset, so this footer doesn't add its own. */}
+        <View style={styles.footer}>
           <Pressable
             style={[styles.saveButton, saving && styles.saveButtonDisabled]}
             onPress={handleSave}
@@ -301,8 +311,9 @@ export default function EditTransactionScreen() {
               <Text style={styles.saveButtonText}>{t('voice.save_changes', locale)}</Text>
             )}
           </Pressable>
-        </ScrollView>
+        </View>
       </KeyboardAvoidingView>
+      <NumericAccessory onDone={() => Keyboard.dismiss()} />
     </SafeAreaView>
   )
 }
@@ -310,7 +321,21 @@ export default function EditTransactionScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.background },
-  content: { padding: Spacing.base, gap: Spacing.base, paddingBottom: Spacing['3xl'] },
+  scroll: { flex: 1 },
+  content: { padding: Spacing.base, gap: Spacing.base, paddingBottom: Spacing.lg },
+  // Pinned outside the ScrollView (F23) — same shape as
+  // VoiceConfirmModal's footer. `SafeAreaView edges={['bottom']}` on the
+  // screen root already reserves the home-indicator inset, so this footer
+  // does not add insets.bottom itself (that would double-count — see F23's
+  // refuted sub-claim).
+  footer: {
+    paddingHorizontal: Spacing.base,
+    paddingTop: Spacing.sm,
+    paddingBottom: Spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+    backgroundColor: Colors.background,
+  },
   directionRow: {
     flexDirection: 'row',
     backgroundColor: Colors.card,
@@ -339,7 +364,15 @@ const styles = StyleSheet.create({
   amountInput: { flex: 1, fontFamily: Typography.fontFamily.serif, fontSize: Typography.size['4xl'], fontWeight: '600', letterSpacing: -0.6, color: Colors.text },
   fields: { gap: Spacing.base },
   field: { gap: Spacing.xs },
-  label: { fontFamily: Typography.fontFamily.sansSemiBold, fontSize: Typography.size.sm, color: Colors.text },
+  // fontWeight pairs with fontFamily so this survives a fallback where the
+  // named face doesn't resolve — see
+  // docs/audit-2026-08-08/01-mobile-ui-and-layout.md F5.
+  label: {
+    fontFamily: Typography.fontFamily.sansSemiBold,
+    fontWeight: '600',
+    fontSize: Typography.size.sm,
+    color: Colors.text,
+  },
   input: {
     backgroundColor: Colors.card,
     borderRadius: Radius.md,
@@ -356,7 +389,7 @@ const styles = StyleSheet.create({
   chipActive: { backgroundColor: Colors.primaryLight, borderColor: Colors.primary },
   chipLabel: { fontFamily: Typography.fontFamily.sans, fontSize: Typography.size.sm, color: Colors.textSecondary },
   chipLabelActive: { color: Colors.primary, fontFamily: Typography.fontFamily.sansSemiBold },
-  saveButton: { backgroundColor: Colors.primary, borderRadius: Radius.md, paddingVertical: Spacing.base, alignItems: 'center', marginTop: Spacing.sm },
+  saveButton: { backgroundColor: Colors.primary, borderRadius: Radius.md, paddingVertical: Spacing.base, alignItems: 'center' },
   saveButtonDisabled: { opacity: 0.6 },
   saveButtonText: { fontFamily: Typography.fontFamily.sansBold, fontSize: Typography.size.base, color: Colors.white },
 })
