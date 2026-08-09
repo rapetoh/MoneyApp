@@ -39,7 +39,7 @@ export default function EditTransactionScreen() {
   const { profile } = useProfile(user?.id)
   const { categories, createCategory } = useCategories(user?.id)
   const { editTransaction } = useTransactions(user?.id)
-  const { rules, createRule, deleteRule, updateRule } = useRecurringRules(user?.id)
+  const { rules, updateRule } = useRecurringRules(user?.id)
   const locale = (profile?.locale ?? 'en') as Locale
   const currency = profile?.currency_code ?? 'USD'
   const router = useRouter()
@@ -77,9 +77,11 @@ export default function EditTransactionScreen() {
         setDirection(data.direction)
         setPaymentMethod(data.payment_method)
         setIsRecurring(data.is_recurring ?? false)
-        // Prefill frequency from the matching rule if one exists.
+        // The row's own recurring_frequency is the durable, offline-safe
+        // record of the user's choice (migration 013); the linked rule is
+        // the fallback for legacy rows saved before the column existed.
         const linkedRule = rules.find((r) => r.template_txn_id === data.id)
-        if (linkedRule) setFrequency(linkedRule.frequency)
+        setFrequency(data.recurring_frequency ?? linkedRule?.frequency ?? 'monthly')
       }
       setLoading(false)
     })
@@ -138,44 +140,19 @@ export default function EditTransactionScreen() {
       category_id: categoryId,
       payment_method: paymentMethod,
       is_recurring: isRecurring,
+      recurring_frequency: isRecurring ? frequency : null,
     })
 
-    // Reconcile the recurring_rules row based on how the toggle and
-    // (if generated) the scope choice resolved.
-    //   off → off                : no-op
-    //   on  → on, no linked rule : create a new rule linked to this txn
-    //   on  → off                : delete the existing rule (only if
-    //                              this txn IS the template — never
-    //                              delete a rule just because the user
-    //                              toggled a single generated occurrence
-    //                              off; that would orphan every other
-    //                              future occurrence)
-    //   on  → on, generated      : update the rule iff the user chose
-    //                              "all future"; otherwise leave it
-    //                              alone (single-occurrence edit)
-    //   on  → on, template       : update the rule with the new values
-    //                              (legacy "ghost" case where the txn
-    //                              was flagged but no rule existed is
-    //                              also handled here)
+    // Rule lifecycle (create on flag, deactivate on unflag of the template)
+    // is owned by the server-side transactions trigger — migration 013 —
+    // which fires atomically when this edit syncs. The one rule mutation
+    // that stays client-side is the explicit "apply to all future" choice
+    // on a generated occurrence: that is direct rule management, not
+    // creation, and has no sync race.
     const wasLinked = !!linkedRule
     const isTemplate = linkedRule?.template_txn_id === txn.id
-    const now = isRecurring
 
-    if (!error && !wasLinked && now) {
-      await createRule({
-        name: merchant.trim() || null,
-        amount: parsedAmount,
-        currency_code: txn.currency_code,
-        category_id: categoryId,
-        direction,
-        payment_method: paymentMethod,
-        note: note.trim() || null,
-        frequency,
-        template_txn_id: txn.id,
-      })
-    } else if (!error && wasLinked && !now && isTemplate) {
-      await deleteRule(linkedRule!.id)
-    } else if (!error && wasLinked && now && (isTemplate || applyToRule)) {
+    if (!error && wasLinked && isRecurring && (isTemplate || applyToRule)) {
       await updateRule(linkedRule!.id, {
         name: merchant.trim() || null,
         amount: parsedAmount,

@@ -27,6 +27,7 @@ function rowToTransaction(row: Record<string, unknown>): Transaction {
     ai_confidence: (row.ai_confidence as number) ?? null,
     is_recurring: Boolean(row.is_recurring),
     recurring_rule_id: (row.recurring_rule_id as string) ?? null,
+    recurring_frequency: (row.recurring_frequency as Transaction['recurring_frequency']) ?? null,
     client_id: row.client_id as string,
     client_created_at: row.client_created_at as string,
     version: row.version as number,
@@ -54,9 +55,9 @@ export async function upsertTransaction(txn: Transaction): Promise<void> {
       id, user_id, amount, direction, currency_code, category_id, merchant, merchant_domain, note,
       payment_method, amount_in_profile_currency, fx_rate_to_profile, fx_rate_date,
       transacted_at, source, raw_transcript, ai_confidence,
-      is_recurring, recurring_rule_id, client_id, client_created_at, version,
+      is_recurring, recurring_rule_id, recurring_frequency, client_id, client_created_at, version,
       is_deleted, deleted_at, synced_at, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(id) DO UPDATE SET
       amount = excluded.amount,
       direction = excluded.direction,
@@ -69,6 +70,11 @@ export async function upsertTransaction(txn: Transaction): Promise<void> {
       fx_rate_to_profile = excluded.fx_rate_to_profile,
       fx_rate_date = excluded.fx_rate_date,
       transacted_at = excluded.transacted_at,
+      source = excluded.source,
+      ai_confidence = excluded.ai_confidence,
+      is_recurring = excluded.is_recurring,
+      recurring_rule_id = excluded.recurring_rule_id,
+      recurring_frequency = excluded.recurring_frequency,
       version = excluded.version,
       is_deleted = excluded.is_deleted,
       deleted_at = excluded.deleted_at,
@@ -95,6 +101,7 @@ export async function upsertTransaction(txn: Transaction): Promise<void> {
       txn.ai_confidence ?? null,
       txn.is_recurring ? 1 : 0,
       txn.recurring_rule_id ?? null,
+      txn.recurring_frequency ?? null,
       txn.client_id,
       txn.client_created_at,
       txn.version,
@@ -118,7 +125,7 @@ export async function softDeleteTransaction(id: string): Promise<void> {
 
 export async function updateTransactionFields(
   id: string,
-  fields: Partial<Pick<Transaction, 'amount' | 'merchant' | 'note' | 'category_id' | 'payment_method' | 'direction' | 'is_recurring'>>,
+  fields: Partial<Pick<Transaction, 'amount' | 'merchant' | 'note' | 'category_id' | 'payment_method' | 'direction' | 'is_recurring' | 'recurring_frequency'>>,
 ): Promise<void> {
   const db = await getDb()
   const now = new Date().toISOString()

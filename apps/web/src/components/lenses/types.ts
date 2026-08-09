@@ -37,9 +37,20 @@ export interface LensProps {
   recurring: LensRecurring[]
   currency: string
   locale: string
-  /** Inclusive start of the current month (00:00 local). */
+  /** Anchor month identity as timezone-independent numbers. Lenses MUST
+   *  derive year/month/weekday from these — never from getFullYear()/
+   *  getMonth()/getDay() on the Date props below. Those Dates are built in
+   *  the server component's timezone (UTC on Vercel) and cross the RSC
+   *  boundary as absolute instants: any browser west of UTC reads them as
+   *  the previous day, which shifted the whole calendar lens to the wrong
+   *  month (the "August shows July 8" production bug). */
+  anchorYear: number
+  /** 0-based month index, same convention as Date#getMonth(). */
+  anchorMonth: number
+  /** Inclusive start of the anchor month as an instant. Range comparisons
+   *  against other instants only — never call date getters on it. */
   monthStart: Date
-  /** Inclusive end of the current month (23:59:59 local). */
+  /** Inclusive end of the anchor month as an instant. Same rule. */
   monthEnd: Date
   /** "April" / "Avril" — already localized. */
   monthLabel: string

@@ -5,7 +5,6 @@ import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '../../src/hooks/useAuth'
 import { useProfile } from '../../src/hooks/useProfile'
-import { useRecurringRules } from '../../src/hooks/useRecurringRules'
 import { useTransactions } from '../../src/hooks/useTransactions'
 import { Colors, Typography, Hairline } from '../../src/theme'
 import { t, type Locale } from '@voice-expense/shared'
@@ -28,7 +27,6 @@ const PRESETS = [
 export default function IncomeScreen() {
   const { user } = useAuth()
   const { profile, updateProfile } = useProfile(user?.id)
-  const { createRule } = useRecurringRules(user?.id)
   const { createTransaction } = useTransactions(user?.id)
   const locale = (profile?.locale ?? 'en') as Locale
   const currency = profile?.currency_code ?? 'USD'
@@ -61,7 +59,11 @@ export default function IncomeScreen() {
     if (useIncome) {
       const sourceName = source.trim() || t('onboarding.income.default_name', locale)
 
-      const { id: txnId } = await createTransaction({
+      // The monthly income rule is created server-side by the transactions
+      // trigger (migration 013) when this row syncs — atomic with the row
+      // write, so onboarding can never again produce a "ghost recurring"
+      // income with no rule behind it.
+      await createTransaction({
         amount: amountNum,
         direction: 'credit',
         currency_code: currency,
@@ -70,26 +72,8 @@ export default function IncomeScreen() {
         category_id: null,
         payment_method: 'bank_transfer',
         is_recurring: true,
+        recurring_frequency: 'monthly',
       })
-
-      // Link the rule back to the txn so the transaction-detail screen's
-      // `rules.find(r => r.template_txn_id === txn.id)` lookup succeeds.
-      // Matches the voice + manual + edit flows; onboarding was the only
-      // path that left this orphan, producing the "ghost recurring" case
-      // for every user's very first income transaction.
-      if (txnId) {
-        await createRule({
-          name: sourceName,
-          amount: amountNum,
-          currency_code: currency,
-          category_id: null,
-          direction: 'credit',
-          payment_method: 'bank_transfer',
-          note: t('onboarding.income.txn_note', locale),
-          frequency: 'monthly',
-          template_txn_id: txnId,
-        })
-      }
     }
 
     setSaving(false)

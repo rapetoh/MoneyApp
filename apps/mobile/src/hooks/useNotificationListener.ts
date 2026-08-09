@@ -90,6 +90,7 @@ export function useNotificationListener(
         direction: 'debit',
         merchant: payload.merchant || null,
         merchant_domain: null,
+        note: null,
         category_suggestion: null,
         payment_method: 'digital_wallet',
         transacted_at: new Date(payload.timestamp).toISOString(),

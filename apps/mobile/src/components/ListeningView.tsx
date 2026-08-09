@@ -8,6 +8,7 @@ import {
   Easing,
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Money } from './Money'
 import { Colors, Typography } from '../theme'
 import { t, type Locale } from '@voice-expense/shared'
@@ -161,9 +162,10 @@ export function ListeningView({
   locale,
 }: Props) {
   const detectedAmount = useMemo(() => extractAmount(transcript), [transcript])
+  const insets = useSafeAreaInsets()
 
   return (
-    <View style={styles.screen}>
+    <View style={[styles.screen, { paddingTop: insets.top }]}>
       {/* Top row */}
       <View style={styles.topRow}>
         <View style={styles.liveWrap}>

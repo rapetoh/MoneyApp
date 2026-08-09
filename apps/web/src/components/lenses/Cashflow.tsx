@@ -23,8 +23,10 @@ interface DayPoint {
 export function CashflowLens({ props }: { props: LensProps }) {
   const credits = monthCredits(props)
   const debits = monthDebits(props)
-  const year = props.monthStart.getFullYear()
-  const monthIdx = props.monthStart.getMonth()
+  // Timezone-free anchor numbers — see LensProps. Never read date getters
+  // off the serialized monthStart instant.
+  const year = props.anchorYear
+  const monthIdx = props.anchorMonth
   const daysInMonth = new Date(year, monthIdx + 1, 0).getDate()
 
   // Build per-day income/expense and a running "balance" relative to start.

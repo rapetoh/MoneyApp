@@ -235,7 +235,7 @@ export default function RecurringPage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
     const startsAt = new Date().toISOString()
-    await supabase.from('recurring_rules').insert({
+    const { error } = await supabase.from('recurring_rules').insert({
       user_id: user.id,
       name: c.merchant,
       amount: c.amount,
@@ -252,6 +252,37 @@ export default function RecurringPage() {
       is_active: true,
       template_txn_id: c.templateTxnId,
     })
+    if (error) {
+      // One active rule per (user, direction, name) — a same-merchant
+      // candidate (e.g. a price change) merges into the existing rule
+      // instead of silently vanishing.
+      if (error.code === '23505') {
+        const { data: existing } = await supabase
+          .from('recurring_rules')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('direction', c.direction)
+          .eq('is_active', true)
+          .ilike('name', c.merchant)
+          .limit(1)
+          .maybeSingle()
+        if (existing) {
+          await supabase
+            .from('recurring_rules')
+            .update({
+              amount: c.amount,
+              frequency: c.frequency,
+              category_id: c.category_id,
+              payment_method: c.payment_method,
+              last_generated: c.lastSeenAt,
+            })
+            .eq('id', existing.id)
+        }
+      } else {
+        window.alert(`Could not set up the recurring rule: ${error.message}`)
+        return
+      }
+    }
     await load()
   }
 

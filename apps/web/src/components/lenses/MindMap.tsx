@@ -496,7 +496,7 @@ export function MindMapLens({ props, displayName }: { props: LensProps; displayN
                 textTransform: 'uppercase',
               }}
             >
-              {props.monthLabel} {props.monthStart.getFullYear()}
+              {props.monthLabel} {props.anchorYear}
             </div>
             <div
               style={{

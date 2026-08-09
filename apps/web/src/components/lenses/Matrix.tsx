@@ -22,10 +22,10 @@ interface MonthCol {
   end: Date
 }
 
-function buildMonths(currentMonthStart: Date, locale: string): MonthCol[] {
+function buildMonths(anchorYear: number, anchorMonth: number, locale: string): MonthCol[] {
   const out: MonthCol[] = []
   for (let i = 5; i >= 0; i--) {
-    const ref = new Date(currentMonthStart.getFullYear(), currentMonthStart.getMonth() - i, 1)
+    const ref = new Date(anchorYear, anchorMonth - i, 1)
     const start = new Date(ref.getFullYear(), ref.getMonth(), 1)
     const end = new Date(ref.getFullYear(), ref.getMonth() + 1, 0, 23, 59, 59, 999)
     out.push({ label: ref.toLocaleDateString(locale, { month: 'short' }), start, end })
@@ -34,7 +34,9 @@ function buildMonths(currentMonthStart: Date, locale: string): MonthCol[] {
 }
 
 export function MatrixLens({ props }: { props: LensProps }) {
-  const months = buildMonths(props.monthStart, props.locale)
+  // Timezone-free anchor numbers — see LensProps. Never read date getters
+  // off the serialized monthStart instant.
+  const months = buildMonths(props.anchorYear, props.anchorMonth, props.locale)
 
   // Aggregate spend per (category, monthIndex).
   const allCats = new Set<string>()

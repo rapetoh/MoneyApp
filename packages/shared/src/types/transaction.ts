@@ -1,3 +1,5 @@
+import type { RecurringFrequency } from './recurring'
+
 export type PaymentMethod =
   | 'cash'
   | 'credit_card'
@@ -47,6 +49,11 @@ export interface Transaction {
   ai_confidence: number | null
   is_recurring: boolean
   recurring_rule_id: string | null
+  /** The cadence the user chose when marking this transaction recurring.
+   *  Durable carrier of intent: the server-side trigger reads it to create
+   *  or link the recurring_rules row. Null when is_recurring is false or
+   *  for rows generated FROM a rule. */
+  recurring_frequency: RecurringFrequency | null
   // Sync fields
   client_id: string
   client_created_at: string

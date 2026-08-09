@@ -33,6 +33,7 @@ async function initSchema(db: SQLite.SQLiteDatabase): Promise<void> {
       ai_confidence REAL,
       is_recurring INTEGER NOT NULL DEFAULT 0,
       recurring_rule_id TEXT,
+      recurring_frequency TEXT,
       client_id TEXT NOT NULL,
       client_created_at TEXT NOT NULL,
       version INTEGER NOT NULL DEFAULT 1,
@@ -89,6 +90,12 @@ async function migrateSchema(db: SQLite.SQLiteDatabase): Promise<void> {
     }
   }
 
+  // Migration 013 mirror — the user's chosen recurring cadence lives on the
+  // transaction row so the server-side trigger can create/link the rule.
+  if (!tableInfo.some((c) => c.name === 'recurring_frequency')) {
+    await db.execAsync('ALTER TABLE transactions ADD COLUMN recurring_frequency TEXT')
+  }
+
   // Step 1 — Drop the legacy `payment_method NOT NULL DEFAULT 'cash'`
   // constraint from existing installs. SQLite has no DROP NOT NULL, so
   // we table-swap: copy rows into a freshly-built table with the
@@ -113,12 +120,16 @@ async function migrateSchema(db: SQLite.SQLiteDatabase): Promise<void> {
         merchant_domain TEXT,
         note TEXT,
         payment_method TEXT,
+        amount_in_profile_currency REAL,
+        fx_rate_to_profile REAL,
+        fx_rate_date TEXT,
         transacted_at TEXT NOT NULL,
         source TEXT NOT NULL DEFAULT 'manual',
         raw_transcript TEXT,
         ai_confidence REAL,
         is_recurring INTEGER NOT NULL DEFAULT 0,
         recurring_rule_id TEXT,
+        recurring_frequency TEXT,
         client_id TEXT NOT NULL,
         client_created_at TEXT NOT NULL,
         version INTEGER NOT NULL DEFAULT 1,
@@ -130,9 +141,11 @@ async function migrateSchema(db: SQLite.SQLiteDatabase): Promise<void> {
       );
       INSERT INTO transactions_new SELECT
         id, user_id, amount, direction, currency_code, category_id,
-        merchant, merchant_domain, note, payment_method, transacted_at,
+        merchant, merchant_domain, note, payment_method,
+        amount_in_profile_currency, fx_rate_to_profile, fx_rate_date,
+        transacted_at,
         source, raw_transcript, ai_confidence, is_recurring,
-        recurring_rule_id, client_id, client_created_at, version,
+        recurring_rule_id, recurring_frequency, client_id, client_created_at, version,
         is_deleted, deleted_at, synced_at, created_at, updated_at
       FROM transactions;
       DROP TABLE transactions;
@@ -172,14 +185,27 @@ async function migrateSchema(db: SQLite.SQLiteDatabase): Promise<void> {
     )
   `)
 
-  // Step 3 — Partial unique index, mirroring Supabase migration 008.
+  // Step 3 — Partial unique index, mirroring Supabase migration 013.
   // Stops the mobile catch-up from inserting a duplicate locally even
   // before the queued upsert hits Supabase. substr(transacted_at, 1, 10)
   // takes the YYYY-MM-DD slice (ISO strings stored as TEXT) — safe
   // because all serializations go through Date.toISOString().
-  await db.execAsync(`
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_txn_recurring_dedup
-      ON transactions (user_id, recurring_rule_id, substr(transacted_at, 1, 10))
-      WHERE recurring_rule_id IS NOT NULL AND is_deleted = 0
-  `)
+  // Scoped to source='recurring_generated': since migration 013 links
+  // user-entered template transactions to their rule too, and a manually
+  // logged bill may legitimately share (rule, date) with a generated
+  // occurrence, only engine-generated rows participate in dedup. The old
+  // broader index (mirror of 008) is dropped and rebuilt with the
+  // narrower predicate.
+  const dedupIdx = await db.getFirstAsync<{ sql: string | null }>(
+    "SELECT sql FROM sqlite_master WHERE type = 'index' AND name = 'idx_txn_recurring_dedup'",
+  )
+  if (!dedupIdx?.sql?.includes('recurring_generated')) {
+    await db.execAsync(`
+      DROP INDEX IF EXISTS idx_txn_recurring_dedup;
+      CREATE UNIQUE INDEX idx_txn_recurring_dedup
+        ON transactions (user_id, recurring_rule_id, substr(transacted_at, 1, 10))
+        WHERE recurring_rule_id IS NOT NULL AND is_deleted = 0
+          AND source = 'recurring_generated'
+    `)
+  }
 }

@@ -401,21 +401,42 @@ export default function BudgetsPage() {
               <text x="110" y="100" textAnchor="middle" fontSize="12" fill={colors.ink3} fontWeight="600">
                 {overall ? `${Math.round(overallPct * 100)}% used` : 'No overall budget'}
               </text>
-              <text
-                x="110"
-                y="128"
-                textAnchor="middle"
-                fontSize="26"
-                fontWeight="700"
-                fontFamily={font.display}
-                fill={colors.ink}
-              >
-                {fmtShort(overallSpent)}
-              </text>
-              {overall && (
-                <text x="110" y="148" textAnchor="middle" fontSize="11" fill={colors.ink4} fontWeight="600">
-                  of {fmtShort(overall.amount)}
-                </text>
+              {/* A bare unlabeled number in a money app is ambiguous — in the
+                  no-budget state the spend figure must say what it is. */}
+              {overall ? (
+                <>
+                  <text
+                    x="110"
+                    y="128"
+                    textAnchor="middle"
+                    fontSize="26"
+                    fontWeight="700"
+                    fontFamily={font.display}
+                    fill={colors.ink}
+                  >
+                    {fmtShort(overallSpent)}
+                  </text>
+                  <text x="110" y="148" textAnchor="middle" fontSize="11" fill={colors.ink4} fontWeight="600">
+                    of {fmtShort(overall.amount)}
+                  </text>
+                </>
+              ) : (
+                <>
+                  <text
+                    x="110"
+                    y="126"
+                    textAnchor="middle"
+                    fontSize="20"
+                    fontWeight="700"
+                    fontFamily={font.display}
+                    fill={colors.ink}
+                  >
+                    {fmtShort(overallSpent)}
+                  </text>
+                  <text x="110" y="144" textAnchor="middle" fontSize="11" fill={colors.ink4} fontWeight="600">
+                    spent this month
+                  </text>
+                </>
               )}
             </svg>
             <div style={{ fontSize: 12, color: colors.ink3, textAlign: 'center', lineHeight: 1.5, padding: '0 10px' }}>

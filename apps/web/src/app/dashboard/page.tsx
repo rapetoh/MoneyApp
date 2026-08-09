@@ -77,6 +77,8 @@ export default async function OverviewPage({
     recurring,
     currency,
     locale,
+    anchorYear: anchorY,
+    anchorMonth: anchorM,
     monthStart,
     monthEnd,
     monthLabel,
@@ -105,7 +107,7 @@ export default async function OverviewPage({
         <div style={styles.headerRow}>
           <div>
             <div style={styles.serifTitle}>
-              {monthLabel} {monthStart.getFullYear()} overview
+              {monthLabel} {anchorY} overview
             </div>
             <div style={styles.kpiLine}>
               <b style={{ color: colors.ink }}>{fmtShort(monthIn)}</b> in ·{' '}

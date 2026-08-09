@@ -69,7 +69,10 @@ export function computeUpcomingRecurring(
   const { start, end } = getPeriodBounds(period, now)
 
   return rules
-    .filter((r) => r.is_active)
+    // Upcoming *spend*: only debit rules belong here. Credit rules (salary,
+    // pension) counted as spend would inflate the committed number by the
+    // user's own income — visible from the first onboarding-created rule.
+    .filter((r) => r.is_active && r.direction === 'debit')
     .reduce((sum, rule) => {
       const next = computeNextOccurrence(rule)
       if (!next) return sum
@@ -131,10 +134,38 @@ export function useRecurringRules(userId: string | undefined) {
       .single()
 
     if (error) {
-      // Previously silent — the onboarding income step relied on this
-      // returning a rule and had no visibility when it didn't. A warn
-      // makes the failure loud enough to notice in dev without breaking
-      // production.
+      // One active rule per (user, direction, name) is enforced by
+      // idx_recurring_rules_active_name — a same-merchant create (e.g.
+      // accepting a price-changed pattern) merges into the existing rule
+      // instead of failing silently.
+      if (error.code === '23505' && params.name) {
+        const { data: existing } = await supabase
+          .from('recurring_rules')
+          .select('*')
+          .eq('user_id', userId)
+          .eq('direction', params.direction)
+          .eq('is_active', true)
+          .ilike('name', params.name)
+          .limit(1)
+          .maybeSingle()
+        if (existing) {
+          await supabase
+            .from('recurring_rules')
+            .update({
+              amount: params.amount,
+              frequency: params.frequency,
+              category_id: params.category_id,
+              payment_method: params.payment_method,
+            })
+            .eq('id', existing.id)
+          await fetch()
+          return {
+            ...(existing as RecurringRule),
+            amount: params.amount,
+            frequency: params.frequency,
+          }
+        }
+      }
       console.warn('[useRecurringRules] createRule failed:', error)
       return null
     }

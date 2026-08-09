@@ -71,6 +71,7 @@ export function VoiceConfirmModal({
     if (!parsedExpense) return
     setAmount(parsedExpense.amount > 0 ? String(parsedExpense.amount) : '')
     setMerchant(parsedExpense.merchant ?? '')
+    setNote(parsedExpense.note ?? '')
     setDirection(parsedExpense.direction ?? 'debit')
 
     if (parsedExpense.is_recurring_suggestion) {
@@ -138,8 +139,11 @@ export function VoiceConfirmModal({
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onDismiss}>
       <Pressable style={styles.backdrop} onPress={onDismiss}>
         <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
-          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-            <SafeAreaView edges={['bottom']}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            style={styles.shrink}
+          >
+            <SafeAreaView edges={['bottom']} style={styles.shrink}>
               <View style={styles.handle} />
 
               <View style={styles.header}>
@@ -314,12 +318,17 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     maxHeight: '72%',
+    overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.15,
     shadowRadius: 12,
     elevation: 12,
   },
+  // Yoga only clamps a subtree to an ancestor's maxHeight if every wrapper in
+  // between can shrink; without this the sheet's content column overflows past
+  // the screen bottom and the Save footer lands under the home indicator.
+  shrink: { flexShrink: 1 },
   handle: {
     alignSelf: 'center',
     width: 40,

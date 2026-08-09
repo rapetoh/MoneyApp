@@ -194,6 +194,9 @@ export default async function InsightsPage() {
   const locale = profile?.locale ?? 'en'
 
   const now = new Date()
+  // The subtitle claims a 6-month scope, so count only what's inside it.
+  const sixMonthStart = startOfMonth(now.getFullYear(), now.getMonth() - 5)
+  const sixMonthCount = txns.filter((t) => new Date(t.transacted_at) >= sixMonthStart).length
   // Last 6 calendar months by total debit
   const monthlyTotals: Array<{ label: string; total: number; year: number; month: number }> = []
   for (let i = 5; i >= 0; i--) {
@@ -221,23 +224,32 @@ export default async function InsightsPage() {
   const dim = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
   const dayOfMonth = now.getDate()
   const currentTotal = monthlyTotals[monthlyTotals.length - 1].total
-  const projectedCurrent = dayOfMonth > 0 ? (currentTotal / dayOfMonth) * dim : currentTotal
-  const projectedDelta = avg > 0 ? Math.round(((projectedCurrent - avg) / avg) * 100) : null
+  // Straight run-rate: spend-so-far ÷ days elapsed × days in month. It is
+  // labeled as "at this pace" in the UI and suppressed early in the month —
+  // on day 1 a single coffee would otherwise "project" to a 31× total.
+  const projectedCurrent = (currentTotal / dayOfMonth) * dim
+  const showPace = dayOfMonth >= 3 && currentTotal > 0
+  const projectedDelta = avg > 0 && showPace ? Math.round(((projectedCurrent - avg) / avg) * 100) : null
 
-  // 3 forecast months from running average
+  // 3 forecast months from the average of complete months. With fewer than
+  // 2 complete months of real spend there is nothing defensible to draw —
+  // the dashed future segment is omitted rather than invented.
+  const canForecastFuture = completeMonthlyTotals.length >= 2 && avg > 0
   const futureLabels: string[] = []
   for (let i = 1; i <= 3; i++) {
     const ref = new Date(now.getFullYear(), now.getMonth() + i, 1)
     futureLabels.push(ref.toLocaleDateString(locale, { month: 'short' }))
   }
   const labels = [...monthlyTotals.map((m) => m.label), ...futureLabels]
+  // The Actual series stays actual — the current month plots what was
+  // really spent. The projection lives only on the dashed forecast series.
   const history = monthlyTotals.map((m) => m.total)
-  // Replace last "incomplete" with projected
-  history[history.length - 1] = projectedCurrent
   const forecastLine: Array<number | null> = new Array(labels.length).fill(null)
-  forecastLine[history.length - 1] = projectedCurrent
-  for (let k = 0; k < 3; k++) {
-    forecastLine[history.length + k] = avg > 0 ? avg : projectedCurrent
+  if (showPace) forecastLine[history.length - 1] = projectedCurrent
+  if (canForecastFuture) {
+    for (let k = 0; k < 3; k++) {
+      forecastLine[history.length + k] = avg
+    }
   }
 
   const overall = budgets.find((b: any) => b.category_id === null)
@@ -261,17 +273,28 @@ export default async function InsightsPage() {
 
   // Patterns
   const patterns: string[] = []
-  // Heaviest weekday
+  // Heaviest weekday — a real average: each weekday's 90-day debit total
+  // divided by the number of DISTINCT such weekdays that actually carry
+  // spending data, and only claimed once at least 4 weeks of history exist
+  // (one Saturday of logging is not a "heaviest day" pattern).
   const weekdaySums = new Array(7).fill(0)
-  const weekdayCounts = new Array(7).fill(0)
+  const weekdayDates: Array<Set<string>> = Array.from({ length: 7 }, () => new Set())
+  let earliestDebit: Date | null = null
   for (const t of txns) {
     if (t.direction !== 'debit') continue
-    if (new Date(t.transacted_at) < ninetyAgo) continue
-    const idx = new Date(t.transacted_at).getDay()
+    const d = new Date(t.transacted_at)
+    if (d < ninetyAgo) continue
+    if (!earliestDebit || d < earliestDebit) earliestDebit = d
+    const idx = d.getDay()
     weekdaySums[idx] += aggAmount(t)
-    weekdayCounts[idx] += 1
+    weekdayDates[idx].add(d.toDateString())
   }
-  const weekdayAvg = weekdaySums.map((sum, i) => (weekdayCounts[i] > 0 ? sum / 12 : 0))
+  const spanDays = earliestDebit
+    ? (now.getTime() - earliestDebit.getTime()) / (24 * 60 * 60 * 1000)
+    : 0
+  const weekdayAvg = weekdaySums.map((sum, i) =>
+    weekdayDates[i].size > 0 ? sum / weekdayDates[i].size : 0,
+  )
   let heaviestIdx = 0
   let heaviestVal = -1
   for (let i = 0; i < 7; i++) {
@@ -281,9 +304,9 @@ export default async function InsightsPage() {
     }
   }
   const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
-  if (heaviestVal > 0) {
+  if (heaviestVal > 0 && spanDays >= 28) {
     patterns.push(
-      `${dayNames[heaviestIdx]} is your heaviest day — avg ${new Intl.NumberFormat(locale, { style: 'currency', currency, maximumFractionDigits: 0 }).format(heaviestVal)}.`,
+      `${dayNames[heaviestIdx]} is your heaviest day — avg ${new Intl.NumberFormat(locale, { style: 'currency', currency, maximumFractionDigits: 0 }).format(heaviestVal)} per ${dayNames[heaviestIdx]}.`,
     )
   }
   // Largest category share
@@ -347,7 +370,8 @@ export default async function InsightsPage() {
             Forecast & patterns
           </div>
           <div style={{ fontSize: 13, color: colors.ink3, marginTop: 2 }}>
-            Based on {txns.length} transactions across the last 6 months.
+            Based on {sixMonthCount} transaction{sixMonthCount === 1 ? '' : 's'} across the last 6
+            months.
           </div>
         </div>
 
@@ -374,10 +398,23 @@ export default async function InsightsPage() {
                 Monthly total · forecast
               </div>
               <div style={{ marginTop: 6, display: 'flex', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' }}>
-                <Money value={projectedCurrent} currency={currency} locale={locale} size={34} />
+                <Money value={currentTotal} currency={currency} locale={locale} size={34} />
                 <span style={{ fontSize: 13, color: colors.ink3 }}>
-                  projected for {now.toLocaleDateString(locale, { month: 'long' })}
+                  spent so far in {now.toLocaleDateString(locale, { month: 'long' })}
                 </span>
+                {showPace && (
+                  <span style={{ fontSize: 13, color: colors.ink3 }}>
+                    · at this pace:{' '}
+                    <b style={{ color: colors.ink }}>
+                      {new Intl.NumberFormat(locale, { style: 'currency', currency, maximumFractionDigits: 0 }).format(projectedCurrent)}
+                    </b>{' '}
+                    by{' '}
+                    {new Date(now.getFullYear(), now.getMonth(), dim).toLocaleDateString(locale, {
+                      month: 'short',
+                      day: 'numeric',
+                    })}
+                  </span>
+                )}
                 {projectedDelta != null && (
                   <span
                     style={{

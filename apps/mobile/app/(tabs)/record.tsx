@@ -19,7 +19,6 @@ import { useCategories } from '../../src/hooks/useCategories'
 import { useTransactions } from '../../src/hooks/useTransactions'
 import { useProfile } from '../../src/hooks/useProfile'
 import { useVoice } from '../../src/hooks/useVoice'
-import { useRecurringRules } from '../../src/hooks/useRecurringRules'
 import { CategoryPicker } from '../../src/components/CategoryPicker'
 import { VoiceWaveform } from '../../src/components/VoiceWaveform'
 import { VoiceConfirmModal, type ConfirmedExpense } from '../../src/components/VoiceConfirmModal'
@@ -49,7 +48,6 @@ export default function RecordScreen() {
   const { profile } = useProfile(user?.id)
   const { categories, createCategory } = useCategories(user?.id)
   const { createTransaction } = useTransactions(user?.id)
-  const { createRule } = useRecurringRules(user?.id)
   const router = useRouter()
 
   const userLocale = (profile?.locale ?? 'en') as Locale
@@ -104,7 +102,9 @@ export default function RecordScreen() {
   )
   const [confirmModalVisible, setConfirmModalVisible] = useState(false)
   const [confirmSaving, setConfirmSaving] = useState(false)
-  const [scanLoading, setScanLoading] = useState(false)
+  // Which scan is in flight — the spinner must render in the button the user
+  // actually tapped, so a bare boolean is not enough state.
+  const [scanningType, setScanningType] = useState<'receipt' | 'paycheck' | null>(null)
   const [transactionSource, setTransactionSource] = useState<TransactionSource>('voice')
 
   // Handle incoming iOS Shortcut deep link — pre-fill confirm modal
@@ -118,6 +118,7 @@ export default function RecordScreen() {
       direction: 'debit',
       merchant: params.shortcut_merchant || null,
       merchant_domain: null,
+      note: null,
       category_suggestion: null,
       payment_method: (params.shortcut_payment_method as PaymentMethod) || 'digital_wallet',
       transacted_at: new Date().toISOString(),
@@ -183,7 +184,7 @@ export default function RecordScreen() {
 
   async function handleConfirmVoice(expense: ConfirmedExpense) {
     setConfirmSaving(true)
-    const { id: txnId, error } = await createTransaction({
+    const { error } = await createTransaction({
       amount: expense.amount,
       direction: expense.direction,
       currency_code: expense.currency,
@@ -200,21 +201,11 @@ export default function RecordScreen() {
       raw_transcript: voice.transcript || null,
       ai_confidence: voice.parsedExpense?.confidence ?? null,
       is_recurring: expense.isRecurring,
+      // The rule itself is created server-side by the transactions trigger
+      // (migration 013) once this row syncs — atomically, so it can't race
+      // the sync queue the way the old client-side insert did.
+      recurring_frequency: expense.isRecurring ? expense.recurringFrequency : null,
     })
-
-    if (!error && expense.isRecurring && txnId) {
-      await createRule({
-        name: expense.merchant,
-        amount: expense.amount,
-        currency_code: expense.currency,
-        category_id: expense.categoryId,
-        direction: expense.direction,
-        payment_method: voice.parsedExpense?.payment_method ?? null,
-        note: expense.note,
-        frequency: expense.recurringFrequency,
-        template_txn_id: txnId,
-      })
-    }
 
     setConfirmSaving(false)
 
@@ -245,7 +236,7 @@ export default function RecordScreen() {
     if (result.canceled || !result.assets[0]?.base64) return
 
     const imageBase64 = result.assets[0].base64
-    setScanLoading(true)
+    setScanningType(type)
 
     try {
       const { data: sessionData } = await supabase.auth.getSession()
@@ -267,7 +258,7 @@ export default function RecordScreen() {
     } catch (err) {
       Alert.alert(t('voice.scan_failed', userLocale), err instanceof Error ? err.message : t('common.error', userLocale))
     } finally {
-      setScanLoading(false)
+      setScanningType(null)
     }
   }
 
@@ -280,7 +271,7 @@ export default function RecordScreen() {
     if (!user) return
 
     setManualSaving(true)
-    const { id: txnId, error } = await createTransaction({
+    const { error } = await createTransaction({
       amount: parsedAmount,
       direction,
       currency_code: userCurrency,
@@ -289,21 +280,8 @@ export default function RecordScreen() {
       category_id: categoryId,
       payment_method: paymentMethod,
       is_recurring: manualIsRecurring,
+      recurring_frequency: manualIsRecurring ? manualRecurringFreq : null,
     })
-
-    if (!error && manualIsRecurring && txnId) {
-      await createRule({
-        name: merchant.trim() || null,
-        amount: parsedAmount,
-        currency_code: userCurrency,
-        category_id: categoryId,
-        direction,
-        payment_method: paymentMethod,
-        note: note.trim() || null,
-        frequency: manualRecurringFreq,
-        template_txn_id: txnId,
-      })
-    }
 
     setManualSaving(false)
 
@@ -428,11 +406,11 @@ export default function RecordScreen() {
 
           <View style={styles.scanRow}>
               <Pressable
-                style={styles.scanButton}
+                style={[styles.scanButton, scanningType !== null && styles.scanButtonDisabled]}
                 onPress={() => handleScan('receipt')}
-                disabled={scanLoading}
+                disabled={scanningType !== null}
               >
-                {scanLoading ? (
+                {scanningType === 'receipt' ? (
                   <ActivityIndicator color={Colors.primary} size="small" />
                 ) : (
                   <>
@@ -442,12 +420,18 @@ export default function RecordScreen() {
                 )}
               </Pressable>
               <Pressable
-                style={styles.scanButton}
+                style={[styles.scanButton, scanningType !== null && styles.scanButtonDisabled]}
                 onPress={() => handleScan('paycheck')}
-                disabled={scanLoading}
+                disabled={scanningType !== null}
               >
-                <Ionicons name="card-outline" size={18} color={Colors.primary} />
-                <Text style={styles.scanLabel}>{t('voice.scan_paycheck', userLocale as any)}</Text>
+                {scanningType === 'paycheck' ? (
+                  <ActivityIndicator color={Colors.primary} size="small" />
+                ) : (
+                  <>
+                    <Ionicons name="card-outline" size={18} color={Colors.primary} />
+                    <Text style={styles.scanLabel}>{t('voice.scan_paycheck', userLocale as any)}</Text>
+                  </>
+                )}
               </Pressable>
           </View>
         </View>
@@ -456,8 +440,16 @@ export default function RecordScreen() {
             No KeyboardAvoidingView; merchant's native keyboard covers the
             keypad area (not the merchant input itself), which is fine. */
         <View style={styles.manualContainer}>
-          {/* Top cluster — anchored to top of container via space-between */}
-          <View style={styles.topCluster}>
+          {/* Top cluster — anchored to top via space-between. A shrinkable
+              ScrollView so that on short screens (SE/mini class) the top
+              fields scroll internally instead of pushing the keypad and the
+              Add CTA under the tab bar; the bottom cluster never moves. */}
+          <ScrollView
+            style={styles.topClusterScroll}
+            contentContainerStyle={styles.topCluster}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
           {/* Amount card — direction toggle + amount hero in one surface */}
           <View style={styles.amountCard}>
             <View style={styles.directionRow}>
@@ -507,8 +499,19 @@ export default function RecordScreen() {
               onCreateCategory={createCategory}
               locale={userLocale}
             />
+            {/* Recurring is a forecast-altering property, used constantly for
+                bills/subscriptions — it earns a primary-surface slot right
+                under Category instead of hiding in More options. */}
+            <RecurringToggle
+              isRecurring={manualIsRecurring}
+              frequency={manualRecurringFreq}
+              onToggle={setManualIsRecurring}
+              onFrequencyChange={setManualRecurringFreq}
+              locale={userLocale}
+              variant="compact"
+            />
           </View>
-          </View>
+          </ScrollView>
 
           {/* Bottom cluster — keypad + Add CTA, anchored to bottom of
               container by space-between on the parent. */}
@@ -624,14 +627,6 @@ export default function RecordScreen() {
                       </View>
                     </ScrollView>
                   </View>
-
-                  <RecurringToggle
-                    isRecurring={manualIsRecurring}
-                    frequency={manualRecurringFreq}
-                    onToggle={setManualIsRecurring}
-                    onFrequencyChange={setManualRecurringFreq}
-                    locale={userLocale}
-                  />
                 </ScrollView>
               </Pressable>
             </Pressable>
@@ -796,6 +791,7 @@ const styles = StyleSheet.create({
     gap: Spacing.xs,
     minHeight: 48,
   },
+  scanButtonDisabled: { opacity: 0.55 },
   scanLabelWrap: {
     flexShrink: 1,
   },
@@ -821,6 +817,13 @@ const styles = StyleSheet.create({
     paddingTop: 4,
     paddingBottom: 120,
     justifyContent: 'space-between',
+  },
+  // flexGrow 0 keeps the space-between visual (fields at top, keypad at
+  // bottom); flexShrink 1 lets the field stack give way and scroll on short
+  // screens instead of overflowing into the keypad / tab bar.
+  topClusterScroll: {
+    flexGrow: 0,
+    flexShrink: 1,
   },
   topCluster: {
     gap: 8,
@@ -956,10 +959,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: Colors.ink3 ?? Colors.textSecondary,
-  },
-  moreOptionsPanel: {
-    gap: Spacing.base,
-    paddingTop: Spacing.xs,
   },
 
   // Bottom-sheet modal for advanced fields — keeps them out of the

@@ -80,6 +80,7 @@ export async function parseExpense(opts: ParseOptions): Promise<ParsedExpense> {
     direction: raw.direction ?? 'debit',
     merchant: raw.merchant ?? null,
     merchant_domain: raw.merchant_domain ?? null,
+    note: raw.note ?? null,
     category_suggestion: raw.category_suggestion ?? null,
     payment_method: raw.payment_method ?? null,
     transacted_at: raw.transacted_at ?? new Date().toISOString(),

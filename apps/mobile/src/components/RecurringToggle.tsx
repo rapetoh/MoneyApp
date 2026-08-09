@@ -22,6 +22,9 @@ interface Props {
   onToggle: (value: boolean) => void
   onFrequencyChange: (freq: RecurringFrequency) => void
   locale?: Locale
+  /** 'compact' matches the manual tab's quickInput surfaces (tighter row,
+      smaller label) so the toggle can live on the primary entry surface. */
+  variant?: 'card' | 'compact'
 }
 
 export function RecurringToggle({
@@ -31,13 +34,15 @@ export function RecurringToggle({
   onToggle,
   onFrequencyChange,
   locale = 'en',
+  variant = 'card',
 }: Props) {
+  const compact = variant === 'compact'
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, compact && styles.containerCompact]}>
       {/* Toggle row */}
-      <View style={styles.toggleRow}>
+      <View style={[styles.toggleRow, compact && styles.toggleRowCompact]}>
         <View style={styles.labelGroup}>
-          <Text style={styles.label}>{t('recurring.toggle', locale)}</Text>
+          <Text style={[styles.label, compact && styles.labelCompact]}>{t('recurring.toggle', locale)}</Text>
           {aiDetected && isRecurring && (
             <View style={styles.aiBadge}>
               <Text style={styles.aiBadgeText}>AI</Text>
@@ -86,12 +91,22 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
     overflow: 'hidden',
   },
+  containerCompact: {
+    borderRadius: 12,
+  },
   toggleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: Spacing.base,
     paddingVertical: Spacing.md,
+  },
+  toggleRowCompact: {
+    paddingHorizontal: 14,
+    paddingVertical: 4,
+  },
+  labelCompact: {
+    fontSize: Typography.size.sm,
   },
   labelGroup: { flex: 1, gap: 4 },
   label: {

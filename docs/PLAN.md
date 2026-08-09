@@ -1,9 +1,9 @@
 # Technical Plan
 ## Murmur (formerly "Voice Expense Tracker" / "Money App")
 
-**Version**: 1.5
-**Date**: April 18, 2026
-**Status**: In Progress — Phases 0–4 code complete; device testing in progress. **Murmur redesign** Phase A (brand + visual refresh) in progress April 18, 2026.
+**Version**: 1.6
+**Date**: August 9, 2026
+**Status**: NOT production-ready — the 2026-08-08 owner test + 360° audit ([audit-2026-08-08/](./audit-2026-08-08/)) found 314 verified defects. The eleven owner-reported issues are fixed ([fixes-2026-08-09.md](./fixes-2026-08-09.md), incl. migration 013: server-side recurring-rule ownership, applied to production). The remaining audit backlog ([audit-2026-08-08/10-FIX-PLAN.md](./audit-2026-08-08/10-FIX-PLAN.md)) is open and gates any production claim.
 
 ---
 

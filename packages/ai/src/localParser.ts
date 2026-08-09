@@ -58,6 +58,7 @@ export function parseExpenseLocally(transcript: string): {
     direction: 'debit',
     merchant,
     merchant_domain: null,
+    note: null,
     category_suggestion: null,
     payment_method: null,
     transacted_at: new Date().toISOString(),

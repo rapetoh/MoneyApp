@@ -36,7 +36,9 @@ export async function POST(req: NextRequest) {
     const completion = await openai.chat.completions.create({
       model: MODEL,
       response_format: { type: 'json_object' },
-      max_tokens: 200,
+      // Headroom for the note field + a clarifying question in the same
+      // payload — 200 could truncate the JSON and 500 the whole parse.
+      max_tokens: 320,
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: transcript },

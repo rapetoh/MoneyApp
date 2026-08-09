@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import { colors, font, cat as catTokens } from '../../lib/theme'
 import { tintFor } from '../../lib/categories'
-import { type LensProps, monthDebits } from './types'
+import { type LensProps } from './types'
 import { aggAmount } from '@voice-expense/shared'
 
 function fmt(value: number, currency: string, locale: string): string {
@@ -14,17 +14,23 @@ function fmt(value: number, currency: string, locale: string): string {
 }
 
 export function CalendarLens({ props }: { props: LensProps }) {
-  const debits = monthDebits(props)
-  const year = props.monthStart.getFullYear()
-  const monthIdx = props.monthStart.getMonth()
+  // Calendar identity comes from the timezone-free anchor numbers — see
+  // LensProps. Reading getMonth()/getDay() off the serialized monthStart
+  // instant shifted the whole lens a month back for every browser west of
+  // UTC (August rendered July's empty grid and a "JUL 8" day panel).
+  const year = props.anchorYear
+  const monthIdx = props.anchorMonth
   const daysInMonth = new Date(year, monthIdx + 1, 0).getDate()
   // Mon-first offset: Sun=0..Sat=6 -> Mon=0..Sun=6
-  const firstDow = (props.monthStart.getDay() + 6) % 7
+  const firstDow = (new Date(year, monthIdx, 1).getDay() + 6) % 7
 
-  // Bucket totals + tx-list by day.
+  // Bucket totals + tx-list by day, membership judged in the viewer's own
+  // timezone (a bill paid 10pm on Aug 31 in Chicago belongs to August even
+  // though its UTC instant is September).
   const dayTotal = new Array(daysInMonth + 1).fill(0)
-  const dayTxns: Record<number, typeof debits> = {}
-  for (const t of debits) {
+  const dayTxns: Record<number, LensProps['transactions']> = {}
+  for (const t of props.transactions) {
+    if (t.direction !== 'debit') continue
     const d = new Date(t.transacted_at)
     if (d.getMonth() !== monthIdx || d.getFullYear() !== year) continue
     const day = d.getDate()

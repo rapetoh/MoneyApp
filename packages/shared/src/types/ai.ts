@@ -6,6 +6,10 @@ export interface ParsedExpense {
   direction: TransactionDirection
   merchant: string | null
   merchant_domain: string | null
+  /** Residual detail from the transcript/image that no other field captures
+   *  (fund names like "S&P 500", what the purchase was for, pay-period range).
+   *  Pre-fills the Note field on the confirm sheet. */
+  note: string | null
   category_suggestion: string | null
   payment_method: PaymentMethod | null
   transacted_at: string // ISO 8601

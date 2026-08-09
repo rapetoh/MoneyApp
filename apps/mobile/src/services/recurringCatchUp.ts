@@ -101,6 +101,8 @@ export async function runRecurringCatchUp(userId: string): Promise<number> {
         ai_confidence: null,
         is_recurring: true,
         recurring_rule_id: rule.id,
+        // Generated FROM a rule — the cadence lives on the rule itself.
+        recurring_frequency: null,
         client_id: txnId,
         client_created_at: nowIso,
         version: 1,
