@@ -63,11 +63,37 @@ jobs:
       - name: Run test suite
         run: npx turbo test
 
-      - name: Unreferenced exports (knip) — report only, not a gate
-        # fix-plan item 1.1: wired into CI for visibility now; several
-        # pre-existing findings remain from before this job existed, and
-        # cleaning those up is separate work. Flip continue-on-error off
-        # once that backlog is clear.
+      - name: Unreferenced exports (knip) — packages/shared is a real gate
+        # fix-plan item 4.3: packages/shared has zero knip findings after
+        # this item's cleanup (dead files, the divergent-formula hooks,
+        # the orphaned style keys) — so this scope fails the build on any
+        # new dead export instead of just reporting it. `knip.json`'s
+        # `ignore` list documents the structural false positives (config
+        # plugins loaded by string path, Edge Functions invoked over
+        # HTTP, docs preview jsx) that made a blanket gate infeasible.
+        run: npx knip --workspace packages/shared
+
+      - name: Unreferenced exports (knip) — apps/mobile/src is a real gate
+        # fix-plan item 4.3, closed: apps/mobile/src's ~24 unused-export
+        # findings are cleared (genuinely dead code deleted; the rest were
+        # exports only ever consumed within their own defining file —
+        # real usage knip's cross-file heuristic can't see — covered by
+        # `knip.json`'s `workspaces["apps/mobile"].ignoreExportsUsedInFile`
+        # instead of deleting live code). `--exports` scopes this step to
+        # export-related issue types only (exports, types, enum/namespace
+        # members, duplicates) — apps/mobile still carries pre-existing,
+        # out-of-scope dependency/unlisted/unresolved findings that stay
+        # on the report-only step below until swept separately.
+        run: npx knip --workspace apps/mobile --exports
+
+      - name: Unreferenced exports (knip) — full repo, report only
+        # apps/web still carries pre-existing findings outside fix-plan
+        # 4.3's named scope (packages/shared and apps/mobile/src only —
+        # see its terse report), and apps/mobile still carries pre-existing
+        # dependency/unlisted/unresolved findings the two gated steps above
+        # don't cover — flip continue-on-error off here once both are
+        # cleared the same way packages/shared and apps/mobile/src's
+        # exports were.
         continue-on-error: true
         run: npx knip
 
@@ -116,7 +142,10 @@ jobs:
         run: npm ci
 
       - name: Lint
-        # Every audit-tracking rule in eslint.config.mjs ships at 'off'
-        # until the fix-plan item that owns it lands (see the file's
-        # header comment) — this job is expected to be clean today.
+        # Every audit-tracking rule in eslint.config.mjs starts at 'off'
+        # and flips to 'error' as the fix-plan item that owns it lands
+        # (see the file's header comment) — period-restrictions,
+        # mobile-clearance-restrictions and mobile-i18n-restrictions are
+        # 'error' already; this job is expected to be clean today either
+        # way, since a rule only flips once its surface is swept.
         run: npx turbo lint

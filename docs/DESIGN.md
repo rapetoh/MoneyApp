@@ -114,6 +114,25 @@ More is the drawer for everything else.
 6. **Plan**: Budgets (ring + per-category)
 7. **Manage**: Settings → Privacy Center → Paywall (for desktop only)
 
+### Navigation naming (one name per destination)
+
+Audit finding 08-F44: the same destination had drifted into three or four
+independent labels across web sidebar / web toolbar / web H1 / mobile tab,
+because each surface wrote its own string instead of reading a shared one.
+This table is the canonical name for each destination — both platforms'
+nav chrome (sidebar label, toolbar title, page H1, mobile tab/screen
+heading) must read this, not a local literal. A page's own descriptive
+copy below the title (e.g. Transactions' "N transactions" stat line, or
+Export's explanatory sentence) is not a nav label and may still differ.
+
+| Destination | Canonical name | Notes |
+|---|---|---|
+| Insights | **Insights** | Was "Reports & forecast" (web sidebar) and "Forecast & patterns" (web H1) — both renamed to match the toolbar title and the mobile tab, which already agreed. |
+| Transactions | **Transactions** | Mobile's Today-header icon and its `more.transactions` accessibility label already match; the mobile screen's own title is "Activity" (`transactions.title`) — a page headline, not a nav label, same exception as Transactions' web H1. |
+| Recurring | **Recurring** | Was "Recurring & subscriptions" as the web H1 only; sidebar, toolbar and the mobile heading already agreed. |
+| Export (free) | **Export all my data** | The GDPR right-to-portability export — a complete JSON account backup, free for every user, reachable from Settings → Privacy on both platforms. Not the same feature as the row below; do not merge the two names. |
+| Export (Plus) | **Export transactions** | The formatted CSV/JSON/PDF transaction + recurring-rule report, Plus-gated, reachable from Settings → Export on both platforms and from its own web sidebar entry (labelled "Export" there — short nav labels are fine as abbreviations of the canonical name, not replacements for it). |
+
 ---
 
 ## 5. Screen-by-screen rationale

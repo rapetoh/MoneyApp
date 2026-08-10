@@ -190,25 +190,7 @@ export function amountAdjustDeltasFor(currencyCode: string): [number, number, nu
   return ADJUST_DELTA_MAGNITUDES[currencyCode] ?? DEFAULT_ADJUST_DELTAS
 }
 
-// Deterministic color from a string (for merchant avatar fallback)
-export function merchantColor(name: string): string {
-  const colors = [
-    '#E85D04',
-    '#F48C06',
-    '#2D6A4F',
-    '#1B4332',
-    '#264653',
-    '#2A9D8F',
-    '#6D6875',
-    '#B5838D',
-    '#457B9D',
-    '#1D3557',
-    '#C77DFF',
-    '#7B2D8B',
-  ]
-  let hash = 0
-  for (let i = 0; i < name.length; i++) {
-    hash = name.charCodeAt(i) + ((hash << 5) - hash)
-  }
-  return colors[Math.abs(hash) % colors.length]
-}
+// `merchantColor`, merchant-logo domain guessing and category-tint
+// derivation moved to `./color.ts` (fix-plan 4.4) — a money-formatting
+// file is the wrong home for color math, and that module is now the one
+// place both apps import all three from.

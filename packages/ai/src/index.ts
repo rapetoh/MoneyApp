@@ -3,7 +3,6 @@
 // Ask-Murmur prompt builder, validators, and sandbox tools live behind
 // `@voice-expense/ai/server` instead.
 
-export { parseExpenseLocally } from './localParser'
 export { parseExpense, clearParseCache } from './parser'
 export { parseScan } from './scanParser'
 export type { ScanType, ScanOptions, ScanResult } from './scanParser'

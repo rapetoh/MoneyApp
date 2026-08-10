@@ -50,32 +50,13 @@ export const Colors = {
   tabBar: '#FFFFFF',
   tabBarBorder: 'rgba(40,36,28,0.06)',
 
-  // Category tints. Backgrounds are pinned to the Murmur Brand Sheet §04
-  // "Category tints (low-sat)" hex values so the in-app palette matches the
-  // brand reference exactly. Olive is kept (extra category not in the brand
-  // sheet's four-up but used by the existing app) using a desaturated tone
-  // consistent with the rest. Ink colors hold their existing readable
-  // contrast pairings against each tint.
-  categoryTints: {
-    peach: { bg: '#F3E7DC', ink: '#8C4A2A' }, // Brand sheet · Food
-    butter: { bg: '#F2E8D5', ink: '#8A6F1F' }, // Brand sheet · Coffee
-    lavender: { bg: '#EEE6F0', ink: '#5A4E7A' }, // Brand sheet · Shop
-    rose: { bg: '#F4DDDD', ink: '#8E424C' }, // Brand sheet · Health
-    sage: { bg: '#DDE5D5', ink: '#3F5A3E' },
-    olive: { bg: '#D9DDC4', ink: '#5A5F34' },
-  },
-
-  // Deterministic merchant-avatar fallback palette — muted, harmonious.
-  // Used when MerchantAvatar has no domain or logo fetch fails. This is a
-  // product-critical feature (see feedback memory: don't regress merchant logos).
-  avatarColors: [
-    '#8C4A2A', // peach-deep
-    '#3F5A3E', // sage
-    '#5A4E7A', // lavender-deep
-    '#8A6F1F', // butter-deep
-    '#8E424C', // rose-deep
-    '#5A5F34', // olive-deep
-    '#4A6B74', // dusty teal
-    '#6B4E3D', // warm taupe
-  ],
+  // The hard-coded `categoryTints` table (a name-keyed guess independent
+  // of the category's own `color`) and the unwired `avatarColors`
+  // palette that was meant to fix `MerchantAvatar`'s fallback-tile
+  // contrast used to live here — deleted (fix-plan 4.4). `categories.
+  // color` is the single source of truth for a category's color, and
+  // `avatarColors` is now `merchantColor`'s own palette in
+  // `@voice-expense/shared`'s `color.ts` (both apps import from there),
+  // so there is exactly one copy of each instead of one declared-but-
+  // unused and one hard-coded table that could disagree with it.
 } as const

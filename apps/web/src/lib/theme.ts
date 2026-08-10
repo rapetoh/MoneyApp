@@ -46,21 +46,14 @@ export const colors = {
   white: '#FFFFFF',
 } as const
 
-// Category tints — keyed by tint name. Mirrors mobile colors.categoryTints
-// and the project tokens.jsx T.cat object. Fonts use `fg` for icons + chip
-// text; backgrounds for chip pills + merchant logo fallbacks.
-export const cat = {
-  food: { bg: '#F3E7DC', fg: '#7A4A22' }, // peach
-  transit: { bg: '#E1E6E0', fg: '#395435' }, // sage
-  shopping: { bg: '#EEE6F0', fg: '#5C3F66' }, // lavender
-  bills: { bg: '#E4E8EE', fg: '#334155' }, // sky-slate
-  coffee: { bg: '#F2E8D5', fg: '#7A5A1C' }, // butter
-  health: { bg: '#F4DDDD', fg: '#843C3C' }, // rose
-  work: { bg: '#E6E7E0', fg: '#45463A' }, // olive
-  other: { bg: '#ECE8E0', fg: '#5A5247' },
-} as const
-
-export type CategoryTint = keyof typeof cat
+// The hard-coded `cat` tint table (keyed by a made-up tint name like
+// "food"/"coffee") and the name-regex `tintFor` heuristic that chose one
+// of its 8 buckets used to live here — deleted (fix-plan 4.4).
+// `categories.color` is the single source of truth for a category's
+// color; every chart/chip derives its tint from that hex via
+// `categoryPalette()` in `@voice-expense/shared` instead, so renaming a
+// category (or a merchant name coincidentally matching a bucket regex)
+// can no longer change what color it renders in.
 
 export const radius = {
   sm: 6,
@@ -82,11 +75,16 @@ export const spacing = {
   '3xl': 48,
 }
 
+// `--font-plus-jakarta-sans`/`--font-dm-mono` are self-hosted via
+// next/font (fix-plan 4.5, `app/layout.tsx`) — the literal "Plus Jakarta
+// Sans"/"DM Mono" names below would silently miss next/font's
+// hash-scoped @font-face and could resolve to a same-named font the
+// OS happens to have installed instead.
 export const font = {
-  sans: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Plus Jakarta Sans", system-ui, sans-serif',
+  sans: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", var(--font-plus-jakarta-sans), system-ui, sans-serif',
   display: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", system-ui, sans-serif',
   serif: '"New York", "Iowan Old Style", "Georgia", "Times New Roman", serif',
-  mono: '"SF Mono", "JetBrains Mono", "DM Mono", "Menlo", monospace',
+  mono: '"SF Mono", "JetBrains Mono", var(--font-dm-mono), "Menlo", monospace',
 }
 
 export const fontSize = {

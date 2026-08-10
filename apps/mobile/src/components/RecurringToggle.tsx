@@ -1,5 +1,6 @@
-import { View, Text, Pressable, Switch, StyleSheet, ScrollView } from 'react-native'
+import { View, Pressable, Switch, StyleSheet, ScrollView } from 'react-native'
 import { Colors, Typography, Spacing, Radius } from '../theme'
+import { ScaledText as Text } from './ScaledText'
 import { t } from '@voice-expense/shared'
 import type { Locale } from '@voice-expense/shared'
 import type { RecurringFrequency } from '@voice-expense/shared'
@@ -45,7 +46,7 @@ export function RecurringToggle({
           <Text style={[styles.label, compact && styles.labelCompact]}>{t('recurring.toggle', locale)}</Text>
           {aiDetected && isRecurring && (
             <View style={styles.aiBadge}>
-              <Text style={styles.aiBadgeText}>AI</Text>
+              <Text style={styles.aiBadgeText}>{t('recurring.ai_badge', locale)}</Text>
               <Text style={styles.aiHint}>{t('recurring.ai_detected', locale)}</Text>
             </View>
           )}
@@ -59,18 +60,24 @@ export function RecurringToggle({
         />
       </View>
 
-      {/* Frequency chips — only shown when recurring is on */}
+      {/* Frequency chips — only shown when recurring is on. Selection is
+          conveyed by colour alone, so the radio role + selected state carry
+          it for screen readers (audit 03-F36, fix-plan 4.1). */}
       {isRecurring && (
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.chipsRow}
+          accessibilityRole="radiogroup"
         >
           {FREQUENCIES.map((freq) => (
             <Pressable
               key={freq}
               style={[styles.chip, frequency === freq && styles.chipActive]}
               onPress={() => onFrequencyChange(freq)}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: frequency === freq }}
+              accessibilityLabel={t(FREQ_KEY[freq], locale)}
             >
               <Text style={[styles.chipLabel, frequency === freq && styles.chipLabelActive]}>
                 {t(FREQ_KEY[freq], locale)}

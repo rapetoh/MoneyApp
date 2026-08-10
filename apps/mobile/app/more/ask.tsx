@@ -37,9 +37,12 @@ const SUGGESTIONS: { icon: string; key: string }[] = [
  * - Free user → /more/paywall (Plus gate)
  * - Plus user → /more/ask-result?q=<question> (grounded reasoner runs there)
  *
- * The mic button still routes to the paywall regardless — voice input inside
- * Ask is its own milestone (would need to thread useVoice through ask-result
- * + transcript-to-submit). Phase E ships text-only.
+ * Voice input inside Ask hasn't been built (it would need to thread
+ * useVoice through ask-result + transcript-to-submit) — Phase E ships
+ * text-only. The mic slot only renders for free users, where it's the
+ * same Plus-gate tap as the input bar (fix-plan 3.1: a control that does
+ * nothing when pressed is worse than no control, so a Plus user with an
+ * empty draft sees no mic at all rather than one that no-ops).
  */
 export default function AskMurmurScreen() {
   const { user } = useAuth()
@@ -72,12 +75,6 @@ export default function AskMurmurScreen() {
     submitQuestion(t(suggestionKey, locale))
   }
 
-  function onMicPress() {
-    // Free users hit the paywall; voice-in-Ask isn't built yet so a Plus
-    // user tapping the mic gets a no-op (the design surface is preserved).
-    if (!isPlus) gotoPaywall()
-  }
-
   const canSend = draft.trim().length > 0
 
   return (
@@ -86,26 +83,27 @@ export default function AskMurmurScreen() {
           chip, per the mockup. */}
       <Stack.Screen options={{ headerShown: false }} />
       <SafeAreaView style={styles.safe} edges={['top', 'bottom', 'left', 'right']}>
+        {/* Top row — close pill + Beta chip. Sibling of the ScrollView,
+            not its first child — a child scrolls off screen (audit
+            01-F32); matches more/transactions.tsx's `topRow`. */}
+        <View style={styles.topRow}>
+          <Pressable
+            onPress={() => router.back()}
+            style={({ pressed }) => [styles.closePill, pressed && styles.pillPressed]}
+            hitSlop={8}
+            accessibilityLabel={t('common.cancel', locale)}
+          >
+            <Ionicons name="close" size={16} color={Colors.ink2 ?? Colors.textSecondary} />
+          </Pressable>
+          <View style={styles.betaChip}>
+            <Ionicons name="sparkles" size={11} color={Colors.accent ?? Colors.primary} />
+            <Text style={styles.betaText}>{t('ask.beta', locale)}</Text>
+          </View>
+        </View>
         <ScrollView
           contentContainerStyle={styles.content}
           showsVerticalScrollIndicator={false}
         >
-          {/* Top row — close pill + Beta chip */}
-          <View style={styles.topRow}>
-            <Pressable
-              onPress={() => router.back()}
-              style={({ pressed }) => [styles.closePill, pressed && styles.pillPressed]}
-              hitSlop={8}
-              accessibilityLabel={t('common.cancel', locale)}
-            >
-              <Ionicons name="close" size={16} color={Colors.ink2 ?? Colors.textSecondary} />
-            </Pressable>
-            <View style={styles.betaChip}>
-              <Ionicons name="sparkles" size={11} color={Colors.accent ?? Colors.primary} />
-              <Text style={styles.betaText}>{t('ask.beta', locale)}</Text>
-            </View>
-          </View>
-
           {/* Hero — sparkle tile + serif title + lead copy */}
           <View style={styles.hero}>
             <View style={styles.sparkleTile}>
@@ -178,17 +176,19 @@ export default function AskMurmurScreen() {
                     <Ionicons name="arrow-up" size={20} color="#FFFFFF" />
                   </Pressable>
                 ) : (
-                  <Pressable
-                    onPress={onMicPress}
-                    style={({ pressed }) => [
-                      styles.micButton,
-                      pressed && styles.micButtonPressed,
-                    ]}
-                    hitSlop={6}
-                    accessibilityLabel={t('ask.mic_label', locale)}
-                  >
-                    <Ionicons name="mic" size={20} color="#FFFFFF" />
-                  </Pressable>
+                  !isPlus && (
+                    <Pressable
+                      onPress={gotoPaywall}
+                      style={({ pressed }) => [
+                        styles.micButton,
+                        pressed && styles.micButtonPressed,
+                      ]}
+                      hitSlop={6}
+                      accessibilityLabel={t('ask.mic_label', locale)}
+                    >
+                      <Ionicons name="mic" size={20} color="#FFFFFF" />
+                    </Pressable>
+                  )
                 )}
               </View>
               <View style={styles.footerRow}>
@@ -338,12 +338,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.06,
     shadowRadius: 12,
     elevation: 2,
-  },
-  inputPlaceholder: {
-    flex: 1,
-    fontSize: 15,
-    color: Colors.ink4 ?? Colors.textMuted,
-    fontFamily: Typography.fontFamily.sans,
   },
   inputField: {
     flex: 1,

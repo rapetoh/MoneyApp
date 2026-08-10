@@ -41,8 +41,9 @@ import {
   retryDeadLetterEntry,
   type QueueEntry,
 } from '../../src/services/sync/syncQueue'
+import { getDeviceLastSynced } from '../../src/services/sync/deviceRegistry'
 import { Colors, Typography, Radius, Hairline, Spacing } from '../../src/theme'
-import { t, formatMoney, type Locale } from '@voice-expense/shared'
+import { t, formatMoney, SHORTCUT_INSTALL_URL, type Locale } from '@voice-expense/shared'
 import type { BudgetPeriod } from '@voice-expense/shared'
 import { useRouter } from 'expo-router'
 
@@ -58,6 +59,25 @@ const BUDGET_PERIODS: { value: BudgetPeriod; key: string }[] = [
   { value: 'biweekly', key: 'settings.period_biweekly' },
   { value: 'monthly', key: 'settings.period_monthly' },
 ]
+
+/** "5 minutes ago" / "yesterday" / "3 days ago", correctly localized via
+ *  ICU rather than a hand-rolled English-only string (fix-plan 3.7 — the
+ *  "Last synced" row). Falls back to a plain date if `RelativeTimeFormat`
+ *  is unavailable on the device's ICU build. */
+function formatLastSynced(iso: string | null, locale: Locale): string {
+  if (!iso) return t('settings.sync_never', locale)
+  const minutes = Math.round((Date.now() - new Date(iso).getTime()) / 60000)
+  try {
+    const rtf = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' })
+    if (minutes < 1) return rtf.format(0, 'minute')
+    if (minutes < 60) return rtf.format(-minutes, 'minute')
+    const hours = Math.round(minutes / 60)
+    if (hours < 24) return rtf.format(-hours, 'hour')
+    return rtf.format(-Math.round(hours / 24), 'day')
+  } catch {
+    return new Date(iso).toLocaleDateString(locale, { month: 'short', day: 'numeric' })
+  }
+}
 
 /**
  * Settings screen. Matches `S_Settings` in
@@ -118,13 +138,29 @@ export default function SettingsScreen() {
   const [deadCount, setDeadCount] = useState(0)
   const [syncIssuesModal, setSyncIssuesModal] = useState(false)
   const [deadEntries, setDeadEntries] = useState<QueueEntry[]>([])
+  // "Last synced" — the signal 1.6's pending/dead counts never carried:
+  // pending===0 && dead===0 answers "is the outbox clean right now?" but
+  // not "when did this device last actually reach the server?" (fix-plan
+  // 3.7). Refetched on mount and every time a drain pass completes
+  // (`syncing` flips back to false), since that's exactly when
+  // `SyncManager` may have just stamped `devices.last_synced_at`.
+  const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null)
+  const refreshLastSynced = useCallback(() => {
+    if (!user?.id) return
+    getDeviceLastSynced(user.id).then(setLastSyncedAt)
+  }, [user?.id])
 
   useEffect(() => {
-    return syncManager.addListener((_syncing, pending, dead) => {
+    refreshLastSynced()
+  }, [refreshLastSynced])
+
+  useEffect(() => {
+    return syncManager.addListener((syncing, pending, dead) => {
       setPendingCount(pending)
       setDeadCount(dead)
+      if (!syncing) refreshLastSynced()
     })
-  }, [])
+  }, [refreshLastSynced])
 
   const refreshDeadEntries = useCallback(async () => {
     setDeadEntries(await getDeadLetterEntries())
@@ -309,16 +345,19 @@ export default function SettingsScreen() {
     setCurrencyModal(false)
   }
 
-  const { permissionGranted, recheckPermission, requestPermission } = useNotificationListener(
-    () => {},
-  )
+  // Permission state only — the actual payload → confirm-sheet handler
+  // (fix-plan 3.4 / audit 07-F10, 08-F20, 02-F34) is mounted once at the
+  // root layout, which can navigate; this screen has no way to reach the
+  // confirm sheet itself. Calling the hook with no `onPayment` means no
+  // second native subscription competes with the root layout's real one.
+  const { permissionGranted, recheckPermission, requestPermission } = useNotificationListener()
 
   const handleNotificationToggle = useCallback(async () => {
     if (permissionGranted) {
       Alert.alert(
         t('settings.disable_notifications', locale),
         t('settings.disable_notifications_msg', locale),
-        [{ text: 'OK' }],
+        [{ text: t('common.ok', locale) }],
       )
       return
     }
@@ -331,12 +370,20 @@ export default function SettingsScreen() {
     })
   }, [permissionGranted, requestPermission, recheckPermission, locale])
 
-  const SHORTCUT_INSTALL_URL = 'https://www.icloud.com/shortcuts/placeholder'
-
   return (
     <SafeAreaView style={styles.safe} edges={['bottom', 'left', 'right']}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Profile card — matches S_Settings avatar + Upgrade pill */}
+        {/* Profile card — matches S_Settings avatar + plan pill. The plan
+            line and pill are branched on `isPlus` (fix-plan 3.1) — both
+            used to be unconditional strings ("Free plan" / "Upgrade")
+            regardless of the account's actual entitlement, and the pill
+            always said "Upgrade" even though there is no purchase flow
+            to upgrade through yet. A Plus account now sees its real plan
+            name and no pill (there is nothing to press); a free account
+            sees "Free plan" — true today, since entitlement reads
+            `profiles.plus_status` alone — and a pill labelled "Plus"
+            that opens the honest preview screen, not an "Upgrade" button
+            that cannot act. */}
         <View style={styles.profileWrap}>
           <View style={styles.profileCard}>
             <View style={styles.avatar}>
@@ -345,15 +392,18 @@ export default function SettingsScreen() {
             <View style={styles.profileInfo}>
               <Text style={styles.profileName} numberOfLines={1}>{displayName}</Text>
               <Text style={styles.profilePlan} numberOfLines={1}>
-                {t('settings.plan_free', locale)} · {txnCount} {t('settings.expenses_count', locale)}
+                {isPlus ? t('settings.plan_plus', locale) : t('settings.plan_free', locale)} ·{' '}
+                {txnCount} {t('settings.expenses_count', locale)}
               </Text>
             </View>
-            <Pressable
-              style={({ pressed }) => [styles.upgradePill, pressed && styles.upgradePillPressed]}
-              onPress={() => router.push('/more/paywall')}
-            >
-              <Text style={styles.upgradePillText}>{t('settings.upgrade', locale)}</Text>
-            </Pressable>
+            {!isPlus && (
+              <Pressable
+                style={({ pressed }) => [styles.upgradePill, pressed && styles.upgradePillPressed]}
+                onPress={() => router.push('/more/paywall')}
+              >
+                <Text style={styles.upgradePillText}>{t('settings.upgrade', locale)}</Text>
+              </Pressable>
+            )}
           </View>
         </View>
 
@@ -415,25 +465,35 @@ export default function SettingsScreen() {
           />
         </SetGroup>
 
-        {/* Automations (platform-specific) */}
-        <SetGroup label={t('settings.automations', locale)}>
-          {Platform.OS === 'ios' ? (
-            <SetRow
-              label={t('settings.apple_pay_shortcut', locale)}
-              detail={t('settings.set_up', locale)}
-              onPress={() => Linking.openURL(SHORTCUT_INSTALL_URL)}
-              last
-            />
-          ) : (
-            <SetRow
-              label={t('settings.payment_notifications', locale)}
-              toggle
-              value={permissionGranted}
-              onToggle={handleNotificationToggle}
-              last
-            />
-          )}
-        </SetGroup>
+        {/* Automations (platform-specific). Fix-plan 3.4 / audit 07-F12,
+            08-F19, 08-F20, 02-F34: no permission prompt or dead link stays
+            visible for a feature that does nothing. On iOS the row only
+            renders once a real shortcut is published (SHORTCUT_INSTALL_URL
+            non-empty) — until then there is nothing this row can honestly
+            offer, so the whole group is hidden rather than shown with a
+            dead link. On Android the toggle is real: the payload it grants
+            access to now reaches the confirm sheet via the root-level
+            listener in app/_layout.tsx. */}
+        {(Platform.OS === 'android' || SHORTCUT_INSTALL_URL) && (
+          <SetGroup label={t('settings.automations', locale)}>
+            {Platform.OS === 'ios' ? (
+              <SetRow
+                label={t('settings.apple_pay_shortcut', locale)}
+                detail={t('settings.set_up', locale)}
+                onPress={() => Linking.openURL(SHORTCUT_INSTALL_URL)}
+                last
+              />
+            ) : (
+              <SetRow
+                label={t('settings.payment_notifications', locale)}
+                toggle
+                value={permissionGranted}
+                onToggle={handleNotificationToggle}
+                last
+              />
+            )}
+          </SetGroup>
+        )}
 
         {/* Data — Plus-gated export. */}
         <SetGroup label={t('settings.data', locale)}>
@@ -453,6 +513,11 @@ export default function SettingsScreen() {
             gated on deadCount > 0) so a user can confirm the outbox is
             clean, not just be told when it isn't. */}
         <SetGroup label={t('settings.sync', locale)}>
+          <SetRow
+            label={t('settings.sync_last_synced', locale)}
+            detail={formatLastSynced(lastSyncedAt, locale)}
+            chevron={false}
+          />
           <SetRow
             label={t('settings.sync_pending', locale)}
             detail={`${pendingCount} ${t('settings.sync_queued_suffix', locale)}`}

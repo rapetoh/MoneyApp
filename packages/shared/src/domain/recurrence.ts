@@ -473,3 +473,74 @@ function flowInWindow<R extends RecurringFlowInput>(
   }
   return { total: cents / 100, pendingCount }
 }
+
+/**
+ * Shape `findRuleForTransaction` needs from a transaction — deliberately
+ * minimal, mirroring `RecurrenceInput`'s own "structurally accepts the
+ * real row anyway" contract.
+ */
+export interface RuleLinkableTransaction {
+  id: string
+  recurring_rule_id: string | null
+}
+
+/** Shape `findRuleForTransaction` needs from a rule. */
+export interface RuleLinkTarget {
+  id: string
+  template_txn_id: string | null
+}
+
+/**
+ * The one rule↔transaction link, fix-plan 2.2/3.3 (audit finding: the
+ * transaction detail screen and the edit screen each hand-rolled their
+ * own version of this lookup, and drifted — one checked only
+ * `template_txn_id`, which finds the rule for the transaction that
+ * *created* it but not for a `recurring_generated` occurrence, whose own
+ * `recurring_rule_id` is set directly on the row and whose
+ * `template_txn_id` is null).
+ *
+ * `recurring_rule_id` is authoritative when present — it is written by
+ * `link_or_create_recurring_rule` (migration 013/014) for the template
+ * transaction, and by the generator for every occurrence after it.
+ * `template_txn_id` is the fallback for rows written before that trigger
+ * existed, where the rule points at the transaction but the transaction
+ * was never linked back.
+ */
+export function findRuleForTransaction<R extends RuleLinkTarget>(
+  txn: RuleLinkableTransaction,
+  rules: readonly R[],
+): R | null {
+  if (txn.recurring_rule_id) {
+    const byId = rules.find((r) => r.id === txn.recurring_rule_id)
+    if (byId) return byId
+  }
+  return rules.find((r) => r.template_txn_id === txn.id) ?? null
+}
+
+/**
+ * Anchor triple (`anchor_day`/`anchor_weekday`/`anchor_time`) plus the
+ * `starts_at` instant it was derived from, for a rule being created or
+ * re-anchored *from an explicit civil date* — the "Add manually" /
+ * "Edit" form path (fix-plan 3.3), as opposed to `createRule`'s
+ * template-transaction path, which anchors on the template's own
+ * `transacted_at`. Both paths need the same three derived columns
+ * (`nextOccurrence`'s `resolveAnchor` reads them when present rather
+ * than re-deriving from `starts_at`), so this is the one place that
+ * builds them from a `{y,m,d,hour,minute,second}` civil instant instead
+ * of leaving each call site to hand-roll the same
+ * `String(...).padStart(2,'0')` triple three times over (mobile's
+ * `createRule`, web's `acceptCandidate`, and now the manual form on
+ * both platforms would have been a fourth and fifth copy).
+ */
+export function buildRuleAnchor(
+  instant: string,
+  tz: string,
+): { starts_at: string; anchor_day: number; anchor_weekday: number; anchor_time: string } {
+  const parts = localParts(instant, tz)
+  return {
+    starts_at: instant,
+    anchor_day: parts.d,
+    anchor_weekday: parts.weekdayIndex + 1,
+    anchor_time: `${String(parts.hour).padStart(2, '0')}:${String(parts.minute).padStart(2, '0')}:${String(parts.second).padStart(2, '0')}`,
+  }
+}

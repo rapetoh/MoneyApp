@@ -27,7 +27,7 @@ tracked in the user's personal plan file (`~/.claude/plans/breezy-painting-zephy
 | J | Docs update (ongoing, every phase) | Continuous |
 
 **Locked decisions (April 18, 2026)**:
-- **Monetization**: mobile free forever; Murmur Plus $3.99/mo or $29.99/yr unlocks Ask Murmur + auto recurring + export + desktop.
+- **Monetization**: mobile free forever; Murmur Plus $3.99/mo or $29.99/yr unlocks Ask Murmur + auto recurring + export + desktop. **Superseded Aug 9, 2026 (fix-plan 3.1)**: no purchase flow exists yet on any platform, so the price and the "Upgrade" CTA are gone from the product until IAP/Stripe ships — see the dated entry below. The feature bundle (Ask Murmur + auto recurring + export + desktop) is unchanged; only "there is a working checkout for it today" was false.
 - **Storage**: Supabase-first; no CloudKit rewrite. Privacy story via on-device voice + transcript-only sync + explicit controls.
 - **Auth**: all 3 providers preserved (Apple + Google + email); lazy identity — no sign-in wall at launch.
 - **Platforms**: iOS + Android, iOS-style design on both; lockscreen widget deferred to v1.1.
@@ -6001,5 +6001,563 @@ suite, 194 passed total (0 regressions). `packages/ai` — existing
 schema fallout from concurrent 2.6/2.7/2.3 passes still in flight
 elsewhere in the tree, not touched by this pass). `eslint` clean (0
 errors) on every file this pass wrote or migrated.
+
+### Entitlement is honest, and account access actually works (fix-plan items 3.1 + 3.2, Aug 9 2026)
+
+Two items, one file-ownership grant centered on the paywall/entitlement
+surfaces plus `apps/mobile/app/(auth)/**` and `apps/web/src/app/{login,auth}/**`.
+Both took the plan's own "defer" branch for 3.1 — IAP/Stripe isn't
+ready, and the item's text says explicitly that removing the pricing UI
+"clears four App Store blockers at once" — so nothing here wires a real
+purchase; everything here stops the product from claiming it has one.
+
+**3.1 — purchases and entitlement.** `usePlusStatus.ts` (mobile) drops
+the `__DEV__` hatch; `packages/shared/src/plus.ts` and
+`apps/web/src/lib/plus.server.ts` now share one honest doc comment:
+entitlement is `profiles.plus_status === 'active'`, full stop, granted
+today only by a manual Supabase update for early access, with no
+per-build override anywhere. `apps/mobile/app/more/paywall.tsx` is
+rewritten from a fake purchase screen (two `PlanCard`s reading
+"$4.99"/"$39" — numbers that also contradicted the locked $3.99/$29.99
+decision above — a `PlanCard` toggle, and an `onPress` whose entire body
+was a comment explaining it does nothing) into an honest "Plus is
+coming" preview: same hero/feature-list chrome, zero price strings,
+zero CTAs. `apps/web/src/components/PaywallGate.tsx` loses the
+`<div>Upgrade to Plus</div>` (not a button — no `onClick` ever existed)
+and the inverted dev-build note ("Plus is free in the dev build —
+production sees the upgrade flow here" was backwards: there was no
+dev/prod branch and no upgrade flow in either). Both mobile Settings'
+profile card (`"Free plan"` / `"Upgrade"` were unconditional strings
+regardless of the account's real `plus_status`) and the web dashboard's
+"Plan & billing" card (`"Murmur Plus · Yearly / Renews on your billing
+date"` on an account that has never been billed, next to a `"Manage"`
+span with no handler) now branch on `isPlus` and never assert a renewal
+date, a "Manage" affordance, or an "Upgrade" CTA that doesn't exist.
+Three more dead-pressed-states named directly in the item's text are
+gone: the Ask entry screen's mic button, which no-op'd for any Plus user
+with an empty draft (now the mic slot doesn't render for Plus users —
+voice-in-Ask isn't built — and still routes free users to the honest
+paywall, same as before); Ask Murmur's result-screen action pills, whose
+`onActionPress` was a function whose entire body was a comment (deleted,
+along with the now-unused `AskMurmurAction` plumbing and
+`actionPill*`/`actionsRow` styles — reinstate once `create_goal` /
+`set_budget` / etc. have a real destination); and the transaction
+detail's transcript card, whose sage circle held a play-triangle glyph
+implying tap-to-hear-the-recording on an app that stores no audio (now
+a static mic glyph — "this came from a voice note," nothing about
+playback). `packages/shared/src/i18n/locales/*.json`: `paywall.cta`,
+`plan_monthly(_sub)`, `plan_yearly(_sub)` and `best` are deleted (no
+longer rendered anywhere); `paywall.headline`/`body`/`disclaimer` and
+`settings.upgrade` are rewritten to match, and a new `settings.plan_plus`
+key backs the Plus-labeled profile-card state — all four locales kept in
+key parity (verified by diff, not just by eye). `docs/PLAN.md:30`'s
+locked monetization decision gets a superseded note pointing here rather
+than being silently edited out from under its own record.
+
+**3.2 — account access.** Password reset now runs end to end on both
+platforms via Supabase's PKCE `resetPasswordForEmail` /
+`exchangeCodeForSession` / `updateUser` sequence — no second, hand-rolled
+token exchange. Mobile: `useAuth.ts` gains `requestPasswordReset`/
+`updatePassword`; `(auth)/sign-in.tsx`'s email form grows a "Forgot
+password?" link; new `(auth)/reset-password.tsx` consumes
+`voiceexpense://reset-password?code=…` via Expo Router's own file-based
+deep-link resolver — deliberately *not* a manual `Linking.parse` call
+like `useShortcutHandler.ts`'s, because Router's resolver folds `host`
+and `path` together internally and so isn't exposed to the
+hostname-vs-path bug fix-plan 3.4 fixes there; confirmed by reading
+`expo-router`'s `extractPathFromURL.ts` rather than assuming. The one
+subtlety: `exchangeCodeForSession` establishes a real session before the
+user has set a new password, and the root layout's `session && inAuthGroup`
+redirect would otherwise fire on that same render and bounce the user
+into `/(tabs)` before the form ever painted — `app/_layout.tsx`'s routing
+effect now carries a narrow, explicitly-commented exemption for exactly
+that one route, and nothing else. Web: `login/page.tsx` gets the same
+"Forgot password?" flow (reusing the existing `/auth/callback?next=…`
+route rather than a second code-exchange implementation) and a real Sign
+in with Apple button — audit 08-F9's actual defect, since the page
+previously offered Google only, so an Apple-created account
+(`@privaterelay.appleid.com`, no password) could never reach web or
+desktop. New `apps/web/src/app/auth/reset/page.tsx` renders the
+new-password form once the callback route's cookie confirms a session
+exists, and an honest "link invalid" state when it doesn't. Button
+order mirrors mobile (Apple first on macOS/iOS user agents, detected
+post-mount via `navigator.userAgent`, Google first elsewhere). The
+generic `auth_failed` callback message is rewritten to say the link may
+have expired rather than a bare "Authentication failed" with no next
+step. Both flows require the Apple Services ID / return URL to be
+registered in the Supabase Auth dashboard — a manual step outside the
+repo, called out here so it isn't lost.
+
+**Tests**: `apps/mobile` — 99 passed (0 regressions). `apps/web` — 31
+passed (0 regressions). `packages/shared` — 211 passed (0 regressions).
+`tsc --noEmit` clean in all three packages for this pass's own files
+(pre-existing `database.types.test.ts` `local_day`/`occurrence_date`/
+`snapshot_currency` fallout from a concurrent, unrelated pass is not
+touched by this one). `eslint` clean (0 errors) on every file this pass
+wrote.
+
+### Automations wired-or-hidden, privacy copy matches the pipeline, and web/desktop parity (fix-plan items 3.4 + 3.5 + 3.6, Aug 9 2026)
+
+Three items, each answering the plan's "wire it or delete it" rule with
+a different verdict, decided by what was actually feasible to build here
+versus what required an external action (publishing a Shortcut to
+iCloud) this session cannot perform.
+
+**3.4 — automations.** Android notification listener: **wired**, not
+deleted. `useNotificationListener.ts:76-77` now takes an *optional*
+`onPayment` — Settings (`more/settings.tsx:353`) calls it with none, for
+permission state only; `app/_layout.tsx:64-104` is the one real
+subscriber, mounted at the root because Settings has no way to navigate.
+A detected payment opens the same `<VoiceConfirmModal>` the Record
+screen uses (`_layout.tsx:313-334`), with its own `useCategories`/
+`useTransactions` instance and `source: 'notification_listener'` on
+save — the payload was always fully built and validated
+(`validateParsedExpense`); only the confirm sheet was missing. iOS
+Shortcut: the parser bug is fixed (`useShortcutHandler.ts:18-22` matches
+`hostname ?? path`, not `path` alone — `expo-linking`'s `parse()` puts
+`shortcut` in `hostname` for `voiceexpense://shortcut?...`, so the old
+check rejected every real Shortcut URL), but the row itself stays
+**hidden**: no Shortcut has actually been published to iCloud from this
+session, so `SHORTCUT_INSTALL_URL` in `packages/shared/src/brand.ts:43`
+is `''`, and `more/settings.tsx:477` renders the whole Automations group
+only when Android's real toggle or a non-empty install URL exists —
+never a dead `.../placeholder` link. Apple Pay chip (web Transactions,
+`dashboard/transactions/page.tsx:65-93`): split into two honest buckets,
+`shortcut` and `notification`, replacing a single "Apple Pay" label that
+called an Android NotificationListenerService source "Apple Pay" and
+was wrong even for genuine Shortcut rows (not every Shortcut is an Apple
+Pay one).
+
+**3.5 — the on-device claim and privacy copy.** Rewrote every "Processed
+on-device" / "On-device" / "Nothing identifying" string to describe the
+real pipeline — speech-to-text is genuinely local (`expo-speech-
+recognition` never leaves the phone), but the transcript and any scanned
+image go to our server and to OpenAI, named explicitly, to extract the
+amount/merchant/category. Touched: `listening.processed_on_device`,
+`settings.voice_engine_on_device`, `onboarding.welcome.prop_voice_*`,
+`privacy.lead`, `privacy.servers_label`/`servers_detail`,
+`privacy.ctrl_voice_on_device` (all four locales, kept in parity); web
+`dashboard/settings/page.tsx` loses both "ON-DEVICE" tags and gets an
+accurate "On-device speech-to-text · OpenAI for extraction" sub-line.
+`privacy.on_device_detail` drops "Voice recordings" (no audio is ever
+persisted, only the transcript) down to "Transcripts". New
+`privacy.merchant_logos_label`/`_detail` row in `more/privacy.tsx`
+discloses the direct device→Google favicon lookup (`MerchantAvatar.tsx`)
+as its own line rather than folding it into "servers" — that request
+never touches our servers at all, so describing it there would misstate
+the flow; proxying it server-side (item 4.4) is out of scope here.
+Analytics (audit 06-F39): mobile's Privacy Center said "Never" while web
+Settings offered a live toggle writing `profiles.analytics_opt_in`/
+`crash_reports_opt_in` — and nothing anywhere reads either column. Since
+no analytics/crash-reporting SDK is wired into the product at all, "no
+analytics collected" is the true statement on both platforms; web's two
+`SettingToggle`s (dead code after removal, deleted) became static "Not
+collected." rows, matching mobile exactly instead of the other way
+around.
+
+**3.6 — web/desktop parity.** Web i18n: `packages/shared/src/i18n` ships
+four complete locales and zero web files import `t()` — translating
+~200 web strings across every dashboard page is real, tracked work well
+beyond this item's file ownership (one page + layout + settings). Per
+the plan's own fallback, the picker in `dashboard/settings/page.tsx` is
+now a read-only value with an explanatory note ("change your language
+from the mobile app") instead of a `<select>` that silently did nothing
+to the page around it; `profile.locale` still drives this page's own
+`Intl` formatting and mobile's real translations. Category seeding:
+`handle_new_user()` (new migration `029_default_category_seeding.sql`,
+applied and smoke-tested live — a scratch `auth.users` insert produced
+exactly 1 profile + 20 categories, then was deleted) now seeds all 20
+`default_categories` rows atomically with the trigger that already
+creates `profiles`, `ON CONFLICT (user_id, name_normalized) DO NOTHING`
+per row so one collision can't discard the other nineteen the way the
+old all-or-nothing batch insert did. This covers every signup surface —
+mobile, web OAuth, web email/password — because it runs from the
+`auth.users` trigger, not from app code. `apps/mobile/src/services/
+seedCategories.ts` and its `_layout.tsx` call site are deleted, not
+superseded. Support: `support@murmur.app` has no MX record — every
+message to it silently bounced. `packages/shared/src/brand.ts:25`'s
+`SUPPORT_EMAIL` is now `string | null = null`; `more/help.tsx` and
+`dashboard/settings/page.tsx`'s "Help & contact" rows hide themselves
+while it's unset (`help.body_no_contact`, all four locales, replaces the
+"write us" copy on the same screen) rather than advertising a channel
+that doesn't deliver.
+
+**Tests**: new `useShortcutHandler.test.ts` (5 tests — the exact URL an
+iOS Shortcut emits, plus the rejection cases) and
+`useNotificationListener.test.ts` (5 tests — a synthetic native payload
+reaching `onPayment` as a validated `ParsedExpense`, a zero-amount and an
+invalid-currency payload both dropped before validation, and zero native
+subscriptions when `onPayment` is omitted). `apps/mobile` — 104 passed
+(0 regressions). `apps/web` — 31 passed (0 regressions). `packages/
+shared` — 211 passed (0 regressions, all four locale files still parse
+and carry no duplicate keys). `tsc --noEmit` clean in `apps/mobile`,
+`apps/web`, `packages/shared` (the pre-existing `database.types.test.ts`
+`local_day`/`occurrence_date`/`snapshot_currency`/`deleted_at` fallout
+from concurrent, unrelated passes is untouched by this one). `eslint`
+clean (0 errors) on every file this pass wrote or edited. Live-DB smoke
+test for migration 029 documented above; no automated CI test exists for
+it (no SQL-level test harness in this repo yet).
+
+### Recurring rule CRUD, and a sync surface that reports reality (fix-plan items 3.3 + 3.7, Aug 9 2026)
+
+Two items, file ownership centered on the Recurring screens/hook on both
+platforms plus the device-registration half of mobile's sync layer and
+the sync-facing rows in web Settings/Sidebar.
+
+**3.3 — recurring rule CRUD.** New `findRuleForTransaction` in
+`packages/shared/src/domain/recurrence.ts` (`recurring_rule_id` first,
+`template_txn_id` fallback) replaces three independent, drifted inline
+lookups: `transaction/[id].tsx:217` (the one the item names — checked
+`template_txn_id` only, so a `recurring_generated` occurrence's chip
+never showed frequency/next-due), `transaction/edit.tsx`'s initial-load
+effect (same bug), and `edit.tsx`'s save-path lookup, which a prior pass
+had already hand-fixed inline but left duplicated rather than shared —
+exactly the "fixed once, left duplicated" shape the owner's standing
+rule calls out. New `buildRuleAnchor(instant, tz)` in the same module
+replaces the hand-rolled `localParts` + zero-padding triple that both
+`useRecurringRules.createRule` and web's `acceptCandidate` each
+carried separately.
+
+Full lifecycle, both platforms, without touching a transaction: new
+`RecurringRuleEditor.tsx` (mobile, via the shared `<BottomSheet>`) and
+`RecurringRuleModal.tsx` (web) — name, amount, currency, category,
+direction, frequency, interval, next date, `ends_at` as "Cancel from",
+exactly the plan's field list. Mobile `recurring.tsx` gains an "Add
+manually" pill (top row + empty state) and an "Edit" entry in the
+existing pause/resume/delete action sheet; web's `recurring/page.tsx`
+un-disables its permanently `disabled title="Coming soon"` button,
+makes each row clickable to edit, and adds a "Cancel this rule" action
+inside the edit modal (web had no delete path for a rule at all before
+this). Both platforms split Active/Paused into two real sections —
+mobile's list previously rendered every rule, paused included, under a
+heading that read "Active subscriptions," told apart only by a dimmed
+row style. Web's empty state no longer tells a free user to "accept a
+detected pattern," a Plus-gated action the banner two lines above it
+already hides from them.
+
+`deleteRule` (mobile hook) and web's new delete action are real soft
+deletes (`is_deleted = true`, `deleted_at`, `version + 1`) — the plan's
+explicit "delete (soft)" requirement — replacing a hard `.delete()` that
+bypassed the `is_deleted` contract migration 018 gave this table. Reads
+on both platforms now filter `is_deleted = false`, which they never did
+(a hard delete made this latent; a soft delete without the filter would
+have resurrected every "deleted" rule on the next load). `createRule`
+and `updateRule` grew `interval`, `currency_code`, `starts_at`
+(re-anchoring `last_generated` to null on an edited "next charge," so
+the new date is the literal next occurrence rather than one cadence
+step past it — same treatment web's edit path gets), and `ends_at`;
+`payment_method`/`note` became optional (the manual form has no use for
+either). New migration `028_recurring_rules_soft_delete.sql` adds
+`deleted_at` to `categories`, `budgets` *and* `recurring_rules` — the
+soft-delete write above needed it on `recurring_rules`, and tracing the
+column revealed `entityRegistry.ts`'s shared `versionGuardedDelete()`
+(Stage 1) has always included `deleted_at` in its update for all three
+generic-store tables despite only `transactions` ever having the
+column, a latent 400 waiting for the first queued delete on any of
+them. Fixed for all three in the same migration rather than
+`recurring_rules` alone. `database.types.ts` hand-patched to match
+(no live-linked project in this environment to regenerate from).
+
+**3.7 — a sync surface that reports reality.** `devices` (migration 001,
+written by nothing until now) gets a real writer: new
+`apps/mobile/src/services/sync/deviceRegistry.ts`
+(`getDeviceId`/`registerDevice`/`touchDeviceSynced`/
+`getDeviceLastSynced`), a stable per-install UUID in SecureStore.
+`registerDevice` runs from `_layout.tsx`'s existing launch-scoped
+`runOncePerSession` effect (same pattern as `seedDefaultCategories`/
+`runRecurringCatchUp`/`runFxBackfill`) — "register on sign-in."
+`SyncManager.drainQueue()` calls `touchDeviceSynced` once a pass
+completes online, using the same `realtimeUserId` `startRealtime`
+already tracks — "`last_synced_at` on drain," true whether or not
+anything was queued to push.
+
+Web sidebar: `dashboard/layout.tsx` (server component) now queries the
+most recent `devices.last_synced_at` for the signed-in user alongside
+its existing profile/recurring-count fetch and passes it to
+`<Sidebar>`, which renders it through new `lib/relativeTime.ts`
+(`Intl.RelativeTimeFormat`) instead of a `"Synced just now"` string that
+rendered unconditionally, including offline and on an account that had
+never opened the mobile app. Web Settings' "Sync & devices" card: real
+`devices` rows (platform + relative last-synced time) replace the one
+hardcoded "This device · Synced just now · web companion" row; zero
+devices renders an honest "no devices synced yet" state rather than a
+fabricated one — web/desktop register no device of their own, having no
+offline outbox to report sync state for. "Recognition language" row now
+reads `profiles.voice_language` (the column mobile's speech recognizer
+actually consumes) instead of the UI `locale` state, which can disagree
+with it. The "Plan & billing" card's own fabricated rows (part of the
+same `08-F41` finding, its billing half) were already made honest by
+the concurrent 3.1 pass — verified, not duplicated, here.
+
+Mobile Settings' sync-health section (built in 1.6: pending/dead-letter
+counts, already real) gains the one signal it was still missing — a
+"Last synced" row reading this device's own `devices.last_synced_at`,
+refreshed on mount and after every drain pass.
+
+**Tests**: new `findRuleForTransaction`/`buildRuleAnchor` cases in
+`packages/shared`'s `recurrence.test.ts` (5 tests) and a new
+`deviceRegistry.test.ts` (7 tests, SecureStore/Supabase mocked).
+`apps/mobile` — 104 passed (0 regressions; `SyncManager.test.ts` and
+`useTransactions.test.ts` gained `expo-secure-store`/`expo-crypto`/
+`expo-constants` mocks now that `SyncManager.ts` transitively imports
+`deviceRegistry.ts`). `apps/web` — 31 passed (0 regressions).
+`packages/shared` — 211 passed (0 regressions, all four locale files
+still parse and carry no duplicate keys — 18 new `recurring.*`/
+`settings.sync_*` keys added in parity across en/fr/es/pt). `tsc
+--noEmit` clean in `apps/mobile` and `apps/web`; `packages/shared`'s
+only remaining errors are the pre-existing, untouched
+`database.types.test.ts` `local_day`/`occurrence_date`/
+`snapshot_currency` fallout two concurrent passes already recorded
+above. `eslint` clean (0 errors) on every file this pass wrote or
+edited; one pre-existing "unused eslint-disable directive" warning on
+`recurring/page.tsx`'s realtime-subscription effect (confirmed present
+on HEAD before this pass touched the file) is untouched.
+
+### Dead code, merchant-colour consolidation, and desktop/web hardening (fix-plan items 4.3 + 4.4 + 4.5, Aug 10 2026)
+
+Three items, verified against their full plan text (not just the cited
+findings) at HEAD. Most of the substantive work — `packages/shared/src/
+utils/color.ts`'s merchant/category-colour consolidation, the Electron
+navigation guards, the CSP headers, the transaction-field allow-list,
+and the `.gitignore` rewrite — was already present and correctly built
+in the working tree from a prior pass over this same scope; this pass's
+job was to verify each item's "done when" line against the actual code
+(not the comments claiming it), close the two gaps that verification
+found, and run the suites. No file outside this pass's ownership
+(`apps/desktop/src/**`, `apps/web/next.config.ts` + `layout.tsx`,
+`apps/mobile/src/services/sync/transactionStore.ts`, `packages/shared/
+src/**`, `.gitignore`, `.gitattributes`, `knip.json`) was touched.
+
+**4.3 — dead code.** Verified gone, by grep, not by trusting the prior
+deletion: `SafeToSpend.tsx`, `useMonthSummary`, `KPI.tsx`,
+`SpendingChart.tsx`, `CategoryChart.tsx`, `advisor.ts` + its barrel
+export in `packages/ai/src/index.ts`, `packages/shared/src/utils/
+date.ts`, `formatAmount`, `tintColors`, the dead (non-`AndEnqueue`)
+`deleteTransaction`, and all eight orphaned style keys (`record.tsx`'s
+`micIcon`/`scanLabelWrap`/`scanIcon`/`moreOptionsPanel`/`fields`,
+`more/transactions.tsx`'s `title` — superseded by the now-used
+`pageTitle` — `more/help.tsx`'s `title`, `ask.tsx`'s
+`inputPlaceholder`). `getDeadLetterEntries`/`clearDeadLetterEntry` and
+`isFxPending` confirmed wired (1.6, 1.4), not deleted. One gap this
+pass found and fixed: `packages/shared/src/types/ai.ts:72-81`'s
+`AdvisorContext` interface — `monthly_income`, `safe_to_spend_remaining`,
+`implied_monthly_savings`, the exact divergent-formula shape this item
+warns about — survived `advisor.ts`'s deletion because it lived in a
+different file, re-exported through `index.ts`'s `export * from
+'./types/ai'`, which is exactly the shape `knip`'s unused-export check
+cannot see through (a barrel re-export always looks "used" to it).
+Deleted; zero other references existed. `npx knip --workspace
+packages/shared` — the hard CI gate `.github/workflows/ci.yml`'s `test`
+job already runs — is clean (exit 0) before and after. The full-repo
+`npx knip` run (report-only, `continue-on-error: true` in the same
+workflow) still lists pre-existing `apps/mobile/src`/`apps/web` unused
+exports outside this item's named scope, honestly scoped as such in the
+workflow's own comment — not this item's job to clear.
+
+**4.4 — merchant logos, category colour, contrast.** `packages/shared/
+src/utils/color.ts` is the single copy of `KNOWN_DOMAINS` (63 entries)
+and `guessDomain`, imported by both `apps/mobile/src/components/
+MerchantAvatar.tsx` and `apps/web/src/components/MerchantLogo.tsx` — the
+two previously-duplicated copies are gone (confirmed by grep: neither
+file defines its own). `merchantColor`'s fallback-tile palette is now
+the deep `AVATAR_COLORS` (8 entries, `color.ts:111-120`) — the old
+lighter 12-entry palette that put 4 of its entries at 2.2–2.8:1
+white-text contrast is gone; `color.test.ts`'s `it('every palette entry
+clears 4.5:1 ...')` exercises all 8 via 200 hashed names and asserts
+`contrastRatio(hex, '#FFFFFF') >= 4.5` for every one. `categories.color`
+is the single source of truth: `categoryPalette(hex)` (`color.ts:241`)
+derives a `{bg, fg}` pair with `fg` guaranteed ≥4.5:1 against both `bg`
+and white by construction (lightness-walk loop, `color.test.ts` proves
+it against all 20 seeded default colours plus a near-gray edge case and
+an arbitrary user-picked hex) and is now the only source for chart
+tints on both platforms (`apps/web/src/components/{Chip,AskChart,lenses/*}
+.tsx`, `dashboard/budgets/page.tsx`, `apps/mobile/src/components/
+MerchantAvatar.tsx`). The two hard-coded tint tables
+(`apps/mobile/src/theme/colors.ts`'s `categoryTints`,
+`apps/web/src/lib/theme.ts`'s `cat`) and the name-regex heuristic
+(`apps/web/src/lib/categories.ts`'s `tintFor`, file deleted) are gone —
+confirmed by grep, only historical comments naming them for context
+remain. Row vs. chart colour parity verified by tracing the call sites,
+not just asserting it: both platforms' transaction-row category
+chip/dot and both platforms' chart bars read `categories.color` (or its
+`categoryPalette` derivation) from the same field, never a second
+lookup. Favicon question: per this session's explicit instruction to
+read fix-plan item 3.5's disclosure decision and not fight it —
+verified `docs/EXTERNAL_SERVICES.md`'s §4 disclosure note and
+`privacy.merchant_logos_label`/`_detail` (mobile Privacy Center, added
+by 3.5) already document the direct device→Google favicon request
+honestly. This item does **not** proxy or drop remote logos — that
+decision was 3.5's to make and it made it (disclose, don't proxy).
+Flagged, not silently accepted: this leaves the item's own "done when"
+line — "a `TransactionRow` render issues no request outside the app's
+own hosts" — **not met**, by the same deliberate choice EXTERNAL_SERVICES.md
+already recorded as "tracked as follow-up work, not done here." Anyone
+picking up a future favicon-proxy item should read `EXTERNAL_SERVICES.md`
+§4 and `color.ts:131-136`'s comment first.
+
+**4.5 — desktop and web hardening.** All five sub-changes verified
+present and working, not just present in comments: (1)
+`apps/desktop/src/main.ts:66-74` `guardNavigation()` attaches a
+`will-navigate` handler that denies any navigation off `appOrigin`,
+handing real `http(s)` URLs to `shell.openExternal` instead; wired via
+`app.on('web-contents-created', ...)` at module scope (`:353-355`,
+before `whenReady()`) so it covers the main window and every child
+window `setWindowOpenHandler` allows. (2) `apps/web/next.config.ts`'s
+`headers()` (`:60-74`) emits `Content-Security-Policy` (`default-src
+'self'`, `frame-ancestors 'none'`, `img-src` scoped to `'self' data:
+https://t0.gstatic.com` — the one deliberate exception from 4.4 above),
+`X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY` on every
+route. `apps/web/src/app/layout.tsx:19-31` self-hosts both fonts via
+`next/font/google` (built ahead of the CSP, per the plan's own
+ordering) — no Google Fonts exception anywhere in the policy; confirmed
+by grep, no `fonts.googleapis`/`fonts.gstatic` reference remains outside
+one historical comment. (3) `apps/mobile/src/services/sync/
+transactionStore.ts:195-204` `UPDATABLE_TRANSACTION_FIELDS`, a `Set`
+`updateTransactionFields` (`:227-230`) checks every incoming key against
+before it reaches the SQL template literal, throwing on anything not in
+the 8-column allow-list — closes the type-guarantee-erased-at-runtime
+gap. (4) `.gitignore` — confirmed via `git show HEAD:.gitignore | file`
+that the pre-existing committed copy was UTF-16 (binary to git, hence
+the `Binary files differ` diff), the working-tree copy is now plain
+UTF-8 with no null bytes (`grep -c $'\x00'` on the original vs. new).
+New `.gitattributes` (`* text=auto eol=lf` plus a binary list for image/
+font assets) — this file did not exist before this pass; created now to
+close the actual gap; nothing else in 4.5 needed touching it. (5)
+Code-signing: confirmed **not** faked — `apps/desktop/electron-builder.yml`'s
+`mac.identity: null` / Windows section and `build/afterPack.cjs`'s
+ad-hoc (`--sign -`) signature are both commented with the exact env vars
+(`CSC_LINK`/`CSC_KEY_PASSWORD`, `APPLE_ID`/`APPLE_APP_SPECIFIC_PASSWORD`/
+`APPLE_TEAM_ID`) to set once the owner provisions a Developer ID
+Application certificate (macOS) and an EV cert (Windows, for SmartScreen
+reputation) — real signing is out of this session's reach without those
+credentials and is flagged here again rather than stubbed. **Owner
+action required:** provision both certs; nothing in this repo can
+substitute for them.
+
+**Tests**: `npx turbo test` — 543 passed, 0 regressions (`packages/
+shared` 238 incl. `color.test.ts`'s 27 new merchant/category-colour
+cases; `apps/mobile` 104; `apps/web` 31; `packages/ai` 170 + 1 expected
+fail + 2 todo, pre-existing). `npx turbo typecheck` clean in `ai`,
+`desktop`, `mobile`, `web`; `packages/shared`'s only error is the
+pre-existing, untouched `database.types.test.ts`
+`local_day`/`occurrence_date`/`snapshot_currency` fallout already
+recorded in this file's history above (unrelated to 4.3/4.4/4.5, not
+this pass's file ownership). `npx turbo lint` — 0 errors everywhere;
+remaining warnings are all pre-existing "unused eslint-disable
+directive" notices on files this pass didn't touch. `npx knip
+--workspace packages/shared` clean (exit 0).
+
+### Accessibility, naming/i18n, and honest empty states (fix-plan items 4.1 + 4.2 + 4.6, Aug 10 2026)
+
+Three items, verified against their full plan text (not just the cited
+findings) at HEAD. As with the 4.3/4.4/4.5 pass immediately above, nearly
+all of the substantive work — `<Tappable>`, `ScaledText`, the recurring
+chips' radio semantics, the web transaction row's `<button>` conversion,
+`aria-pressed` on the ACTIVE/Resume pills, the naming table in
+`docs/DESIGN.md`, the six `01-F29` strings, the `08-F48` locale-drop
+sweep, the duplicate `detail.recurring` key removal, the free-user "Plus
+feature" copy, the four back pills, `apps/web/src/lib/useRealtime.ts`
+wired into all three dashboard pages, the per-screen status-bar rule,
+the budget-delete confirm, the Settings unsaved-changes guard, the
+toolbar-search scoping, and the `sign-in.tsx`/`brand.ts` comment fixes —
+was already present and correct in the working tree from a prior pass.
+This pass's job was to verify each "Change" bullet and "Done when" line
+against the actual code, not the comments claiming it, and close what
+verification found open. File ownership respected:
+`apps/mobile/src/components/**`, `apps/mobile/app/**`,
+`apps/web/src/components/{Sidebar,Toolbar}.tsx` + dashboard pages,
+`packages/shared/src/i18n/**`, `apps/web/src/lib/useRealtime.ts`,
+`eslint.config.mjs` (the one config file all three items' CI gates live
+in), `.github/workflows/ci.yml` (one stale comment line).
+
+**4.1 — accessibility.** All three genuine sub-44pt targets, the
+recurring chips' `radiogroup`/`radio` semantics, the web `<button>`
+conversion and `aria-pressed` pills, and `<Tappable>` were verified
+present and correct by reading the code, not the comments. One gap
+`03-F36`'s own "same defect elsewhere" note flagged and the prior pass
+missed: `app/recurring.tsx`'s `RuleRow` — the row that opens a
+destructive (edit/delete) action sheet — carried no `accessibilityRole`
+or `accessibilityLabel`, so VoiceOver read its child `<Text>`s
+individually with no indication the row itself was interactive. Fixed:
+`accessibilityRole="button"` plus a label combining the rule name and
+its active/paused status. **Flagged, not silently skipped:** the item's
+"done when" line calling for "an axe-core run on `/dashboard/
+transactions` reports zero critical violations" has no automated check
+in this pass — no axe-core/Playwright dependency or harness exists
+anywhere in the repo (`grep -rn axe` across every `package.json` returns
+nothing), and standing one up (browser install, a new CI job) is
+infrastructure, not a code fix, so it's out of this pass's scope. The
+code-level fixes it would verify (real `<button>`, keyboard handlers,
+`aria-pressed`, roles) are in place and manually confirmed; nothing runs
+axe against them yet.
+
+**4.2 — naming, i18n leftovers, copy that argues with itself.** The
+naming table, the six `01-F29` strings, the `08-F48` sweep
+(`getLocales()` pre-auth seeding, `locale` always passed to
+`formatCurrency`, `Intl.DateTimeFormat.formatRange` for the Insights
+range label), the duplicate-key removal + `localeIntegrity.test.ts` gate,
+and the free-user Plus-feature copy were all verified correct. The one
+real gap: `eslint.config.mjs`'s own `MOBILE_I18N_RESTRICTIONS` selector
+— the mechanism the item's "done when" line requires ("a lint rule flags
+string literals passed as `<Text>` children") — existed but had never
+been flipped on. Trying it surfaced why: the audit's original `/\S/`
+value pattern also matches currency glyphs (`$`), checkmarks (`✓`),
+emoji, stepper `+`/`−`, percent signs, digit placeholders and the
+`·`/`/`/`–` separators used throughout the app to join two already-
+translated `t()` calls — 33 of 37 hits on a first pass were exactly
+that, not English words. Narrowed the selector to require a Latin
+letter (`/[A-Za-zÀ-ÖØ-öø-ÿ]/`), which left exactly four genuine
+untranslated strings, all outside `01-F29`'s original (now-stale)
+"exhaustive" list because they were added by later stages:
+`RecurringToggle`'s "AI" badge (new key `recurring.ai_badge`, which
+translates to "IA" in es/fr/pt — matching the adjacent sentence's
+existing translation of the same word) and `SyncFailureBanner`'s
+"Retry"/"Discard"/"Retry all"/"Details"/"Hide"/"Unknown error"/"N item(s)
+couldn't sync", which now reuses the `settings.sync_*` vocabulary
+Settings' own "fuller" sync-health surface already carries (same words,
+same keys, not a second translation of the same fact) via a new
+`locale` prop threaded from `_layout.tsx`. `local/mobile-i18n-
+restrictions` is now `['error', ...]` on its own alias, matching the
+`period-restrictions`/`mobile-clearance-restrictions` pattern for the
+same reason (an independent severity switch within one `no-restricted-
+syntax` file-set key) — `npx turbo lint` is 0 errors with it on.
+
+**4.6 — honest empty states and remaining copy.** All eight sub-changes
+— the four back pills, the shared `useRealtime` hook, the status-bar
+caveat comment, the budget-delete confirm, the Settings guard (verified
+it covers *both* `beforeunload` and in-app client-side route changes via
+a capturing click listener — the App Router doesn't fire `beforeunload`
+for its own navigations), the toolbar-search scoping, the Treemap
+caption, and the brand comments — were verified present and correct.
+One item worth recording rather than silently accepting as already
+done: the Treemap's "Includes savings" caption, which the plan text says
+to drop "until 1.4's transfer classification makes the band reachable",
+turned out to already be reachable — `TreemapLens` computes `saved` from
+`monthSummary(props).transfers`, the real transfer-kind classification
+1.4/2.1 landed, not the old `max(0, income − expense)` heuristic the
+audit found broken — so the caption is accurate today and was correctly
+left in place rather than removed. **Flagged, not silently skipped:**
+the item's "done when" line about mounting/unmounting Recurring ten
+times and asserting `supabase.getChannels()` is empty has no automated
+test — `apps/web`'s `vitest.config.mts` runs `environment: 'node'` and
+includes only `*.test.ts` (no jsdom, no React Testing Library, no
+`.test.tsx` anywhere in the app), so a component-mount test for
+`useRealtime` would mean standing up that harness from scratch, which is
+infrastructure this pass's file ownership doesn't cover. The hook itself
+(`apps/web/src/lib/useRealtime.ts`) is structurally correct — the
+cleanup returns synchronously from the effect body, not from inside an
+async IIFE, which was the exact defect `08-F36`/`08-F50` described — and
+is verified by code reading, not by a runtimes test.
+
+**Tests**: `npx turbo test` — 549 passed, 0 regressions (`packages/
+shared` 238, `apps/mobile` 107, `packages/ai` 173 incl. 1 expected fail
++ 2 todo, `apps/web` 31). `npx turbo typecheck` clean in `mobile`, `web`,
+`ai`, `desktop`; `packages/shared`'s only error is the pre-existing,
+untouched `database.types.test.ts` `local_day`/`occurrence_date`/
+`snapshot_currency` fallout already recorded earlier in this file
+(unrelated to 4.1/4.2/4.6, not this pass's file ownership). `npx turbo
+lint` — 0 errors repo-wide, including the newly-flipped `local/mobile-
+i18n-restrictions` gate; remaining warnings are pre-existing "unused
+eslint-disable directive" notices on files this pass didn't touch.
 
 *End of Plan*

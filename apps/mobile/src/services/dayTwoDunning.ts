@@ -85,14 +85,6 @@ Notifications.setNotificationHandler({
   }),
 })
 
-/** True only after the user successfully saves a transaction at least once.
- *  Used to gate the permission ask so we don't burn the one-shot dialog
- *  before the user understands what they're agreeing to. */
-export async function hasAskedPermissionBefore(): Promise<boolean> {
-  const v = await SecureStore.getItemAsync(STORAGE_PERMISSION_ASKED)
-  return v === '1'
-}
-
 async function markPermissionAsked() {
   await SecureStore.setItemAsync(STORAGE_PERMISSION_ASKED, '1')
 }

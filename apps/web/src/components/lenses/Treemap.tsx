@@ -1,7 +1,13 @@
-import { colors, font, cat as catTokens } from '../../lib/theme'
-import { tintFor } from '../../lib/categories'
-import { type LensProps, monthDebits, monthSummary, groupByCategory } from './types'
-import { isSpend } from '@voice-expense/shared'
+import { colors, font } from '../../lib/theme'
+import {
+  type LensProps,
+  monthDebits,
+  monthSummary,
+  groupByCategory,
+  buildCategoryColorByName,
+  NEUTRAL_CATEGORY_COLOR,
+} from './types'
+import { isSpend, categoryPalette } from '@voice-expense/shared'
 
 // Treemap of category spend for the month. Saved & invested gets its own
 // row at the bottom (income - debits) so the whole money picture is one
@@ -95,10 +101,11 @@ export function TreemapLens({ props }: { props: LensProps }) {
   const saved = summary.transfers
 
   const debitsByCat = groupByCategory(spendDebits)
+  const colorByName = buildCategoryColorByName(props.categories)
   const items = Object.entries(debitsByCat).map(([name, amt]) => ({
     label: name,
     amt,
-    color: catTokens[tintFor(name)].fg,
+    color: categoryPalette(colorByName[name] || NEUTRAL_CATEGORY_COLOR).fg,
   }))
 
   const cells = layoutCells(items)

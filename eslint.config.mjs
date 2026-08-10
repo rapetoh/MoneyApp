@@ -49,6 +49,13 @@ const localRules = {
     // `paddingBottom` selector needs this same independent-severity
     // treatment, split off from the rest of `MOBILE_PRESENTATION_RESTRICTIONS`.
     'mobile-clearance-restrictions': builtinRules.get('no-restricted-syntax'),
+    // See `MOBILE_I18N_RESTRICTIONS`'s own comment for why this needs the
+    // same independent-severity alias.
+    'mobile-i18n-restrictions': builtinRules.get('no-restricted-syntax'),
+    // See `MOBILE_PRICE_RESTRICTIONS`'s own comment — same independent-
+    // severity need, scoped even narrower (apps/mobile/app/more/** only,
+    // not all of apps/mobile).
+    'mobile-price-restrictions': builtinRules.get('no-restricted-syntax'),
   },
 }
 
@@ -138,16 +145,57 @@ const MOBILE_CLEARANCE_RESTRICTIONS = [
   },
 ]
 
-// --- Stage 4: mobile i18n ---------------------------------------------------
-// Stays 'off' — routing every literal `<Text>` string through `t()` is
-// Stage 4's own, much larger, item. Kept under the shared `no-restricted-
-// syntax` key (see the Tier-3 block below) since nothing has flipped that
-// key's severity yet.
+// --- Stage 4.2: mobile i18n --------------------------------------------------
+// Given its own alias (`local/mobile-i18n-restrictions`) for the same reason
+// `period-restrictions` and `mobile-clearance-restrictions` did: it needs a
+// severity independent of `MONEY_RESTRICTIONS`/`CLIENT_BOUNDARY_RESTRICTIONS`,
+// which correctly stay 'off' in the same file set until their own items land.
+//
+// The value pattern requires a Latin letter, not just non-whitespace — a
+// bare `/\S/` (the audit's original 01-F29/08-F48 proposal) also matched
+// currency glyphs (`$`), checkmarks (`✓`), emoji (`💸`), stepper `+`/`−`,
+// percent signs, digit placeholders and the `·`/`/`/`–` separators used
+// throughout the app to join two already-translated `t()` calls — 33 of the
+// 37 matches when this was first tried were exactly that, not English
+// words. None of those need a translator; requiring a letter keeps the rule
+// aimed at what item 4.2 actually means by "untranslated literal" without
+// permanently red-lining the build on punctuation.
 const MOBILE_I18N_RESTRICTIONS = [
   {
-    selector: "JSXElement[openingElement.name.name='Text'] > JSXText[value=/\\S/]",
+    selector: "JSXElement[openingElement.name.name='Text'] > JSXText[value=/[A-Za-zÀ-ÖØ-öø-ÿ]/]",
     message:
-      'A string literal as `<Text>` children bypasses i18n (Stage 4). Route it through t().',
+      'A string literal as `<Text>` children bypasses i18n (fix-plan 4.2). Route it through t().',
+  },
+]
+
+// --- 3.1 regression guard: no hardcoded price strings under more/ ----------
+// fix-plan 3.1: the paywall used to show "$4.99/$39" — hardcoded in
+// dollars for every storefront, and it contradicted the locked $3.99/
+// $29.99 decision in docs/PLAN.md (audit 3.1.2, an automatic App Store
+// review rejection). The fix (this item) deleted the pricing UI outright
+// — apps/mobile/app/more/paywall.tsx now describes Plus without a price,
+// since there's no purchase flow yet to quote one for — so this rule has
+// nothing to catch today; it exists purely to stop the same literal from
+// coming back the next time someone wires up a real purchase flow here
+// without going through a locale/storefront-aware price formatter.
+// Scoped to apps/mobile/app/more/** (not all of apps/mobile) because
+// that's this item's own surface — paywall.tsx plus its siblings in the
+// same route group.
+const MOBILE_PRICE_RESTRICTIONS = [
+  {
+    selector: 'Literal[value=/\\$\\d/]',
+    message:
+      'A hardcoded "$" + digit price string regressed fix-plan 3.1/3.1.2 (the paywall\'s $4.99/$39 that contradicted docs/PLAN.md\'s locked $3.99/$29.99 and was hardcoded in dollars for every storefront). Prices come from a locale/storefront-aware formatter, never a literal.',
+  },
+  {
+    selector: 'JSXText[value=/\\$\\d/]',
+    message:
+      'A hardcoded "$" + digit price string regressed fix-plan 3.1/3.1.2 (the paywall\'s $4.99/$39 that contradicted docs/PLAN.md\'s locked $3.99/$29.99 and was hardcoded in dollars for every storefront). Prices come from a locale/storefront-aware formatter, never a literal.',
+  },
+  {
+    selector: 'TemplateElement[value.raw=/\\$\\d/]',
+    message:
+      'A hardcoded "$" + digit price string regressed fix-plan 3.1/3.1.2 (the paywall\'s $4.99/$39 that contradicted docs/PLAN.md\'s locked $3.99/$29.99 and was hardcoded in dollars for every storefront). Prices come from a locale/storefront-aware formatter, never a literal.',
   },
 ]
 
@@ -203,12 +251,27 @@ export default tseslint.config(
       // is clean (verified by grep across apps/mobile immediately before
       // this flip; see the item's commit).
       'local/mobile-clearance-restrictions': ['error', ...MOBILE_CLEARANCE_RESTRICTIONS],
-      'no-restricted-syntax': [
-        'off',
-        ...MONEY_RESTRICTIONS,
-        ...CLIENT_BOUNDARY_RESTRICTIONS,
-        ...MOBILE_I18N_RESTRICTIONS,
-      ],
+      // Item 4.2's own switch — flipped now that the letter-bearing sweep
+      // is clean (four genuine hits fixed: RecurringToggle's "AI" badge,
+      // SyncFailureBanner's "Retry"/"Discard"/"Retry all" — see the item's
+      // commit). MONEY_RESTRICTIONS/CLIENT_BOUNDARY_RESTRICTIONS stay 'off'
+      // under the shared key below; their own items haven't landed.
+      'local/mobile-i18n-restrictions': ['error', ...MOBILE_I18N_RESTRICTIONS],
+      'no-restricted-syntax': ['off', ...MONEY_RESTRICTIONS, ...CLIENT_BOUNDARY_RESTRICTIONS],
+    },
+  },
+  // Tier 3a: apps/mobile/app/more/** — fix-plan 3.1's own surface
+  // (paywall.tsx and its route-group siblings). A narrower override on
+  // top of Tier 3 above; its own key (`local/mobile-price-restrictions`)
+  // so it doesn't collide with Tier 3's shared `no-restricted-syntax` key
+  // (still 'off' for MONEY_RESTRICTIONS/CLIENT_BOUNDARY_RESTRICTIONS —
+  // unrelated items) — same independent-severity pattern as every other
+  // `local/*-restrictions` alias in this file.
+  {
+    files: ['apps/mobile/app/more/**/*.{ts,tsx}'],
+    plugins: { local: localRules },
+    rules: {
+      'local/mobile-price-restrictions': ['error', ...MOBILE_PRICE_RESTRICTIONS],
     },
   },
   // --- 1.3 Stage-2 debt: pre-existing call sites outside this item's own

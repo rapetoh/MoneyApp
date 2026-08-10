@@ -198,19 +198,20 @@ export default function PrivacyScreen() {
       {/* Hide the native Stack header — the mockup has a chevron-pill + breadcrumb label */}
       <Stack.Screen options={{ headerShown: false }} />
       <SafeAreaView style={styles.safe} edges={['top', 'bottom', 'left', 'right']}>
+        {/* Back pill + breadcrumb. Sibling of the ScrollView, not its
+            first child — a child scrolls off screen on this long page
+            (audit 01-F32); matches more/transactions.tsx's `topRow`. */}
+        <View style={styles.topRow}>
+          <Pressable
+            onPress={() => router.back()}
+            style={({ pressed }) => [styles.backPill, pressed && styles.backPillPressed]}
+            hitSlop={8}
+          >
+            <Ionicons name="chevron-back" size={20} color={Colors.ink2 ?? Colors.textSecondary} />
+          </Pressable>
+          <Text style={styles.breadcrumb}>{t('more.settings', locale)}</Text>
+        </View>
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-          {/* Back pill + breadcrumb */}
-          <View style={styles.topRow}>
-            <Pressable
-              onPress={() => router.back()}
-              style={({ pressed }) => [styles.backPill, pressed && styles.backPillPressed]}
-              hitSlop={8}
-            >
-              <Ionicons name="chevron-back" size={20} color={Colors.ink2 ?? Colors.textSecondary} />
-            </Pressable>
-            <Text style={styles.breadcrumb}>{t('more.settings', locale)}</Text>
-          </View>
-
           {/* Intro — lock tile + serif headline + lead copy */}
           <View style={styles.intro}>
             <View style={styles.lockTile}>
@@ -220,7 +221,13 @@ export default function PrivacyScreen() {
             <Text style={styles.lead}>{t('privacy.lead', locale)}</Text>
           </View>
 
-          {/* What's stored where */}
+          {/* What's stored where. Four rows, not three (fix-plan 3.5 /
+              audit 02-F4, 02-F16, 01-F28): merchant-logo lookups are their
+              own third-party data flow — a direct device→Google request
+              that never touches our servers at all — so folding it into
+              the "servers" row would misdescribe it. The servers row's
+              icon changed from 🚫 ("nothing leaves") to 🌐, since the
+              detail below now honestly says data does leave, to OpenAI. */}
           <SetGroup label={t('privacy.group_where', locale)}>
             <PrivacyRow
               icon="📱"
@@ -233,7 +240,12 @@ export default function PrivacyScreen() {
               detail={t('privacy.icloud_detail', locale)}
             />
             <PrivacyRow
-              icon="🚫"
+              icon="🖼️"
+              label={t('privacy.merchant_logos_label', locale)}
+              detail={t('privacy.merchant_logos_detail', locale)}
+            />
+            <PrivacyRow
+              icon="🌐"
               label={t('privacy.servers_label', locale)}
               detail={t('privacy.servers_detail', locale)}
               last

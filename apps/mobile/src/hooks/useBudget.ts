@@ -3,7 +3,7 @@ import * as Crypto from 'expo-crypto'
 import { getCalendars } from 'expo-localization'
 import { supabase } from '../lib/supabase'
 import { DataEvents } from '../events/dataEvents'
-import { aggAmount, periodBounds, budgetStatus, localDay } from '@voice-expense/shared'
+import { budgetStatus, localDay } from '@voice-expense/shared'
 import type {
   Budget,
   BudgetPeriod,
@@ -108,52 +108,6 @@ export function useActiveBudget(userId: string | undefined) {
   }
 
   return { budget, loading, error, setBudget: setBudget_, refetch: fetch }
-}
-
-// Backwards-compatible alias used by HomeScreen + SafeToSpend
-export const useMonthlyBudget = useActiveBudget
-
-/**
- * Amount spent in `budget`'s own period window, ending "now" — the
- * half-open `[start, endExclusive)` bound from `periodBounds()`
- * (`packages/shared/src/utils/period.ts`, fix-plan 1.3), anchored on
- * `budget.starts_at` rather than "now" itself, exhaustively switched
- * over all five `BudgetPeriod` values. Before this, the branch list
- * ended at `biweekly` and fell into an `else` comment reading "monthly
- * (default) and others" — a quarterly or yearly budget silently read
- * a calendar-month window here while its own header said QUARTERLY —
- * and every window had a start with no end, so a transaction dated any
- * number of days in the future counted against the current period.
- *
- * Returns spend only (no recurring "committed" outflow) so existing
- * 2-argument call sites this item doesn't own (`app/(tabs)/index.tsx`)
- * keep compiling and keep their own separate recurring math untouched;
- * `budgetStatusFor()` below is the full `{spent, committed, remaining,
- * pct}` breakdown for callers that have the rules to feed it.
- */
-export function usePeriodSpend(
-  budget: Budget | null,
-  transactions: {
-    amount: number
-    amount_in_profile_currency: number | null
-    direction: string
-    transacted_at: string
-    is_deleted: boolean
-  }[],
-  tz: string = deviceTimeZone(),
-): number {
-  if (!budget) return 0
-  const anchor = budget.starts_at
-  const window = periodBounds(budget.period, new Date().toISOString(), tz, anchor)
-  return transactions
-    .filter(
-      (t) =>
-        !t.is_deleted &&
-        t.direction === 'debit' &&
-        t.transacted_at >= window.start &&
-        t.transacted_at < window.endExclusive,
-    )
-    .reduce((sum, t) => sum + aggAmount(t), 0)
 }
 
 /**

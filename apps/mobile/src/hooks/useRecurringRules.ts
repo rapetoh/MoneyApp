@@ -4,14 +4,9 @@ import * as Crypto from 'expo-crypto'
 import { supabase } from '../lib/supabase'
 import { getCurrentProfileCurrency } from '../services/profileCurrency'
 import type { RecurringRule, RecurringFrequency } from '@voice-expense/shared'
-import type { BudgetPeriod } from '@voice-expense/shared'
 import {
   nextOccurrence as sharedNextOccurrence,
-  periodBounds,
-  monthBounds,
-  monthIso,
-  localParts,
-  recurringOutflowInWindow,
+  buildRuleAnchor,
   snapshotFx,
 } from '@voice-expense/shared'
 
@@ -82,43 +77,14 @@ export function isRuleOverdue(rule: RecurringRule, tz: string = deviceTimeZone()
   return strictNext != null && strictNext.getTime() < Date.now()
 }
 
-// ─── Upcoming amount for Safe to Spend ───────────────────────────────────────
-
-/**
- * Debit-only, FX-normalised, every-occurrence recurring spend in the
- * budget `period` containing "now" — the shared-engine replacement for
- * the four defects `computeUpcomingRecurring` had (fix-plan 2.1's "Why
- * now"): it summed raw `rule.amount` across currencies, counted only
- * the *next* occurrence (so a weekly rule contributed 1/4 of what it
- * should), and its own hand-rolled window regime had a `biweekly`
- * branch that ended *today* (nothing future was ever in-window) and a
- * `weekly` branch that could span 38 days across a month boundary.
- *
- * `anchorInstant` fixes a `biweekly` period's phase (`budgets.starts_at`
- * — `packages/shared/src/utils/period.ts`'s `periodBounds` throws
- * without one). Neither current caller (`app/(tabs)/index.tsx`,
- * `app/(tabs)/budgets.tsx`) threads the active budget's `starts_at`
- * through yet — that's those screens' own Stage 2 adoption, outside
- * this hook's file ownership — so a missing anchor for a biweekly
- * budget falls back to the calendar month rather than throwing on
- * every Home/Budgets render.
- */
-export function computeUpcomingRecurring(
-  rules: RecurringRule[],
-  period: BudgetPeriod | undefined,
-  opts: { anchorInstant?: string; tz?: string } = {},
-): number {
-  const tz = opts.tz ?? deviceTimeZone()
-  const now = new Date().toISOString()
-  let bounds
-  try {
-    bounds = periodBounds(period ?? 'monthly', now, tz, opts.anchorInstant)
-  } catch {
-    bounds = monthBounds(monthIso(now, tz), tz)
-  }
-  const { total } = recurringOutflowInWindow(rules, bounds.start, bounds.endExclusive, tz)
-  return total
-}
+// `computeUpcomingRecurring` (debit-only, FX-normalised, every-occurrence
+// recurring spend in a budget period) lived here until fix-plan 4.3: its
+// last two callers (`app/(tabs)/index.tsx`, `app/(tabs)/budgets.tsx`)
+// migrated to the single `budgetStatusFor` computation in fix-plan 2.5,
+// which folds the same recurring-outflow figure into one status object
+// alongside actual spend — see the "The one budget-status computation"
+// comment at each call site. Deleted rather than kept as an unused
+// export so the next reader cannot wire up the old formula by mistake.
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
@@ -139,6 +105,12 @@ export function useRecurringRules(userId: string | undefined) {
       .from('recurring_rules')
       .select('*')
       .eq('user_id', userId)
+      // Soft-deleted rules (fix-plan 3.3 — `deleteRule` below no longer
+      // hard-deletes the row) must not resurrect in the list they were
+      // just removed from. `is_deleted` has carried this contract since
+      // migration 018 gave every synced entity the same shape as
+      // `transactions`; this read simply never honoured it.
+      .eq('is_deleted', false)
       .order('created_at', { ascending: false })
     if (fetchError) {
       setError(fetchError.message)
@@ -157,25 +129,40 @@ export function useRecurringRules(userId: string | undefined) {
     currency_code: string
     category_id: string | null
     direction: 'debit' | 'credit'
-    payment_method: string | null
-    note: string | null
+    /** Optional — the "Add manually" form (fix-plan 3.3) has no payment-
+     *  method/note fields (they describe *how a transaction was paid*,
+     *  meaningless before any occurrence exists yet); defaults to null. */
+    payment_method?: string | null
+    note?: string | null
     frequency: RecurringFrequency
     template_txn_id?: string | null
+    /** Cadence multiplier — "every N {frequency}". Defaults to 1. */
+    interval?: number
+    /** Explicit first-occurrence instant for a rule created with no
+     *  template transaction (fix-plan 3.3's "Add manually" form's own
+     *  "next date" field). Ignored when `template_txn_id` is set — the
+     *  template's own `transacted_at` is authoritative there, exactly as
+     *  before. Defaults to "now" when neither is given. */
+    starts_at?: string
+    /** "Cancel from" — the rule stops generating occurrences at/after
+     *  this instant. Null (the default) means no end. */
+    ends_at?: string | null
   }): Promise<RecurringRule | null> {
     if (!userId) return null
 
     // Anchor + FX snapshot (fix-plan 2.3(b) / 2.1). When this rule
-    // templates an existing transaction (the only caller today,
-    // `acceptPattern`, always passes one — a pattern candidate's
-    // `templateTxnId` is its *newest* occurrence, i.e. `lastSeenAt`),
-    // anchor `starts_at`/`last_generated` to that transaction's own
-    // date instead of "now": generating from "now" onward is what let
-    // an accepted candidate spanning Jun-Aug back-generate a duplicate
-    // for a month the user had already logged manually. Reusing the
-    // template's own FX snapshot (rather than a fresh lookup) is exact
-    // — same amount, same currency, same day — and avoids a second
-    // network round-trip.
-    let anchorInstant = new Date().toISOString()
+    // templates an existing transaction (e.g. `acceptPattern` — a
+    // pattern candidate's `templateTxnId` is its *newest* occurrence,
+    // i.e. `lastSeenAt`), anchor `starts_at`/`last_generated` to that
+    // transaction's own date instead of "now": generating from "now"
+    // onward is what let an accepted candidate spanning Jun-Aug
+    // back-generate a duplicate for a month the user had already logged
+    // manually. Reusing the template's own FX snapshot (rather than a
+    // fresh lookup) is exact — same amount, same currency, same day —
+    // and avoids a second network round-trip. A rule created manually
+    // (fix-plan 3.3, no template) anchors on the form's own "next date"
+    // field instead, defaulting to "now" when that's also absent.
+    let anchorInstant = params.starts_at ?? new Date().toISOString()
     let fxSnapshot: {
       amount_in_profile_currency: number | null
       fx_rate_to_profile: number | null
@@ -206,7 +193,11 @@ export function useRecurringRules(userId: string | undefined) {
       const fx = await snapshotFx(anchorInstant, params.currency_code, profileCurrency, params.amount, tz)
       if (fx) fxSnapshot = fx
     }
-    const anchorParts = localParts(anchorInstant, deviceTimeZone())
+    // Shared anchor derivation (fix-plan 3.3's `buildRuleAnchor`) — this
+    // used to hand-roll the same `localParts` + zero-padding triple that
+    // web's `acceptCandidate` also hand-rolls; the manual-creation path
+    // added here would have been a third copy.
+    const anchor = buildRuleAnchor(anchorInstant, deviceTimeZone())
 
     const { data, error } = await supabase
       .from('recurring_rules')
@@ -221,24 +212,30 @@ export function useRecurringRules(userId: string | undefined) {
         payment_method: params.payment_method,
         note: params.note,
         frequency: params.frequency,
-        interval: 1,
-        starts_at: anchorInstant,
+        interval: params.interval ?? 1,
+        starts_at: anchor.starts_at,
+        ends_at: params.ends_at ?? null,
         // NOT the `last_generated: now()` workaround 03-F32 describes —
         // the shared engine correctly treats `starts_at` as the first
         // occurrence when `last_generated` is null (`nextOccurrence
-        // (rule, null, tz) === starts_at`). Anchoring both to the
-        // template's own date (or "now" when there is none) means the
-        // generators produce the *next* occurrence after whatever was
-        // already observed, never a back-dated duplicate of it.
-        last_generated: anchorInstant,
+        // (rule, null, tz) === starts_at`). A template transaction IS an
+        // already-observed occurrence, so `last_generated` anchors to it
+        // too — the generators then produce the *next* occurrence after
+        // it, never a back-dated duplicate of the row the user already
+        // logged. A rule created manually with no template (fix-plan
+        // 3.3's "Add manually") has observed nothing yet: leaving
+        // `last_generated` null is what makes the form's own "next
+        // date" the literal next occurrence rather than one cadence
+        // step past it.
+        last_generated: params.template_txn_id ? anchor.starts_at : null,
         template_txn_id: params.template_txn_id ?? null,
         is_active: true,
         amount_in_profile_currency: fxSnapshot.amount_in_profile_currency,
         fx_rate_to_profile: fxSnapshot.fx_rate_to_profile,
         fx_rate_date: fxSnapshot.fx_rate_date,
-        anchor_day: anchorParts.d,
-        anchor_weekday: anchorParts.weekdayIndex + 1,
-        anchor_time: `${String(anchorParts.hour).padStart(2, '0')}:${String(anchorParts.minute).padStart(2, '0')}:${String(anchorParts.second).padStart(2, '0')}`,
+        anchor_day: anchor.anchor_day,
+        anchor_weekday: anchor.anchor_weekday,
+        anchor_time: anchor.anchor_time,
       })
       .select()
       .single()
@@ -264,6 +261,8 @@ export function useRecurringRules(userId: string | undefined) {
             .update({
               amount: params.amount,
               frequency: params.frequency,
+              interval: params.interval ?? 1,
+              ends_at: params.ends_at ?? null,
               category_id: params.category_id,
               payment_method: params.payment_method,
               // Re-snapshotted on update (fix-plan 2.1's "snapshotted on
@@ -294,8 +293,23 @@ export function useRecurringRules(userId: string | undefined) {
     await fetch()
   }
 
+  /**
+   * Soft delete (fix-plan 3.3 — the plan's explicit "delete (soft)"
+   * requirement). The old hard `.delete()` bypassed the `is_deleted`
+   * contract every other synced entity carries since migration 018 (the
+   * generic sync store's `softDelete`, `versionGuardedDelete`) — a rule
+   * deleted here left no trace for a future audit/undo and, had mobile's
+   * offline outbox for `recurring_rule` ever been adopted (it is wired
+   * in `entityRegistry.ts` but this hook still writes online-only), a
+   * hard delete would have raced a concurrent update instead of losing
+   * to a version guard.
+   */
   async function deleteRule(id: string) {
-    await supabase.from('recurring_rules').delete().eq('id', id)
+    const current = rules.find((r) => r.id === id)
+    await supabase
+      .from('recurring_rules')
+      .update({ is_deleted: true, deleted_at: new Date().toISOString(), version: (current?.version ?? 1) + 1 })
+      .eq('id', id)
     await fetch()
   }
 
@@ -305,8 +319,11 @@ export function useRecurringRules(userId: string | undefined) {
       Pick<
         RecurringRule,
         | 'frequency'
+        | 'interval'
         | 'amount'
+        | 'currency_code'
         | 'name'
+        | 'starts_at'
         | 'ends_at'
         | 'category_id'
         | 'direction'
@@ -317,23 +334,70 @@ export function useRecurringRules(userId: string | undefined) {
   ) {
     let payload: typeof changes & {
       amount_in_profile_currency?: number | null
+      fx_rate_to_profile?: number | null
+      fx_rate_date?: string | null
+      last_generated?: string | null
+      anchor_day?: number | null
+      anchor_weekday?: number | null
+      anchor_time?: string | null
     } = changes
-    // Amount changed: re-derive the FX snapshot in place from the rule's
-    // own already-known rate (mirrors `updateAmountSnapshot` in
-    // `apps/mobile/src/services/sync/transactionStore.ts` for a
-    // transaction's amount edit) rather than a fresh network lookup —
-    // fix-plan 2.1's "snapshotted on create/update".
-    if (changes.amount != null) {
-      const current = rules.find((r) => r.id === id)
-      if (current?.fx_rate_to_profile != null) {
-        payload = {
-          ...changes,
-          amount_in_profile_currency: Math.round(changes.amount * current.fx_rate_to_profile * 100) / 100,
-        }
+    const current = rules.find((r) => r.id === id)
+
+    // "Next charge" edited (fix-plan 3.3's edit form). `nextOccurrence`
+    // computes forward from `last_generated`, not from `starts_at`, once
+    // a rule has one (every rule does after its first generation/
+    // creation) — so changing `starts_at` alone would silently do
+    // nothing to the displayed/generated next date. Re-anchoring
+    // `last_generated` to null puts the rule back in the same "nothing
+    // observed yet, starts_at is the pending first occurrence" state a
+    // freshly-created manual rule starts in (see `createRule` above),
+    // which is what makes the new date the literal next occurrence
+    // rather than one cadence step past it. The anchor triple moves
+    // with it so the day-of-month clamp matches the new date, not the
+    // old one.
+    if (changes.starts_at != null) {
+      const anchor = buildRuleAnchor(changes.starts_at, deviceTimeZone())
+      payload = {
+        ...payload,
+        starts_at: anchor.starts_at,
+        last_generated: null,
+        anchor_day: anchor.anchor_day,
+        anchor_weekday: anchor.anchor_weekday,
+        anchor_time: anchor.anchor_time,
       }
     }
-    await supabase.from('recurring_rules').update(payload).eq('id', id)
+
+    // Amount or currency changed: re-derive the FX snapshot. An amount-only
+    // change re-derives in place from the rule's own already-known rate
+    // (mirrors `updateAmountSnapshot` in `apps/mobile/src/services/sync/
+    // transactionStore.ts` for a transaction's amount edit); a currency
+    // change needs a fresh network lookup — the old rate was to a
+    // different quote currency entirely (fix-plan 2.1's "snapshotted on
+    // create/update").
+    if (changes.currency_code != null && changes.currency_code !== current?.currency_code) {
+      const profileCurrency = getCurrentProfileCurrency()
+      const amount = changes.amount ?? current?.amount ?? 0
+      const fx = await snapshotFx(
+        current?.starts_at ?? new Date().toISOString(),
+        changes.currency_code,
+        profileCurrency,
+        amount,
+        deviceTimeZone(),
+      )
+      if (fx) payload = { ...payload, ...fx }
+    } else if (changes.amount != null && current?.fx_rate_to_profile != null) {
+      payload = {
+        ...payload,
+        amount_in_profile_currency: Math.round(changes.amount * current.fx_rate_to_profile * 100) / 100,
+      }
+    }
+    // Surfaced return (fix-plan 2.13's pattern, extended here) — this
+    // used to discard the write outcome entirely, so the "Edit recurring
+    // rule" sheet (fix-plan 3.3) could not tell a caller a save had
+    // failed and would close as if it had succeeded.
+    const { error } = await supabase.from('recurring_rules').update(payload).eq('id', id)
     await fetch()
+    return !error
   }
 
   return { rules, loading, error, createRule, toggleRule, deleteRule, updateRule, refetch: fetch }

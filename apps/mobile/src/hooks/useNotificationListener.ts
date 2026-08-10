@@ -61,11 +61,20 @@ export interface UseNotificationListenerReturn {
  * Wraps the Android NotificationListenerService.
  * On iOS, all values are no-ops (permissionGranted = false, functions do nothing).
  *
+ * Two call sites, deliberately: Settings calls this with no `onPayment` at
+ * all — it only needs `permissionGranted`/`requestPermission` to render and
+ * drive the toggle. The root layout (fix-plan 3.4 / audit 07-F10, 08-F20,
+ * 02-F34) calls it with a real `onPayment` that routes the validated
+ * payload into the shared capture sheet. Gating the native subscription on
+ * `onPayment` being present (rather than always subscribing) means exactly
+ * one listener is ever attached, not two competing for the same event.
+ *
  * @param onPayment - Called whenever a payment notification is detected.
- *   Receives a pre-built ParsedExpense ready to pass to voice.injectParsed().
+ *   Receives a pre-built, already-validated ParsedExpense ready to pass to
+ *   voice.injectParsed(). Omit when a call site only needs permission state.
  */
 export function useNotificationListener(
-  onPayment: (parsed: ParsedExpense) => void,
+  onPayment?: (parsed: ParsedExpense) => void,
 ): UseNotificationListenerReturn {
   const [permissionGranted, setPermissionGranted] = useState(false)
 
@@ -80,7 +89,7 @@ export function useNotificationListener(
   }, [recheckPermission])
 
   useEffect(() => {
-    if (Platform.OS !== 'android' || !permissionGranted) return
+    if (Platform.OS !== 'android' || !permissionGranted || !onPayment) return
 
     const sub = addPaymentNotificationListener((payload: NotificationPayload) => {
       if (payload.amount <= 0) return

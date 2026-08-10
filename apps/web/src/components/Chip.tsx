@@ -1,19 +1,22 @@
-import { cat, font, type CategoryTint } from '../lib/theme'
-import { tintFor } from '../lib/categories'
+import { colors, font } from '../lib/theme'
+import { categoryPalette } from '@voice-expense/shared'
 
+// `categories.color` is the single source of truth for a category's
+// color (fix-plan 4.4) — this chip derives its bg/fg from the category's
+// own hex via `categoryPalette` instead of a name-regex `tintFor` guess,
+// so it can never render a different color than the same category's row
+// or chart elsewhere. `categoryColor` unset (no category, e.g. an
+// uncategorized income row) falls back to a neutral ink tint.
 export function Chip({
   label,
-  tint,
-  categoryName,
+  categoryColor,
   size = 'md',
 }: {
   label: string
-  tint?: CategoryTint
-  categoryName?: string | null
+  categoryColor?: string | null
   size?: 'sm' | 'md'
 }) {
-  const key = tint ?? tintFor(categoryName)
-  const c = cat[key]
+  const { bg, fg } = categoryColor ? categoryPalette(categoryColor) : { bg: colors.surface2, fg: colors.ink3 }
   const pad = size === 'sm' ? '3px 8px' : '5px 10px'
   const fs = size === 'sm' ? 11 : 12
   return (
@@ -21,8 +24,8 @@ export function Chip({
       style={{
         display: 'inline-flex',
         alignItems: 'center',
-        background: c.bg,
-        color: c.fg,
+        background: bg,
+        color: fg,
         padding: pad,
         borderRadius: 999,
         fontSize: fs,

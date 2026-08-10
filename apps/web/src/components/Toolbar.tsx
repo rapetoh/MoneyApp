@@ -8,16 +8,20 @@ import { Icon } from './Icons'
 export function Toolbar({
   title,
   right,
+  search = false,
   searchInitial,
 }: {
   title: string
   right?: ReactNode
   /**
-   * Optional initial value for the global search field. Pages that already
-   * own a "?q=" param (Transactions) hydrate the toolbar field with it; other
-   * pages start empty and routing the user to /dashboard/transactions on
-   * submit.
+   * The search box always submits to /dashboard/transactions?q= — it is a
+   * transaction search, not a per-page filter. Rendering it on Budgets,
+   * Recurring, Insights and Settings made it look like it filtered the
+   * page it sat on when it silently navigated away instead (audit 08-F49).
+   * Only Transactions, which owns the "?q=" param it submits to, opts in.
    */
+  search?: boolean
+  /** Initial value for the field; only meaningful when `search` is set. */
   searchInitial?: string
 }) {
   return (
@@ -25,7 +29,7 @@ export function Toolbar({
       <div style={styles.toolbarTitle}>{title}</div>
       <div style={styles.toolbarRight}>
         {right}
-        <ToolbarSearch initial={searchInitial} />
+        {search && <ToolbarSearch initial={searchInitial} />}
       </div>
     </div>
   )

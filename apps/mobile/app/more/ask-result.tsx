@@ -29,11 +29,7 @@ import {
   buildAskMurmurRequest,
   postAskMurmur,
 } from '../../src/services/askMurmurClient'
-import type {
-  AskMurmurResponse,
-  AskMurmurAction,
-  AskMurmurStatRow,
-} from '@voice-expense/shared'
+import type { AskMurmurResponse, AskMurmurStatRow } from '@voice-expense/shared'
 
 /**
  * Ask Murmur — result state.
@@ -41,13 +37,20 @@ import type {
  * Traces S_AskResult in docs/money-app/project/mobile-screens-5.jsx. The user's
  * question + the grounded reasoner's answer render as a chat thread: user
  * bubble (right, ink), Murmur bubble (left, sparkle avatar) with verdict +
- * breakdown card + optional sage note + attribution + action pills.
+ * breakdown card + optional sage note + attribution.
  *
  * The screen owns its own back-pill chrome — the native Stack header is hidden
  * via `more/ask-result` options in app/_layout.tsx.
  *
  * Loading / error / refusal states all render inside the Murmur bubble so the
  * thread layout stays consistent.
+ *
+ * `response.actions` (create_goal / set_budget / show_category /
+ * show_transactions suggestions from the reasoner) is intentionally not
+ * rendered — the pills that used to show them called an inert
+ * `onActionPress` with no target surface to route to (fix-plan 3.1: a
+ * pressed state that does nothing is worse than no pill). Reintroduce
+ * once those destinations exist.
  */
 export default function AskResultScreen() {
   const { user } = useAuth()
@@ -138,13 +141,6 @@ export default function AskResultScreen() {
     void runAsk()
   }
 
-  function onActionPress(_action: AskMurmurAction) {
-    // Action destinations (create_goal / set_budget / show_category /
-    // show_transactions) ship in their own milestones. The pill renders the
-    // model's localized label; press is intentionally inert until the target
-    // surfaces exist.
-  }
-
   return (
     <>
       <Stack.Screen options={{ headerShown: false }} />
@@ -172,12 +168,7 @@ export default function AskResultScreen() {
           showsVerticalScrollIndicator={false}
         >
           <UserBubble text={question} />
-          <MurmurBubble
-            state={state}
-            locale={locale}
-            onRetry={onRetry}
-            onActionPress={onActionPress}
-          />
+          <MurmurBubble state={state} locale={locale} onRetry={onRetry} />
         </ScrollView>
 
         {/* Follow-up bar was a dead placeholder — it looked like a chat
@@ -214,10 +205,9 @@ interface MurmurBubbleProps {
     | { kind: 'error' }
   locale: Locale
   onRetry: () => void
-  onActionPress: (action: AskMurmurAction) => void
 }
 
-function MurmurBubble({ state, locale, onRetry, onActionPress }: MurmurBubbleProps) {
+function MurmurBubble({ state, locale, onRetry }: MurmurBubbleProps) {
   return (
     <View style={styles.murmurRow}>
       <View style={styles.avatarTile}>
@@ -243,11 +233,7 @@ function MurmurBubble({ state, locale, onRetry, onActionPress }: MurmurBubblePro
             </Pressable>
           </View>
         ) : (
-          <ResultBody
-            response={state.response}
-            locale={locale}
-            onActionPress={onActionPress}
-          />
+          <ResultBody response={state.response} locale={locale} />
         )}
       </View>
     </View>
@@ -261,11 +247,9 @@ function MurmurBubble({ state, locale, onRetry, onActionPress }: MurmurBubblePro
 function ResultBody({
   response,
   locale,
-  onActionPress,
 }: {
   response: AskMurmurResponse
   locale: Locale
-  onActionPress: (a: AskMurmurAction) => void
 }) {
   const verdictTokens = useMemo(() => splitInlineBold(response.verdict.text), [
     response.verdict.text,
@@ -322,28 +306,6 @@ function ResultBody({
         </Text>
       </View>
 
-      {response.actions.length > 0 && (
-        <View style={styles.actionsRow}>
-          {response.actions.map((a, i) => (
-            <Pressable
-              key={i}
-              onPress={() => onActionPress(a)}
-              style={({ pressed }) => [
-                i === 0 ? styles.actionPillPrimary : styles.actionPillSecondary,
-                pressed && styles.pressed,
-              ]}
-            >
-              {i === 0 && <Ionicons name="add" size={14} color="#FFFFFF" />}
-              <Text
-                style={i === 0 ? styles.actionPrimaryText : styles.actionSecondaryText}
-                numberOfLines={1}
-              >
-                {a.label}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-      )}
     </>
   )
 }
@@ -594,42 +556,4 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     fontFamily: Typography.fontFamily.sans,
   },
-
-  // Actions
-  actionsRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: 14,
-    flexWrap: 'wrap',
-  },
-  actionPillPrimary: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 999,
-    backgroundColor: Colors.ink,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  actionPrimaryText: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '700',
-    fontFamily: Typography.fontFamily.sansBold,
-  },
-  actionPillSecondary: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 999,
-    backgroundColor: '#FFFFFF',
-    borderWidth: Hairline.width,
-    borderColor: Hairline.color,
-  },
-  actionSecondaryText: {
-    color: Colors.ink2,
-    fontSize: 13,
-    fontWeight: '600',
-    fontFamily: Typography.fontFamily.sansBold,
-  },
-
 })

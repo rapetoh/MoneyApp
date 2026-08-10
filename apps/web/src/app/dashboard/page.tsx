@@ -30,7 +30,7 @@ import {
   monthBounds,
 } from '@voice-expense/shared'
 
-type Cat = { id: string; name: string; kind: CategoryKind }
+type Cat = { id: string; name: string; kind: CategoryKind; color: string | null }
 
 /**
  * One `LensDay` per civil day of `monthIso`, in `tz` — the "bucketing

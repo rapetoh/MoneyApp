@@ -21,7 +21,3 @@ export async function signInWithApple() {
   if (error) throw error
   return data
 }
-
-export async function isAppleAuthAvailable() {
-  return AppleAuthentication.isAvailableAsync()
-}

@@ -1,5 +1,4 @@
 import type { ParsedExpense, Locale, ParseFieldError } from '@voice-expense/shared'
-import { parseExpenseLocally } from './localParser'
 import { assertParsedExpense, ParseValidationError } from './validateParsedExpense'
 
 export interface ParseOptions {
@@ -73,18 +72,12 @@ function setCached(key: string, result: ParsedExpense): void {
 }
 
 export async function parseExpense(opts: ParseOptions): Promise<ParsedExpense> {
-  // Tier 1: local parser (no AI call)
-  const { result: localResult, confidence } = parseExpenseLocally(opts.transcript)
-  if (localResult && confidence >= 0.85) {
-    return { ...localResult, currency: opts.currency }
-  }
-
-  // Tier 2: cache check
+  // Tier 1: cache check
   const key = cacheKey(opts)
   const cached = getCached(key)
   if (cached) return cached
 
-  // Tier 3: AI call via Next.js API route
+  // Tier 2: AI call via Next.js API route
   const response = await fetch(`${opts.apiBaseUrl}/api/ai/parse-expense`, {
     method: 'POST',
     headers: {
@@ -113,8 +106,6 @@ export async function parseExpense(opts: ParseOptions): Promise<ParsedExpense> {
       }
       throw new ParseValidationError(body.errors ?? [])
     }
-    // Fallback: return local parse result even with low confidence
-    if (localResult) return { ...localResult, currency: opts.currency }
     throw new Error(`AI parse failed: ${response.status}`)
   }
 

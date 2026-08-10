@@ -69,17 +69,6 @@ export interface ParseRejection {
   errors: ParseFieldError[]
 }
 
-export interface AdvisorContext {
-  monthly_income: number | null
-  avg_monthly_spend_last_3mo: number
-  top_categories: { name: string; avg_monthly: number }[]
-  recurring_expenses: { name: string; amount: number; frequency: string }[]
-  current_month_spent: number
-  safe_to_spend_remaining: number
-  implied_monthly_savings: number
-  user_question: string
-}
-
 // ─── Ask Murmur (Phase E) ────────────────────────────────────────────────────
 //
 // Wire format for the grounded-reasoner endpoint at /api/ai/ask-murmur.

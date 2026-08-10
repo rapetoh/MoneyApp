@@ -1,10 +1,13 @@
-import { View, Text, Pressable, StyleSheet } from 'react-native'
+import { View, Pressable, StyleSheet } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { Colors, Typography, Hairline } from '../theme'
+import { ScaledText as Text } from './ScaledText'
+import { Tappable } from './Tappable'
 
-// Reproductions of SetGroup / SetRow / PrivacyRow from
-// docs/money-app/project/mobile-screens-4.jsx. Reused by the Settings and
-// Privacy Center screens so both share identical visual primitives.
+// Reproductions of SetGroup / SetRow from docs/money-app/project/
+// mobile-screens-4.jsx. Reused by the Settings screen for its visual
+// primitives. (Privacy Center — app/more/privacy.tsx — keeps its own local
+// PrivacyRow; the two never shared this module's copy.)
 
 export function SetGroup({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -53,12 +56,20 @@ export function SetRow({
       </Text>
       {detail ? <Text style={styles.rowDetail}>{detail}</Text> : null}
       {toggle ? (
-        <Pressable
+        // 42×26 visually — below the 44pt minimum (audit 01-F26). `hitSlop`
+        // extends the touch target without changing the switch's drawn
+        // size; `<Tappable>` asserts that extension in dev so it can't
+        // silently regress (fix-plan 4.1).
+        <Tappable
           onPress={() => onToggle?.(!value)}
+          hitSlop={10}
+          accessibilityRole="switch"
+          accessibilityState={{ checked: !!value }}
+          accessibilityLabel={label}
           style={[styles.toggle, value ? styles.toggleOn : styles.toggleOff]}
         >
           <View style={styles.toggleKnob} />
-        </Pressable>
+        </Tappable>
       ) : chevron && onPress ? (
         <Ionicons
           name="chevron-forward"
@@ -68,30 +79,6 @@ export function SetRow({
         />
       ) : null}
     </Pressable>
-  )
-}
-
-export function PrivacyRow({
-  icon,
-  label,
-  detail,
-  last,
-}: {
-  icon: string
-  label: string
-  detail: string
-  last?: boolean
-}) {
-  return (
-    <View style={[styles.row, !last && styles.rowDivider]}>
-      <View style={styles.privacyIcon}>
-        <Text style={styles.privacyIconGlyph}>{icon}</Text>
-      </View>
-      <View style={styles.privacyInfo}>
-        <Text style={styles.privacyLabel}>{label}</Text>
-        <Text style={styles.privacyDetail}>{detail}</Text>
-      </View>
-    </View>
   )
 }
 
@@ -142,30 +129,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: Colors.ink3 ?? Colors.textSecondary,
     fontFamily: Typography.fontFamily.sans,
-  },
-
-  // Privacy row
-  privacyIcon: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
-    backgroundColor: Colors.accentSoft ?? Colors.primaryLight,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  privacyIconGlyph: { fontSize: 17 },
-  privacyInfo: { flex: 1 },
-  privacyLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    fontFamily: Typography.fontFamily.sansSemiBold,
-    color: Colors.ink ?? Colors.text,
-  },
-  privacyDetail: {
-    fontSize: 12,
-    color: Colors.ink3 ?? Colors.textSecondary,
-    fontFamily: Typography.fontFamily.sans,
-    marginTop: 1,
   },
 
   // Toggle pill (matches SetRow's switch in the mockup)

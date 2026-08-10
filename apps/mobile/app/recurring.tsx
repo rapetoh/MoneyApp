@@ -17,6 +17,7 @@ import { useCategories } from '../src/hooks/useCategories'
 import { useRecurringRules, computeNextOccurrence, isRuleOverdue } from '../src/hooks/useRecurringRules'
 import { MerchantAvatar } from '../src/components/MerchantAvatar'
 import { Money } from '../src/components/Money'
+import { RecurringRuleEditor, type RecurringRuleFormValues } from '../src/components/RecurringRuleEditor'
 import { Colors, Typography, Hairline } from '../src/theme'
 import { formatCurrency, monthlyEquivalent, t } from '@voice-expense/shared'
 import type { Locale } from '@voice-expense/shared'
@@ -37,14 +38,16 @@ const FREQ_KEY: Record<RecurringFrequency, string> = {
 
 // Compact "/mo" / "/wk" tag rendered beneath the amount on each row. Mockup
 // shows "/MO" for the monthly-heavy preview — we keep the shape for every
-// frequency so the visual rhythm holds.
-const FREQ_SHORT: Record<RecurringFrequency, string> = {
-  daily: '/day',
-  weekly: '/wk',
-  biweekly: '/2wk',
-  monthly: '/mo',
-  quarterly: '/qtr',
-  yearly: '/yr',
+// frequency so the visual rhythm holds. Localized (audit 01-F29/08-F48,
+// fix-plan 4.2) — these six were the last hard-coded English literals on
+// this screen.
+const FREQ_SHORT_KEY: Record<RecurringFrequency, string> = {
+  daily: 'recurring.short_daily',
+  weekly: 'recurring.short_weekly',
+  biweekly: 'recurring.short_biweekly',
+  monthly: 'recurring.short_monthly',
+  quarterly: 'recurring.short_quarterly',
+  yearly: 'recurring.short_yearly',
 }
 
 /** "Overdue — pending generation" (fix-plan 2.1 / 03-F24) rather than a
@@ -74,11 +77,41 @@ function monthlyEquivalentFx(rule: RecurringRule): number {
 export default function RecurringScreen() {
   const { user } = useAuth()
   const { profile } = useProfile(user?.id)
-  const { categories } = useCategories(user?.id)
+  const { categories, createCategory } = useCategories(user?.id)
   // Read-error exposure (fix-plan 2.13 / audit 08-F21 family) — a failed
   // read used to render identically to "no recurring rules yet"
   // (`rules` stays `[]` either way).
-  const { rules, loading, error, toggleRule, deleteRule, refetch } = useRecurringRules(user?.id)
+  const { rules, loading, error, createRule, toggleRule, deleteRule, updateRule, refetch } =
+    useRecurringRules(user?.id)
+
+  // Create/edit sheet (fix-plan 3.3 — "Add manually" + tapping a rule to
+  // edit it, the two lifecycle actions this screen never had). One sheet,
+  // one component, driven by `editorMode` — mirrors every other
+  // create/edit pair in the app (BudgetEditorModal, IncomeEditorModal)
+  // rather than a second hand-rolled form.
+  const [editorVisible, setEditorVisible] = useState(false)
+  const [editorMode, setEditorMode] = useState<'create' | 'edit'>('create')
+  const [editingRule, setEditingRule] = useState<RecurringRule | null>(null)
+
+  function openCreate() {
+    setEditorMode('create')
+    setEditingRule(null)
+    setEditorVisible(true)
+  }
+
+  function openEdit(rule: RecurringRule) {
+    setEditorMode('edit')
+    setEditingRule(rule)
+    setEditorVisible(true)
+  }
+
+  async function handleEditorSave(values: RecurringRuleFormValues): Promise<boolean> {
+    if (editorMode === 'edit' && editingRule) {
+      return updateRule(editingRule.id, values)
+    }
+    const created = await createRule(values)
+    return created != null
+  }
 
   // useRecurringRules fetches once on mount, but this screen stays in the
   // navigation stack between visits — so a rule created elsewhere (e.g. by
@@ -125,14 +158,27 @@ export default function RecurringScreen() {
       .reduce((sum, r) => sum + monthlyEquivalentFx(r), 0)
   }, [rules])
 
+  // Active/Paused as two real sections (fix-plan 3.3's "Why now": this
+  // list used to render every rule — active *and* paused — under one
+  // heading that read "Active subscriptions", with only a dimmed row
+  // style to tell them apart.
+  const activeRules = useMemo(() => rules.filter((r) => r.is_active), [rules])
+  const pausedRules = useMemo(() => rules.filter((r) => !r.is_active), [rules])
+
   function handleRowPress(rule: RecurringRule) {
     // Action sheet via Alert — preserves the shipped pause/resume + delete
-    // affordances the mockup's row layout doesn't show. Destructive delete is
-    // last, matching iOS convention.
+    // affordances the mockup's row layout doesn't show, and now Edit
+    // (fix-plan 3.3 — this screen was previously a viewer: pause/resume/
+    // delete only, no way to create or edit a rule from here at all).
+    // Destructive delete is last, matching iOS convention.
     Alert.alert(
       rule.name ?? formatCurrency(rule.amount, rule.currency_code, locale),
       t(FREQ_KEY[rule.frequency], locale) + ' · ' + formatCurrency(rule.amount, rule.currency_code, locale),
       [
+        {
+          text: t('detail.edit', locale),
+          onPress: () => openEdit(rule),
+        },
         {
           text: rule.is_active ? t('recurring.pause', locale) : t('recurring.resume', locale),
           onPress: async () => {
@@ -169,19 +215,32 @@ export default function RecurringScreen() {
       {/* Hide the native Stack header — the mockup renders its own chevron pill + breadcrumb. */}
       <Stack.Screen options={{ headerShown: false }} />
       <SafeAreaView style={styles.safe} edges={['top', 'bottom', 'left', 'right']}>
+        {/* Back pill + breadcrumb (comes from the More drawer) + Add
+            manually (fix-plan 3.3 — this screen had no create affordance
+            at all; a rule could only ever be created by flagging a
+            transaction or accepting a detected pattern). Sibling of the
+            ScrollView, not its first child — a child scrolls off screen
+            (audit 01-F32); matches more/transactions.tsx's `topRow`. */}
+        <View style={styles.topRow}>
+          <Pressable
+            onPress={() => router.back()}
+            style={({ pressed }) => [styles.backPill, pressed && styles.backPillPressed]}
+            hitSlop={8}
+          >
+            <Ionicons name="chevron-back" size={20} color={Colors.ink2 ?? Colors.textSecondary} />
+          </Pressable>
+          <Text style={styles.breadcrumb}>{t('more.title', locale)}</Text>
+          <View style={{ flex: 1 }} />
+          <Pressable
+            onPress={openCreate}
+            style={({ pressed }) => [styles.addPill, pressed && styles.addPillPressed]}
+            hitSlop={8}
+          >
+            <Ionicons name="add" size={16} color="#FFFFFF" />
+            <Text style={styles.addPillText}>{t('recurring.add_manually', locale)}</Text>
+          </Pressable>
+        </View>
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-          {/* Back pill + breadcrumb (comes from the More drawer) */}
-          <View style={styles.topRow}>
-            <Pressable
-              onPress={() => router.back()}
-              style={({ pressed }) => [styles.backPill, pressed && styles.backPillPressed]}
-              hitSlop={8}
-            >
-              <Ionicons name="chevron-back" size={20} color={Colors.ink2 ?? Colors.textSecondary} />
-            </Pressable>
-            <Text style={styles.breadcrumb}>{t('more.title', locale)}</Text>
-          </View>
-
           {/* Title block */}
           <View style={styles.intro}>
             <Text style={styles.eyebrow}>{t('recurring.eyebrow_detected', locale)}</Text>
@@ -210,6 +269,17 @@ export default function RecurringScreen() {
               <Text style={styles.emptyIcon}>🔄</Text>
               <Text style={styles.emptyTitle}>{t('recurring.empty', locale)}</Text>
               <Text style={styles.emptySub}>{t('recurring.empty_sub', locale)}</Text>
+              {/* The one action every user can reach regardless of plan
+                  (fix-plan 3.3 — "never name a control that is rendered
+                  disabled": unlike the detected-patterns banner, which is
+                  Plus-gated, this button always works). */}
+              <Pressable
+                onPress={openCreate}
+                style={({ pressed }) => [styles.emptyAddBtn, pressed && styles.emptyAddBtnPressed]}
+              >
+                <Ionicons name="add" size={14} color="#FFFFFF" />
+                <Text style={styles.emptyAddBtnText}>{t('recurring.add_manually', locale)}</Text>
+              </Pressable>
             </View>
           ) : (
             <>
@@ -241,68 +311,144 @@ export default function RecurringScreen() {
                 </View>
               </View>
 
-              {/* Active subscriptions */}
-              <View style={styles.sectionWrap}>
-                <Text style={styles.sectionLabel}>{t('recurring.active_subs', locale)}</Text>
-                <View style={styles.listCard}>
-                  {rules.map((rule, i) => {
-                    const cat = rule.category_id ? categoryById.get(rule.category_id) : null
-                    const isTogglingThis = toggling === rule.id
-                    return (
-                      <Pressable
+              {/* Active / Paused as two real sections (fix-plan 3.3) —
+                  previously one flat list under an "Active subscriptions"
+                  heading that included paused rules too, told apart only
+                  by a dimmed row style. */}
+              {activeRules.length > 0 && (
+                <View style={styles.sectionWrap}>
+                  <Text style={styles.sectionLabel}>{t('recurring.active_section', locale)}</Text>
+                  <View style={styles.listCard}>
+                    {activeRules.map((rule, i) => (
+                      <RuleRow
                         key={rule.id}
+                        rule={rule}
+                        isLast={i === activeRules.length - 1}
+                        isToggling={toggling === rule.id}
+                        currency={currency}
+                        locale={locale}
+                        categoryById={categoryById}
                         onPress={() => handleRowPress(rule)}
-                        style={({ pressed }) => [
-                          styles.ruleRow,
-                          i < rules.length - 1 && styles.ruleRowDivider,
-                          !rule.is_active && styles.ruleRowInactive,
-                          pressed && styles.ruleRowPressed,
-                        ]}
-                      >
-                        <MerchantAvatar
-                          merchant={rule.name}
-                          size={36}
-                          radius={10}
-                          categoryName={cat?.name ?? null}
-                          categoryColor={cat?.color ?? null}
-                        />
-                        <View style={styles.ruleInfo}>
-                          <Text style={styles.ruleName} numberOfLines={1}>
-                            {rule.name ?? formatCurrency(rule.amount, rule.currency_code, locale)}
-                          </Text>
-                          <Text style={styles.ruleNext} numberOfLines={1}>
-                            {rule.is_active
-                              ? `${t('recurring.next_due', locale)} · ${formatNextDue(rule, locale)}`
-                              : t('recurring.paused', locale)}
-                          </Text>
-                        </View>
-                        <View style={styles.ruleAmountCol}>
-                          {isTogglingThis ? (
-                            <ActivityIndicator size="small" color={Colors.primary} />
-                          ) : (
-                            <>
-                              <Money
-                                value={rule.amount}
-                                size={14}
-                                serif={false}
-                                sansWeight="700"
-                                currencyCode={rule.currency_code || currency}
-                                locale={locale}
-                              />
-                              <Text style={styles.ruleFreqTag}>{FREQ_SHORT[rule.frequency]}</Text>
-                            </>
-                          )}
-                        </View>
-                      </Pressable>
-                    )
-                  })}
+                      />
+                    ))}
+                  </View>
                 </View>
-              </View>
+              )}
+              {pausedRules.length > 0 && (
+                <View style={styles.sectionWrap}>
+                  <Text style={styles.sectionLabel}>{t('recurring.paused_section', locale)}</Text>
+                  <View style={styles.listCard}>
+                    {pausedRules.map((rule, i) => (
+                      <RuleRow
+                        key={rule.id}
+                        rule={rule}
+                        isLast={i === pausedRules.length - 1}
+                        isToggling={toggling === rule.id}
+                        currency={currency}
+                        locale={locale}
+                        categoryById={categoryById}
+                        onPress={() => handleRowPress(rule)}
+                      />
+                    ))}
+                  </View>
+                </View>
+              )}
             </>
           )}
         </ScrollView>
       </SafeAreaView>
+
+      {/* Create/edit sheet (fix-plan 3.3). */}
+      <RecurringRuleEditor
+        visible={editorVisible}
+        mode={editorMode}
+        initial={editingRule}
+        categories={categories}
+        onCreateCategory={createCategory}
+        defaultCurrency={currency}
+        locale={locale}
+        tz={profile?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone}
+        onSave={handleEditorSave}
+        onClose={() => setEditorVisible(false)}
+      />
     </>
+  )
+}
+
+/** One row in the Active or Paused list — factored out so both sections
+ *  render the identical row shape (fix-plan 3.3's split). */
+function RuleRow({
+  rule,
+  isLast,
+  isToggling,
+  currency,
+  locale,
+  categoryById,
+  onPress,
+}: {
+  rule: RecurringRule
+  isLast: boolean
+  isToggling: boolean
+  currency: string
+  locale: Locale
+  categoryById: Map<string, { name: string; color: string | null }>
+  onPress: () => void
+}) {
+  const cat = rule.category_id ? categoryById.get(rule.category_id) : null
+  const ruleLabel = rule.name ?? formatCurrency(rule.amount, rule.currency_code, locale)
+  const statusLabel = rule.is_active
+    ? `${t('recurring.next_due', locale)} ${formatNextDue(rule, locale)}`
+    : t('recurring.paused', locale)
+  return (
+    <Pressable
+      onPress={onPress}
+      // No role/label previously (audit 03-F36's "same defect elsewhere"
+      // note) — VoiceOver read the row's child `<Text>`s individually with
+      // no indication the row itself opens the edit/delete action sheet.
+      accessibilityRole="button"
+      accessibilityLabel={`${ruleLabel}, ${statusLabel}`}
+      style={({ pressed }) => [
+        styles.ruleRow,
+        !isLast && styles.ruleRowDivider,
+        !rule.is_active && styles.ruleRowInactive,
+        pressed && styles.ruleRowPressed,
+      ]}
+    >
+      <MerchantAvatar
+        merchant={rule.name}
+        size={36}
+        radius={10}
+        categoryName={cat?.name ?? null}
+        categoryColor={cat?.color ?? null}
+      />
+      <View style={styles.ruleInfo}>
+        <Text style={styles.ruleName} numberOfLines={1}>
+          {rule.name ?? formatCurrency(rule.amount, rule.currency_code, locale)}
+        </Text>
+        <Text style={styles.ruleNext} numberOfLines={1}>
+          {rule.is_active
+            ? `${t('recurring.next_due', locale)} · ${formatNextDue(rule, locale)}`
+            : t('recurring.paused', locale)}
+        </Text>
+      </View>
+      <View style={styles.ruleAmountCol}>
+        {isToggling ? (
+          <ActivityIndicator size="small" color={Colors.primary} />
+        ) : (
+          <>
+            <Money
+              value={rule.amount}
+              size={14}
+              serif={false}
+              sansWeight="700"
+              currencyCode={rule.currency_code || currency}
+              locale={locale}
+            />
+            <Text style={styles.ruleFreqTag}>{t(FREQ_SHORT_KEY[rule.frequency], locale)}</Text>
+          </>
+        )}
+      </View>
+    </Pressable>
   )
 }
 
@@ -333,6 +479,22 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   backPillPressed: { opacity: 0.6 },
+  addPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 12,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: Colors.ink ?? '#1B1915',
+  },
+  addPillPressed: { opacity: 0.8 },
+  addPillText: {
+    fontFamily: Typography.fontFamily.sansSemiBold,
+    fontSize: 12.5,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
   breadcrumb: {
     fontFamily: Typography.fontFamily.sansSemiBold,
     fontSize: 15,
@@ -495,6 +657,23 @@ const styles = StyleSheet.create({
   },
   retryBtnPressed: { opacity: 0.8 },
   retryBtnText: {
+    fontFamily: Typography.fontFamily.sansSemiBold,
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  emptyAddBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 999,
+    backgroundColor: Colors.ink ?? '#1B1915',
+  },
+  emptyAddBtnPressed: { opacity: 0.8 },
+  emptyAddBtnText: {
     fontFamily: Typography.fontFamily.sansSemiBold,
     fontSize: 13,
     fontWeight: '600',

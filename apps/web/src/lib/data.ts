@@ -79,8 +79,3 @@ export async function getActiveBudgets(supabase: SupabaseClient, userId: string)
   if (error) throw new DataFetchError('budgets', error)
   return data ?? []
 }
-
-export async function getCurrentUser(supabase: SupabaseClient) {
-  const { data: { user } } = await supabase.auth.getUser()
-  return user
-}

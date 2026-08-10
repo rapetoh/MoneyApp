@@ -39,6 +39,7 @@ vi.mock('@react-native-community/netinfo', () => ({
 vi.mock('react-native', () => ({
   AppState: { addEventListener: vi.fn(() => ({ remove: vi.fn() })) },
   DeviceEventEmitter: { emit: vi.fn(), addListener: vi.fn(() => ({ remove: vi.fn() })) },
+  Platform: { OS: 'ios' },
 }))
 
 // `entityRegistry.ts` routes the `transaction` entity through
@@ -49,6 +50,17 @@ vi.mock('react-native', () => ({
 // pulls that chain in below. Mirrors `useTransactions.test.ts`'s
 // `deleteTransactionAndEnqueue` test.
 vi.mock('expo-localization', () => ({ getCalendars: () => [{ timeZone: 'UTC' }] }))
+
+// `SyncManager.ts` now calls `deviceRegistry.ts`'s `touchDeviceSynced` at
+// the end of a drain pass (fix-plan 3.7) — same real-`expo-modules-core`
+// reason as `expo-localization` above, for `expo-secure-store`/
+// `expo-crypto`/`expo-constants`.
+vi.mock('expo-secure-store', () => ({
+  getItemAsync: vi.fn(() => Promise.resolve('mock-device-id')),
+  setItemAsync: vi.fn(() => Promise.resolve()),
+}))
+vi.mock('expo-crypto', () => ({ randomUUID: () => 'mock-device-id' }))
+vi.mock('expo-constants', () => ({ default: { deviceName: 'Test Device' } }))
 
 // Imported after the mocks above are registered (vi.mock calls are
 // hoisted above imports by vitest, but these dynamic-safe static imports

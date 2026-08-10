@@ -1,6 +1,7 @@
 import { supabase, removePersistedAuthSession } from '../lib/supabase'
 import { useEffect, useState } from 'react'
 import * as SecureStore from 'expo-secure-store'
+import * as AuthSession from 'expo-auth-session'
 import type { Session, User } from '@supabase/supabase-js'
 import { syncManager } from '../services/sync/SyncManager'
 import { wipeLocalDatabase } from '../services/sync/localDb'
@@ -119,6 +120,31 @@ export async function signInWithEmail(email: string, password: string) {
 
 export async function signUpWithEmail(email: string, password: string) {
   return supabase.auth.signUp({ email, password })
+}
+
+/**
+ * Password reset, step 1 — fix-plan 3.2 / audit 08-F7 ("no password-reset
+ * flow anywhere in the product"). Sends the Supabase recovery email with a
+ * PKCE `redirectTo` back into this app; `app/(auth)/reset-password.tsx`
+ * consumes the `?code=` param it lands with, exchanges it for a session,
+ * and calls `updatePassword` below.
+ *
+ * The `voiceexpense://reset-password` redirect must be listed under
+ * Supabase Auth → URL Configuration → Redirect URLs, the same as
+ * `voiceexpense://auth/callback` (see `services/googleAuth.ts`).
+ */
+export async function requestPasswordReset(email: string) {
+  const redirectTo = AuthSession.makeRedirectUri({
+    scheme: 'voiceexpense',
+    path: 'reset-password',
+  })
+  return supabase.auth.resetPasswordForEmail(email, { redirectTo })
+}
+
+/** Password reset, step 2 — called from the reset-password screen once the
+ *  recovery code has been exchanged for a session. */
+export async function updatePassword(password: string) {
+  return supabase.auth.updateUser({ password })
 }
 
 export async function signOut() {

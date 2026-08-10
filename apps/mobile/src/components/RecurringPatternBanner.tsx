@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
-import { View, Text, StyleSheet, Pressable, ActivityIndicator } from 'react-native'
+import { View, StyleSheet, Pressable, ActivityIndicator } from 'react-native'
 import * as SecureStore from 'expo-secure-store'
 import { Ionicons } from '@expo/vector-icons'
 import { Colors, Typography, Hairline } from '../theme'
+import { ScaledText as Text } from './ScaledText'
+import { Tappable } from './Tappable'
 import { t, formatMoney, type Locale } from '@voice-expense/shared'
 import type { Transaction, RecurringRule } from '@voice-expense/shared'
 import {
@@ -152,9 +154,15 @@ export function RecurringPatternBanner({
         </Text>
 
         <View style={styles.actions}>
-          <Pressable
+          {/* Both buttons are 36pt (`minHeight: 36`, styles below) — below
+              the 44pt minimum (audit 01-F26). hitSlop via `<Tappable>`
+              closes the gap without changing the drawn pill size. */}
+          <Tappable
             onPress={handleAccept}
             disabled={accepting}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={t('home.pattern_accept', locale)}
             style={({ pressed }) => [
               styles.acceptBtn,
               accepting && styles.btnDisabled,
@@ -171,16 +179,19 @@ export function RecurringPatternBanner({
                 </Text>
               </>
             )}
-          </Pressable>
-          <Pressable
+          </Tappable>
+          <Tappable
             onPress={handleDismiss}
             disabled={accepting}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={t('home.pattern_dismiss', locale)}
             style={({ pressed }) => [styles.notNowBtn, pressed && styles.pressedSoft]}
           >
             <Text style={styles.notNowText}>
               {t('home.pattern_dismiss', locale)}
             </Text>
-          </Pressable>
+          </Tappable>
         </View>
       </View>
     </View>

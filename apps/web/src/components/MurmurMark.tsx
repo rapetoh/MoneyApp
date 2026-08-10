@@ -4,7 +4,6 @@
 // docs/money-app/project/Murmur Logos.html direction 04: a coin with a
 // soft wave engraved across it, on a 160-unit grid (coin r=62 at 80,80;
 // primary wave at y=80, faint secondary at y=96).
-import { colors } from '../lib/theme'
 
 type Variant = 'cream' | 'sage' | 'ink' | 'mono-ink' | 'mono-cream'
 
@@ -81,21 +80,5 @@ export function MurmurMark({
         className={animating ? 'murmur-pulse-arc2' : undefined}
       />
     </svg>
-  )
-}
-
-export function MurmurWordmark({ size = 16 }: { size?: number }) {
-  return (
-    <span
-      style={{
-        fontFamily: '"New York", "Iowan Old Style", Georgia, serif',
-        fontWeight: 500,
-        fontSize: size,
-        letterSpacing: -0.5,
-        color: colors.ink,
-      }}
-    >
-      Murmur
-    </span>
   )
 }

@@ -73,6 +73,7 @@ function rule(overrides: Partial<RecurringRule> = {}): RecurringRule {
     anchor_time: null,
     is_active: true,
     is_deleted: false,
+    deleted_at: null,
     template_txn_id: null,
     synced_at: null,
     created_at: '2025-01-01T12:00:00.000Z',

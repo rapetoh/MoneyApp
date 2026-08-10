@@ -24,6 +24,7 @@ import { VoiceConfirmModal, type ConfirmedExpense } from '../../src/components/V
 import { ListeningView } from '../../src/components/ListeningView'
 import { RecurringToggle } from '../../src/components/RecurringToggle'
 import { BottomSheet } from '../../src/components/BottomSheet'
+import { Tappable } from '../../src/components/Tappable'
 import { Colors, Typography, Text as TextStyles, Spacing, Radius, Hairline, useTabBarClearance } from '../../src/theme'
 import { parseScan, ISO_4217_CODES, PAYMENT_METHOD_VALUES, deriveDirectionFromFlowType } from '@voice-expense/ai'
 import { supabase } from '../../src/lib/supabase'
@@ -401,24 +402,32 @@ export default function RecordScreen() {
         <View style={styles.headerSpacer} />
       </View>
 
-      {/* Tab toggle: Voice / Manual */}
-      <View style={styles.tabRow}>
-        <Pressable
+      {/* Tab toggle: Voice / Manual. Each tab is ~34pt tall — below the
+          44pt minimum (audit 01-F26); `<Tappable>`'s hitSlop closes the
+          gap without changing the pill's drawn size (fix-plan 4.1). */}
+      <View style={styles.tabRow} accessibilityRole="tablist">
+        <Tappable
           style={[styles.tab, activeTab === 'voice' && styles.tabActive]}
           onPress={() => setActiveTab('voice')}
+          hitSlop={8}
+          accessibilityRole="tab"
+          accessibilityState={{ selected: activeTab === 'voice' }}
         >
           <Text style={[styles.tabLabel, activeTab === 'voice' && styles.tabLabelActive]}>
             {t('voice.tab_voice', userLocale as any)}
           </Text>
-        </Pressable>
-        <Pressable
+        </Tappable>
+        <Tappable
           style={[styles.tab, activeTab === 'manual' && styles.tabActive]}
           onPress={() => setActiveTab('manual')}
+          hitSlop={8}
+          accessibilityRole="tab"
+          accessibilityState={{ selected: activeTab === 'manual' }}
         >
           <Text style={[styles.tabLabel, activeTab === 'manual' && styles.tabLabelActive]}>
             {t('voice.tab_manual', userLocale as any)}
           </Text>
-        </Pressable>
+        </Tappable>
       </View>
 
       {activeTab === 'voice' ? (
@@ -830,7 +839,6 @@ const styles = StyleSheet.create({
   },
   micButtonActive: { backgroundColor: Colors.destructive, shadowColor: Colors.destructive },
   micButtonDisabled: { opacity: 0.5 },
-  micIcon: { fontSize: 28 },
   tapToStop: TextStyles.hint,
   scanRow: {
     flexDirection: 'row',
@@ -854,10 +862,6 @@ const styles = StyleSheet.create({
     minHeight: 48,
   },
   scanButtonDisabled: { opacity: 0.55 },
-  scanLabelWrap: {
-    flexShrink: 1,
-  },
-  scanIcon: { fontSize: 16 },
   scanLabel: {
     ...TextStyles.button,
     color: Colors.primary,
@@ -1052,7 +1056,6 @@ const styles = StyleSheet.create({
     letterSpacing: -0.2,
   },
 
-  fields: { gap: Spacing.base },
   field: { gap: Spacing.xs },
   label: {
     fontFamily: Typography.fontFamily.sansSemiBold,

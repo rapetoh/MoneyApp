@@ -19,7 +19,7 @@ import { DataEvents } from '../../src/events/dataEvents'
 import { MerchantAvatar } from '../../src/components/MerchantAvatar'
 import { Money } from '../../src/components/Money'
 import { Colors, Typography, Hairline } from '../../src/theme'
-import { formatCurrency, currencySymbolFor, t } from '@voice-expense/shared'
+import { formatCurrency, currencySymbolFor, t, findRuleForTransaction } from '@voice-expense/shared'
 import type { Transaction, Locale } from '@voice-expense/shared'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -148,7 +148,7 @@ export default function TransactionDetailScreen() {
     if (!txn) return
     const snapshot = txn
     const merchantLabel = snapshot.merchant ?? t('transactions.unknown', locale)
-    const formatted = formatCurrency(snapshot.amount, snapshot.currency_code || currency)
+    const formatted = formatCurrency(snapshot.amount, snapshot.currency_code || currency, locale)
 
     const deletedVersion = (snapshot.version ?? 1) + 1
     await softDeleteTransaction(snapshot.id)
@@ -210,11 +210,15 @@ export default function TransactionDetailScreen() {
   const categoryName = category?.name ?? null
   const categoryColor = category?.color ?? Colors.ink3 ?? Colors.textSecondary
 
-  // Recurring chip data — only relevant if the txn is flagged. The linked
-  // rule (matched by template_txn_id) gives us frequency + next-due. If no
-  // rule is found (the "ghost" case from issue 1) we still show "Recurring"
-  // so the user sees the saved state, but without frequency/next-due.
-  const linkedRule = txn.is_recurring ? rules.find((r) => r.template_txn_id === txn.id) ?? null : null
+  // Recurring chip data — only relevant if the txn is flagged. Linked via
+  // the shared `findRuleForTransaction` (fix-plan 3.3 — this screen used
+  // to look the rule up by `template_txn_id` alone, which finds the
+  // transaction that *created* the rule but not a `recurring_generated`
+  // occurrence, whose `recurring_rule_id` is set directly on the row and
+  // whose `template_txn_id` is null). If no rule is found (the "ghost"
+  // case from issue 1) we still show "Recurring" so the user sees the
+  // saved state, but without frequency/next-due.
+  const linkedRule = txn.is_recurring ? findRuleForTransaction(txn, rules) : null
   const nextDue = linkedRule ? computeNextOccurrence(linkedRule) : null
   const nextDueLabel = nextDue
     ? nextDue.toLocaleDateString(locale, { month: 'short', day: 'numeric' })
@@ -241,16 +245,18 @@ export default function TransactionDetailScreen() {
       {/* Hide the native Stack header — the mockup draws its own back + menu-dots pills. */}
       <Stack.Screen options={{ headerShown: false }} />
       <SafeAreaView style={styles.safe} edges={['top', 'bottom', 'left', 'right']}>
+        {/* Top bar: back pill only. Sibling of the ScrollView, not its
+            first child — a child scrolls off screen (audit 01-F32); this
+            matches more/transactions.tsx's `topRow`, the item's own
+            reference implementation. The mockup's right-side dots menu was
+            a no-op placeholder — removed per user feedback. Actions (Edit,
+            Delete) live in the button row below the fields. */}
+        <View style={styles.topRow}>
+          <HeaderPill onPress={() => router.back()}>
+            <Ionicons name="chevron-back" size={20} color={Colors.ink2 ?? Colors.textSecondary} />
+          </HeaderPill>
+        </View>
         <ScrollView contentContainerStyle={styles.content}>
-          {/* Top bar: back pill only. The mockup's right-side dots menu was a
-              no-op placeholder — removed per user feedback. Actions (Edit,
-              Delete) live in the button row below the fields. */}
-          <View style={styles.topRow}>
-            <HeaderPill onPress={() => router.back()}>
-              <Ionicons name="chevron-back" size={20} color={Colors.ink2 ?? Colors.textSecondary} />
-            </HeaderPill>
-          </View>
-
           {/* Hero */}
           <View style={styles.hero}>
             <MerchantAvatar
@@ -323,21 +329,17 @@ export default function TransactionDetailScreen() {
             />
           </View>
 
-          {/* Transcript playback card — sage-tinted. The sage circle uses a
-               play triangle glyph to match the S_Detail mockup (user-flagged
-               regression — I had used a sparkle). The icon is purely visual
-               for now because we don't store audio; tapping it doesn't play
-               anything yet. If we ever add 24h local-audio retention, this is
-               where real playback would wire in. */}
+          {/* Transcript card — sage-tinted, non-interactive. Fix-plan 3.1:
+               this used to show a play-triangle glyph, which reads as "tap
+               to hear the recording" — we don't store audio, so that icon
+               promised playback the code has never been able to do. The
+               mic glyph below says only what's true: this text came from a
+               voice note. If 24h local-audio retention ships, real
+               playback (a Pressable + actual audio) would wire in here. */}
           {txn.raw_transcript && (
             <View style={styles.transcriptCard}>
               <View style={styles.transcriptIcon}>
-                <Ionicons
-                  name="play"
-                  size={14}
-                  color={Colors.white}
-                  style={styles.playGlyph}
-                />
+                <Ionicons name="mic" size={14} color={Colors.white} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.transcriptQuote} numberOfLines={4}>
@@ -520,11 +522,6 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.accent ?? Colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  // Ionicons' play triangle points slightly past the optical center of its
-  // box; nudge right so it reads centered inside the sage circle.
-  playGlyph: {
-    marginLeft: 2,
   },
   transcriptQuote: {
     fontFamily: Typography.fontFamily.sans,

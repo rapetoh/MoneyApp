@@ -1,20 +1,25 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
+import { Alert } from 'react-native'
 import { Stack, useRouter, useSegments } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import * as SplashScreen from 'expo-splash-screen'
 import { useFonts } from 'expo-font'
 import { useAuth } from '../src/hooks/useAuth'
 import { useProfile } from '../src/hooks/useProfile'
+import { useCategories } from '../src/hooks/useCategories'
+import { useTransactions } from '../src/hooks/useTransactions'
 import { syncManager } from '../src/services/sync/SyncManager'
 import { useShortcutHandler } from '../src/hooks/useShortcutHandler'
-import { seedDefaultCategories } from '../src/services/seedCategories'
+import { useNotificationListener } from '../src/hooks/useNotificationListener'
 import { runRecurringCatchUp } from '../src/services/recurringCatchUp'
 import { runFxBackfill } from '../src/services/fxBackfill'
+import { registerDevice } from '../src/services/sync/deviceRegistry'
 import { runOncePerSession } from '../src/services/launchOnce'
 import { UndoProvider } from '../src/hooks/useUndo'
 import { SyncFailureBanner } from '../src/components/SyncFailureBanner'
+import { VoiceConfirmModal, type ConfirmedExpense } from '../src/components/VoiceConfirmModal'
 import { t } from '@voice-expense/shared'
-import type { Locale } from '@voice-expense/shared'
+import type { Locale, ParsedExpense } from '@voice-expense/shared'
 
 SplashScreen.preventAutoHideAsync()
 
@@ -56,6 +61,48 @@ export default function RootLayout() {
   // Handles voiceexpense://shortcut?amount=XX&merchant=... deep links from iOS Shortcuts
   useShortcutHandler()
 
+  // Android payment-notification capture (fix-plan 3.4 / audit 07-F10,
+  // 08-F20, 02-F34). Mounted here — not in the Settings screen, which has
+  // no way to navigate — so a detected payment can reach a confirm sheet.
+  // `categories`/`createTransaction` are a dedicated instance for this
+  // root-level capture flow, independent of whatever screen is on top.
+  const { categories, createCategory } = useCategories(session?.user?.id)
+  const { createTransaction } = useTransactions(session?.user?.id)
+  const [notifCapture, setNotifCapture] = useState<ParsedExpense | null>(null)
+  const [notifSaving, setNotifSaving] = useState(false)
+
+  useNotificationListener(
+    useCallback((parsed: ParsedExpense) => setNotifCapture(parsed), []),
+  )
+
+  const handleConfirmNotification = useCallback(
+    async (expense: ConfirmedExpense) => {
+      setNotifSaving(true)
+      const { error } = await createTransaction({
+        amount: expense.amount,
+        direction: expense.direction,
+        currency_code: expense.currency,
+        merchant: expense.merchant,
+        note: expense.note,
+        category_id: expense.categoryId,
+        merchant_domain: notifCapture?.merchant_domain ?? null,
+        payment_method: notifCapture?.payment_method ?? null,
+        transacted_at: expense.transactedAt ?? undefined,
+        source: 'notification_listener',
+        ai_confidence: notifCapture?.confidence ?? null,
+        is_recurring: expense.isRecurring,
+        recurring_frequency: expense.isRecurring ? expense.recurringFrequency : null,
+      })
+      setNotifSaving(false)
+      if (error) {
+        Alert.alert(t('common.error', locale), error)
+        return
+      }
+      setNotifCapture(null)
+    },
+    [createTransaction, notifCapture, locale],
+  )
+
   useEffect(() => {
     syncManager.start()
     return () => syncManager.stop()
@@ -82,7 +129,18 @@ export default function RootLayout() {
     const justLeftOnboarding =
       prevSegmentGroup === '(onboarding)' && !inOnboardingGroup
 
-    if (!session && !inAuthGroup) {
+    // Password recovery (fix-plan 3.2 / audit 08-F7) is the one (auth)
+    // screen this gate must leave alone. `exchangeCodeForSession` there
+    // establishes a real session before the user has set a new password —
+    // without this exemption, the `session && inAuthGroup` branch below
+    // would fire on that same render and replace the screen with
+    // /(tabs)/(onboarding) before the reset form ever appears. The screen
+    // owns its own post-success navigation (`router.replace('/(tabs)')`).
+    const isPasswordReset = inAuthGroup && segments[1] === 'reset-password'
+
+    if (isPasswordReset) {
+      // no-op — let the screen drive navigation
+    } else if (!session && !inAuthGroup) {
       router.replace('/(auth)/sign-in')
     } else if (session && inAuthGroup) {
       // Authed user stuck in auth group — wait for profile to load before
@@ -128,8 +186,13 @@ export default function RootLayout() {
     const userId = session?.user?.id
     if (!userId) return
 
-    // Seed default categories for new users (no-op if categories already exist)
-    runOncePerSession(`seedDefaultCategories:${userId}`, () => seedDefaultCategories(userId))
+    // Default categories are seeded server-side, atomically with account
+    // creation, by the `handle_new_user` trigger (fix-plan 3.6 / audit
+    // 07-F17 family — migration 029) — surface-independent, so a web-only
+    // sign-up gets the same 20 categories a mobile sign-up always did.
+    // The client-side `seedDefaultCategories` batch insert this replaced
+    // failed *all* twenty rows on a single collision and discarded the
+    // error; it has been deleted, not just superseded.
 
     // Generate any missed recurring transactions since last app open
     runOncePerSession(`runRecurringCatchUp:${userId}`, () => runRecurringCatchUp(userId))
@@ -138,6 +201,11 @@ export default function RootLayout() {
     // snapshot migration. Self-throttles to FX_BACKFILL_BATCH per launch
     // and is a no-op once everything is filled in.
     runOncePerSession(`runFxBackfill:${userId}`, () => runFxBackfill(userId))
+
+    // Register (or refresh) this device's `devices` row — fix-plan 3.7.
+    // Never written before this; the web sidebar/Settings "Synced just
+    // now" string was hardcoded because there was no real row to read.
+    runOncePerSession(`registerDevice:${userId}`, () => registerDevice(userId))
   }, [session?.user?.id])
 
   if (!ready) return null
@@ -248,7 +316,22 @@ export default function RootLayout() {
       </Stack>
       {/* App-wide failure surface for the sync outbox (fix-plan 1.6 point
           4) — renders nothing unless something is dead-lettered. */}
-      <SyncFailureBanner />
+      <SyncFailureBanner locale={locale} />
+      {/* Confirm sheet for an Android payment notification (fix-plan 3.4) —
+          the same component the Record screen uses for voice/scan, mounted
+          here because this is the level that can react to a detected
+          payment regardless of which screen is on top. */}
+      <VoiceConfirmModal
+        visible={notifCapture !== null}
+        transcript=""
+        parsedExpense={notifCapture}
+        categories={categories}
+        onCreateCategory={createCategory}
+        onConfirm={handleConfirmNotification}
+        onDismiss={() => setNotifCapture(null)}
+        saving={notifSaving}
+        locale={locale}
+      />
     </UndoProvider>
   )
 }

@@ -1,7 +1,16 @@
 // Plus-gated route surface. When the user is not Plus, render a soft-wall
-// that mirrors the mobile paywall in tone: serif headline, two-line value
-// prop, sage primary CTA. Below it the real surface is hidden behind a
-// blur overlay so the user can preview what's behind the wall.
+// that mirrors the mobile paywall (`apps/mobile/app/more/paywall.tsx`) in
+// tone: serif headline, two-line value prop. Below it the real surface is
+// hidden behind a blur overlay so the user can preview what's behind the
+// wall.
+//
+// Fix-plan 3.1: this used to render `<div>Upgrade to Plus</div>` — not a
+// button, no `onClick`, nothing it could do when clicked — next to a note
+// that only ever printed in the deployed build ("Plus is free in the dev
+// build — production sees the upgrade flow here" is exactly backwards:
+// there was no dev/prod branch, and no upgrade flow to see in either).
+// There's no purchase flow yet on any platform, so this gate states that
+// plainly instead of pretending a CTA exists.
 import type { ReactNode } from 'react'
 import { colors, font, radius } from '../lib/theme'
 import { Icon } from './Icons'
@@ -27,9 +36,8 @@ export function PaywallGate({
           <div style={styles.eyebrow}>{`Murmur Plus · ${feature}`}</div>
           <div style={styles.title}>{title}</div>
           <div style={styles.body}>{body}</div>
-          <div style={styles.cta}>Upgrade to Plus</div>
           <div style={styles.note}>
-            {'Plus is free in the dev build — production sees the upgrade flow here.'}
+            {"Plus is in preview. Purchases aren't live yet, so there's nothing to buy here."}
           </div>
         </div>
       </div>
@@ -97,20 +105,10 @@ const styles: Record<string, React.CSSProperties> = {
     color: colors.ink2,
     lineHeight: 1.5,
   },
-  cta: {
-    marginTop: 8,
-    background: colors.accent,
-    color: '#fff',
-    padding: '10px 18px',
-    borderRadius: radius.md,
-    fontFamily: font.sans,
-    fontSize: 13,
-    fontWeight: 700,
-  },
   note: {
     fontFamily: font.sans,
     fontSize: 11,
     color: colors.ink3,
-    marginTop: 4,
+    marginTop: 8,
   },
 }

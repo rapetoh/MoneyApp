@@ -1,12 +1,17 @@
-import { View, Text, StyleSheet } from 'react-native'
+import { View, StyleSheet } from 'react-native'
 import Svg, { Circle } from 'react-native-svg'
 import { Colors, Typography } from '../theme'
+import { ScaledText as Text } from './ScaledText'
+import { t, type Locale } from '@voice-expense/shared'
 
 interface Props {
   spent: number
   limit: number
   /** Outer diameter in px. Defaults to 110 to match S_Budgets in the mockup. */
   size?: number
+  /** Defaults to 'en' — the ring center's "used" caption is the only string
+   *  here, and every caller so far has a locale in scope (audit 01-F29). */
+  locale?: Locale
 }
 
 /**
@@ -18,7 +23,7 @@ interface Props {
  * arc (dasharray clamped at circumference) but switches the color to rose so
  * the semantic is clear at a glance.
  */
-export function BudgetRing({ spent, limit, size = 110 }: Props) {
+export function BudgetRing({ spent, limit, size = 110, locale = 'en' }: Props) {
   const pct = limit > 0 ? Math.min(spent / limit, 1) : 0
   const pctLabel = Math.round(pct * 100)
   const over = limit > 0 && spent > limit
@@ -63,7 +68,7 @@ export function BudgetRing({ spent, limit, size = 110 }: Props) {
       </Svg>
       <View style={styles.center}>
         <Text style={[styles.pct, { color: Colors.ink ?? Colors.text }]}>{pctLabel}%</Text>
-        <Text style={styles.caption}>used</Text>
+        <Text style={styles.caption}>{t('budgets.ring_used', locale)}</Text>
       </View>
     </View>
   )

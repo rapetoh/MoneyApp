@@ -166,13 +166,6 @@ export async function getNextScheduledAttempt(): Promise<string | null> {
   return row?.next_attempt_at ?? null
 }
 
-/** Fetches a single entry by id — used to report a create/edit's outbox fate back to the caller. */
-export async function getEntryById(id: number): Promise<QueueEntry | null> {
-  const db = await getDb()
-  const row = await db.getFirstAsync('SELECT * FROM sync_queue WHERE id = ?', [id])
-  return (row as QueueEntry | null) ?? null
-}
-
 /** Finds the (at most one) live queue entry for a given entity, newest first — used to await a fresh write's outcome. */
 export async function getLatestEntryForEntity(entityId: string): Promise<QueueEntry | null> {
   const db = await getDb()

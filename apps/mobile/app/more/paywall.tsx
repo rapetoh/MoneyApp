@@ -1,7 +1,7 @@
-import { useState } from 'react'
 import { View, Text, Pressable, StyleSheet, ScrollView } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Stack, useRouter } from 'expo-router'
+import { StatusBar } from 'expo-status-bar'
 import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '../../src/hooks/useAuth'
 import { useProfile } from '../../src/hooks/useProfile'
@@ -9,28 +9,30 @@ import { Typography, Colors } from '../../src/theme'
 import { t, type Locale } from '@voice-expense/shared'
 
 /**
- * Paywall — matches S_Paywall in docs/money-app/project/mobile-screens-4.jsx.
+ * Paywall — honest "Plus is in preview" state (audit fix-plan 3.1).
  *
- *   - Dark canvas with a radial sage-tinted gradient in the top-left
- *     (approximated with a large absolutely-positioned radial-gradient-ish
- *     tint view since RN doesn't support CSS radial gradients natively —
- *     close enough for a tinted glow).
- *   - Hero: sage "Murmur Plus · Desktop" pill → serif 38px headline →
- *     muted white body copy.
- *   - 4 feature rows with sage check bullets.
- *   - Two PlanCards (monthly + yearly, yearly featured with "BEST" badge).
- *   - White Upgrade button.
- *   - Footer disclaimer.
+ * There is no purchase flow in this build: no IAP/RevenueCat integration
+ * exists yet, and `profiles.plus_status` has no automated writer, so
+ * showing a price or an "Upgrade" button here would be a control that
+ * looks interactive but cannot act — the exact defect class 3.1 exists
+ * to close. This screen keeps the dark hero + feature list from
+ * S_Paywall (docs/money-app/project/mobile-screens-4.jsx) — the layout
+ * post-launch IAP will reuse — but the plan cards, the price strings
+ * ($4.99/$39, which also contradicted the locked $3.99/$29.99 decision
+ * in docs/PLAN.md), the "Upgrade to Plus" button and the disclaimer
+ * that lied about the free tier being unlimited are gone. What's left
+ * is a screen that describes Plus without promising a purchase the code
+ * cannot complete.
  *
- * Upgrade currently does nothing (no IAP yet). The plan toggle is wired
- * with local state so tapping a card actually highlights it.
+ * Entitlement (`usePlusStatus` → `profiles.plus_status === 'active'`) is
+ * still granted manually for early access today, same as web. When real
+ * purchases ship, this screen regains its plan cards and CTA.
  */
 export default function PaywallScreen() {
   const { user } = useAuth()
   const { profile } = useProfile(user?.id)
   const locale = (profile?.locale ?? 'en') as Locale
   const router = useRouter()
-  const [plan, setPlan] = useState<'monthly' | 'yearly'>('yearly')
 
   const features = [
     t('paywall.feature_desktop', locale),
@@ -42,6 +44,22 @@ export default function PaywallScreen() {
   return (
     <>
       <Stack.Screen options={{ headerShown: false }} />
+      {/* This is the app's one full-screen dark canvas (`root.backgroundColor`
+          below is #0B0B0C) — the root layout's `<StatusBar style="dark" />`
+          (audit 01-F22) leaves the clock/battery glyphs dark-on-dark here.
+          Per-screen override, matching the fix-plan's "any screen with a
+          dark canvas declares its own <StatusBar>" rule.
+          Caveat (from the audit, unverified on a physical device in this
+          environment): this screen is registered `presentation: 'modal'`
+          (`_layout.tsx`) — a page-sheet on iOS — and a page-sheet's status
+          bar is owned by the *presenting* view controller, so this
+          override may be a no-op there. It is correct and takes effect on
+          Android, where `presentation: 'modal'` doesn't carry that
+          restriction. Switching to `fullScreenModal` would make the iOS
+          case reliable too, at the cost of the sheet's swipe-to-dismiss
+          and reveal-behind — a presentation change, not a status-bar fix,
+          so it's left to whoever verifies this on-device. */}
+      <StatusBar style="light" />
       <View style={styles.root}>
         {/* Radial-gradient-ish sage halo in the top-left */}
         <View pointerEvents="none" style={styles.halo} />
@@ -85,77 +103,14 @@ export default function PaywallScreen() {
             </View>
           </ScrollView>
 
-          {/* Bottom: plan cards + upgrade button + disclaimer */}
+          {/* Footer — no plan cards, no price, no CTA. Just the honest
+              status: purchases aren't live yet. */}
           <View style={styles.bottom}>
-            <View style={styles.planRow}>
-              <PlanCard
-                period={t('paywall.plan_monthly', locale)}
-                price="$4.99"
-                sub={t('paywall.plan_monthly_sub', locale)}
-                selected={plan === 'monthly'}
-                onPress={() => setPlan('monthly')}
-              />
-              <PlanCard
-                period={t('paywall.plan_yearly', locale)}
-                price="$39"
-                sub={t('paywall.plan_yearly_sub', locale)}
-                selected={plan === 'yearly'}
-                best={t('paywall.best', locale)}
-                onPress={() => setPlan('yearly')}
-              />
-            </View>
-
-            <Pressable
-              style={({ pressed }) => [styles.upgradeBtn, pressed && styles.upgradeBtnPressed]}
-              onPress={() => {
-                // Purchase flow isn't wired yet. Keep the button responsive so the
-                // pressed state reads; actual subscription logic is post-Phase D.
-              }}
-            >
-              <Text style={styles.upgradeBtnText}>{t('paywall.cta', locale)}</Text>
-            </Pressable>
-
             <Text style={styles.disclaimer}>{t('paywall.disclaimer', locale)}</Text>
           </View>
         </SafeAreaView>
       </View>
     </>
-  )
-}
-
-function PlanCard({
-  period,
-  price,
-  sub,
-  selected,
-  best,
-  onPress,
-}: {
-  period: string
-  price: string
-  sub: string
-  selected?: boolean
-  best?: string
-  onPress?: () => void
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [
-        planStyles.card,
-        selected && planStyles.cardSelected,
-        pressed && planStyles.cardPressed,
-      ]}
-    >
-      {best && (
-        <View style={planStyles.bestBadge}>
-          <Text style={planStyles.bestBadgeText}>{best}</Text>
-        </View>
-      )}
-      <Text style={planStyles.period}>{period}</Text>
-      <Text style={planStyles.price}>{price}</Text>
-      <Text style={planStyles.sub}>{sub}</Text>
-    </Pressable>
   )
 }
 
@@ -257,29 +212,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   bottom: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 28,
     paddingTop: 8,
     paddingBottom: 20,
-  },
-  planRow: {
-    flexDirection: 'row',
-    gap: 10,
-    marginBottom: 18,
-  },
-  upgradeBtn: {
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: Colors.white,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  upgradeBtnPressed: { opacity: 0.85 },
-  upgradeBtnText: {
-    fontFamily: Typography.fontFamily.sansBold,
-    fontSize: 17,
-    fontWeight: '700',
-    color: Colors.ink ?? '#1B1915',
-    letterSpacing: -0.2,
   },
   disclaimer: {
     textAlign: 'center',
@@ -287,62 +222,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '500',
     fontFamily: Typography.fontFamily.sans,
-    marginTop: 12,
-  },
-})
-
-const planStyles = StyleSheet.create({
-  card: {
-    flex: 1,
-    padding: 14,
-    paddingHorizontal: 16,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderWidth: 0.5,
-    borderColor: 'rgba(255,255,255,0.12)',
-    position: 'relative',
-  },
-  cardSelected: {
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    borderWidth: 1.5,
-    borderColor: Colors.accent ?? Colors.primary,
-  },
-  cardPressed: { opacity: 0.85 },
-  bestBadge: {
-    position: 'absolute',
-    top: -10,
-    right: 10,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    backgroundColor: Colors.accent ?? Colors.primary,
-    borderRadius: 6,
-  },
-  bestBadgeText: {
-    color: Colors.white,
-    fontSize: 10,
-    fontFamily: Typography.fontFamily.sansBold,
-    fontWeight: '700',
-    letterSpacing: 0.4,
-    textTransform: 'uppercase',
-  },
-  period: {
-    color: 'rgba(255,255,255,0.7)',
-    fontSize: 12,
-    fontWeight: '600',
-    fontFamily: Typography.fontFamily.sansSemiBold,
-  },
-  price: {
-    color: Colors.white,
-    fontFamily: Typography.fontFamily.sansBold,
-    fontSize: 22,
-    fontWeight: '700',
-    letterSpacing: -0.5,
-    marginTop: 2,
-  },
-  sub: {
-    color: 'rgba(255,255,255,0.55)',
-    fontSize: 11,
-    fontFamily: Typography.fontFamily.sans,
-    marginTop: 2,
+    lineHeight: 18,
   },
 })

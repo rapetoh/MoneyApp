@@ -7,6 +7,8 @@ import {
   firstOccurrenceOnOrAfter,
   monthlyEquivalent,
   annualEquivalent,
+  findRuleForTransaction,
+  buildRuleAnchor,
   type RecurrenceInput,
 } from '../recurrence'
 import { localDay } from '../../utils/period'
@@ -266,6 +268,48 @@ describe('monthlyEquivalent / annualEquivalent (03-F23 — honour interval)', ()
   it('annualEquivalent is twelve times the monthly figure', () => {
     const rule = { frequency: 'quarterly' as const, interval: 1, amount: 300 }
     expect(annualEquivalent(rule)).toBeCloseTo(monthlyEquivalent(rule) * 12, 10)
+  })
+})
+
+describe('findRuleForTransaction (fix-plan 2.2/3.3 — the "looked up by name/template only" bug)', () => {
+  it('finds a generated occurrence via recurring_rule_id even though template_txn_id points elsewhere', () => {
+    const rules = [{ id: 'rule-1', template_txn_id: 'original-txn' }]
+    const generatedOccurrence = { id: 'occurrence-2', recurring_rule_id: 'rule-1' }
+    expect(findRuleForTransaction(generatedOccurrence, rules)).toEqual(rules[0])
+  })
+
+  it('falls back to template_txn_id for a legacy row with no recurring_rule_id', () => {
+    const rules = [{ id: 'rule-1', template_txn_id: 'original-txn' }]
+    const legacyTemplate = { id: 'original-txn', recurring_rule_id: null }
+    expect(findRuleForTransaction(legacyTemplate, rules)).toEqual(rules[0])
+  })
+
+  it('prefers recurring_rule_id over a template_txn_id match on a different rule', () => {
+    const rules = [
+      { id: 'rule-1', template_txn_id: 'txn-a' },
+      { id: 'rule-2', template_txn_id: 'txn-b' },
+    ]
+    // txn-a's own id happens to equal another rule's template_txn_id — the
+    // explicit recurring_rule_id link must win over the name/template
+    // coincidence.
+    const txn = { id: 'txn-a', recurring_rule_id: 'rule-2' }
+    expect(findRuleForTransaction(txn, rules)?.id).toBe('rule-2')
+  })
+
+  it('returns null when neither lookup matches', () => {
+    const rules = [{ id: 'rule-1', template_txn_id: 'txn-a' }]
+    expect(findRuleForTransaction({ id: 'txn-z', recurring_rule_id: null }, rules)).toBeNull()
+  })
+})
+
+describe('buildRuleAnchor', () => {
+  it('derives anchor_day/anchor_weekday/anchor_time from the civil date in tz', () => {
+    // 2026-08-08 is a Saturday.
+    const anchor = buildRuleAnchor('2026-08-08T14:30:05.000Z', 'UTC')
+    expect(anchor.starts_at).toBe('2026-08-08T14:30:05.000Z')
+    expect(anchor.anchor_day).toBe(8)
+    expect(anchor.anchor_weekday).toBe(6) // ISO Saturday = 6
+    expect(anchor.anchor_time).toBe('14:30:05')
   })
 })
 

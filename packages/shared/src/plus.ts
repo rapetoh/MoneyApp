@@ -1,12 +1,15 @@
 /**
  * Shared Plus-entitlement resolver.
  *
- * The single canonical "is this user Plus?" question. Reads the
- * profile column populated by IAP / RevenueCat receipt validation
- * (or the manual Supabase update for early access). Per-platform
- * dev hatches layer over this — mobile checks `__DEV__`, the web
- * server checks `MURMUR_DEV_PLUS=1` / non-production NODE_ENV —
- * but the production read is always this function.
+ * The single canonical "is this user Plus?" question, and the only
+ * source: `profile.plus_status === 'active'`, populated today by a
+ * manual Supabase update (early access — there is no purchase flow yet
+ * on any platform) and, once IAP/Stripe ships, by a validated receipt
+ * webhook. There are no per-platform dev hatches layered over this —
+ * mobile's `__DEV__` override and the web server's `MURMUR_DEV_PLUS`/
+ * non-production `NODE_ENV` overrides were both deleted (fix-plan 0.4 +
+ * 3.1): every build, dev or production, reads the same column the same
+ * way.
  *
  * Why a column and not three drifting implementations: until this
  * shipped, mobile / web client / web server each had their own

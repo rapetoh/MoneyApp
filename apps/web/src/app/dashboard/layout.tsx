@@ -23,7 +23,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   // unbranded default error screen. Overview and Insights, where the
   // profile/transaction read *is* the page's content, let the same
   // `DataFetchError` propagate to that boundary instead (fix-plan 2.13).
-  const [profile, recurringResult] = await Promise.all([
+  const [profile, recurringResult, deviceResult] = await Promise.all([
     getProfile(supabase, user.id).catch((err: unknown) => {
       console.error('[dashboard layout] profile read failed', err)
       return null
@@ -33,9 +33,24 @@ export default async function DashboardLayout({ children }: { children: React.Re
       .select('id', { count: 'exact', head: true })
       .eq('user_id', user.id)
       .eq('is_active', true),
+    // Fix-plan 3.7: the sidebar's "Synced just now" used to render
+    // unconditionally, including offline. `devices.last_synced_at` is
+    // written by `apps/mobile/src/services/sync/deviceRegistry.ts` at the
+    // end of a real drain pass — this reads the most recently synced of
+    // the user's own devices (mobile is the only writer today; web/desktop
+    // have no offline outbox to report on), so the sidebar states either a
+    // real timestamp or "not synced yet" rather than a hardcoded lie.
+    supabase
+      .from('devices')
+      .select('last_synced_at')
+      .eq('user_id', user.id)
+      .order('last_synced_at', { ascending: false, nullsFirst: false })
+      .limit(1)
+      .maybeSingle(),
   ])
   const displayName = profile?.display_name ?? user.email?.split('@')[0] ?? 'User'
   const recurringCount = recurringResult.count ?? 0
+  const lastSyncedAt = deviceResult.data?.last_synced_at ?? null
   // Pass the profile in so `plus_status === 'active'` flips the gate
   // on production once IAP populates the column. Dev-only env hatches
   // still take effect when the column is null/free.
@@ -61,7 +76,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           background: colors.background,
         }}
       >
-        <Sidebar displayName={displayName} recurringCount={recurringCount} />
+        <Sidebar displayName={displayName} recurringCount={recurringCount} lastSyncedAt={lastSyncedAt} />
         <main
           style={{
             flex: 1,

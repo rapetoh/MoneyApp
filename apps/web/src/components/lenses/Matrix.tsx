@@ -1,8 +1,7 @@
 import React from 'react'
-import { colors, font, cat as catTokens } from '../../lib/theme'
-import { tintFor } from '../../lib/categories'
-import { type LensProps, toSummarizable } from './types'
-import { addMonthsClamped, monthBounds, summarize } from '@voice-expense/shared'
+import { colors, font } from '../../lib/theme'
+import { type LensProps, toSummarizable, buildCategoryColorMap, NEUTRAL_CATEGORY_COLOR } from './types'
+import { addMonthsClamped, monthBounds, summarize, categoryPalette } from '@voice-expense/shared'
 
 // 6-month × category grid. Rows = categories. Cols = trailing 6 months.
 // Cell intensity scales with amount; trend column shows a tiny sparkline +
@@ -78,6 +77,7 @@ export function MatrixLens({ props }: { props: LensProps }) {
     for (const id of Object.keys(s.byCategory)) catIds.add(id)
   }
   const nameById: Record<string, string> = {}
+  const colorById = buildCategoryColorMap(props.categories)
   const matrix: Record<string, number[]> = {}
   for (const id of catIds) {
     matrix[id] = monthSummaries.map((s) => s.byCategory[id]?.amount ?? 0)
@@ -243,7 +243,9 @@ export function MatrixLens({ props }: { props: LensProps }) {
           Trend
         </div>
 
-        {topIds.map((id) => renderRow(id, nameById[id], catTokens[tintFor(nameById[id])].fg, matrix[id]))}
+        {topIds.map((id) =>
+          renderRow(id, nameById[id], categoryPalette(colorById[id] || NEUTRAL_CATEGORY_COLOR).fg, matrix[id]),
+        )}
         {/* Everything past the top 8, folded into one row rather than
             dropped — this is what makes `Total` below agree with the
             Overview header's "out" (fix-plan 2.11's done-when). */}

@@ -257,8 +257,15 @@ export default function InsightsScreen() {
 
   // "Spent · Apr 1 – 18" on the hero — end day is today if viewing the
   // current month, otherwise the last day of the selected month.
+  // `Intl.DateTimeFormat.formatRange` (audit 08-F48, fix-plan 4.2) instead
+  // of joining a localized month name to a bare day integer — the old
+  // `${monthLabel} 1 – ${day}` was always English word order ("août 1 –
+  // 18") regardless of locale.
   const rangeEndDay = isCurrentMonth ? nowParts.d : daysInSelectedMonth
-  const rangeLabel = `${monthLabel(selY, selM, tz, locale, { month: 'short' })} 1 – ${rangeEndDay}`
+  const rangeLabel = new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric', timeZone: tz }).formatRange(
+    new Date(civilDateTimeToInstant(selY, selM, 1, 12, 0, 0, tz)),
+    new Date(civilDateTimeToInstant(selY, selM, rangeEndDay, 12, 0, 0, tz)),
+  )
 
   const monthSpent = useMemo(
     () => spendInWindow(transactions, categoryKindById, monthBoundsInstants.start, monthBoundsInstants.endExclusive),

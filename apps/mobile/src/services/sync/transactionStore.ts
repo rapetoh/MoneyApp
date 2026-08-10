@@ -179,6 +179,30 @@ export async function softDeleteTransaction(id: string): Promise<void> {
   )
 }
 
+/**
+ * The only column names `updateTransactionFields` is ever allowed to
+ * interpolate into the `UPDATE … SET` list below. The parameter type
+ * (`Pick<Transaction, …>`) already names this same set, but a `Pick` is
+ * erased at compile time — nothing stops a future caller from doing
+ * `updateTransactionFields(id, obj as any)` with a key sourced from,
+ * say, a deep-link or an AI tool-call payload, and `Object.entries`
+ * would happily hand that key straight into a template-literal SQL
+ * fragment (fix-plan 4.5 / audit 07-F42). This array is the runtime
+ * half of the guarantee the type only makes at build time; keep it in
+ * sync with the `Pick<…>` union above by hand — there are few enough
+ * fields that a shared derivation would be more indirection than value.
+ */
+const UPDATABLE_TRANSACTION_FIELDS = new Set<string>([
+  'amount',
+  'merchant',
+  'note',
+  'category_id',
+  'payment_method',
+  'direction',
+  'is_recurring',
+  'recurring_frequency',
+])
+
 export async function updateTransactionFields(
   id: string,
   fields: Partial<
@@ -201,6 +225,9 @@ export async function updateTransactionFields(
   const values: unknown[] = [now]
 
   for (const [key, val] of Object.entries(fields)) {
+    if (!UPDATABLE_TRANSACTION_FIELDS.has(key)) {
+      throw new Error(`updateTransactionFields: "${key}" is not an updatable column`)
+    }
     sets.push(`${key} = ?`)
     // SQLite binds booleans as 0/1; scalars and null pass through unchanged.
     const coerced = typeof val === 'boolean' ? (val ? 1 : 0) : (val ?? null)

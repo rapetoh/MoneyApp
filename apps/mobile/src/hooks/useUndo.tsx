@@ -5,7 +5,9 @@ interface PendingUndo {
   id: number
   message: string
   undo: () => void | Promise<void>
-  undoLabel?: string
+  /** Required — `UndoSnackbar` no longer carries an untranslated "Undo"
+   *  fallback (audit 01-F29); callers pass `t('common.undo', locale)`. */
+  undoLabel: string
   durationMs?: number
 }
 

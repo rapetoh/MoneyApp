@@ -6,6 +6,7 @@ import { createClient } from '../lib/supabase/client'
 import { colors, font, radius } from '../lib/theme'
 import { Icon } from './Icons'
 import { MurmurMark } from './MurmurMark'
+import { formatRelativeSync } from '../lib/relativeTime'
 
 type NavKey =
   | 'overview'
@@ -36,8 +37,11 @@ const NAV: Array<{
   { key: 'budgets', label: 'Budgets', href: '/dashboard/budgets', icon: Icon.sparkle, group: 'plan' },
   { key: 'recurring', label: 'Recurring', href: '/dashboard/recurring', icon: Icon.refresh, group: 'plan', badgeKey: 'recurring' },
   { key: 'ask', label: 'Ask Murmur', href: '/dashboard/ask', icon: Icon.sparkle, group: 'plan', plus: true, aiPill: true },
-  // Insights is free on every platform (CROSS §4.2) — no plus flag.
-  { key: 'reports', label: 'Reports & forecast', href: '/dashboard/insights', icon: Icon.chart, group: 'analyze' },
+  // Insights is free on every platform (CROSS §4.2) — no plus flag. Label
+  // matches the page's own toolbar title/H1 and the mobile tab — was
+  // "Reports & forecast" here, a fourth name for one destination (audit
+  // 08-F44, fix-plan 4.2 — see docs/DESIGN.md's navigation naming table).
+  { key: 'reports', label: 'Insights', href: '/dashboard/insights', icon: Icon.chart, group: 'analyze' },
   { key: 'export', label: 'Export', href: '/dashboard/export', icon: Icon.download, group: 'data', plus: true },
   { key: 'settings', label: 'Settings', href: '/dashboard/settings', icon: Icon.settings, group: 'data' },
 ]
@@ -52,10 +56,16 @@ const GROUP_LABEL: Record<GroupKey, string> = {
 export function Sidebar({
   displayName,
   recurringCount,
+  lastSyncedAt,
 }: {
   displayName?: string | null
   /** Count badge value on the Recurring nav row. Falsy/0 hides the badge. */
   recurringCount?: number
+  /** Most recent `devices.last_synced_at` across the user's devices, or
+   *  null if none have ever synced (fix-plan 3.7) — replaces the
+   *  hardcoded "Synced just now" that rendered unconditionally,
+   *  including offline. */
+  lastSyncedAt?: string | null
 }) {
   const pathname = usePathname()
   const router = useRouter()
@@ -147,7 +157,7 @@ export function Sidebar({
         <div style={styles.userAvatar}>{initial}</div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={styles.userName}>{displayName ?? 'You'}</div>
-          <div style={styles.userMeta}>Synced just now</div>
+          <div style={styles.userMeta}>{formatRelativeSync(lastSyncedAt)}</div>
         </div>
         <button onClick={handleSignOut} style={styles.signOut} title="Sign out">
           <Icon.signOut color={colors.ink3} size={14} />

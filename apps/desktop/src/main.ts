@@ -24,6 +24,55 @@ let nextServer: UtilityProcess | null = null
 let gatewayServer: http.Server | null = null
 let mainWindow: BrowserWindow | null = null
 
+/**
+ * The one origin the app shell is ever allowed to navigate to in-place —
+ * `http://127.0.0.1:<gatewayPort>`, set once `startGateway()` resolves,
+ * before any window is created. `will-navigate` guards below compare
+ * against this rather than a hard-coded port, since the port is chosen
+ * freshly (`findFreePort()`) on every launch.
+ */
+let appOrigin: string | null = null
+
+function isAllowedNavigation(targetUrl: string): boolean {
+  if (!appOrigin) return false
+  try {
+    return new URL(targetUrl).origin === appOrigin
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Blocks a same-frame navigation away from the app shell — the gap
+ * `setWindowOpenHandler` below doesn't cover, because that only fires
+ * for `window.open`-style new-window requests. A same-frame navigation
+ * (a link, a redirect, injected JS setting `location.href`) can replace
+ * the *existing* window's content with a remote page in place, while
+ * the renderer still holds the user's live Supabase session and the
+ * gateway's proxy to the hosted AI routes — the app shell would keep
+ * its title and window chrome while actually showing an attacker's page
+ * (fix-plan 4.5 / audit 07-F33). In-app navigation (anywhere under the
+ * local gateway origin — the embedded Next app's own pages) is left
+ * alone; everything else is denied, with real http(s) URLs handed off
+ * to the OS browser instead of silently dropped, matching
+ * `setWindowOpenHandler`'s existing external-link policy.
+ *
+ * Registered once via `app.on('web-contents-created')` — which fires for
+ * the main window's own `webContents` *and* every child window
+ * `setWindowOpenHandler` allows (e.g. the export-to-PDF preview) — so
+ * there is one navigation policy for the whole app, not just the window
+ * created first.
+ */
+function guardNavigation(contents: Electron.WebContents): void {
+  contents.on('will-navigate', (event, targetUrl) => {
+    if (isAllowedNavigation(targetUrl)) return
+    event.preventDefault()
+    if (targetUrl.startsWith('http://') || targetUrl.startsWith('https://')) {
+      shell.openExternal(targetUrl)
+    }
+  })
+}
+
 function findFreePort(): Promise<number> {
   return new Promise((resolve, reject) => {
     const srv = createServer()
@@ -272,7 +321,8 @@ async function bootstrap() {
   try {
     const nextPort = await startEmbeddedServer()
     const gatewayPort = await startGateway(nextPort)
-    createWindow(`http://${HOSTNAME}:${gatewayPort}/`)
+    appOrigin = `http://${HOSTNAME}:${gatewayPort}`
+    createWindow(`${appOrigin}/`)
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     dialog.showErrorBox('Murmur failed to start', message)
@@ -294,6 +344,14 @@ app.on('second-instance', () => {
     if (mainWindow.isMinimized()) mainWindow.restore()
     mainWindow.focus()
   }
+})
+
+// One navigation policy for every window this app ever creates — the
+// main window and any child `setWindowOpenHandler` allows (fix-plan
+// 4.5). Registered at module scope, before `whenReady()`, so it is in
+// place for the very first `webContents` Electron creates.
+app.on('web-contents-created', (_event, contents) => {
+  guardNavigation(contents)
 })
 
 app.whenReady().then(() => {

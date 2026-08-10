@@ -117,7 +117,11 @@ export default function MoreScreen() {
                     <Text style={styles.rowLabel}>{row.label}</Text>
                     {row.plusGated && (
                       <View style={styles.plusPill}>
-                        <Text style={styles.plusPillText}>Plus</Text>
+                        {/* Same key `settings.tsx`'s adjacent Plus pill uses
+                            (audit 01-F29) — one badge, one key, not two
+                            literals that happen to read the same in
+                            English today. */}
+                        <Text style={styles.plusPillText}>{t('settings.upgrade', locale)}</Text>
                       </View>
                     )}
                     <Ionicons

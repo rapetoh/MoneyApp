@@ -13,10 +13,11 @@ import {
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Link } from 'expo-router'
+import { getLocales } from 'expo-localization'
 import { signUpWithEmail } from '../../src/hooks/useAuth'
 import { MurmurMark } from '../../src/components/MurmurMark'
 import { Colors, Typography, Hairline } from '../../src/theme'
-import { t } from '@voice-expense/shared'
+import { t, resolveLocale } from '@voice-expense/shared'
 import type { Locale } from '@voice-expense/shared'
 
 /**
@@ -27,7 +28,9 @@ import type { Locale } from '@voice-expense/shared'
  * email/password account.
  */
 export default function SignUpScreen() {
-  const locale: Locale = 'en'
+  // Same pre-auth device-locale seed as sign-in.tsx (audit 08-F48,
+  // fix-plan 4.2) — no profile to read `locale` from yet.
+  const locale: Locale = resolveLocale(getLocales().map((l) => l.languageCode))
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)

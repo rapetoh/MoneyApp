@@ -14,6 +14,10 @@ export * from './utils/period'
 export * from './utils/fx'
 export * from './utils/validation'
 
+// Utils — merchant avatar color, merchant-logo domain guessing, and
+// category-tint derivation (fix-plan 4.4, one copy for both apps)
+export * from './utils/color'
+
 // Domain — money aggregation (spend/income/transfers/saved, one definition)
 export * from './domain/money'
 

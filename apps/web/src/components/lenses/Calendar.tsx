@@ -1,8 +1,8 @@
 'use client'
 import { useState } from 'react'
-import { colors, font, cat as catTokens } from '../../lib/theme'
-import { tintFor } from '../../lib/categories'
-import { type LensDay, type LensProps } from './types'
+import { colors, font } from '../../lib/theme'
+import { categoryPalette } from '@voice-expense/shared'
+import { type LensDay, type LensProps, buildCategoryColorMap, NEUTRAL_CATEGORY_COLOR } from './types'
 
 function fmt(value: number, currency: string, locale: string): string {
   return new Intl.NumberFormat(locale, {
@@ -25,6 +25,7 @@ export function CalendarLens({ props }: { props: LensProps }) {
   // browser could read it as Friday or Sunday).
   const days = props.days
   const max = Math.max(...days.map((d) => d.spendTotal), 1)
+  const colorById = buildCategoryColorMap(props.categories)
 
   // Today's cell, if the anchor month is the current one — `todayIso` is
   // resolved server-side in the profile's zone, never `new Date()` here.
@@ -237,8 +238,7 @@ export function CalendarLens({ props }: { props: LensProps }) {
         </div>
         <div style={{ overflow: 'auto', flex: 1 }}>
           {selTxns.map((t, i) => {
-            const tint = tintFor(t.category_name ?? null)
-            const c = catTokens[tint]
+            const c = categoryPalette((t.category_id && colorById[t.category_id]) || NEUTRAL_CATEGORY_COLOR)
             return (
               <div
                 key={i}

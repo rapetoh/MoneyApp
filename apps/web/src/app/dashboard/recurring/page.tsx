@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useMemo } from 'react'
+import Link from 'next/link'
 import { createClient } from '../../../lib/supabase/client'
 import { colors, font, radius } from '../../../lib/theme'
 import { Toolbar } from '../../../components/Toolbar'
@@ -12,6 +13,8 @@ import {
   type RecurringPatternCandidate,
 } from '../../../lib/recurringPatternDetector'
 import { usePlus } from '../../../lib/plus'
+import { useRealtime } from '../../../lib/useRealtime'
+import { RecurringRuleModal, type RecurringRuleFormValues } from '../../../components/RecurringRuleModal'
 import type { RecurringRule, RecurringFrequency } from '@voice-expense/shared'
 import {
   nextOccurrence as sharedNextOccurrence,
@@ -23,6 +26,7 @@ import {
   daysBetween,
   addDays,
   civilDateTimeToInstant,
+  snapshotFx,
 } from '@voice-expense/shared'
 
 type Txn = {
@@ -180,6 +184,11 @@ export default function RecurringPage() {
         .from('recurring_rules')
         .select('*')
         .eq('user_id', user.id)
+        // Soft-deleted rules (fix-plan 3.3 — the new delete action below
+        // soft-deletes, matching the `is_deleted` contract migration 018
+        // gave this table) must not resurrect in the list they were just
+        // removed from.
+        .eq('is_deleted', false)
         .order('created_at', { ascending: false }),
       supabase
         .from('transactions')
@@ -207,42 +216,18 @@ export default function RecurringPage() {
     load()
   }, [])
 
-  // Realtime. Without this, the user accepting a "new pattern detected"
-  // banner on mobile (or adding a rule from the edit screen there)
-  // leaves the desktop Recurring page showing yesterday's list until
-  // the user reloads — the page would also miss new transactions that
-  // feed the candidate detector. One channel covers both tables.
-  useEffect(() => {
-    let userId: string | null = null
-    let active = true
-    void (async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user || !active) return
-      userId = user.id
-      const channel = supabase
-        .channel(`web:recurring:${userId}:${Math.random().toString(36).slice(2)}`)
-        .on(
-          'postgres_changes',
-          { event: '*', schema: 'public', table: 'recurring_rules', filter: `user_id=eq.${userId}` },
-          () => { void load() },
-        )
-        .on(
-          'postgres_changes',
-          { event: '*', schema: 'public', table: 'transactions', filter: `user_id=eq.${userId}` },
-          () => { void load() },
-        )
-        .subscribe()
-      return () => {
-        active = false
-        channel.unsubscribe()
-        void supabase.removeChannel(channel)
-      }
-    })()
-    return () => {
-      active = false
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  // Realtime — one shared hook per table, not a hand-rolled effect
+  // (fix-plan 4.6). The previous version returned its
+  // `channel.unsubscribe()` from *inside* the async IIFE; the `useEffect`
+  // itself only ever returned `() => { active = false }`, so React never
+  // called the real cleanup and every mount/unmount leaked a channel.
+  // Without this subscription at all, the user accepting a "new pattern
+  // detected" banner on mobile (or adding a rule from the edit screen
+  // there) leaves the desktop Recurring page showing yesterday's list
+  // until the user reloads.
+  const realtimeFilter = userId ? `user_id=eq.${userId}` : null
+  useRealtime('recurring_rules', realtimeFilter, load)
+  useRealtime('transactions', realtimeFilter, load)
 
   const catMap = Object.fromEntries(categories.map((c) => [c.id, c]))
 
@@ -347,6 +332,122 @@ export default function RecurringPage() {
     await load()
   }
 
+  // Create/edit/cancel — fix-plan 3.3. "Add manually" was a permanently
+  // `disabled` button and the only mutation this page had was pause/
+  // resume; a rule could not be created, edited or deleted from web at
+  // all without going through a transaction or a detected pattern.
+  const [modalOpen, setModalOpen] = useState(false)
+  const [modalMode, setModalMode] = useState<'create' | 'edit'>('create')
+  const [editingRule, setEditingRule] = useState<RecurringRule | null>(null)
+
+  function openCreateModal() {
+    setModalMode('create')
+    setEditingRule(null)
+    setModalOpen(true)
+  }
+
+  function openEditModal(rule: RecurringRule) {
+    setModalMode('edit')
+    setEditingRule(rule)
+    setModalOpen(true)
+  }
+
+  async function handleModalSave(values: RecurringRuleFormValues): Promise<boolean> {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return false
+
+    const anchorParts = localParts(values.starts_at, tz)
+    const anchorPayload = {
+      anchor_day: anchorParts.d,
+      anchor_weekday: anchorParts.weekdayIndex + 1,
+      anchor_time: `${String(anchorParts.hour).padStart(2, '0')}:${String(anchorParts.minute).padStart(2, '0')}:${String(anchorParts.second).padStart(2, '0')}`,
+    }
+
+    if (modalMode === 'edit' && editingRule) {
+      // Amount/currency changed: re-snapshot FX in place (fix-plan 2.1's
+      // "snapshotted on create/update"). A `starts_at` edit ("next
+      // charge") re-anchors `last_generated` to null so the new date is
+      // the literal next occurrence rather than one cadence step past
+      // it — mirrors `useRecurringRules.ts`'s `updateRule` on mobile.
+      let fxPayload: { amount_in_profile_currency: number | null; fx_rate_to_profile: number | null; fx_rate_date: string | null } | null = null
+      const amountOrCurrencyChanged =
+        values.amount !== editingRule.amount || values.currency_code !== editingRule.currency_code
+      if (amountOrCurrencyChanged) {
+        const fx = await snapshotFx(values.starts_at, values.currency_code, currency, values.amount, tz)
+        fxPayload = fx
+      }
+      const startsAtChanged = values.starts_at !== editingRule.starts_at
+      const { error } = await supabase
+        .from('recurring_rules')
+        .update({
+          name: values.name,
+          amount: values.amount,
+          currency_code: values.currency_code,
+          category_id: values.category_id,
+          direction: values.direction,
+          frequency: values.frequency,
+          interval: values.interval,
+          ends_at: values.ends_at,
+          ...(startsAtChanged ? { starts_at: values.starts_at, last_generated: null, ...anchorPayload } : {}),
+          ...(fxPayload ?? {}),
+        })
+        .eq('id', editingRule.id)
+      if (error) {
+        window.alert(`Could not save this rule: ${error.message}`)
+        return false
+      }
+      await load()
+      return true
+    }
+
+    // Create — no template transaction, so `last_generated` stays null:
+    // `starts_at` (the form's own "next date") is the pending first
+    // occurrence, exactly like mobile's manual-creation path.
+    const fx = await snapshotFx(values.starts_at, values.currency_code, currency, values.amount, tz)
+    const { error } = await supabase.from('recurring_rules').insert({
+      user_id: user.id,
+      client_id: crypto.randomUUID(),
+      name: values.name,
+      amount: values.amount,
+      currency_code: values.currency_code,
+      category_id: values.category_id,
+      direction: values.direction,
+      payment_method: null,
+      note: null,
+      frequency: values.frequency,
+      interval: values.interval,
+      starts_at: values.starts_at,
+      ends_at: values.ends_at,
+      last_generated: null,
+      template_txn_id: null,
+      is_active: true,
+      amount_in_profile_currency: fx?.amount_in_profile_currency ?? null,
+      fx_rate_to_profile: fx?.fx_rate_to_profile ?? null,
+      fx_rate_date: fx?.fx_rate_date ?? null,
+      ...anchorPayload,
+    })
+    if (error) {
+      window.alert(`Could not create this rule: ${error.message}`)
+      return false
+    }
+    await load()
+    return true
+  }
+
+  // Soft delete (fix-plan 3.3's explicit "delete (soft)" requirement) —
+  // mirrors `useRecurringRules.ts`'s `deleteRule` on mobile rather than a
+  // hard `.delete()`, which would bypass the `is_deleted` contract every
+  // other synced entity on this table carries (migration 018/028).
+  async function handleDeleteRule(rule: RecurringRule) {
+    if (!window.confirm(`Cancel ${rule.name ?? 'this recurring rule'}? This can't be undone.`)) return
+    await supabase
+      .from('recurring_rules')
+      .update({ is_deleted: true, deleted_at: new Date().toISOString(), version: (rule.version ?? 1) + 1 })
+      .eq('id', rule.id)
+    setModalOpen(false)
+    await load()
+  }
+
   const active = rules.filter((r) => r.is_active)
   const inactive = rules.filter((r) => !r.is_active)
 
@@ -446,7 +547,11 @@ export default function RecurringPage() {
         right={
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <span style={styles.sortPill}>Sort: Next charge</span>
-            <button style={styles.addBtn} type="button" disabled title="Coming soon">
+            {/* Fix-plan 3.3: this was permanently `disabled title="Coming
+                soon"` — a priced-looking control that could never be
+                pressed. A rule can now be created without touching a
+                transaction, on both platforms. */}
+            <button style={styles.addBtn} type="button" onClick={openCreateModal}>
               <Icon.plus color="#fff" size={12} />
               Add manually
             </button>
@@ -457,20 +562,43 @@ export default function RecurringPage() {
       <div style={styles.content}>
         <div style={styles.headerRow}>
           <div>
-            <div style={styles.serifTitle}>Recurring & subscriptions</div>
+            {/* Matches the sidebar label, the toolbar title above, and the
+                mobile screen's own heading — one name, not a fourth
+                variant (audit 08-F44, fix-plan 4.2's naming-table item). */}
+            <div style={styles.serifTitle}>Recurring</div>
             <div style={styles.subtitleLine}>
-              Auto-detected from your spend patterns.{' '}
-              {reviewCount > 0 ? (
-                <b style={{ color: colors.accent }}>{reviewCount} worth reviewing.</b>
+              {isPlus ? (
+                <>
+                  Auto-detected from your spend patterns.{' '}
+                  {reviewCount > 0 ? (
+                    <b style={{ color: colors.accent }}>{reviewCount} worth reviewing.</b>
+                  ) : (
+                    <span>{loading ? 'Loading…' : 'No new patterns to review.'}</span>
+                  )}
+                </>
               ) : (
-                <span>{loading ? 'Loading…' : 'No new patterns to review.'}</span>
+                // Free users never ran the detector at all — `candidates`
+                // short-circuits to `[]` above (audit 03-F33) — so this
+                // must not assert "no new patterns" as a finding about
+                // their data. It's a fact about their plan, not their
+                // spending.
+                <span>
+                  Pattern detection is a{' '}
+                  <Link href="/dashboard/settings" style={{ color: colors.accent, textDecoration: 'none' }}>
+                    Murmur Plus
+                  </Link>{' '}
+                  feature.
+                </span>
               )}
             </div>
           </div>
           <div style={{ display: 'flex', gap: 24, alignItems: 'flex-end' }}>
             <Stat label="Monthly" value={fmtShort(monthlyTotal)} />
             <Stat label="Annual cost" value={fmtShort(annualTotal)} />
-            <Stat label="To review" value={String(reviewCount)} accent="#B07B2A" />
+            {/* "—" for free users, not "0" — the detector never ran for
+                them (same fact as the subtitle above), and "0" would
+                assert a finding about their data instead of their plan. */}
+            <Stat label="To review" value={isPlus ? String(reviewCount) : '—'} accent="#B07B2A" />
           </div>
         </div>
 
@@ -552,8 +680,15 @@ export default function RecurringPage() {
               ) : loadError ? (
                 <ErrorState message="We couldn't load your recurring rules." detail={loadError} onRetry={load} />
               ) : sortedActive.length === 0 && inactive.length === 0 ? (
+                // Fix-plan 3.3: plan-aware — "accept a detected pattern"
+                // is a Plus feature (the banner above only renders when
+                // `isPlus`), so naming it here for a free user pointed at
+                // a control they can't reach. "Add manually" now works on
+                // every plan, so it's the one action worth naming for
+                // everyone.
                 <div style={styles.empty}>
-                  No recurring rules yet. Mark a transaction as recurring on mobile or accept a detected pattern.
+                  No recurring rules yet. Add one manually, mark a transaction as recurring on mobile
+                  {isPlus ? ', or accept a detected pattern below.' : '.'}
                 </div>
               ) : (
                 <>
@@ -571,8 +706,24 @@ export default function RecurringPage() {
                     return (
                       <div
                         key={r.id}
+                        onClick={() => openEditModal(r)}
+                        // A real <button> can't wrap this row — it already
+                        // nests the ACTIVE pill button, and buttons cannot
+                        // nest inside buttons. role="button" + tabIndex +
+                        // onKeyDown is the fix-plan's named alternative
+                        // (4.1) for exactly this shape.
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault()
+                            openEditModal(r)
+                          }
+                        }}
+                        aria-label={`Edit ${r.name ?? 'recurring rule'}`}
                         style={{
                           ...styles.tableRow,
+                          cursor: 'pointer',
                           borderBottom:
                             i === sortedActive.length - 1 && inactive.length === 0
                               ? 'none'
@@ -612,8 +763,20 @@ export default function RecurringPage() {
                               : '—'}
                         </div>
                         <div style={{ textAlign: 'right' }}>
-                          <button onClick={() => toggleActive(r)} style={styles.activePill} title="Pause">
-                            ACTIVE
+                          {/* Text now matches the action the click performs
+                              (audit 03-F36/08-F49) — it used to read
+                              "ACTIVE" while `title` said "Pause", a status
+                              word standing in for a toggle button. */}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              toggleActive(r)
+                            }}
+                            style={styles.activePill}
+                            title="Pause"
+                            aria-pressed="true"
+                          >
+                            Pause
                           </button>
                         </div>
                       </div>
@@ -624,9 +787,20 @@ export default function RecurringPage() {
                     return (
                       <div
                         key={r.id}
+                        onClick={() => openEditModal(r)}
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault()
+                            openEditModal(r)
+                          }
+                        }}
+                        aria-label={`Edit ${r.name ?? 'recurring rule'}`}
                         style={{
                           ...styles.tableRow,
                           opacity: 0.6,
+                          cursor: 'pointer',
                           borderBottom:
                             i === inactive.length - 1 ? 'none' : `0.5px solid ${colors.line}`,
                         }}
@@ -658,7 +832,14 @@ export default function RecurringPage() {
                         </div>
                         <div style={{ color: colors.ink4, fontSize: 12 }}>Paused</div>
                         <div style={{ textAlign: 'right' }}>
-                          <button onClick={() => toggleActive(r)} style={styles.resumePill}>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              toggleActive(r)
+                            }}
+                            style={styles.resumePill}
+                            aria-pressed="false"
+                          >
                             Resume
                           </button>
                         </div>
@@ -791,6 +972,18 @@ export default function RecurringPage() {
           </div>
         </div>
       </div>
+
+      <RecurringRuleModal
+        open={modalOpen}
+        mode={modalMode}
+        initial={editingRule}
+        categories={categories}
+        defaultCurrency={currency}
+        tz={tz}
+        onSave={handleModalSave}
+        onClose={() => setModalOpen(false)}
+        onDelete={editingRule ? () => handleDeleteRule(editingRule) : undefined}
+      />
     </div>
   )
 }

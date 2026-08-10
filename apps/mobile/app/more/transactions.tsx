@@ -211,7 +211,7 @@ export default function TransactionsScreen() {
               onPress={() => setSelectedCategoryId(null)}
             >
               <Text style={[styles.pillLabel, !selectedCategoryId && styles.pillLabelActive]}>
-                All
+                {t('transactions.filter_all', locale)}
               </Text>
             </Pressable>
             {usedCategories.map((cat) => {
@@ -342,11 +342,6 @@ const styles = StyleSheet.create({
   // Matches the back-pill footprint so the centered title stays optically centered.
   topRightSpacer: { width: 36, height: 36 },
   header: { padding: Spacing.base, gap: Spacing.md },
-  title: {
-    fontFamily: Typography.fontFamily.sansBold,
-    fontSize: Typography.size['2xl'],
-    color: Colors.text,
-  },
   segment: {
     flexDirection: 'row',
     backgroundColor: Colors.card,

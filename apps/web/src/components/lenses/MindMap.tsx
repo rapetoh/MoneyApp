@@ -1,7 +1,6 @@
 'use client'
 import React, { useRef, useState, useCallback, useEffect } from 'react'
-import { colors, font, cat as catTokens, type CategoryTint } from '../../lib/theme'
-import { tintFor } from '../../lib/categories'
+import { colors, font } from '../../lib/theme'
 import {
   type LensProps,
   type LensTxn,
@@ -201,7 +200,7 @@ function buildBranches(p: LensProps, displayName: string): Branch[] {
       label: 'Expenses',
       side: 'right',
       y: -1,
-      color: catTokens.bills.fg,
+      color: colors.expense,
       total: expenseTotal > 0 ? expenseTotal : null,
       subs: expenseSubs,
     },
@@ -920,7 +919,7 @@ export function MindMapLens({ props, displayName }: { props: LensProps; displayN
         </span>
         <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
           <span
-            style={{ width: 10, height: 10, borderRadius: 5, background: catTokens.bills.fg }}
+            style={{ width: 10, height: 10, borderRadius: 5, background: colors.expense }}
           />
           Money out
         </span>
@@ -964,6 +963,3 @@ function ZoomButton({
     </button>
   )
 }
-
-void tintFor
-void (catTokens as Record<CategoryTint, unknown>)

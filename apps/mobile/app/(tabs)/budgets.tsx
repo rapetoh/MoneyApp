@@ -149,7 +149,7 @@ export default function BudgetsScreen() {
           </View>
         ) : limit > 0 ? (
           <View style={styles.heroCard}>
-            <BudgetRing spent={spent} limit={limit} />
+            <BudgetRing spent={spent} limit={limit} locale={locale} />
             <View style={styles.heroText}>
               <Text style={styles.heroLabel}>{periodLabel(budget?.period, locale)}</Text>
               <View style={styles.heroAmount}>

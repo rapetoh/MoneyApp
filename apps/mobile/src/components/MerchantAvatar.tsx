@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { View, Text, Image, StyleSheet, type ImageStyle } from 'react-native'
-import { merchantColor } from '@voice-expense/shared'
+import { merchantColor, guessDomain, categoryPalette } from '@voice-expense/shared'
 import { Typography } from '../theme'
 
 interface Props {
@@ -23,78 +23,6 @@ interface Props {
   categoryName?: string | null
   /** Hex color of the category. Used only when falling back to the category tile. */
   categoryColor?: string | null
-}
-
-// Well-known merchants whose domain can't be derived by stripping spaces.
-const KNOWN_DOMAINS: Record<string, string> = {
-  netflix: 'netflix.com',
-  spotify: 'spotify.com',
-  amazon: 'amazon.com',
-  walmart: 'walmart.com',
-  target: 'target.com',
-  costco: 'costco.com',
-  starbucks: 'starbucks.com',
-  mcdonalds: 'mcdonalds.com',
-  uber: 'uber.com',
-  ubereats: 'ubereats.com',
-  lyft: 'lyft.com',
-  apple: 'apple.com',
-  google: 'google.com',
-  microsoft: 'microsoft.com',
-  adobe: 'adobe.com',
-  hulu: 'hulu.com',
-  disneyplus: 'disneyplus.com',
-  disney: 'disney.com',
-  hbomax: 'hbomax.com',
-  youtube: 'youtube.com',
-  paypal: 'paypal.com',
-  venmo: 'venmo.com',
-  cashapp: 'cash.app',
-  bestbuy: 'bestbuy.com',
-  homedepot: 'homedepot.com',
-  lowes: 'lowes.com',
-  ikea: 'ikea.com',
-  nike: 'nike.com',
-  adidas: 'adidas.com',
-  zara: 'zara.com',
-  sephora: 'sephora.com',
-  wholefoods: 'wholefoods.com',
-  traderjoes: 'traderjoes.com',
-  kroger: 'kroger.com',
-  walgreens: 'walgreens.com',
-  cvs: 'cvs.com',
-  tmobile: 't-mobile.com',
-  verizon: 'verizon.com',
-  att: 'att.com',
-  comcast: 'comcast.com',
-  chipotle: 'chipotle.com',
-  doordash: 'doordash.com',
-  grubhub: 'grubhub.com',
-  airbnb: 'airbnb.com',
-  booking: 'booking.com',
-  expedia: 'expedia.com',
-  playstation: 'playstation.com',
-  xbox: 'xbox.com',
-  steam: 'steampowered.com',
-  github: 'github.com',
-  notion: 'notion.so',
-  slack: 'slack.com',
-  zoom: 'zoom.us',
-  dropbox: 'dropbox.com',
-  chickfila: 'chick-fil-a.com',
-  burgerking: 'bk.com',
-  wendys: 'wendys.com',
-  dominos: 'dominos.com',
-  pizzahut: 'pizzahut.com',
-  subways: 'subway.com',
-  subway: 'subway.com',
-  dunkin: 'dunkindonuts.com',
-  panera: 'panerabread.com',
-}
-
-function guessDomain(name: string): string {
-  const normalized = name.toLowerCase().replace(/[^a-z0-9]/g, '')
-  return KNOWN_DOMAINS[normalized] ?? (normalized + '.com')
 }
 
 export function MerchantAvatar({
@@ -124,10 +52,17 @@ export function MerchantAvatar({
   const fallbackSource = hasMerchant ? merchant! : hasCategory ? categoryName! : '?'
   const initial = fallbackSource[0]?.toUpperCase() ?? '?'
 
-  // Fallback background color: category color when we're leaning on a category
-  // (rent → housing color). Otherwise deterministic merchant color.
+  // Fallback background color: category color when we're leaning on a
+  // category (rent → housing color), run through `categoryPalette` for
+  // its `fg` tone rather than painted raw. `categories.color` is an
+  // arbitrary user-picked hex (the seeded defaults alone render white
+  // text at 2.2–4.6:1 — under the 4.5:1 floor for six of twenty, e.g.
+  // Subscriptions #F39C12 at 2.19:1) so the tile needs the same
+  // guaranteed-≥4.5:1-vs-white derivation the chart tints use, not the
+  // raw value (fix-plan 4.4 / audit 01-F28). Otherwise deterministic
+  // merchant color, whose palette is chosen for the same guarantee.
   const bgColor = !hasMerchant && hasCategory && categoryColor
-    ? categoryColor
+    ? categoryPalette(categoryColor).fg
     : merchantColor(fallbackSource)
 
   // Only attempt a favicon fetch when we actually have a merchant name. Using

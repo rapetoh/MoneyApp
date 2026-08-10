@@ -14,13 +14,14 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Link } from 'expo-router'
 import * as AppleAuthentication from 'expo-apple-authentication'
+import { getLocales } from 'expo-localization'
 import { Ionicons } from '@expo/vector-icons'
-import { signInWithEmail } from '../../src/hooks/useAuth'
+import { signInWithEmail, requestPasswordReset } from '../../src/hooks/useAuth'
 import { signInWithApple } from '../../src/services/appleAuth'
 import { signInWithGoogle } from '../../src/services/googleAuth'
 import { MurmurMark } from '../../src/components/MurmurMark'
 import { Colors, Typography, Hairline } from '../../src/theme'
-import { t, type Locale } from '@voice-expense/shared'
+import { t, resolveLocale, type Locale } from '@voice-expense/shared'
 
 // Three value props that double as the welcome pitch. Same source of truth as
 // the prior (onboarding)/welcome.tsx — that screen has been retired and its
@@ -49,16 +50,19 @@ const PROPS: {
  * sees product value AND the one-tap entry on the same surface.
  */
 export default function WelcomeSignInScreen() {
-  // Locale source: pre-auth, the user has no Supabase profile yet, so we fall
-  // back to English. The full locale picker lives in Settings + onboarding's
-  // income step — both reachable post-sign-in.
-  const locale: Locale = 'en'
+  // Locale source: pre-auth, the user has no Supabase profile yet, so we
+  // read the device's own language preferences instead of hard-coding
+  // English (audit 08-F48, fix-plan 4.2). The full locale picker still
+  // lives in Settings + onboarding's income step — both reachable
+  // post-sign-in — for the user to override this guess.
+  const locale: Locale = resolveLocale(getLocales().map((l) => l.languageCode))
 
   const [appleAvailable, setAppleAvailable] = useState(false)
   const [showEmailForm, setShowEmailForm] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
+  const [resetLoading, setResetLoading] = useState(false)
   // Return-key flow: "next" on the email field hands focus to the password
   // field (it previously did nothing).
   const passwordRef = useRef<TextInput>(null)
@@ -105,6 +109,27 @@ export default function WelcomeSignInScreen() {
     if (error) Alert.alert(t('auth.sign_in_failed', locale), error.message)
   }
 
+  // Fix-plan 3.2 / audit 08-F7: the only recovery path for an email/password
+  // account. Requires an email above (Apple/Google users have no password to
+  // reset, and error copy here shouldn't imply otherwise — Supabase itself
+  // stays silent on whether the address has an account, so this can't leak
+  // that either).
+  async function handleForgotPassword() {
+    const trimmed = email.trim()
+    if (!trimmed) {
+      Alert.alert(t('auth.forgot_password', locale), t('auth.forgot_password_need_email', locale))
+      return
+    }
+    setResetLoading(true)
+    const { error } = await requestPasswordReset(trimmed)
+    setResetLoading(false)
+    if (error) {
+      Alert.alert(t('auth.reset_failed', locale), error.message)
+    } else {
+      Alert.alert(t('auth.check_email', locale), t('auth.reset_email_sent', locale).replace('{email}', trimmed))
+    }
+  }
+
   // Platform-aware CTA order: SIWA hero on iOS (and only iOS — guideline 4.8
   // requires it whenever a third-party sign-in is offered there), Google hero
   // on Android. Both providers are still reachable on both platforms; ordering
@@ -122,7 +147,9 @@ export default function WelcomeSignInScreen() {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          {/* Murmur — The Listening Drop, sage-tile variant per brand sheet §02. */}
+          {/* Murmur's mark — Coin & Wave, sage-tile variant per brand sheet §02.
+              ("The Listening Drop" was the retired candidate; see
+              packages/shared/src/brand.ts for PRODUCT_NAME vs. mark name.) */}
           <MurmurMark size={64} variant="sage" />
 
 
@@ -232,6 +259,16 @@ export default function WelcomeSignInScreen() {
                   accessibilityLabel={t('auth.password', locale)}
                 />
                 <Pressable
+                  onPress={handleForgotPassword}
+                  disabled={resetLoading}
+                  style={({ pressed }) => [styles.forgotPasswordRow, pressed && styles.btnPressed]}
+                  hitSlop={6}
+                >
+                  <Text style={styles.forgotPasswordText}>
+                    {resetLoading ? t('common.loading', locale) : t('auth.forgot_password', locale)}
+                  </Text>
+                </Pressable>
+                <Pressable
                   style={({ pressed }) => [
                     styles.emailSubmitBtn,
                     (loading || !email || !password) && styles.btnDisabled,
@@ -279,8 +316,8 @@ const styles = StyleSheet.create({
     paddingBottom: 32,
   },
 
-  // Brand mark + headline + lead. The Listening Drop is a self-contained
-  // tile (MurmurMark renders its own background + corner radius), so no
+  // Brand mark + headline + lead. Coin & Wave is a self-contained tile
+  // (MurmurMark renders its own background + corner radius), so no
   // wrapping styles are needed for the mark itself.
   headline: {
     fontFamily: Typography.fontFamily.serif,
@@ -397,6 +434,16 @@ const styles = StyleSheet.create({
 
   // Email form (shown when "More options" expanded)
   emailForm: { gap: 10 },
+  forgotPasswordRow: {
+    alignItems: 'flex-end',
+    paddingVertical: 2,
+  },
+  forgotPasswordText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: Colors.accent ?? Colors.primary,
+    fontFamily: Typography.fontFamily.sansSemiBold,
+  },
   input: {
     height: 50,
     borderRadius: 16,

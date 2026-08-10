@@ -37,6 +37,7 @@ import { paginateAscending, type PageResult } from './pagination'
 import { getSyncCursor, setSyncCursor } from './localDb'
 import { softDeleteTransaction } from './transactionStore'
 import { ENTITY_HANDLERS } from './entityRegistry'
+import { touchDeviceSynced } from './deviceRegistry'
 import { DataEvents } from '../../events/dataEvents'
 import type { SyncEntityType } from '@voice-expense/shared'
 
@@ -191,6 +192,18 @@ class SyncManager {
         }
 
         if (batch.length < DRAIN_BATCH_SIZE) break
+      }
+
+      // Fix-plan 3.7: "last_synced_at on drain". This pass only reaches
+      // here if it ran to completion online (the epoch guards above
+      // `return` early on a mid-flight stop()), so it is a real signal
+      // that this device just confirmed contact with the server —
+      // whether or not there was anything queued to push. `realtimeUserId`
+      // is set by `startRealtime(userId)`, called once per session
+      // alongside `pullRemote` — best-effort and silent: a missed stamp
+      // is caught by the next drain (every reconnect/foreground event).
+      if (this.realtimeUserId) {
+        touchDeviceSynced(this.realtimeUserId).catch(() => {})
       }
     } finally {
       if (epoch === this.drainEpoch) {

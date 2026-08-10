@@ -5,7 +5,7 @@ import { enqueue } from '../services/sync/syncQueue'
 import { syncManager, type OutboxOutcome } from '../services/sync/SyncManager'
 import { DataEvents } from '../events/dataEvents'
 import type { Transaction } from '@voice-expense/shared'
-import { snapshotFx, aggAmount, localDay } from '@voice-expense/shared'
+import { snapshotFx, localDay } from '@voice-expense/shared'
 import { validateTransactionWriteFields } from '@voice-expense/ai'
 import * as Crypto from 'expo-crypto'
 import { getCurrentProfileCurrency } from '../services/profileCurrency'
@@ -258,15 +258,6 @@ export function useTransactions(userId: string | undefined) {
     return { id: clientId, status: outcome.status, error: outcome.error }
   }
 
-  async function deleteTransaction(id: string): Promise<MutationResult> {
-    if (!userId) return { id, status: 'rejected', error: 'Not authenticated' }
-
-    const result = await deleteTransactionAndEnqueue(userId, id)
-    await loadLocal()
-    DataEvents.emitTransactions(userId)
-    return result
-  }
-
   async function editTransaction(
     id: string,
     fields: Partial<Pick<Transaction, 'amount' | 'merchant' | 'note' | 'category_id' | 'payment_method' | 'direction' | 'is_recurring' | 'recurring_frequency'>>,
@@ -306,34 +297,5 @@ export function useTransactions(userId: string | undefined) {
     return { id, status: outcome.status, error: outcome.error }
   }
 
-  return { transactions, loading, error, createTransaction, deleteTransaction, editTransaction }
-}
-
-// Current month summary
-export function useMonthSummary(transactions: Transaction[]) {
-  const now = new Date()
-  // Stage 2 (2.4/2.14) migration pending: device-local month boundary,
-  // not `period.ts`'s `monthBounds(monthIso(now, tz), tz)`. This hook has
-  // no `tz` threaded in (it only receives `transactions`) and, unlike
-  // `createTransaction` above, is unreferenced anywhere in the app today
-  // — left as explicit debt rather than migrated speculatively without a
-  // real caller to verify the zone-aware behaviour against.
-  // eslint-disable-next-line local/period-restrictions
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
-
-  const monthTxns = transactions.filter(
-    (t) => t.transacted_at >= startOfMonth && !t.is_deleted,
-  )
-
-  const totalIncome = monthTxns
-    .filter((t) => t.direction === 'credit')
-    .reduce((sum, t) => sum + aggAmount(t), 0)
-
-  const totalExpenses = monthTxns
-    .filter((t) => t.direction === 'debit')
-    .reduce((sum, t) => sum + aggAmount(t), 0)
-
-  const netBalance = totalIncome - totalExpenses
-
-  return { totalIncome, totalExpenses, netBalance, monthTxns }
+  return { transactions, loading, error, createTransaction, editTransaction }
 }

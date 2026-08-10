@@ -1,20 +1,20 @@
 'use client'
 import { useState, useEffect, useMemo } from 'react'
 import { createClient } from '../../../lib/supabase/client'
-import { colors, font, radius, cat, type CategoryTint } from '../../../lib/theme'
-import { tintFor } from '../../../lib/categories'
+import { colors, font, radius } from '../../../lib/theme'
 import { Toolbar } from '../../../components/Toolbar'
 import { Money } from '../../../components/Money'
 import { Chip } from '../../../components/Chip'
 import { Icon } from '../../../components/Icons'
 import { ErrorState } from '../../../components/ErrorState'
+import { useRealtime } from '../../../lib/useRealtime'
 import type {
   BudgetPeriod,
   BudgetStatusRule,
   BudgetStatusTransaction,
   CategoryKind,
 } from '@voice-expense/shared'
-import { budgetStatus, localDay } from '@voice-expense/shared'
+import { budgetStatus, localDay, categoryPalette } from '@voice-expense/shared'
 
 const PERIODS: { value: BudgetPeriod; label: string }[] = [
   { value: 'weekly', label: 'Weekly' },
@@ -24,7 +24,7 @@ const PERIODS: { value: BudgetPeriod; label: string }[] = [
   { value: 'yearly', label: 'Yearly' },
 ]
 
-type Cat = { id: string; name: string; kind: CategoryKind }
+type Cat = { id: string; name: string; kind: CategoryKind; color: string | null }
 type Txn = {
   amount: number
   amount_in_profile_currency: number | null
@@ -63,10 +63,13 @@ export default function BudgetsPage() {
   // own error) and distinct from "loaded, no active budget yet" (fix-plan
   // 2.13 / audit 08-F21 family).
   const [loadError, setLoadError] = useState<string | null>(null)
+  // Drives the realtime subscriptions' filter below.
+  const [userId, setUserId] = useState<string | null>(null)
 
   async function load() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
+    setUserId(user.id)
     const [b, t, c, r, p] = await Promise.all([
       supabase
         .from('budgets')
@@ -83,7 +86,7 @@ export default function BudgetsPage() {
         .select('amount, amount_in_profile_currency, direction, transacted_at, category_id, recurring_rule_id')
         .eq('user_id', user.id)
         .eq('is_deleted', false),
-      supabase.from('categories').select('id, name, kind').eq('user_id', user.id).eq('is_archived', false),
+      supabase.from('categories').select('id, name, kind, color').eq('user_id', user.id).eq('is_archived', false),
       // `budgetStatus()`'s `committed` figure — active debit rules due in
       // the window that haven't posted as a transaction yet.
       supabase.from('recurring_rules').select('*').eq('user_id', user.id).eq('is_active', true),
@@ -103,67 +106,15 @@ export default function BudgetsPage() {
     load()
   }, [])
 
-  // Realtime — re-fetch whenever the user's own transactions or
-  // budgets change. Without this, an expense logged on mobile leaves
-  // the desktop Budgets ring stuck on stale numbers until the user
-  // reloads the page (DESKTOP §4.4). The channel name is randomised
-  // so React Strict Mode's double-invoke never collides with itself,
-  // matching the mobile pattern in useTransactions.
-  useEffect(() => {
-    let cancelled = false
-    let cleanup: (() => void) | undefined
-
-    async function subscribe() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (cancelled || !user) return
-
-      const channelName = `web:budgets:${user.id}:${Math.random().toString(36).slice(2)}`
-      const channel = supabase
-        .channel(channelName)
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'transactions',
-            filter: `user_id=eq.${user.id}`,
-          },
-          () => { void load() },
-        )
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'budgets',
-            filter: `user_id=eq.${user.id}`,
-          },
-          () => { void load() },
-        )
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'recurring_rules',
-            filter: `user_id=eq.${user.id}`,
-          },
-          () => { void load() },
-        )
-        .subscribe()
-
-      cleanup = () => {
-        channel.unsubscribe()
-        supabase.removeChannel(channel)
-      }
-    }
-
-    void subscribe()
-    return () => {
-      cancelled = true
-      cleanup?.()
-    }
-  }, [])
+  // Realtime — one shared hook per table, not a hand-rolled multi-table
+  // effect (fix-plan 4.6). Without this, an expense logged on mobile
+  // leaves the desktop Budgets ring stuck on stale numbers until the user
+  // reloads the page (DESKTOP §4.4). All three stay unsubscribed until
+  // `load()` above resolves `userId`.
+  const realtimeFilter = userId ? `user_id=eq.${userId}` : null
+  useRealtime('transactions', realtimeFilter, load)
+  useRealtime('budgets', realtimeFilter, load)
+  useRealtime('recurring_rules', realtimeFilter, load)
 
   async function handleSave() {
     const parsed = parseFloat(amount.replace(',', '.'))
@@ -231,6 +182,10 @@ export default function BudgetsPage() {
   }
 
   async function handleRemove(id: string) {
+    // Matches the transaction-delete confirm (transactions/page.tsx) —
+    // this used to deactivate immediately on click, no confirmation and
+    // no undo (audit 08-F49).
+    if (!window.confirm('Remove this budget?')) return
     await supabase.from('budgets').update({ is_active: false }).eq('id', id)
     await load()
   }
@@ -294,6 +249,10 @@ export default function BudgetsPage() {
       .filter((b) => b.category_id !== null)
       .map((b) => {
         const cName = b.category_id ? catMap[b.category_id]?.name ?? '—' : '—'
+        // categories.color, not a name-regex guess (fix-plan 4.4) — this
+        // is the same hex the category's own row/chip renders elsewhere,
+        // so the budget bar can never disagree with it.
+        const cColor = b.category_id ? catMap[b.category_id]?.color ?? null : null
         const status = budgetStatus(
           {
             period: b.period,
@@ -308,7 +267,7 @@ export default function BudgetsPage() {
         )
         const spent = status.spent + status.committed
         const pct = spent / b.amount
-        return { id: b.id, name: cName, period: b.period, cap: b.amount, spent, pct }
+        return { id: b.id, name: cName, color: cColor, period: b.period, cap: b.amount, spent, pct }
       })
       .sort((a, b) => b.pct - a.pct)
   }, [budgets, txnsForStatus, recurringRules, tz, catMap])
@@ -541,10 +500,15 @@ export default function BudgetsPage() {
               </div>
             ) : (
               perCat.map((b, i) => {
-                const tint = tintFor(b.name)
                 const over = b.pct > 1
                 const near = b.pct > 0.9 && !over
-                const barColor = over ? '#A94646' : near ? colors.warn : cat[tint as CategoryTint].fg
+                const barColor = over
+                  ? '#A94646'
+                  : near
+                    ? colors.warn
+                    : b.color
+                      ? categoryPalette(b.color).fg
+                      : colors.ink3
                 return (
                   <div
                     key={b.id}
@@ -555,7 +519,7 @@ export default function BudgetsPage() {
                   >
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <Chip label={b.name} categoryName={b.name} />
+                        <Chip label={b.name} categoryColor={b.color} />
                         <span style={{ fontSize: 11, color: colors.ink3, textTransform: 'capitalize' }}>{b.period}</span>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>

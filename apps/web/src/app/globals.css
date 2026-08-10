@@ -3,7 +3,9 @@
 html { font-size: 15px; }
 
 body {
-  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  /* Self-hosted via next/font (fix-plan 4.5) — see layout.tsx's doc
+     comment for why this is a CSS var, not the literal font name. */
+  font-family: var(--font-plus-jakarta-sans), -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   background-color: #F4F1EA; /* bgDesk — recessed desktop canvas per DESIGN.md §3 */
   color: #1B1915;
   -webkit-font-smoothing: antialiased;

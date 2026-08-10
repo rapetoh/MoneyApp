@@ -389,8 +389,12 @@ export default function ExportPage() {
 
       <div style={styles.content}>
         <div>
+          {/* "Export transactions", not "Export your data" — the latter
+              read as a synonym for the Settings → Privacy card's separate,
+              free "Export all my data" GDPR backup, which this isn't
+              (audit 08-F44, fix-plan 4.2). */}
           <div style={{ fontFamily: font.serif, fontSize: 28, fontWeight: 500, color: colors.ink, letterSpacing: -0.6 }}>
-            Export your data
+            Export transactions
           </div>
           <div style={{ fontSize: 13, color: colors.ink3, marginTop: 2 }}>
             Choose a date range and a format. Files stay local — Murmur never uploads exports.

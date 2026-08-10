@@ -49,7 +49,19 @@ export type LensCategory = {
   id: string
   name: string
   kind: CategoryKind
+  /** `categories.color` — the single source of truth for this
+   *  category's color (fix-plan 4.4). `null` for the handful of
+   *  pre-4.4 rows a migration hasn't backfilled; lenses fall back to
+   *  `NEUTRAL_CATEGORY_COLOR` for those and for "Uncategorized". */
+  color: string | null
 }
+
+/** Fallback hex for a chart mark with no real category to key off
+ *  ("Uncategorized", or a category row with a null `color`) — run
+ *  through `categoryPalette` like any other category color so it stays
+ *  visually consistent with the rest of the palette rather than being a
+ *  one-off gray. */
+export const NEUTRAL_CATEGORY_COLOR = '#9C9589'
 
 /** Fix-plan 2.1: before `direction`/`currency_code`/`interval` were
  *  carried here, MindMap's "Recurring outflow" summed every active
@@ -155,9 +167,21 @@ export function isLensKey(v: unknown): v is LensKey {
   return typeof v === 'string' && (LENS_KEYS as string[]).includes(v)
 }
 
-/** Map of category id -> name, used by lenses that need to resolve names. */
-export function buildCategoryMap(cats: LensCategory[]): Record<string, string> {
-  return Object.fromEntries(cats.map((c) => [c.id, c.name]))
+/** Map of category id -> `categories.color`, for a lens that still has
+ *  the `category_id` on hand (e.g. Calendar's day-panel rows, off
+ *  `LensTxn`). Prefer this over `buildCategoryColorByName` below
+ *  whenever an id is available — fix-plan 4.4. */
+export function buildCategoryColorMap(cats: LensCategory[]): Record<string, string | null> {
+  return Object.fromEntries(cats.map((c) => [c.id, c.color]))
+}
+
+/** Map of category name -> `categories.color`, for a lens whose
+ *  aggregation already discarded the id (`groupByCategory` above buckets
+ *  by name, "Uncategorized" included) — category names are unique per
+ *  user (`name_normalized` UNIQUE, fix-plan 2.9(d)), so this is exact,
+ *  not a guess. */
+export function buildCategoryColorByName(cats: LensCategory[]): Record<string, string | null> {
+  return Object.fromEntries(cats.map((c) => [c.name, c.color]))
 }
 
 /** True when `instant` falls in the anchor month's half-open window —

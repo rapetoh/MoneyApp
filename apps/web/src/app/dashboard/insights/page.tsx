@@ -1,8 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '../../../lib/supabase/server'
 import { getProfile, getTransactions, getCategories, getActiveBudgets } from '../../../lib/data'
-import { colors, font, radius, cat, type CategoryTint } from '../../../lib/theme'
-import { tintFor } from '../../../lib/categories'
+import { colors, font, radius } from '../../../lib/theme'
 import { Toolbar } from '../../../components/Toolbar'
 import { Card } from '../../../components/Card'
 import { Money } from '../../../components/Money'
@@ -20,6 +19,7 @@ import {
   topMerchants,
   isSpend,
   resolveCategoryKind,
+  merchantColor,
   type CategoryKind,
   type ForecastRule,
   type ForecastTxn,
@@ -403,8 +403,11 @@ export default async function InsightsPage() {
 
       <div style={styles.content}>
         <div>
+          {/* Matches the sidebar label, the toolbar title above, and the
+              mobile tab — was "Forecast & patterns", a third variant of
+              this destination's name (audit 08-F44, fix-plan 4.2). */}
           <div style={{ fontFamily: font.serif, fontSize: 28, fontWeight: 500, color: colors.ink, letterSpacing: -0.6 }}>
-            Forecast & patterns
+            Insights
           </div>
           <div style={{ fontSize: 13, color: colors.ink3, marginTop: 2 }}>
             Based on {sixMonthCount} transaction{sixMonthCount === 1 ? '' : 's'} across the last 6
@@ -528,7 +531,12 @@ export default async function InsightsPage() {
                 <div style={{ fontSize: 12, color: colors.ink3 }}>Not enough data yet.</div>
               ) : (
                 merchantRows.map((r, i) => {
-                  const fg = cat[tintFor(r.merchant) as CategoryTint].fg
+                  // A merchant name, not a category — `merchantColor`
+                  // (the same deterministic hash `MerchantLogo`'s
+                  // fallback tile uses), not a category-name regex guess
+                  // that could coincidentally match an unrelated
+                  // category bucket (fix-plan 4.4).
+                  const fg = merchantColor(r.merchant)
                   return (
                     <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12 }}>
                       <div

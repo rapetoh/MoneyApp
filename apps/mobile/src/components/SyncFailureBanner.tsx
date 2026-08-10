@@ -16,8 +16,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors, Typography, Spacing, Radius } from '../theme'
 import { syncManager } from '../services/sync/SyncManager'
 import { getDeadLetterEntries, clearDeadLetterEntry, retryDeadLetterEntry, type QueueEntry } from '../services/sync/syncQueue'
+import { t, type Locale } from '@voice-expense/shared'
 
-export function SyncFailureBanner() {
+export function SyncFailureBanner({ locale = 'en' }: { locale?: Locale }) {
   const insets = useSafeAreaInsets()
   const [deadCount, setDeadCount] = useState(0)
   const [expanded, setExpanded] = useState(false)
@@ -61,18 +62,24 @@ export function SyncFailureBanner() {
     await refreshEntries()
   }
 
+  // Same "N item(s) couldn't sync" phrasing used for both the visible pill
+  // and its accessibility label — one string, not two independently
+  // maintained tenses of the same fact (audit 01-F29/08-F48, fix-plan 4.2).
+  const itemWord = t(deadCount === 1 ? 'settings.sync_item_singular' : 'settings.sync_item_plural', locale)
+  const failureMessage = `${deadCount} ${itemWord}`
+
   return (
     <View style={[styles.container, { top: insets.top }]} pointerEvents="box-none">
       <Pressable
         style={styles.pill}
         onPress={() => setExpanded((v) => !v)}
         accessibilityRole="button"
-        accessibilityLabel={`${deadCount} ${deadCount === 1 ? 'item' : 'items'} failed to sync`}
+        accessibilityLabel={failureMessage}
       >
-        <Text style={styles.message}>
-          {deadCount === 1 ? "1 item couldn't sync" : `${deadCount} items couldn't sync`}
+        <Text style={styles.message}>{failureMessage}</Text>
+        <Text style={styles.chevron}>
+          {expanded ? t('settings.sync_hide', locale) : t('settings.sync_details', locale)}
         </Text>
-        <Text style={styles.chevron}>{expanded ? 'Hide' : 'Details'}</Text>
       </Pressable>
 
       {expanded && (
@@ -85,21 +92,21 @@ export function SyncFailureBanner() {
                     {entry.operation} · {entry.entity_type}
                   </Text>
                   <Text style={styles.rowError} numberOfLines={2}>
-                    {entry.last_error ?? 'Unknown error'}
+                    {entry.last_error ?? t('settings.sync_unknown_error', locale)}
                   </Text>
                 </View>
                 <Pressable onPress={() => handleRetry(entry.id)} hitSlop={8} style={styles.action}>
-                  <Text style={styles.actionText}>Retry</Text>
+                  <Text style={styles.actionText}>{t('common.retry', locale)}</Text>
                 </Pressable>
                 <Pressable onPress={() => handleDiscard(entry.id)} hitSlop={8} style={styles.action}>
-                  <Text style={styles.discardText}>Discard</Text>
+                  <Text style={styles.discardText}>{t('settings.sync_discard', locale)}</Text>
                 </Pressable>
               </View>
             ))}
           </ScrollView>
           {entries.length > 1 && (
             <Pressable onPress={handleRetryAll} style={styles.retryAll}>
-              <Text style={styles.retryAllText}>Retry all</Text>
+              <Text style={styles.retryAllText}>{t('settings.sync_retry_all', locale)}</Text>
             </Pressable>
           )}
         </View>

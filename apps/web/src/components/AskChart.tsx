@@ -3,27 +3,24 @@
 // stories the reasoner actually tells over a transaction history. Pure SVG;
 // no recharts dependency to keep the bundle clean.
 import type { AskMurmurChart } from '@voice-expense/shared'
-import { cat as catTints, colors, font } from '../lib/theme'
-import { tintFor } from '../lib/categories'
+import { categoryPalette } from '@voice-expense/shared'
+import { colors, font } from '../lib/theme'
 
-const PALETTE: string[] = [
-  catTints.food.fg,
-  catTints.transit.fg,
-  catTints.shopping.fg,
-  catTints.bills.fg,
-  catTints.coffee.fg,
-  catTints.health.fg,
-  catTints.work.fg,
-  catTints.other.fg,
-]
+// Ask Murmur's chart payload is AI-authored — `data[].label` can be a
+// category name, a merchant, a month, or anything else the reasoner
+// decided to group by, with no `category_id` attached. There's no real
+// category to look up here, so (fix-plan 4.4) this no longer runs the
+// label through the name-regex `tintFor` heuristic the rest of the app
+// deleted — a label that happened to contain "health" would silently
+// render the Health category's color regardless of whether the chart
+// had anything to do with categories at all. Every slice/bar instead
+// cycles through a fixed, hue-spread rotation, each stop derived via
+// `categoryPalette` so it clears the same 4.5:1 contrast floor.
+const PALETTE_SEED_HUES = ['#E85D04', '#2D6A4F', '#457B9D', '#9B59B6', '#C77A2E', '#2A9D8F', '#8E424C', '#5A5F34']
+const PALETTE: string[] = PALETTE_SEED_HUES.map((hex) => categoryPalette(hex).fg)
 
-function colorFor(label: string, fallbackIdx: number): string {
-  // Prefer a category-aware tint when the label looks like one of our category
-  // names; else cycle through the palette so neighboring slices/bars don't
-  // collide.
-  const tint = tintFor(label)
-  if (tint !== 'other') return catTints[tint].fg
-  return PALETTE[fallbackIdx % PALETTE.length]
+function colorFor(_label: string, idx: number): string {
+  return PALETTE[idx % PALETTE.length]
 }
 
 export function AskChart({

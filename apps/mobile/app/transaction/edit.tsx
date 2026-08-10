@@ -24,7 +24,7 @@ import { RecurringToggle } from '../../src/components/RecurringToggle'
 import { NumericAccessory, NUMERIC_ACCESSORY_ID } from '../../src/components/NumericAccessory'
 import { useKeyboardLift } from '../../src/hooks/useKeyboardLift'
 import { Colors, Typography, Spacing, Radius } from '../../src/theme'
-import { t, currencySymbolFor, validateAmount } from '@voice-expense/shared'
+import { t, currencySymbolFor, validateAmount, findRuleForTransaction } from '@voice-expense/shared'
 import type { Transaction, TransactionDirection, PaymentMethod, Locale, RecurringFrequency } from '@voice-expense/shared'
 
 const PAYMENT_METHODS: { value: PaymentMethod; key: string }[] = [
@@ -91,15 +91,16 @@ export default function EditTransactionScreen() {
         setPaymentMethod(data.payment_method)
         setIsRecurring(data.is_recurring ?? false)
         // The row's own recurring_frequency is the durable, offline-safe
-        // record of the user's choice (migration 013); the linked rule is
-        // the fallback for legacy rows saved before the column existed.
-        const linkedRule = rules.find((r) => r.template_txn_id === data.id)
+        // record of the user's choice (migration 013); the linked rule
+        // (fix-plan 3.3's shared `findRuleForTransaction` — recurring_
+        // rule_id first, template_txn_id fallback) is the fallback for
+        // legacy rows saved before the column existed.
+        const linkedRule = findRuleForTransaction(data, rules)
         setFrequency(data.recurring_frequency ?? linkedRule?.frequency ?? 'monthly')
       }
       setLoading(false)
     })
     // rules intentionally not in deps: we only want the initial value.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
 
   async function handleSave() {
@@ -122,15 +123,13 @@ export default function EditTransactionScreen() {
     const parsedAmount = validation.amount
     if (!txn) return
 
-    // Look up the linked rule. Template txns (the original "this is
-    // recurring" entry) are found via `template_txn_id`. Server-cron-
-    // or catch-up-generated occurrences carry the rule's id on the
-    // row itself via `recurring_rule_id` — those won't match the
-    // template lookup, which is the LOGIC §3.3 bug. Try both.
-    const linkedRule =
-      (txn.recurring_rule_id
-        ? rules.find((r) => r.id === txn.recurring_rule_id)
-        : null) ?? rules.find((r) => r.template_txn_id === txn.id) ?? null
+    // Look up the linked rule via the one shared resolver (fix-plan
+    // 3.3's `findRuleForTransaction`, deleting the two-direction lookup
+    // this file's own comment used to call "the LOGIC §3.3 bug" —
+    // `recurring_rule_id` first (server-cron/catch-up-generated
+    // occurrences carry it directly), `template_txn_id` as the fallback
+    // for the original "this is recurring" entry.
+    const linkedRule = findRuleForTransaction(txn, rules)
 
     // For a generated occurrence with a linked rule, the user's
     // intent when editing is ambiguous: "fix only this occurrence"

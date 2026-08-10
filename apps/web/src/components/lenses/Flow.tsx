@@ -1,17 +1,18 @@
-import { colors, font, cat as catTokens, type CategoryTint } from '../../lib/theme'
-import { tintFor } from '../../lib/categories'
-import { type LensProps, monthDebits, monthCredits, groupByCategory } from './types'
-import { aggAmount } from '@voice-expense/shared'
+import { colors, font } from '../../lib/theme'
+import {
+  type LensProps,
+  monthDebits,
+  monthCredits,
+  groupByCategory,
+  buildCategoryColorByName,
+  NEUTRAL_CATEGORY_COLOR,
+} from './types'
+import { aggAmount, categoryPalette } from '@voice-expense/shared'
 
 // Sankey-style flow: income (left) -> categories (middle) -> top merchants
 // (right). Width of each ribbon is proportional to amount. We compute the
 // flows from real data; if a column is empty, that side renders blank but
 // the chart still tells a story.
-
-function tintFG(name: string): string {
-  const k = tintFor(name) as CategoryTint
-  return catTokens[k].fg
-}
 
 function fmt(value: number, currency: string, locale: string): string {
   return new Intl.NumberFormat(locale, {
@@ -78,6 +79,8 @@ export function FlowLens({ props }: { props: LensProps }) {
   const credits = monthCredits(props)
   const debits = monthDebits(props)
   const incomeTotal = credits.reduce((s, t) => s + aggAmount(t), 0)
+  const colorByName = buildCategoryColorByName(props.categories)
+  const tintFG = (name: string) => categoryPalette(colorByName[name] || NEUTRAL_CATEGORY_COLOR).fg
 
   // Income column — group by category name. If income has no category
   // ("salary deposits" not categorized), they all roll into "Income".
@@ -153,7 +156,7 @@ export function FlowLens({ props }: { props: LensProps }) {
             Income
           </span>
           <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-            <span style={{ width: 10, height: 10, borderRadius: 3, background: catTokens.bills.fg }} />
+            <span style={{ width: 10, height: 10, borderRadius: 3, background: colors.expense }} />
             Spent
           </span>
         </div>

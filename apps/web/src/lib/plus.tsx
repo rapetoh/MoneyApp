@@ -5,14 +5,12 @@ import { createContext, useContext, type ReactNode } from 'react'
 /**
  * Web mirror of apps/mobile/src/hooks/usePlusStatus.ts.
  *
- * Same gating contract as mobile: in development, every user is treated
- * as Plus so the developer can exercise the gated surface (Insights,
- * Recurring detection, Ask Murmur, Export) without RC sandbox setup.
- * In production, `isPlus` flips off until IAP / RevenueCat receipts
- * populate `profile.plus_status` — except when the runtime override
- * `MURMUR_DEV_PLUS=1` (server-side) is set on the user's machine, which
- * is how the packaged dev build still gets to test Plus surfaces before
- * IAP wiring lands.
+ * Same gating contract as mobile: exactly one source, `profile.plus_status
+ * === 'active'` — resolved server-side by `resolvePlusStatus`
+ * (`plus.server.ts`). No dev-mode or env-var hatch exists on either
+ * platform (audit fix-plan 0.4 + 3.1 deleted both `MURMUR_DEV_PLUS` and
+ * mobile's `__DEV__` override) — entitlement reads the same column for
+ * every build.
  *
  * The server resolves the boolean once per request in
  * dashboard/layout.tsx and ships it through PlusProvider so the entire

@@ -162,6 +162,7 @@ export type Database = {
           client_id: string
           created_at: string
           currency_code: string
+          deleted_at: string | null
           id: string
           is_active: boolean
           is_deleted: boolean
@@ -178,6 +179,7 @@ export type Database = {
           client_id: string
           created_at?: string
           currency_code?: string
+          deleted_at?: string | null
           id?: string
           is_active?: boolean
           is_deleted?: boolean
@@ -194,6 +196,7 @@ export type Database = {
           client_id?: string
           created_at?: string
           currency_code?: string
+          deleted_at?: string | null
           id?: string
           is_active?: boolean
           is_deleted?: boolean
@@ -219,6 +222,7 @@ export type Database = {
           client_id: string
           color: string | null
           created_at: string
+          deleted_at: string | null
           icon: string | null
           id: string
           is_archived: boolean
@@ -236,6 +240,7 @@ export type Database = {
           client_id: string
           color?: string | null
           created_at?: string
+          deleted_at?: string | null
           icon?: string | null
           id?: string
           is_archived?: boolean
@@ -253,6 +258,7 @@ export type Database = {
           client_id?: string
           color?: string | null
           created_at?: string
+          deleted_at?: string | null
           icon?: string | null
           id?: string
           is_archived?: boolean
@@ -395,6 +401,7 @@ export type Database = {
           client_id: string
           created_at: string
           currency_code: string
+          deleted_at: string | null
           direction: string
           ends_at: string | null
           frequency: string
@@ -425,6 +432,7 @@ export type Database = {
           client_id: string
           created_at?: string
           currency_code?: string
+          deleted_at?: string | null
           direction?: string
           ends_at?: string | null
           frequency: string
@@ -455,6 +463,7 @@ export type Database = {
           client_id?: string
           created_at?: string
           currency_code?: string
+          deleted_at?: string | null
           direction?: string
           ends_at?: string | null
           frequency?: string

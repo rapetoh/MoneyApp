@@ -8,8 +8,10 @@ interface Props {
   onUndo: () => void
   /** Called when the 4-second window elapses with no tap. */
   onDismiss: () => void
-  /** Button text (defaults to "Undo" — the calling site passes a localized string). */
-  undoLabel?: string
+  /** Button text. Required, not defaulted — a hardcoded English fallback
+   *  here would be an untranslated literal waiting for a caller to forget
+   *  it (audit 01-F29); every caller passes `t('common.undo', locale)`. */
+  undoLabel: string
   /** Milliseconds until auto-dismiss. DESIGN.md §3 Motion specifies 4s. */
   durationMs?: number
 }
@@ -23,7 +25,7 @@ export function UndoSnackbar({
   message,
   onUndo,
   onDismiss,
-  undoLabel = 'Undo',
+  undoLabel,
   durationMs = 4000,
 }: Props) {
   const progress = useRef(new Animated.Value(0)).current

@@ -12,8 +12,6 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@google/genai": "^1.49.0",
-    "@google/generative-ai": "^0.24.0",
     "@supabase/ssr": "^0.10.2",
     "@supabase/supabase-js": "^2.102.1",
     "@voice-expense/ai": "*",
@@ -24,7 +22,7 @@
     "openai": "^6.34.0",
     "react": "19.1.0",
     "react-dom": "19.1.0",
-    "recharts": "^3.8.1"
+    "server-only": "^0.0.1"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

@@ -8,7 +8,20 @@ import { Icon } from '../../../components/Icons'
 import { ErrorState } from '../../../components/ErrorState'
 import { usePlus } from '../../../lib/plus'
 import { changeCurrency } from '../../../lib/changeCurrency'
+import { formatRelativeSync } from '../../../lib/relativeTime'
 import { SUPPORT_EMAIL, SUPPORT_MAILTO } from '@voice-expense/shared'
+
+/** `devices.platform` -> a human label (fix-plan 3.7's real device rows). */
+function platformLabel(platform: string): string {
+  switch (platform) {
+    case 'ios': return 'iPhone'
+    case 'android': return 'Android'
+    case 'web': return 'Web'
+    case 'desktop_mac': return 'Mac'
+    case 'desktop_win': return 'Windows'
+    default: return platform
+  }
+}
 
 const CURRENCIES = ['USD', 'EUR', 'GBP', 'CAD', 'CHF', 'JPY', 'AUD', 'XAF', 'NGN', 'GHS']
 const LOCALES = [
@@ -46,7 +59,17 @@ export default function SettingsPage() {
     locale?: string
     monthly_income?: number | null
     timezone?: string | null
+    voice_language?: string | null
   } | null>(null)
+  // Fix-plan 3.7: real rows from `devices` (populated by mobile's
+  // `deviceRegistry.ts`) instead of one hardcoded "This device · Synced
+  // just now · web companion" row — web itself never registers a device
+  // (it has no offline outbox to report sync state for), so this list is
+  // "devices this account has signed into", which for most users today
+  // means their phone.
+  const [devices, setDevices] = useState<
+    Array<{ id: string; platform: string; device_name: string | null; last_synced_at: string | null }>
+  >([])
   const [email, setEmail] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   // Read-error state (fix-plan 2.13 / audit 08-F21 family). This page had
@@ -87,13 +110,51 @@ export default function SettingsPage() {
   // string saves null so the user can clear their income.
   const [monthlyIncomeInput, setMonthlyIncomeInput] = useState('')
 
-  // Privacy preferences — backed by `profiles.analytics_opt_in` +
-  // `profiles.crash_reports_opt_in` (migration 010). Defaults mirror the
-  // column defaults (analytics off, crash reports on). `saving*` keeps
-  // the toggle from echoing optimistic state if a write fails.
-  const [analyticsOn, setAnalyticsOn] = useState(false)
-  const [crashReportingOn, setCrashReportingOn] = useState(true)
   const [deleting, setDeleting] = useState(false)
+
+  // Unsaved-changes guard for the Account form (audit 08-F49) — this used
+  // to have none at all; navigating away silently discarded edits. Baseline
+  // is the last value the form was loaded or saved *to*, not `profile`
+  // itself, so a mid-edit save immediately clears the dirty flag rather
+  // than waiting on a re-fetch.
+  const savedFormRef = useRef({ displayName: '', locale: 'en', monthlyIncomeInput: '' })
+  const isAccountFormDirty =
+    displayName !== savedFormRef.current.displayName ||
+    locale !== savedFormRef.current.locale ||
+    monthlyIncomeInput !== savedFormRef.current.monthlyIncomeInput
+
+  useEffect(() => {
+    if (!isAccountFormDirty) return
+    function handleBeforeUnload(e: BeforeUnloadEvent) {
+      e.preventDefault()
+      e.returnValue = ''
+    }
+    // In-app navigation (Sidebar/Toolbar links) doesn't trigger
+    // `beforeunload` under the App Router's client-side routing — a
+    // capturing click listener on any same-origin `<a>` is the
+    // route-change half of the guard.
+    function handleClickCapture(e: MouseEvent) {
+      const anchor = (e.target as HTMLElement | null)?.closest('a[href]') as HTMLAnchorElement | null
+      if (!anchor) return
+      let url: URL
+      try {
+        url = new URL(anchor.href, window.location.origin)
+      } catch {
+        return
+      }
+      if (url.origin !== window.location.origin || url.pathname === window.location.pathname) return
+      if (!window.confirm('You have unsaved changes. Leave without saving?')) {
+        e.preventDefault()
+        e.stopImmediatePropagation()
+      }
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    document.addEventListener('click', handleClickCapture, true)
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+      document.removeEventListener('click', handleClickCapture, true)
+    }
+  }, [isAccountFormDirty])
 
   const sectionRefs = useRef<Record<SectionKey, HTMLDivElement | null>>({
     account: null,
@@ -111,31 +172,38 @@ export default function SettingsPage() {
     } = await supabase.auth.getUser()
     if (!user) return
     setEmail(user.email ?? null)
-    const [{ data, error }, countResult] = await Promise.all([
+    const [{ data, error }, countResult, deviceResult] = await Promise.all([
       supabase.from('profiles').select('*').eq('id', user.id).single(),
       supabase
         .from('transactions')
         .select('id', { count: 'exact', head: true })
         .eq('user_id', user.id)
         .eq('is_deleted', false),
+      supabase
+        .from('devices')
+        .select('id, platform, device_name, last_synced_at')
+        .eq('user_id', user.id)
+        .order('last_synced_at', { ascending: false, nullsFirst: false }),
     ])
     setTxnCount(countResult.count ?? 0)
+    setDevices(deviceResult.data ?? [])
     if (error) {
       setLoadError(error.message)
     } else if (data) {
       setLoadError(null)
       setProfile(data)
-      setDisplayName(data.display_name ?? '')
+      const loadedDisplayName = data.display_name ?? ''
+      const loadedLocale = data.locale ?? 'en'
+      const loadedMonthlyIncomeInput = data.monthly_income != null ? String(data.monthly_income) : ''
+      setDisplayName(loadedDisplayName)
       setCurrency(data.currency_code ?? 'USD')
-      setLocale(data.locale ?? 'en')
-      setMonthlyIncomeInput(
-        data.monthly_income != null ? String(data.monthly_income) : '',
-      )
-      // Match migration 010's defaults if the column is missing in
-      // an older deployment (e.g. local Supabase that hasn't applied
-      // the migration yet) — analytics off, crash reports on.
-      setAnalyticsOn(data.analytics_opt_in ?? false)
-      setCrashReportingOn(data.crash_reports_opt_in ?? true)
+      setLocale(loadedLocale)
+      setMonthlyIncomeInput(loadedMonthlyIncomeInput)
+      savedFormRef.current = {
+        displayName: loadedDisplayName,
+        locale: loadedLocale,
+        monthlyIncomeInput: loadedMonthlyIncomeInput,
+      }
     }
     setLoading(false)
   }, [])
@@ -143,35 +211,6 @@ export default function SettingsPage() {
   useEffect(() => {
     load()
   }, [load])
-
-  // Persist the privacy toggles optimistically, then write to Supabase.
-  // On failure we revert the local state so the UI doesn't lie about
-  // what's persisted.
-  async function persistPrivacyFlag(
-    column: 'analytics_opt_in' | 'crash_reports_opt_in',
-    next: boolean,
-  ) {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (!user) return
-    // TS widens an object literal keyed by a union-typed variable to a
-    // generic `{ [x: string]: boolean }` index signature, which the
-    // strictly-typed client's exact-object `update()` then rejects (it
-    // can't confirm no other key sneaks in). The cast tells it what's
-    // already true: `column` is one of exactly the two known literals.
-    const { error } = await supabase
-      .from('profiles')
-      .update({ [column]: next } as Record<'analytics_opt_in' | 'crash_reports_opt_in', boolean>)
-      .eq('id', user.id)
-    if (error) {
-      // Roll back the optimistic flip — the toggle should reflect the
-      // database, not the user's most-recent click.
-      if (column === 'analytics_opt_in') setAnalyticsOn(!next)
-      else setCrashReportingOn(!next)
-      console.error('[settings] privacy flag write failed', error)
-    }
-  }
 
   // GDPR right to erasure. Calls the server-side `delete-user` Edge
   // Function (only path that can also remove the auth.users row), then
@@ -316,6 +355,9 @@ export default function SettingsPage() {
       setSaveError(error.message)
       return
     }
+    // Clears the unsaved-changes guard — these values are now what's
+    // actually persisted, not just what's on screen.
+    savedFormRef.current = { displayName, locale, monthlyIncomeInput }
     setSuccess(true)
     setTimeout(() => setSuccess(false), 3000)
   }
@@ -492,15 +534,24 @@ export default function SettingsPage() {
                       <div style={styles.currencyStatusError}>{currencyError}</div>
                     )}
                   </div>
+                  {/* Fix-plan 3.6 / audit 07-F17: `packages/shared/src/i18n`
+                      ships four complete locales, but no web page imports
+                      `t()` — this picker used to change `profiles.locale`
+                      while every string on every dashboard page stayed
+                      English regardless. A picker that only half-works is
+                      worse than an honest read-only row: translating the
+                      web dashboard is real, tracked follow-up work, not
+                      done here. `locale` still drives this page's own
+                      `Intl` number/date formatting and stays whatever the
+                      mobile app (which *is* fully translated) last set. */}
                   <div style={{ ...styles.field, flex: 1 }}>
                     <label style={styles.label}>Language</label>
-                    <select value={locale} onChange={(e) => setLocale(e.target.value)} style={styles.select}>
-                      {LOCALES.map((l) => (
-                        <option key={l.value} value={l.value}>
-                          {l.label}
-                        </option>
-                      ))}
-                    </select>
+                    <div style={styles.readOnlyValue}>
+                      {LOCALES.find((l) => l.value === locale)?.label ?? locale}
+                    </div>
+                    <div style={{ fontSize: 11, color: colors.ink3, marginTop: 4 }}>
+                      The web dashboard is English-only for now. Change your language from the mobile app.
+                    </div>
                   </div>
                 </div>
                 {/* Monthly income — fed to Ask Murmur for affordability
@@ -536,11 +587,35 @@ export default function SettingsPage() {
               title="Sync & devices"
               refCb={(el) => (sectionRefs.current.sync = el)}
             >
-              <SettingRow
-                label="This device"
-                sub="Synced just now · web companion"
-                right={<Tag color={colors.accent} bg={colors.accentSoft}>THIS DEVICE</Tag>}
-              />
+              {/* Fix-plan 3.7: real `devices` rows, populated by mobile's
+                  `deviceRegistry.ts` on sign-in and stamped with
+                  `last_synced_at` on every successful drain — replacing the
+                  single hardcoded "This device · Synced just now · web
+                  companion" row that rendered unconditionally, including
+                  offline and including on an account that had never opened
+                  the mobile app at all. Web/desktop don't register a device
+                  of their own (no offline outbox to report sync state
+                  for), so an empty list here is itself true information —
+                  a fabricated row would be worse than none. */}
+              {devices.length === 0 ? (
+                <SettingRow
+                  label="No devices synced yet"
+                  sub="Sign in on the mobile app to see it here."
+                />
+              ) : (
+                devices.map((d) => (
+                  <SettingRow
+                    key={d.id}
+                    label={d.device_name || platformLabel(d.platform)}
+                    sub={formatRelativeSync(d.last_synced_at)}
+                    right={
+                      <Tag color={colors.accent} bg={colors.accentSoft}>
+                        {platformLabel(d.platform).toUpperCase()}
+                      </Tag>
+                    }
+                  />
+                ))
+              )}
               {/* Read-only — fix-plan 1.3 part 1. Captured automatically
                   from the browser (see TimezoneSync in dashboard/layout.tsx)
                   whenever it drifts from what's stored; there is nothing
@@ -567,30 +642,31 @@ export default function SettingsPage() {
               </div>
             </SettingsCard>
 
+            {/* Fix-plan 3.1: this card used to show "Murmur Plus · Yearly /
+                Renews on your billing date · cancel anytime" next to a
+                "Manage" span with no `onClick` — a fabricated subscription
+                (there is no billing provider wired up; `plus_status` is a
+                manual grant) next to a control that couldn't act. There's
+                no purchase flow yet on any platform, so this card states
+                the account's real, current status and nothing it can't
+                back up. */}
             <SettingsCard
               title="Plan & billing"
               refCb={(el) => (sectionRefs.current.plan = el)}
               right={
                 isPlus ? (
-                  <Tag color={colors.accent} bg={colors.accentSoft}>ACTIVE</Tag>
+                  <Tag color={colors.accent} bg={colors.accentSoft}>PLUS</Tag>
                 ) : (
                   <Tag color="#7A4A22" bg="#F2E5D5">FREE</Tag>
                 )
               }
             >
               <SettingRow
-                label={isPlus ? 'Murmur Plus · Yearly' : 'Mobile app'}
+                label={isPlus ? 'Murmur Plus' : 'Free plan'}
                 sub={
                   isPlus
-                    ? 'Renews on your billing date · cancel anytime'
-                    : 'Free forever · no trial, no upsells'
-                }
-                right={
-                  isPlus ? (
-                    <span style={styles.linkBtn}>Manage</span>
-                  ) : (
-                    <span style={{ fontSize: 12, color: colors.ink3, fontWeight: 600 }}>Always</span>
-                  )
+                    ? 'Granted for early access — no billing, nothing to cancel'
+                    : 'Purchases are not live yet'
                 }
               />
               {!isPlus && (
@@ -606,7 +682,7 @@ export default function SettingsPage() {
                     fontFamily: font.sans,
                   }}
                 >
-                  Murmur Plus unlocks Ask Murmur, recurring detection, and full export.
+                  Ask Murmur, recurring detection and full export are part of Murmur Plus. Plus is in preview — there's nothing to buy here yet.
                 </div>
               )}
             </SettingsCard>
@@ -614,28 +690,17 @@ export default function SettingsPage() {
             <SettingsCard
               title="Privacy"
               refCb={(el) => (sectionRefs.current.privacy = el)}
-              right={<Tag color={colors.accent} bg={colors.accentSoft}>ON-DEVICE</Tag>}
             >
-              <SettingToggle
-                label="Anonymous usage analytics"
-                sub="Help us improve. No transaction data sent."
-                on={analyticsOn}
-                onToggle={() => {
-                  const next = !analyticsOn
-                  setAnalyticsOn(next)
-                  void persistPrivacyFlag('analytics_opt_in', next)
-                }}
-              />
-              <SettingToggle
-                label="Crash reporting"
-                sub="Sends crash logs only — no personal data."
-                on={crashReportingOn}
-                onToggle={() => {
-                  const next = !crashReportingOn
-                  setCrashReportingOn(next)
-                  void persistPrivacyFlag('crash_reports_opt_in', next)
-                }}
-              />
+              {/* Fix-plan 3.5 / audit 06-F39: this used to be a live toggle
+                  writing `profiles.analytics_opt_in` / `crash_reports_opt_in`
+                  while mobile's own Privacy screen told the user analytics
+                  are shared "Never" — and nothing anywhere reads either
+                  column, so the toggle changed a value with no effect. One
+                  product decision (no analytics, no crash reporting
+                  collected today), mirrored on both platforms, instead of a
+                  control that does nothing. */}
+              <SettingRow label="Anonymous usage analytics" sub="Not collected." />
+              <SettingRow label="Crash reporting" sub="Not collected." />
               {/* GDPR-grade controls, mirrored to mobile Privacy.
                   Export-all is free for every user (right to data
                   portability — can't be paywalled). Delete-all calls
@@ -670,15 +735,29 @@ export default function SettingsPage() {
               title="Voice & language"
               refCb={(el) => (sectionRefs.current.voice = el)}
             >
+              {/* Fix-plan 3.5 / audit 02-F4, 02-F16: speech-to-text runs on
+                  the phone (true), but the resulting text is sent to our
+                  server and to OpenAI to extract the amount, merchant and
+                  category — an "ON-DEVICE" tag on this row claimed the
+                  whole pipeline never leaves the device. */}
               <SettingRow
                 label="Voice engine"
-                sub="On-device (mobile)"
-                right={<Tag color={colors.accent} bg={colors.accentSoft}>ON-DEVICE</Tag>}
+                sub="On-device speech-to-text (mobile) · OpenAI for extraction"
               />
+              {/* Fix-plan 3.7: `profiles.voice_language` (e.g. "en-US") is
+                  the column mobile's speech recognizer actually reads —
+                  `locale` (the UI/display-string language, e.g. "en") is a
+                  different setting that happens to default from the same
+                  value. Reading the UI locale here could show "FR" while
+                  the phone still recognizes English speech. */}
               <SettingRow
                 label="Recognition language"
                 sub="Used by the mic in Ask Murmur and the mobile capture flow."
-                right={<span style={{ fontSize: 13, color: colors.ink2, fontWeight: 600 }}>{locale.toUpperCase()}</span>}
+                right={
+                  <span style={{ fontSize: 13, color: colors.ink2, fontWeight: 600 }}>
+                    {(profile?.voice_language ?? locale).toUpperCase()}
+                  </span>
+                }
               />
             </SettingsCard>
 
@@ -686,8 +765,13 @@ export default function SettingsPage() {
               title="Export"
               refCb={(el) => (sectionRefs.current.export = el)}
             >
+              {/* Same label mobile's Settings row uses for this feature
+                  (audit 08-F44) — distinct from the Privacy card's "Export
+                  all my data" above, which is a different, free, complete
+                  JSON backup rather than this formatted CSV/JSON/PDF
+                  transaction report. */}
               <SettingRow
-                label="Export all transactions"
+                label="Export transactions"
                 sub="CSV · JSON · PDF"
                 right={
                   <Link href="/dashboard/export" style={styles.linkBtn}>
@@ -710,18 +794,25 @@ export default function SettingsPage() {
                   </span>
                 }
               />
-              <SettingRow
-                label="Help & contact"
-                sub={SUPPORT_EMAIL}
-                right={
-                  <a
-                    href={SUPPORT_MAILTO}
-                    style={styles.linkBtn}
-                  >
-                    Email
-                  </a>
-                }
-              />
+              {/* Fix-plan 3.6 / audit 08-F33: `support@murmur.app` has no MX
+                  record — every message sent to it bounced. Hidden while
+                  `SUPPORT_EMAIL` is unset (see its doc comment in
+                  packages/shared/src/brand.ts) rather than offering a
+                  channel that silently drops what's sent to it. */}
+              {SUPPORT_EMAIL && SUPPORT_MAILTO && (
+                <SettingRow
+                  label="Help & contact"
+                  sub={SUPPORT_EMAIL}
+                  right={
+                    <a
+                      href={SUPPORT_MAILTO}
+                      style={styles.linkBtn}
+                    >
+                      Email
+                    </a>
+                  }
+                />
+              )}
             </SettingsCard>
           </div>
         </div>
@@ -768,56 +859,6 @@ function SettingRow({
         {sub && <div style={{ fontSize: 12, color: colors.ink3, marginTop: 2, fontFamily: font.sans }}>{sub}</div>}
       </div>
       {right}
-    </div>
-  )
-}
-
-function SettingToggle({
-  label,
-  sub,
-  on,
-  onToggle,
-}: {
-  label: string
-  sub?: string
-  on: boolean
-  onToggle: () => void
-}) {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-      <div style={{ flex: 1 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: colors.ink, fontFamily: font.sans }}>{label}</div>
-        {sub && <div style={{ fontSize: 12, color: colors.ink3, marginTop: 2, fontFamily: font.sans }}>{sub}</div>}
-      </div>
-      <button
-        type="button"
-        onClick={onToggle}
-        style={{
-          width: 38,
-          height: 22,
-          borderRadius: 11,
-          background: on ? colors.accent : '#D8D5CC',
-          border: 'none',
-          position: 'relative',
-          cursor: 'pointer',
-          transition: 'background 120ms',
-        }}
-        aria-pressed={on}
-      >
-        <span
-          style={{
-            position: 'absolute',
-            top: 2,
-            left: on ? 18 : 2,
-            width: 18,
-            height: 18,
-            borderRadius: 9,
-            background: '#fff',
-            boxShadow: '0 1px 2px rgba(0,0,0,0.2)',
-            transition: 'left 120ms',
-          }}
-        />
-      </button>
     </div>
   )
 }
@@ -942,6 +983,18 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 13,
     color: colors.ink,
     outline: 'none',
+    background: colors.surface2,
+  },
+  // A read-only stand-in for `input`/`select` — same box, no interaction
+  // affordance. Used where a field is informational only (fix-plan 3.6's
+  // Language row: real data, not editable from here).
+  readOnlyValue: {
+    padding: '8px 12px',
+    border: `0.5px solid ${colors.line}`,
+    borderRadius: radius.md,
+    fontFamily: font.sans,
+    fontSize: 13,
+    color: colors.ink2,
     background: colors.surface2,
   },
   select: {

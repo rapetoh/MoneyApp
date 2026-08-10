@@ -45,6 +45,8 @@ Everything we depend on outside our own code. Reviewed before Phase 0.
 
 **Logging policy (all three AI routes)**: production logs carry non-identifying telemetry only — question length, transaction/tool-call counts, latency, outcome, and error `message`/`status` (never the raw SDK error object, which embeds the request body). Payload-bearing traces (question text, data overview, tool args/results, validator detail) require `AI_DEBUG_TRACE=1`, which stays unset in production. This mirrors migration 009's scrubbing of `raw_transcript` from the database.
 
+**Disclosure (fix-plan 3.5 / audit 02-F4, 02-F16)**: OpenAI is named as a subprocessor in-app — the mobile Privacy Center (`apps/mobile/app/more/privacy.tsx`, `privacy.servers_label`/`privacy.servers_detail`) and web Settings' "Voice engine" row both state that the transcript and any scanned image are sent to OpenAI to extract expense details, replacing copy that previously said voice processing was on-device "Always" and that our servers held "Nothing identifying." Audio itself never leaves the device — only the text `expo-speech-recognition` transcribes locally is sent — which the copy now states as the specific, true claim rather than the broader, false one.
+
 ---
 
 ## 4. Google Favicon V2 — Merchant Logos
@@ -64,6 +66,8 @@ Everything we depend on outside our own code. Reviewed before Phase 0.
 - `size=128` is the reliable sweet spot. `size=256` causes 404s for some domains.
 
 **Our usage**: Logos are cached by React Native's Image component. No rate limit concerns at our scale.
+
+**Disclosure (fix-plan 3.5 / audit 01-F28)**: this is a direct device→Google request — it never touches our servers, and the merchant name (which can be user-typed, e.g. "Dr Chen Therapy" → a request for `drchentherapy.com`'s favicon) is embedded in the URL. The mobile Privacy Center now discloses it as its own row (`privacy.merchant_logos_label`/`privacy.merchant_logos_detail`) rather than folding it into the "Our servers" row, which would misdescribe a request our servers never see. Whether to proxy this lookup through our own API instead (so no third party receives the merchant string) is tracked as follow-up work, not done here — see `docs/audit-2026-08-08/10-FIX-PLAN.md` item 4.4.
 
 ---
 
@@ -205,6 +209,8 @@ Everything we depend on outside our own code. Reviewed before Phase 0.
 
 ---
 
-*Last updated: Aug 9, 2026 — audit fix 0.4: removed the admin/bypass-RLS Supabase credential from the web/desktop surface (anon-key-only auth); noted that credential is now `supabase/functions/**`-only.*
+*Last updated: Aug 9, 2026 — audit fixes 3.4–3.6: OpenAI and the Google favicon lookup are now named/disclosed in the in-app Privacy Center rather than only here; `support@murmur.app` has no MX record and is hidden from the app until the domain resolves (`SUPPORT_EMAIL` is `null` in `packages/shared/src/brand.ts`).*
+
+*Previously: Aug 9, 2026 — audit fix 0.4: removed the admin/bypass-RLS Supabase credential from the web/desktop surface (anon-key-only auth); noted that credential is now `supabase/functions/**`-only.*
 
 *Previously: April 14, 2026 — replaced dead Clearbit Logo API with Google Favicon V2; updated Supabase key format (legacy JWT → publishable key)*

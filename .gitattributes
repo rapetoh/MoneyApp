@@ -1,0 +1,19 @@
+# Normalize line endings on checkin, check out LF everywhere (fix-plan
+# 4.5 / audit 07-F42's neighbor finding: `.gitignore` had carried a
+# UTF-16 tail — see its own history — since a past commit on a Windows
+# checkout with autocrlf mis-set). This is the repo-wide guard so a
+# single misconfigured client can't reintroduce a CRLF- or UTF-16-
+# encoded text file the way `.gitignore` was.
+* text=auto eol=lf
+
+# Binary assets — never subject to text normalization or diffing.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.icns binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary

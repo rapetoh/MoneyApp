@@ -42,6 +42,7 @@ vi.mock('@react-native-community/netinfo', () => ({
 vi.mock('react-native', () => ({
   AppState: { addEventListener: vi.fn(() => ({ remove: vi.fn() })) },
   DeviceEventEmitter: { emit: vi.fn(), addListener: vi.fn(() => ({ remove: vi.fn() })) },
+  Platform: { OS: 'ios' },
 }))
 
 // useTransactions.ts imports `expo-crypto` for `createTransaction`
@@ -49,6 +50,16 @@ vi.mock('react-native', () => ({
 // `requireNativeModule` at import time, which throws outside a React
 // Native runtime, so the whole module must be mocked before import.
 vi.mock('expo-crypto', () => ({ randomUUID: () => 'mock-uuid' }))
+
+// `useTransactions.ts` imports `SyncManager.ts`, which now calls
+// `deviceRegistry.ts`'s `touchDeviceSynced` at the end of a drain pass
+// (fix-plan 3.7) — same real-`expo-modules-core` reason as `expo-crypto`
+// above, for `expo-secure-store`/`expo-constants`.
+vi.mock('expo-secure-store', () => ({
+  getItemAsync: vi.fn(() => Promise.resolve('mock-device-id')),
+  setItemAsync: vi.fn(() => Promise.resolve()),
+}))
+vi.mock('expo-constants', () => ({ default: { deviceName: 'Test Device' } }))
 
 // Same reason, for `expo-localization` — `createTransaction`'s
 // `getDeviceTimeZone` (fix-plan 1.3 part 3, `local_day`) pulls in
