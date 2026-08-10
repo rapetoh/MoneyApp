@@ -112,16 +112,37 @@ function partsFormatter(tz: string): Intl.DateTimeFormat {
   return dtf
 }
 
+/** Civil clock fields of `epochMs` as displayed in `tz`. Uses
+ *  `formatToParts` where the runtime has it; Hermes (React Native's JS
+ *  engine) ships an Intl subset WITHOUT it — `format()` works, so there
+ *  the en-US "MM/DD/YYYY, HH:MM:SS" string from the exact same cached
+ *  formatter is parsed instead. TestFlight build #6 crashed at boot on
+ *  this gap (the runtime-vs-Node difference no unit test can see). */
+function civilFieldsAt(epochMs: number, tz: string): Record<string, number> {
+  const dtf = partsFormatter(tz)
+  if (typeof dtf.formatToParts === 'function') {
+    const parts = dtf.formatToParts(new Date(epochMs))
+    const out: Record<string, number> = {}
+    for (const p of parts) {
+      if (p.type !== 'literal') out[p.type] = Number(p.value)
+    }
+    return out
+  }
+  const m = dtf.format(new Date(epochMs)).match(/(\d{2})\/(\d{2})\/(\d{4}),?\s+(\d{2}):(\d{2}):(\d{2})/u)
+  if (!m) throw new Error(`period.ts: unparseable DateTimeFormat output for tz "${tz}"`)
+  return { month: +m[1], day: +m[2], year: +m[3], hour: +m[4], minute: +m[5], second: +m[6] }
+}
+
 /** The offset (ms) such that `epochMs + offset` is the wall-clock instant
  *  `tz` displays at `epochMs`, expressed as if it were itself a UTC
  *  instant. Standard `Intl`-based zone offset technique — no zone
  *  database dependency needed beyond what the runtime already ships. */
 function tzOffsetMsAt(epochMs: number, tz: string): number {
-  const parts = partsFormatter(tz).formatToParts(new Date(epochMs))
+  const fields = civilFieldsAt(epochMs, tz)
   const get = (type: string): number => {
-    const found = parts.find((p) => p.type === type)
-    if (!found) throw new Error(`period.ts: Intl did not return a "${type}" part for tz "${tz}"`)
-    return Number(found.value)
+    const found = fields[type]
+    if (found === undefined || Number.isNaN(found)) throw new Error(`period.ts: Intl did not return a "${type}" part for tz "${tz}"`)
+    return found
   }
   const asIfUtc = Date.UTC(
     get('year'),
@@ -205,17 +226,17 @@ function civilDayBounds(dayIsoStr: string, tz: string, lengthDays: number): Boun
 // Public API
 // ---------------------------------------------------------------------------
 
-/** Decomposes an instant into its civil parts in `tz`. The only function
- *  in this module that reaches into `Intl.DateTimeFormat.formatToParts`
- *  directly — everything else composes from this and from the pure
- *  day-number helpers above. */
+/** Decomposes an instant into its civil parts in `tz`. Everything else
+ *  in this module composes from this and from the pure day-number
+ *  helpers above; the Intl access itself lives in `civilFieldsAt`,
+ *  which is Hermes-safe (no formatToParts dependency). */
 export function localParts(instantIso: string, tz: string): LocalParts {
   const epochMs = Date.parse(instantIso)
   if (Number.isNaN(epochMs)) {
     throw new Error(`period.ts: "${instantIso}" is not a parseable ISO instant`)
   }
-  const parts = partsFormatter(tz).formatToParts(new Date(epochMs))
-  const get = (type: string): number => Number(parts.find((p) => p.type === type)?.value)
+  const fields = civilFieldsAt(epochMs, tz)
+  const get = (type: string): number => Number(fields[type])
   const y = get('year')
   const m = get('month')
   const d = get('day')

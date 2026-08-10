@@ -51,12 +51,24 @@ export function formatMoneyParts(
   currencyCode: string,
   locale: string,
 ): MoneyParts {
-  const parts = new Intl.NumberFormat(locale, {
+  const nf = new Intl.NumberFormat(locale, {
     style: 'currency',
     currency: currencyCode,
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
-  }).formatToParts(Math.abs(value))
+  })
+
+  // Hermes (the RN runtime) implements only a subset of Intl:
+  // NumberFormat.format() exists, formatToParts() does NOT — calling it
+  // crashed TestFlight build #6 on the first <Money> render ("undefined
+  // is not a function"). Node (where tests run) has full ICU, so only a
+  // real device build exposes this. Feature-detect and fall back to
+  // composing parts from format() output + the symbol table.
+  if (typeof nf.formatToParts !== 'function') {
+    return formatMoneyPartsFallback(nf, value, currencyCode)
+  }
+
+  const parts = nf.formatToParts(Math.abs(value))
 
   let symbol = ''
   let integer = ''
@@ -87,6 +99,41 @@ export function formatMoneyParts(
     integer,
     decimal,
     fraction,
+  }
+}
+
+/**
+ * Parts composition for runtimes without `formatToParts` (Hermes).
+ * Uses `format()` — which Hermes does implement, with correct locale
+ * grouping/decimal separators — and strips the currency affix to
+ * recover the numeric run. Symbol placement is taken from where the
+ * affix sat in the formatted string.
+ */
+function formatMoneyPartsFallback(
+  nf: Intl.NumberFormat,
+  value: number,
+  currencyCode: string,
+): MoneyParts {
+  const abs = Math.abs(value)
+  const formatted = nf.format(abs)
+  // The digits run: first-to-last character that is a digit, keeping
+  // everything between (grouping and decimal separators included).
+  const digitRun = formatted.match(/\d[\d\s.,  ']*\d|\d/u)
+  const numeric = digitRun ? digitRun[0] : String(abs.toFixed(2))
+  const affixBefore = digitRun ? formatted.slice(0, digitRun.index).trim() : ''
+  const symbol = (affixBefore || formatted.slice((digitRun?.index ?? 0) + numeric.length).trim())
+    || currencySymbolFor(currencyCode)
+  // The decimal separator is the LAST non-digit run in the numeric part
+  // (grouping separators repeat every 3 digits; the decimal comes last).
+  const sepMatch = numeric.match(/([^\d])(\d+)$/u)
+  const hasFraction = sepMatch != null && sepMatch[2].length === 2
+  return {
+    sign: value < 0 ? '-' : '',
+    symbol,
+    symbolFirst: affixBefore.length > 0,
+    integer: hasFraction ? numeric.slice(0, numeric.length - 3) : numeric,
+    decimal: hasFraction ? sepMatch![1] : '',
+    fraction: hasFraction ? sepMatch![2] : '',
   }
 }
 

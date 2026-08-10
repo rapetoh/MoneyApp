@@ -2,19 +2,27 @@ import { createClient } from '@supabase/supabase-js'
 import * as SecureStore from 'expo-secure-store'
 import type { Database } from '@voice-expense/shared'
 
-function requireEnv(name: 'EXPO_PUBLIC_SUPABASE_URL' | 'EXPO_PUBLIC_SUPABASE_ANON_KEY'): string {
-  const value = process.env[name]
-  // A misbuilt binary shipping without Supabase credentials must fail loudly
-  // at boot instead of the bare `!` assertion turning into an opaque
-  // "Invalid URL" thrown from deep inside supabase-js.
+// EXPO_PUBLIC_* vars are BUILD-TIME LITERALS: Expo's babel transform only
+// inlines `process.env.EXPO_PUBLIC_X` when written exactly like that. A
+// computed access (`process.env[name]`) is NOT inlined and reads undefined
+// in every release binary even when the build profile sets the var — which
+// shipped TestFlight build #6 as a crash-on-launch. Never read these
+// dynamically; the eslint no-computed-env rule enforces this file-wide.
+const rawSupabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL
+const rawSupabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY
+
+// A misbuilt binary shipping without Supabase credentials must still fail
+// loudly at boot instead of the bare `!` assertion turning into an opaque
+// "Invalid URL" thrown from deep inside supabase-js.
+function requireEnv(name: string, value: string | undefined): string {
   if (!value) {
     throw new Error(`${name} is not set — this build profile is missing its env (see apps/mobile/eas.json)`)
   }
   return value
 }
 
-const supabaseUrl = requireEnv('EXPO_PUBLIC_SUPABASE_URL')
-const supabaseAnonKey = requireEnv('EXPO_PUBLIC_SUPABASE_ANON_KEY')
+const supabaseUrl = requireEnv('EXPO_PUBLIC_SUPABASE_URL', rawSupabaseUrl)
+const supabaseAnonKey = requireEnv('EXPO_PUBLIC_SUPABASE_ANON_KEY', rawSupabaseAnonKey)
 
 // SecureStore on iOS has a 2048-byte limit per key.
 // The Supabase session object (tokens + user metadata) regularly exceeds this.

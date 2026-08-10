@@ -262,10 +262,15 @@ export default function InsightsScreen() {
   // `${monthLabel} 1 – ${day}` was always English word order ("août 1 –
   // 18") regardless of locale.
   const rangeEndDay = isCurrentMonth ? nowParts.d : daysInSelectedMonth
-  const rangeLabel = new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric', timeZone: tz }).formatRange(
-    new Date(civilDateTimeToInstant(selY, selM, 1, 12, 0, 0, tz)),
-    new Date(civilDateTimeToInstant(selY, selM, rangeEndDay, 12, 0, 0, tz)),
-  )
+  // Hermes' Intl subset has no formatRange (the class of gap that crashed
+  // TestFlight build #6) — fall back to formatting both endpoints, which
+  // keeps localized month order at the cost of repeating the month name.
+  const rangeFmt = new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric', timeZone: tz })
+  const rangeStart = new Date(civilDateTimeToInstant(selY, selM, 1, 12, 0, 0, tz))
+  const rangeEnd = new Date(civilDateTimeToInstant(selY, selM, rangeEndDay, 12, 0, 0, tz))
+  const rangeLabel = typeof rangeFmt.formatRange === 'function'
+    ? rangeFmt.formatRange(rangeStart, rangeEnd)
+    : `${rangeFmt.format(rangeStart)} – ${rangeFmt.format(rangeEnd)}`
 
   const monthSpent = useMemo(
     () => spendInWindow(transactions, categoryKindById, monthBoundsInstants.start, monthBoundsInstants.endExclusive),

@@ -56,6 +56,9 @@ const localRules = {
     // severity need, scoped even narrower (apps/mobile/app/more/** only,
     // not all of apps/mobile).
     'mobile-price-restrictions': builtinRules.get('no-restricted-syntax'),
+    // See `MOBILE_ENV_RESTRICTIONS`'s own comment — same independent-
+    // severity need (the build-#6 crash class: computed process.env reads).
+    'mobile-env-restrictions': builtinRules.get('no-restricted-syntax'),
   },
 }
 
@@ -181,6 +184,19 @@ const MOBILE_I18N_RESTRICTIONS = [
 // Scoped to apps/mobile/app/more/** (not all of apps/mobile) because
 // that's this item's own surface — paywall.tsx plus its siblings in the
 // same route group.
+// Computed access to process.env is invisible to Expo's EXPO_PUBLIC_*
+// build-time inlining: `process.env[name]` reads undefined in every
+// release binary even when the profile sets the var. TestFlight build #6
+// crashed on launch from exactly this (supabase.ts's requireEnv). Only
+// literal member access (`process.env.EXPO_PUBLIC_X`) is inlined.
+const MOBILE_ENV_RESTRICTIONS = [
+  {
+    selector: "MemberExpression[computed=true][object.object.name='process'][object.property.name='env']",
+    message:
+      'Computed process.env access is never inlined by Expo — in a release binary this reads undefined even when the build profile sets the var (TestFlight build #6 crashed on launch from this). Reference EXPO_PUBLIC_* vars literally: process.env.EXPO_PUBLIC_X.',
+  },
+]
+
 const MOBILE_PRICE_RESTRICTIONS = [
   {
     selector: 'Literal[value=/\\$\\d/]',
@@ -257,6 +273,7 @@ export default tseslint.config(
       // commit). MONEY_RESTRICTIONS/CLIENT_BOUNDARY_RESTRICTIONS stay 'off'
       // under the shared key below; their own items haven't landed.
       'local/mobile-i18n-restrictions': ['error', ...MOBILE_I18N_RESTRICTIONS],
+      'local/mobile-env-restrictions': ['error', ...MOBILE_ENV_RESTRICTIONS],
       'no-restricted-syntax': ['off', ...MONEY_RESTRICTIONS, ...CLIENT_BOUNDARY_RESTRICTIONS],
     },
   },
