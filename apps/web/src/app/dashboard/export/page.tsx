@@ -1,9 +1,5 @@
 'use client'
-/* eslint-disable local/period-restrictions -- Stage 2 (2.4/2.14) migration
- * pending: this page's date-range math hasn't been converted onto
- * packages/shared/src/utils/period.ts yet (fix-plan 2.15 owns the
- * export rewrite) — out of item 1.3's own named surfaces. */
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { createClient } from '../../../lib/supabase/client'
 import { colors, font, radius } from '../../../lib/theme'
 import { Toolbar } from '../../../components/Toolbar'
@@ -11,79 +7,153 @@ import { Card } from '../../../components/Card'
 import { Money } from '../../../components/Money'
 import { Icon } from '../../../components/Icons'
 import { PaywallGate } from '../../../components/PaywallGate'
+import { ErrorState } from '../../../components/ErrorState'
 import { usePlus } from '../../../lib/plus'
-import { aggAmount } from '@voice-expense/shared'
+import {
+  buildExport,
+  exportSummaryJSON,
+  localDay,
+  monthIso,
+  type CategoryKind,
+  type ExportableTransaction,
+  type ExportRecurringRule,
+} from '@voice-expense/shared'
 
 type Txn = {
   id: string
   amount: number
   amount_in_profile_currency: number | null
   currency_code: string | null
+  fx_rate_to_profile: number | null
+  fx_rate_date: string | null
   direction: 'debit' | 'credit'
   merchant: string | null
   note: string | null
   category_id: string | null
   payment_method: string | null
   source: string | null
+  is_recurring: boolean | null
   transacted_at: string
 }
 
 type Format = 'csv' | 'json' | 'pdf'
 
+/** The viewer's own zone — this page only ever renders client-side
+ *  ('use client'), so `Intl`'s resolved zone here *is* the user's zone,
+ *  not a server/browser mismatch (fix-plan 1.3). Used for the date-
+ *  range picker's initial "this month" default; `profile.timezone` (the
+ *  captured, authoritative value) drives every actual export bound
+ *  below once it loads. */
+function browserTz(): string {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+}
+
+function defaultDateRange(): { from: string; to: string } {
+  const tz = browserTz()
+  const nowIso = new Date().toISOString()
+  return { from: `${monthIso(nowIso, tz)}-01`, to: localDay(nowIso, tz) }
+}
+
 export default function ExportPage() {
   const supabase = createClient()
   const [transactions, setTransactions] = useState<Txn[]>([])
-  const [categories, setCategories] = useState<Array<{ id: string; name: string }>>([])
-  const [profile, setProfile] = useState<{ currency_code?: string; locale?: string } | null>(null)
+  const [categories, setCategories] = useState<Array<{ id: string; name: string; kind: CategoryKind }>>([])
+  const [recurringRules, setRecurringRules] = useState<ExportRecurringRule[]>([])
+  const [profile, setProfile] = useState<{ currency_code?: string; locale?: string; timezone?: string } | null>(null)
   const [loading, setLoading] = useState(true)
+  // Read-error state, distinct from "loaded, zero transactions in range"
+  // (fix-plan 2.13 / audit 08-F21 family) — this page has no separate
+  // list body, so an unsurfaced read failure used to render as an
+  // honest-looking "0 transactions / $0 / $0" summary with the export
+  // buttons quietly disabled, indistinguishable from an empty range.
+  const [loadError, setLoadError] = useState<string | null>(null)
   const { isPlus } = usePlus()
   const [busy, setBusy] = useState<Format | null>(null)
 
-  const now = new Date()
-  const defaultFrom = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10)
-  const defaultTo = now.toISOString().slice(0, 10)
-  const [dateFrom, setDateFrom] = useState(defaultFrom)
-  const [dateTo, setDateTo] = useState(defaultTo)
+  const [dateFrom, setDateFrom] = useState(() => defaultDateRange().from)
+  const [dateTo, setDateTo] = useState(() => defaultDateRange().to)
 
-  useEffect(() => {
-    async function load() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-      const [t, c, p] = await Promise.all([
-        supabase
-          .from('transactions')
-          .select('*')
-          .eq('user_id', user.id)
-          .eq('is_deleted', false)
-          .order('transacted_at', { ascending: false }),
-        supabase.from('categories').select('id, name').eq('user_id', user.id),
-        supabase.from('profiles').select('currency_code, locale').eq('id', user.id).single(),
-      ])
-      setTransactions((t.data ?? []) as Txn[])
-      setCategories(c.data ?? [])
-      setProfile(p.data)
-      setLoading(false)
-    }
-    load()
+  const load = useCallback(async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const [t, c, r, p] = await Promise.all([
+      supabase
+        .from('transactions')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('is_deleted', false)
+        .order('transacted_at', { ascending: false }),
+      supabase.from('categories').select('id, name, kind').eq('user_id', user.id),
+      supabase
+        .from('recurring_rules')
+        .select('id, name, amount, currency_code, direction, frequency, is_active')
+        .eq('user_id', user.id),
+      supabase.from('profiles').select('currency_code, locale, timezone').eq('id', user.id).single(),
+    ])
+    const failure = t.error ?? c.error ?? r.error ?? p.error
+    setLoadError(failure ? failure.message : null)
+    if (!t.error) setTransactions((t.data ?? []) as Txn[])
+    if (!c.error) setCategories((c.data ?? []) as Array<{ id: string; name: string; kind: CategoryKind }>)
+    if (!r.error) setRecurringRules((r.data ?? []) as ExportRecurringRule[])
+    if (!p.error) setProfile(p.data)
+    setLoading(false)
   }, [])
 
-  const catMap = Object.fromEntries(categories.map((c) => [c.id, c]))
+  useEffect(() => {
+    load()
+  }, [load])
+
   const currency = profile?.currency_code ?? 'USD'
   const locale = profile?.locale ?? 'en'
+  // profiles.timezone (fix-plan 1.3) — 'UTC' matches the column default
+  // for the rare render before capture lands; see TimezoneSync in
+  // dashboard/layout.tsx.
+  const tz = profile?.timezone || 'UTC'
 
-  const filtered = useMemo(() => {
-    return transactions.filter((t) => {
-      const d = t.transacted_at.slice(0, 10)
-      return d >= dateFrom && d <= dateTo
+  const catKindById = useMemo(
+    () => new Map(categories.map((c) => [c.id, c.kind])),
+    [categories],
+  )
+
+  // The one export-assembly call (fix-plan 2.15): every date below
+  // (the range bounds and each row's own date/time) resolves through
+  // packages/shared/src/utils/period.ts in the user's own zone, and the
+  // summary total is computed from the exact same
+  // `amount_in_profile_currency` column the rows print — so a
+  // spreadsheet sum of the CSV's converted column always equals the
+  // total printed above it.
+  const exportResult = useMemo(() => {
+    const exportableTxns: ExportableTransaction[] = transactions.map((t) => ({
+      id: t.id,
+      amount: t.amount,
+      amount_in_profile_currency: t.amount_in_profile_currency,
+      currency_code: t.currency_code,
+      direction: t.direction,
+      merchant: t.merchant,
+      note: t.note,
+      category_id: t.category_id,
+      category_kind: t.category_id ? catKindById.get(t.category_id) ?? null : null,
+      payment_method: t.payment_method,
+      source: t.source,
+      is_recurring: t.is_recurring,
+      transacted_at: t.transacted_at,
+      fx_rate_to_profile: t.fx_rate_to_profile,
+      fx_rate_date: t.fx_rate_date,
+    }))
+    return buildExport({
+      profile: { currency_code: currency, locale, timezone: tz },
+      transactions: exportableTxns,
+      categories: categories.map((c) => ({ id: c.id, name: c.name })),
+      recurringRules,
+      dateFrom,
+      dateTo,
     })
-  }, [transactions, dateFrom, dateTo])
+  }, [transactions, categories, catKindById, recurringRules, currency, locale, tz, dateFrom, dateTo])
 
-  const totalExpenses = filtered
-    .filter((t) => t.direction === 'debit')
-    .reduce((s, t) => s + aggAmount(t), 0)
-  const totalIncome = filtered
-    .filter((t) => t.direction === 'credit')
-    .reduce((s, t) => s + aggAmount(t), 0)
+  const filtered = exportResult.rows
+  const totalExpenses = exportResult.summary.expense
+  const totalIncome = exportResult.summary.income
+  const pendingCount = exportResult.summary.pendingCount
 
   function fileBase() {
     return `murmur-${dateFrom}-to-${dateTo}`
@@ -103,22 +173,46 @@ export default function ExportPage() {
   async function exportCSV() {
     setBusy('csv')
     try {
-      const headers = ['Date', 'Time', 'Merchant', 'Category', 'Direction', 'Amount', 'Currency', 'Payment Method', 'Source', 'Note']
-      const rows = filtered.map((t) => [
-        t.transacted_at.slice(0, 10),
-        new Date(t.transacted_at).toLocaleTimeString('en', { hour: '2-digit', minute: '2-digit', hour12: false }),
-        t.merchant ?? '',
-        t.category_id ? catMap[t.category_id]?.name ?? '' : '',
-        t.direction,
-        t.amount.toFixed(2),
-        t.currency_code || currency,
-        t.payment_method ?? '',
-        t.source ?? '',
-        t.note ?? '',
+      const headers = [
+        'Date',
+        'Time',
+        'Merchant',
+        'Category',
+        'Direction',
+        'Amount',
+        'Currency',
+        `Amount (${currency})`,
+        'FX rate',
+        'FX date',
+        'Payment Method',
+        'Source',
+        'Note',
+      ]
+      const rows = filtered.map((r) => [
+        r.date,
+        r.time,
+        r.merchant,
+        r.category,
+        r.direction,
+        r.amount.toFixed(2),
+        r.currency,
+        r.amountInProfileCurrency != null ? r.amountInProfileCurrency.toFixed(2) : '',
+        r.fxRate ?? '',
+        r.fxDate ?? '',
+        r.paymentMethod,
+        r.source,
+        r.note,
       ])
-      const csv = '\uFEFF' + [headers, ...rows]
+      let csv = '\uFEFF' + [headers, ...rows]
         .map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(','))
         .join('\r\n')
+      // A row missing its FX snapshot prints an empty converted-amount
+      // cell rather than a silent 0 — this trailing note is the receipt
+      // for why the header total and a naive row-count-based check might
+      // look short (fix-plan 1.4's "N transactions awaiting conversion").
+      if (pendingCount > 0) {
+        csv += `\r\n"${pendingCount} transaction${pendingCount === 1 ? '' : 's'} above ${pendingCount === 1 ? 'is' : 'are'} awaiting currency conversion and excluded from the totals."`
+      }
       downloadBlob(new Blob([csv], { type: 'text/csv;charset=utf-8' }), `${fileBase()}.csv`)
     } finally {
       setBusy(null)
@@ -128,25 +222,11 @@ export default function ExportPage() {
   async function exportJSON() {
     setBusy('json')
     try {
-      const payload = {
-        app: 'Murmur',
-        version: 1,
-        exported_at: new Date().toISOString(),
-        currency,
-        date_range: { from: dateFrom, to: dateTo },
-        transactions: filtered.map((t) => ({
-          id: t.id,
-          amount: t.amount,
-          currency: t.currency_code || currency,
-          direction: t.direction,
-          merchant: t.merchant,
-          category: t.category_id ? catMap[t.category_id]?.name ?? null : null,
-          payment_method: t.payment_method,
-          source: t.source,
-          note: t.note,
-          transacted_at: t.transacted_at,
-        })),
-      }
+      // One canonical shape (fix-plan 2.15) — the mobile export's JSON
+      // button calls the same `exportSummaryJSON` over its own
+      // `buildExport()` result, so the two files carry the same
+      // top-level keys.
+      const payload = exportSummaryJSON(exportResult)
       const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
       downloadBlob(blob, `${fileBase()}.json`)
     } finally {
@@ -218,21 +298,24 @@ export default function ExportPage() {
 
       // Transaction table. autoTable paginates automatically and re-
       // emits the header on every page, so the user gets a clean
-      // multi-page document for long ranges.
+      // multi-page document for long ranges. Both the original-currency
+      // amount and the profile-currency amount print (fix-plan 2.15) so
+      // the printed total above reconciles with a reader manually adding
+      // the right-hand column, not the left.
       autoTable(doc, {
         startY: totalsY + 60,
-        head: [['Date', 'Merchant', 'Category', 'Amount']],
-        body: filtered.map((t) => {
-          const cat = t.category_id ? catMap[t.category_id]?.name ?? '' : ''
-          const sign = t.direction === 'credit' ? '+' : '−'
-          // Rows keep their original currency — a €45 dinner must not
-          // print as $45 (same rule as the transactions table).
-          const rowCurrency = t.currency_code || currency
-          const display =
-            rowCurrency === currency
-              ? fmt(t.amount).replace(/^[+−\-]/, '')
-              : new Intl.NumberFormat(locale, { style: 'currency', currency: rowCurrency }).format(t.amount)
-          return [t.transacted_at.slice(0, 10), t.merchant ?? '', cat, `${sign}${display}`]
+        head: [['Date', 'Merchant', 'Category', 'Amount', `Amount (${currency})`]],
+        body: filtered.map((r) => {
+          const sign = r.direction === 'credit' ? '+' : '−'
+          // The native column keeps the transaction's own currency — a
+          // €45 dinner must not print as $45 (same rule as the
+          // transactions table).
+          const native =
+            r.currency === currency
+              ? fmt(r.amount).replace(/^[+−\-]/, '')
+              : new Intl.NumberFormat(locale, { style: 'currency', currency: r.currency }).format(r.amount)
+          const converted = r.amountInProfileCurrency != null ? fmt(r.amountInProfileCurrency).replace(/^[+−\-]/, '') : '—'
+          return [r.date, r.merchant, r.category, `${sign}${native}`, `${sign}${converted}`]
         }),
         styles: { fontSize: 9, cellPadding: 6, lineColor: [225, 222, 213], lineWidth: 0.5 },
         headStyles: {
@@ -243,12 +326,13 @@ export default function ExportPage() {
           cellPadding: { top: 8, right: 6, bottom: 8, left: 6 },
         },
         columnStyles: {
-          0: { cellWidth: 70 },
-          3: { halign: 'right', cellWidth: 80, fontStyle: 'bold' },
+          0: { cellWidth: 62 },
+          3: { halign: 'right', cellWidth: 76, fontStyle: 'bold' },
+          4: { halign: 'right', cellWidth: 76 },
         },
         didParseCell: (data) => {
           // Sage-tinted credits to match the brand colour for income.
-          if (data.section === 'body' && data.column.index === 3) {
+          if (data.section === 'body' && (data.column.index === 3 || data.column.index === 4)) {
             const cell = data.cell.raw as string
             if (typeof cell === 'string' && cell.startsWith('+')) {
               data.cell.styles.textColor = [63, 90, 62]
@@ -259,16 +343,19 @@ export default function ExportPage() {
         margin: { left: 40, right: 40 },
       })
 
-      // Footer on every page
+      // Footer on every page — the receipt for a total that would
+      // otherwise look short when some rows are still awaiting FX
+      // conversion (fix-plan 1.4).
       const pageCount = doc.getNumberOfPages()
       doc.setFont('helvetica', 'normal')
       doc.setFontSize(8)
       doc.setTextColor('#9C9589')
+      const pendingNote = pendingCount > 0 ? ` · ${pendingCount} awaiting currency conversion, excluded above` : ''
       for (let i = 1; i <= pageCount; i++) {
         doc.setPage(i)
         const h = doc.internal.pageSize.getHeight()
         doc.text(
-          `Exported by Murmur · ${new Date().toLocaleString(locale)} · ${filtered.length} transactions`,
+          `Exported by Murmur · ${new Date().toLocaleString(locale)} · ${filtered.length} transactions${pendingNote}`,
           40,
           h - 28,
         )
@@ -321,50 +408,67 @@ export default function ExportPage() {
               <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} style={styles.input} />
             </div>
           </div>
-          <div style={styles.summary}>
-            <div style={styles.summaryItem}>
-              <span style={styles.summaryLabel}>Transactions</span>
-              <span style={{ fontFamily: font.display, fontSize: 18, fontWeight: 700, color: colors.ink }}>{filtered.length}</span>
-            </div>
-            <div style={styles.summaryItem}>
-              <span style={styles.summaryLabel}>Total expenses</span>
-              <Money value={totalExpenses} currency={currency} locale={locale} size={18} serif={false} bold={700} />
-            </div>
-            <div style={styles.summaryItem}>
-              <span style={styles.summaryLabel}>Total income</span>
-              <Money
-                value={totalIncome}
-                currency={currency}
-                locale={locale}
-                size={18}
-                serif={false}
-                bold={700}
-                showPositiveSign
-                color={colors.income}
-              />
-            </div>
-          </div>
+          {loadError ? (
+            <ErrorState
+              compact
+              message="We couldn't load your data to export."
+              detail={loadError}
+              onRetry={load}
+            />
+          ) : (
+            <>
+              <div style={styles.summary}>
+                <div style={styles.summaryItem}>
+                  <span style={styles.summaryLabel}>Transactions</span>
+                  <span style={{ fontFamily: font.display, fontSize: 18, fontWeight: 700, color: colors.ink }}>{filtered.length}</span>
+                </div>
+                <div style={styles.summaryItem}>
+                  <span style={styles.summaryLabel}>Total expenses</span>
+                  <Money value={totalExpenses} currency={currency} locale={locale} size={18} serif={false} bold={700} />
+                </div>
+                <div style={styles.summaryItem}>
+                  <span style={styles.summaryLabel}>Total income</span>
+                  <Money
+                    value={totalIncome}
+                    currency={currency}
+                    locale={locale}
+                    size={18}
+                    serif={false}
+                    bold={700}
+                    showPositiveSign
+                    color={colors.income}
+                  />
+                </div>
+              </div>
+              {pendingCount > 0 && (
+                <div style={styles.pendingNote}>
+                  {pendingCount} transaction{pendingCount === 1 ? '' : 's'} awaiting currency conversion —
+                  excluded from the totals above until the exchange rate lands.
+                </div>
+              )}
+            </>
+          )}
         </Card>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
           <FormatCard
             title="CSV"
             sub="Spreadsheets, accountants"
-            disabled={busy != null || filtered.length === 0 || loading}
+            disabled={busy != null || filtered.length === 0 || loading || !!loadError}
             busy={busy === 'csv'}
             onClick={exportCSV}
           />
           <FormatCard
             title="JSON"
             sub="Backup, re-import"
-            disabled={busy != null || filtered.length === 0 || loading}
+            disabled={busy != null || filtered.length === 0 || loading || !!loadError}
             busy={busy === 'json'}
             onClick={exportJSON}
           />
           <FormatCard
             title="PDF"
             sub="Records, tax filings"
-            disabled={busy != null || filtered.length === 0 || loading}
+            disabled={busy != null || filtered.length === 0 || loading || !!loadError}
             busy={busy === 'pdf'}
             onClick={exportPDF}
           />
@@ -465,5 +569,11 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 600,
     letterSpacing: 0.4,
     textTransform: 'uppercase',
+  },
+  pendingNote: {
+    marginTop: 10,
+    fontFamily: font.sans,
+    fontSize: 11,
+    color: colors.ink4,
   },
 }

@@ -4,56 +4,121 @@ import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { Money } from './Money'
 import { Colors, Typography, Hairline } from '../theme'
-import { t, weekdayLabels, type Locale } from '@voice-expense/shared'
+import {
+  t,
+  weekdayLabels,
+  aggAmount,
+  localParts,
+  monthIso,
+  monthBounds,
+  daysBetween,
+  addMonthsClamped,
+  civilDateTimeToInstant,
+  type Locale,
+} from '@voice-expense/shared'
 import type { Transaction } from '@voice-expense/shared'
 
-/* eslint-disable local/period-restrictions -- Stage 2 (2.4/2.14) migration
- * pending. Fix-plan 1.3's own surface for this file is the weekday-label
- * row alone (`weekdayLabels()` below, already adopted — see that call
- * site's comment). The month-grid layout (`monthParam`, `dailyTotals`,
- * the `heatmapMonth` state and its prev/next stepping, `firstWeekday`/
- * `daysInMonth`) still builds its civil-date math from device-local
- * `Date` getters/setters rather than `period.ts`, matching every other
- * calendar-grid rewrite parked at Stage 2 (2.4/2.14/2.15). Converting it
- * needs a zone threaded into this component (it currently has none) plus
- * the grid-building helpers rewritten on `period.ts`'s civil-day
- * primitives — a bigger, riskier change than this item's own scope, so
- * it's marked as debt here instead of migrated. */
+// Fix-plan 1.3/2.4 — this file used to carry a file-level
+// `eslint-disable local/period-restrictions` because its whole month-grid
+// layout (`monthParam`, `dailyTotals`, the `heatmapMonth` state and its
+// prev/next stepping, `firstWeekday`/`daysInMonth`) built its civil-date
+// math from device-local `Date` getters/setters with no zone concept at
+// all. It's now `tz`-aware throughout, via `packages/shared/src/utils/
+// period.ts`'s civil-day primitives, matching every other calendar grid
+// in the app (2.4's own "one month window" contract) — the disable
+// comment is gone with the code it was covering for.
 
-function monthParam(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+function pad2(n: number): string {
+  return String(n).padStart(2, '0')
+}
+function pad4(n: number): string {
+  return String(n).padStart(4, '0')
+}
+function monthKeyOf(y: number, m: number): string {
+  return `${pad4(y)}-${pad2(m)}`
+}
+function splitMonthKey(key: string): { y: number; m: number } {
+  const [y, m] = key.split('-').map(Number)
+  return { y, m }
 }
 
-// Collapse the transaction list into a { YYYY-MM → total debits } map.
-function totalsByMonth(txns: Transaction[]): Record<string, number> {
+/** Display label for a civil month, resolved in `tz` regardless of the
+ *  device's own runtime zone — `civilDateTimeToInstant` + an explicit
+ *  `timeZone` option, never a `Date` getter (fix-plan 1.3). Day 15 is an
+ *  arbitrary mid-month anchor so the resolved instant can never cross
+ *  into an adjacent month across a DST transition. */
+function monthLabel(y: number, m: number, tz: string, locale: string, opts: Intl.DateTimeFormatOptions): string {
+  const instant = civilDateTimeToInstant(y, m, 15, 12, 0, 0, tz)
+  return new Date(instant).toLocaleDateString(locale, { ...opts, timeZone: tz })
+}
+
+/** Collapse the transaction list into a `{ YYYY-MM → total debits }` map,
+ *  in `tz`. Sums `amount_in_profile_currency` (via `aggAmount`), never
+ *  raw `amount` — this total renders through a single `currencyCode`
+ *  prop below, so summing figures that might be in different original
+ *  currencies as if they were all one currency would be silently wrong
+ *  (fix-plan 1.4). */
+function totalsByMonth(txns: Transaction[], tz: string): Record<string, number> {
   const out: Record<string, number> = {}
   for (const tx of txns) {
     if (tx.is_deleted || tx.direction !== 'debit') continue
-    const d = new Date(tx.transacted_at)
-    const key = monthParam(d)
-    out[key] = (out[key] ?? 0) + tx.amount
+    const key = monthIso(tx.transacted_at, tz)
+    out[key] = (out[key] ?? 0) + aggAmount(tx)
   }
   return out
 }
 
-// Daily debits for a specific month (0-indexed). dayOf[n] = total spent on
-// day n (1..daysInMonth). Day 0 unused — keeps the index honest.
-function dailyTotals(txns: Transaction[], year: number, month: number): number[] {
-  const daysInMonth = new Date(year, month + 1, 0).getDate()
+/** Daily debits for the civil month `monthKey`, in `tz`. `dayOf[n]` =
+ *  total spent on day `n` (1..daysInMonth); day 0 unused, keeping the
+ *  index honest. */
+function dailyTotals(txns: Transaction[], monthKey: string, tz: string, daysInMonth: number): number[] {
   const dayOf: number[] = new Array(daysInMonth + 1).fill(0)
   for (const tx of txns) {
     if (tx.is_deleted || tx.direction !== 'debit') continue
-    const d = new Date(tx.transacted_at)
-    if (d.getFullYear() !== year || d.getMonth() !== month) continue
-    dayOf[d.getDate()] += tx.amount
+    if (monthIso(tx.transacted_at, tz) !== monthKey) continue
+    const day = localParts(tx.transacted_at, tz).d
+    dayOf[day] += aggAmount(tx)
   }
   return dayOf
+}
+
+/** Number of civil days in `monthKey`, in `tz` — the half-open
+ *  `monthBounds` window's own length, so this can never disagree with
+ *  the window `dailyTotals`/the grid actually iterate over. */
+function daysInMonthOf(monthKey: string, tz: string): number {
+  const bounds = monthBounds(monthKey, tz)
+  const start = localParts(bounds.start, tz)
+  const end = localParts(bounds.endExclusive, tz)
+  return daysBetween(start.y, start.m, start.d, end.y, end.m, end.d)
+}
+
+/** Monday=0..Sunday=6 weekday of the 1st of `monthKey`, in `tz` — the
+ *  grid's leading-blank count. Resolved from `monthBounds`' own start
+ *  instant rather than a second independent calculation, so the grid
+ *  padding and the header it sits under always agree on which column is
+ *  "first" (audit 04-F10, the `WEEK_START` finding). */
+function firstWeekdayOf(monthKey: string, tz: string): number {
+  const bounds = monthBounds(monthKey, tz)
+  return localParts(bounds.start, tz).weekdayIndex
 }
 
 interface Props {
   transactions: Transaction[]
   locale: Locale
+  /** ISO 4217 code every total on this card renders in — `profile.
+   *  currency_code`. Required (mirrors `Money`'s own required prop, fix-
+   *  plan 2.6): there is no safe default for "which currency is this
+   *  total in". */
+  currencyCode: string
+  /** IANA zone — `profile.timezone` (fix-plan 1.3). Every month/day
+   *  boundary on this card resolves in this zone, never the device's
+   *  own, so this card agrees with Today/Budgets/Insights about which
+   *  month/day a transaction belongs to. */
+  tz: string
 }
+
+const GRID_GAP = 6
+const GRID_COLUMNS = 7
 
 /**
  * Heatmap + months-list section, extracted from the old `/more/history`
@@ -64,61 +129,67 @@ interface Props {
  * host (currently Insights) is responsible for its own section heading
  * and overall page chrome.
  */
-export function HistoryHeatmap({ transactions, locale }: Props) {
+export function HistoryHeatmap({ transactions, locale, currencyCode, tz }: Props) {
   const router = useRouter()
 
-  const now = new Date()
-  const [heatmapMonth, setHeatmapMonth] = useState<Date>(
-    new Date(now.getFullYear(), now.getMonth(), 1),
-  )
-  const year = heatmapMonth.getFullYear()
-  const month = heatmapMonth.getMonth()
-  const isCurrentMonth = year === now.getFullYear() && month === now.getMonth()
+  // Frozen for the life of this mount, same rationale as every other
+  // screen's own `nowInstant` (`insights.tsx`, `(tabs)/index.tsx`) — every
+  // date-derived value below stays internally consistent within one
+  // render pass instead of drifting mid-calculation.
+  const nowIso = useMemo(() => new Date().toISOString(), [])
+  const nowParts = useMemo(() => localParts(nowIso, tz), [nowIso, tz])
+  const currentMonthKey = useMemo(() => monthIso(nowIso, tz), [nowIso, tz])
 
-  const monthTotals = useMemo(() => totalsByMonth(transactions), [transactions])
+  const [heatmapMonthKey, setHeatmapMonthKey] = useState<string>(currentMonthKey)
+  const isCurrentMonth = heatmapMonthKey === currentMonthKey
+  const { y: heatmapY, m: heatmapM } = splitMonthKey(heatmapMonthKey)
+
+  const monthTotals = useMemo(() => totalsByMonth(transactions, tz), [transactions, tz])
 
   const months = useMemo(() => {
     const keys = new Set(Object.keys(monthTotals))
-    const currentKey = monthParam(now)
-    keys.add(currentKey)
+    keys.add(currentMonthKey)
     return Array.from(keys)
       .map((k) => {
-        const [y, m] = k.split('-').map(Number)
+        const { y, m } = splitMonthKey(k)
         return {
           key: k,
-          date: new Date(y, m - 1, 1),
+          y,
+          m,
           total: monthTotals[k] ?? 0,
-          current: k === currentKey,
+          current: k === currentMonthKey,
         }
       })
-      .sort((a, b) => b.date.getTime() - a.date.getTime())
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [monthTotals])
+      // Keys are `YYYY-MM` — lexicographic order is chronological order,
+      // no `Date#getTime()` needed to sort them newest-first.
+      .sort((a, b) => (a.key < b.key ? 1 : a.key > b.key ? -1 : 0))
+  }, [monthTotals, currentMonthKey])
 
+  const daysInMonth = useMemo(() => daysInMonthOf(heatmapMonthKey, tz), [heatmapMonthKey, tz])
   const heatmapDaily = useMemo(
-    () => dailyTotals(transactions, year, month),
-    [transactions, year, month],
+    () => dailyTotals(transactions, heatmapMonthKey, tz, daysInMonth),
+    [transactions, heatmapMonthKey, tz, daysInMonth],
   )
-  const heatmapTotal = monthTotals[monthParam(heatmapMonth)] ?? 0
+  const heatmapTotal = monthTotals[heatmapMonthKey] ?? 0
   const maxDaily = Math.max(...heatmapDaily, 1)
 
   const canGoNext = !isCurrentMonth
   function goPrevMonth() {
-    setHeatmapMonth((m) => new Date(m.getFullYear(), m.getMonth() - 1, 1))
+    const prev = addMonthsClamped(heatmapY, heatmapM, 1, -1)
+    setHeatmapMonthKey(monthKeyOf(prev.y, prev.m))
   }
   function goNextMonth() {
     if (!canGoNext) return
-    setHeatmapMonth((m) => new Date(m.getFullYear(), m.getMonth() + 1, 1))
+    const next = addMonthsClamped(heatmapY, heatmapM, 1, 1)
+    setHeatmapMonthKey(monthKeyOf(next.y, next.m))
   }
 
   // Monday=0..Sunday=6 (rotated from `Intl`/`Date#getDay()`'s Sunday=0),
   // matching `weekdayLabels()`'s `WEEK_START` convention below — the grid
   // padding and the header it sits under must agree on which column is
   // "first" or every day lands under the wrong weekday name (audit
-  // 04-F10, the `WEEK_START` finding). The rest of this grid's math is
-  // still Stage 2 (2.4) debt — see the file-top `eslint-disable`.
-  const firstWeekday = (new Date(year, month, 1).getDay() + 6) % 7
-  const daysInMonth = new Date(year, month + 1, 0).getDate()
+  // 04-F10, the `WEEK_START` finding).
+  const firstWeekday = useMemo(() => firstWeekdayOf(heatmapMonthKey, tz), [heatmapMonthKey, tz])
   const gridCells: ({ day: number; amount: number } | null)[] = []
   for (let i = 0; i < firstWeekday; i++) gridCells.push(null)
   for (let d = 1; d <= daysInMonth; d++) {
@@ -131,6 +202,18 @@ export function HistoryHeatmap({ transactions, locale }: Props) {
   // wrong for fr/es/pt (all Monday-first locales). That key is deleted
   // from every locale JSON.
   const weekdayLabelList = weekdayLabels(locale, 'narrow')
+
+  // Measured cell size (fix-plan 2.4) — replaces the `width: '13.1%'` +
+  // `gap: 6` combination, which wraps after six cells on every iPhone
+  // (13.1% × 7 + 6 gaps of 6px routinely exceeds 100% of the card's
+  // content width), so day 7 onward silently sat under the wrong weekday
+  // column. `onLayout` on the wrapper shared by the header row and the
+  // grid body measures the one true available width both render at; the
+  // seven columns' worth of `GRID_GAP`-wide gutters are subtracted from
+  // it once, here, instead of each row hoping the percentage math and the
+  // gap add up to the same thing independently.
+  const [gridWidth, setGridWidth] = useState(0)
+  const cellSize = gridWidth > 0 ? (gridWidth - (GRID_COLUMNS - 1) * GRID_GAP) / GRID_COLUMNS : 0
 
   function goToMonth(key: string) {
     router.push({ pathname: '/more/transactions', params: { month: key } })
@@ -156,9 +239,9 @@ export function HistoryHeatmap({ transactions, locale }: Props) {
                 />
               </Pressable>
               <Text style={styles.heatmapMonth}>
-                {heatmapMonth.toLocaleDateString(locale, {
+                {monthLabel(heatmapY, heatmapM, tz, locale, {
                   month: 'long',
-                  year: heatmapMonth.getFullYear() === now.getFullYear() ? undefined : 'numeric',
+                  year: heatmapY === nowParts.y ? undefined : 'numeric',
                 })}
               </Text>
               <Pressable
@@ -183,52 +266,59 @@ export function HistoryHeatmap({ transactions, locale }: Props) {
                 />
               </Pressable>
             </View>
-            <Money value={heatmapTotal} size={16} serif={false} sansWeight="700" />
+            <Money value={heatmapTotal} size={16} serif={false} sansWeight="700" currencyCode={currencyCode} locale={locale} />
           </View>
 
-          <View style={styles.weekdayRow}>
-            {weekdayLabelList.map((label, i) => (
-              <View key={i} style={styles.weekdayCell}>
-                <Text style={styles.weekdayText}>{label}</Text>
-              </View>
-            ))}
-          </View>
+          {/* Shared `onLayout` measurement (fix-plan 2.4) — the header row
+              and the grid body below both render at exactly this width,
+              which is what `cellSize` is derived from. */}
+          <View onLayout={(e) => setGridWidth(e.nativeEvent.layout.width)}>
+            <View style={styles.weekdayRow}>
+              {weekdayLabelList.map((label, i) => (
+                <View key={i} style={[styles.weekdayCell, { width: cellSize }]}>
+                  <Text style={styles.weekdayText}>{label}</Text>
+                </View>
+              ))}
+            </View>
 
-          <View style={styles.grid}>
-            {gridCells.map((cell, i) => {
-              if (!cell) return <View key={`x${i}`} style={styles.cellEmpty} />
-              const isToday = isCurrentMonth && cell.day === now.getDate()
-              const intensity =
-                cell.amount > 0 ? 0.2 + Math.min(cell.amount / maxDaily, 1) * 0.7 : 0
-              const bg =
-                cell.amount > 0
-                  ? `rgba(63,90,62,${intensity.toFixed(2)})`
-                  : Colors.surface2 ?? '#F5F2EB'
-              const textLight = cell.amount > 0 && intensity > 0.5
-              return (
-                <View
-                  key={`d${cell.day}`}
-                  style={[
-                    styles.cell,
-                    { backgroundColor: bg },
-                    isToday && styles.cellToday,
-                  ]}
-                >
-                  <Text
+            <View style={styles.grid}>
+              {gridCells.map((cell, i) => {
+                if (!cell) {
+                  return <View key={`x${i}`} style={[styles.cellEmpty, { width: cellSize, height: cellSize }]} />
+                }
+                const isToday = isCurrentMonth && cell.day === nowParts.d
+                const intensity =
+                  cell.amount > 0 ? 0.2 + Math.min(cell.amount / maxDaily, 1) * 0.7 : 0
+                const bg =
+                  cell.amount > 0
+                    ? `rgba(63,90,62,${intensity.toFixed(2)})`
+                    : Colors.surface2 ?? '#F5F2EB'
+                const textLight = cell.amount > 0 && intensity > 0.5
+                return (
+                  <View
+                    key={`d${cell.day}`}
                     style={[
-                      styles.cellText,
-                      {
-                        color: textLight
-                          ? '#FFFFFF'
-                          : Colors.ink3 ?? Colors.textSecondary,
-                      },
+                      styles.cell,
+                      { width: cellSize, height: cellSize, backgroundColor: bg },
+                      isToday && styles.cellToday,
                     ]}
                   >
-                    {cell.day}
-                  </Text>
-                </View>
-              )
-            })}
+                    <Text
+                      style={[
+                        styles.cellText,
+                        {
+                          color: textLight
+                            ? '#FFFFFF'
+                            : Colors.ink3 ?? Colors.textSecondary,
+                        },
+                      ]}
+                    >
+                      {cell.day}
+                    </Text>
+                  </View>
+                )
+              })}
+            </View>
           </View>
         </View>
       </View>
@@ -256,9 +346,9 @@ export function HistoryHeatmap({ transactions, locale }: Props) {
                 >
                   <View style={styles.monthRowLeft}>
                     <Text style={styles.monthName}>
-                      {m.date.toLocaleDateString(locale, {
+                      {monthLabel(m.y, m.m, tz, locale, {
                         month: 'long',
-                        year: m.date.getFullYear() === year ? undefined : 'numeric',
+                        year: m.y === heatmapY ? undefined : 'numeric',
                       })}
                     </Text>
                     {m.current && (
@@ -268,7 +358,7 @@ export function HistoryHeatmap({ transactions, locale }: Props) {
                     )}
                   </View>
                   <View style={styles.monthRowRight}>
-                    <Money value={m.total} size={14} serif={false} sansWeight="600" />
+                    <Money value={m.total} size={14} serif={false} sansWeight="600" currencyCode={currencyCode} locale={locale} />
                     <Ionicons
                       name="chevron-forward"
                       size={16}
@@ -316,23 +406,23 @@ const styles = StyleSheet.create({
     fontFamily: Typography.fontFamily.sansBold,
     marginHorizontal: 4,
   },
-  weekdayRow: { flexDirection: 'row', marginBottom: 6, gap: 6 },
-  weekdayCell: { flex: 1, alignItems: 'center' },
+  weekdayRow: { flexDirection: 'row', marginBottom: 6, gap: GRID_GAP },
+  weekdayCell: { alignItems: 'center' },
   weekdayText: {
     fontSize: 10,
     color: Colors.ink4 ?? Colors.textMuted,
     fontWeight: '700',
     fontFamily: Typography.fontFamily.sansBold,
   },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: GRID_GAP },
+  // `width`/`height` set per-instance above from the measured `cellSize`
+  // (fix-plan 2.4) — no hand-tuned percentage literal here anymore.
   cell: {
-    width: '13.1%',
-    aspectRatio: 1,
     borderRadius: 6,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  cellEmpty: { width: '13.1%', aspectRatio: 1 },
+  cellEmpty: {},
   cellToday: {
     borderWidth: 1.5,
     borderColor: Colors.ink ?? Colors.text,

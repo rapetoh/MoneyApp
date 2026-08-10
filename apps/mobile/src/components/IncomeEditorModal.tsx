@@ -1,14 +1,6 @@
 import { useEffect, useState } from 'react'
-import {
-  Modal,
-  View,
-  Text,
-  Pressable,
-  TextInput,
-  StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
-} from 'react-native'
+import { View, Text, Pressable, TextInput, StyleSheet } from 'react-native'
+import { BottomSheet } from './BottomSheet'
 import { Colors, Typography, Hairline } from '../theme'
 import { t, currencySymbolFor, type Locale } from '@voice-expense/shared'
 
@@ -33,6 +25,13 @@ interface Props {
  * modify the income they set during onboarding. The income is stored on
  * `profile.monthly_income` + `profile.monthly_income_source`; clearing the
  * amount writes null so the field reads "—" everywhere that displays it.
+ *
+ * Rendered through the shared `<BottomSheet>` (fix-plan 1.8/2.14) rather
+ * than a hand-rolled `<Modal>` + `<KeyboardAvoidingView>` — this was one of
+ * the four sheets 2.14 names explicitly: it already had `onRequestClose`
+ * (audit 01-F14 lists it as one of the three that got this right), so the
+ * point of the move isn't fixing this component in isolation, it's that a
+ * fourth hand-rolled sheet implementation is itself the defect (01-F1).
  */
 export function IncomeEditorModal({
   visible,
@@ -65,90 +64,60 @@ export function IncomeEditorModal({
   }
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose}>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          style={styles.sheetWrap}
-        >
-          <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
-            <View style={styles.header}>
-              <Pressable onPress={onClose} hitSlop={10}>
-                <Text style={styles.navText}>{t('common.cancel', locale)}</Text>
-              </Pressable>
-              <Text style={styles.title}>{t('settings.monthly_income', locale)}</Text>
-              <Pressable onPress={handleSave} hitSlop={10} disabled={saving}>
-                <Text style={[styles.navText, styles.saveText, saving && { opacity: 0.4 }]}>
-                  {t('common.save', locale)}
-                </Text>
-              </Pressable>
-            </View>
+    <BottomSheet
+      visible={visible}
+      onClose={onClose}
+      title={t('settings.monthly_income', locale)}
+      cancelLabel={t('common.cancel', locale)}
+      headerRight={
+        <Pressable onPress={handleSave} hitSlop={10} disabled={saving}>
+          <Text style={[styles.navText, styles.saveText, saving && { opacity: 0.4 }]}>
+            {t('common.save', locale)}
+          </Text>
+        </Pressable>
+      }
+      contentContainerStyle={styles.body}
+      testID="income-editor-sheet"
+    >
+      <Text style={styles.fieldLabel}>
+        {t('settings.income_amount', locale)}
+      </Text>
+      <View style={styles.amountRow}>
+        <Text style={styles.currencyGlyph}>{currencySymbolFor(currency)}</Text>
+        <TextInput
+          value={amount}
+          onChangeText={(v) => setAmount(v.replace(/[^\d.]/g, ''))}
+          placeholder="0"
+          placeholderTextColor={Colors.ink4 ?? Colors.textMuted}
+          keyboardType="decimal-pad"
+          style={styles.amountInput}
+          maxLength={9}
+          autoFocus
+        />
+      </View>
+      <Text style={styles.currencyHint}>
+        {t('onboarding.income.per_month', locale)} · {currency}
+      </Text>
 
-            <View style={styles.body}>
-              <Text style={styles.fieldLabel}>
-                {t('settings.income_amount', locale)}
-              </Text>
-              <View style={styles.amountRow}>
-                <Text style={styles.currencyGlyph}>{currencySymbolFor(currency)}</Text>
-                <TextInput
-                  value={amount}
-                  onChangeText={(v) => setAmount(v.replace(/[^\d.]/g, ''))}
-                  placeholder="0"
-                  placeholderTextColor={Colors.ink4 ?? Colors.textMuted}
-                  keyboardType="decimal-pad"
-                  style={styles.amountInput}
-                  maxLength={9}
-                  autoFocus
-                />
-              </View>
-              <Text style={styles.currencyHint}>
-                {t('onboarding.income.per_month', locale)} · {currency}
-              </Text>
-
-              <Text style={[styles.fieldLabel, { marginTop: 20 }]}>
-                {t('onboarding.income.source_label', locale)}
-              </Text>
-              <TextInput
-                value={source}
-                onChangeText={setSource}
-                placeholder={t('onboarding.income.source_placeholder', locale)}
-                placeholderTextColor={Colors.ink4 ?? Colors.textMuted}
-                style={styles.sourceInput}
-                autoCapitalize="words"
-              />
-              <Text style={styles.helperText}>
-                {t('settings.income_source_helper', locale)}
-              </Text>
-            </View>
-          </Pressable>
-        </KeyboardAvoidingView>
-      </Pressable>
-    </Modal>
+      <Text style={[styles.fieldLabel, { marginTop: 20 }]}>
+        {t('onboarding.income.source_label', locale)}
+      </Text>
+      <TextInput
+        value={source}
+        onChangeText={setSource}
+        placeholder={t('onboarding.income.source_placeholder', locale)}
+        placeholderTextColor={Colors.ink4 ?? Colors.textMuted}
+        style={styles.sourceInput}
+        autoCapitalize="words"
+      />
+      <Text style={styles.helperText}>
+        {t('settings.income_source_helper', locale)}
+      </Text>
+    </BottomSheet>
   )
 }
 
 const styles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    justifyContent: 'flex-end',
-  },
-  sheetWrap: { justifyContent: 'flex-end' },
-  sheet: {
-    backgroundColor: Colors.background,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    paddingBottom: 32,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: Hairline.width,
-    borderBottomColor: Hairline.color,
-  },
   navText: {
     fontSize: 15,
     color: Colors.ink2 ?? Colors.textSecondary,
@@ -159,14 +128,8 @@ const styles = StyleSheet.create({
     color: Colors.accent ?? Colors.primary,
     fontWeight: '700',
   },
-  title: {
-    fontFamily: Typography.fontFamily.sansBold,
-    fontSize: 16,
-    fontWeight: '700',
-    color: Colors.ink ?? Colors.text,
-  },
 
-  body: { padding: 20 },
+  body: { paddingHorizontal: 20, paddingTop: 4 },
   fieldLabel: {
     fontSize: 12,
     fontWeight: '700',

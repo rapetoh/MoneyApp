@@ -48,13 +48,13 @@ Rules:
 - Return ONLY valid JSON, no prose, no markdown.
 - amount: numeric, positive, no currency symbols. Transcribe the number exactly as spoken — never rescale it or silently guess where the decimal point goes. If a bare integer of 3+ digits is genuinely ambiguous for the context (speech-to-text can drop a decimal, so "450" could mean $450 or $4.50), do not pick one: set needs_clarification: true and clarifying_question to a two-option question naming both readings, e.g. "Was that $4.50 or $450?" — substitute the actual digits and the target currency. Do not set needs_clarification for amounts that are unambiguous in context (e.g. "$1450 rent", "315 a month" for a car payment).
 - currency: ISO 4217 code. Default to ${ctx.currency} if not stated.
-- flow_type: classify the transaction's MONEY-FLOW INTENT relative to the user, never by topic vocabulary — never state a debit/credit sign yourself, the app derives it from this field. One of "expense"|"income"|"transfer_out"|"transfer_in"|"refund"|"reimbursement":
-  "expense" = an ordinary purchase, bill, fee, rent, or donation — money spent and gone.
+- flow_type: classify the transaction's MONEY-FLOW INTENT relative to the user, never by topic vocabulary — never state a debit/credit sign yourself, the app derives it from this field. One of "expense"|"income"|"transfer_out"|"transfer_in"|"refund"|"reimbursement". NEVER pre-select "income" (a credit) just because the utterance contains an investing, transfer, or payoff verb — read the direction the cash actually moves, not the topic:
+  "expense" = an ordinary purchase, bill, fee, rent, or donation — money spent and gone. Also use "expense" for paying down a credit card or loan balance ("paid off my Amex", "made my car loan payment") and for cash pulled from an ATM ("took $60 out of the ATM") — both move money out of the user's spending power even though no merchant is involved.
   "income" = salary/paycheck, dividends or interest actually RECEIVED as cash, cash gifts received, or any other cash arriving that isn't a refund/reimbursement/investment sale.
   "transfer_out" = money the user moves out of their spending account into savings, brokerage, retirement, or crypto — "investing", "contributing", "depositing", "buying stocks/funds/ETFs" are ALL "transfer_out". Example: "I am investing $300 every month at Charles Schwab in the S&P 500" → flow_type "transfer_out" (the $300 left the user's checking account; a future return does not make it income today).
-  "transfer_in" = proceeds from SELLING an investment, or money moved back from savings/brokerage into the spending account.
-  "refund" = money returned for a purchase or a return.
-  "reimbursement" = money paid back to the user by another person or an employer for an expense the user fronted.
+  "transfer_in" = proceeds from SELLING an investment, or money moved back from savings/brokerage into the spending account. Example: "I sold some of my Tesla stock and $500 landed back in my checking account" → flow_type "transfer_in" (the sale itself is not "income" — it's the user's own money coming back).
+  "refund" = money returned for a purchase or a return, or a cashback/rewards credit ("got $15 cashback from my credit card" → "refund").
+  "reimbursement" = money paid back to the user by another person or an employer for an expense the user fronted ("my roommate paid me back for utilities" → "reimbursement").
   Default "expense" when unclear.
 - merchant: name of store/service if identifiable, else null.
 - merchant_domain: the website domain if you know it (e.g. "netflix.com", "starbucks.com"), else null.

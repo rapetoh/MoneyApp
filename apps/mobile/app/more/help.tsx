@@ -40,7 +40,11 @@ export default function HelpScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
-  content: { padding: Spacing.base, gap: Spacing.lg, paddingBottom: 120 },
+  // No floating tab bar here (tab-less Stack push) and `SafeAreaView
+  // edges={['bottom', ...]}` above already reserves the home-indicator
+  // inset — a plain breathing-room constant, not a bar-clearance literal
+  // (audit 01-F13).
+  content: { padding: Spacing.base, gap: Spacing.lg, paddingBottom: 24 },
   title: { ...TextStyles.displaySerif },
   body: {
     fontFamily: Typography.fontFamily.sans,

@@ -15,13 +15,77 @@ import { MatrixLens } from '../../components/lenses/Matrix'
 import {
   isLensKey,
   monthSummary,
+  type LensDay,
   type LensKey,
   type LensProps,
+  type LensRecurring,
   type LensTxn,
 } from '../../components/lenses/types'
-import { type CategoryKind, monthBounds } from '@voice-expense/shared'
+import {
+  type CategoryKind,
+  addDays,
+  civilDateTimeToInstant,
+  localDay,
+  localParts,
+  monthBounds,
+} from '@voice-expense/shared'
 
 type Cat = { id: string; name: string; kind: CategoryKind }
+
+/**
+ * One `LensDay` per civil day of `monthIso`, in `tz` — the "bucketing
+ * happens once" primitive fix-plan 2.4 calls for. Iterates `d` from 1
+ * upward and lets `civilDateTimeToInstant`'s underlying `Date.UTC`
+ * overflow do the loop-termination work: `civilDateTimeToInstant(y, m,
+ * 32, ...)` for a 31-day month silently normalizes to the 1st of the
+ * next month, which is `>= endExclusive` and stops the loop — so this
+ * never needs to compute "how many days are in this month" itself.
+ *
+ * Sums raw debit/credit (`amount_in_profile_currency`, FX-pending rows
+ * silently excluded — same as the `aggAmount` both call sites used
+ * before centralizing here), *not* the transfer-excluding `isSpend`
+ * split money.ts's `summarize()` uses: `Cashflow.tsx`'s running balance
+ * deliberately includes a Savings & Investing transfer (it really does
+ * leave the checking balance), and `Calendar.tsx`'s per-day totals
+ * always have. The month-level KPI header/MindMap/Treemap route through
+ * `monthSummary()` (fix-plan 1.4) for the transfer-aware figures instead.
+ */
+function buildMonthDays(monthIso: string, tz: string, endExclusive: string, txns: LensTxn[]): LensDay[] {
+  const [yStr, mStr] = monthIso.split('-')
+  const y = Number(yStr)
+  const m = Number(mStr)
+
+  const days: LensDay[] = []
+  for (let d = 1; ; d++) {
+    const windowStart = civilDateTimeToInstant(y, m, d, 0, 0, 0, tz)
+    if (windowStart >= endExclusive) break
+    const next = addDays(y, m, d, 1)
+    const windowEndExclusive = civilDateTimeToInstant(next.y, next.m, next.d, 0, 0, 0, tz)
+    const local = localParts(windowStart, tz)
+    days.push({
+      dayOfMonth: local.d,
+      isoDate: localDay(windowStart, tz),
+      weekdayIndex: local.weekdayIndex,
+      windowStart,
+      windowEndExclusive,
+      spendTotal: 0,
+      incomeTotal: 0,
+      txns: [],
+    })
+  }
+
+  for (const t of txns) {
+    if (t.transacted_at < days[0]?.windowStart || t.transacted_at >= endExclusive) continue
+    const day = days.find((d) => t.transacted_at >= d.windowStart && t.transacted_at < d.windowEndExclusive)
+    if (!day) continue
+    day.txns.push(t)
+    if (t.amount_in_profile_currency == null) continue // FX-pending — excluded, not folded in as 0
+    if (t.direction === 'debit') day.spendTotal += t.amount_in_profile_currency
+    else day.incomeTotal += t.amount_in_profile_currency
+  }
+
+  return days
+}
 
 export default async function OverviewPage({
   searchParams,
@@ -38,10 +102,14 @@ export default async function OverviewPage({
     getCategories(supabase, user.id),
     supabase
       .from('recurring_rules')
-      .select('name, amount, frequency')
+      // fix-plan 2.1: direction/currency_code/interval/
+      // amount_in_profile_currency added — LensRecurring (and MindMap's
+      // "Recurring outflow") cannot get the sign, FX conversion or
+      // cadence right without them. See types.ts's LensRecurring doc.
+      .select('name, amount, amount_in_profile_currency, currency_code, direction, frequency, interval')
       .eq('user_id', user.id)
       .eq('is_active', true)
-      .then((r) => (r.data ?? []) as Array<{ name: string | null; amount: number; frequency: string }>),
+      .then((r) => (r.data ?? []) as LensRecurring[]),
   ])
 
   const sp = await searchParams
@@ -64,22 +132,22 @@ export default async function OverviewPage({
   // Overview at once.
   const { year: anchorY, month: anchorM } = parseMonthIso(sp.month, tz)
   const monthIso = sp.month && /^\d{4}-\d{2}$/.test(sp.month) ? sp.month : currentMonthIso(tz)
-  // Half-open UTC bounds from period.ts (fix-plan 1.3) — replaces the old
-  // `new Date(anchorY, anchorM+1, 0, 23,59,59,999)` pattern, which built
-  // the month's end in whichever zone the *runtime* happens to be in
-  // (Vercel's UTC on the server) rather than the user's own (audit
-  // 04-F4/04-F5/04-F6 — "August shows July 8"). `LensProps.monthEnd` is
-  // documented as the *inclusive* last instant of the month, one ms
-  // behind period.ts's half-open exclusive bound.
+  // Half-open UTC bounds from period.ts (fix-plan 1.3) — never crossed
+  // to a lens as a `Date`. Passing `new Date(bounds.start)` across the
+  // RSC boundary and re-reading it with the *browser's* local getters
+  // is exactly the "August shows July 8" production bug (audit
+  // 04-F4/04-F5/04-F6/05-F1/07-F2/08-F1) — lenses get the ISO strings
+  // themselves (`LensProps.windowStart`/`windowEndExclusive`) and a
+  // precomputed `days` array (below) instead.
   const bounds = monthBounds(monthIso, tz)
-  const monthStart = new Date(bounds.start)
-  const monthEnd = new Date(new Date(bounds.endExclusive).getTime() - 1)
-  const monthLabel = monthStart.toLocaleDateString(locale, { month: 'long', timeZone: tz })
+  const monthLabel = new Date(bounds.start).toLocaleDateString(locale, { month: 'long', timeZone: tz })
+  const todayIso = localDay(new Date().toISOString(), tz)
 
   // Shape transactions for lens consumption. We pass the *full* set so
   // history-aware lenses (Matrix) can look at trailing months too.
   const lensTxns: LensTxn[] = transactions.map((t: any) => ({
     amount: t.amount,
+    currency_code: t.currency_code,
     amount_in_profile_currency: t.amount_in_profile_currency ?? null,
     direction: t.direction,
     category_id: t.category_id ?? null,
@@ -91,16 +159,26 @@ export default async function OverviewPage({
     is_recurring: !!t.is_recurring,
   }))
 
+  // Bucket every civil day of the anchor month once — see `buildMonthDays`
+  // below — so Calendar/Cashflow (and any future day-grid lens) render off
+  // `LensProps.days` instead of each re-deriving `daysInMonth`/`firstDow`
+  // from a `Date` built in whatever zone happens to be running the client.
+  const days = buildMonthDays(monthIso, tz, bounds.endExclusive, lensTxns)
+
   const lensProps: LensProps = {
     transactions: lensTxns,
     categories: cats,
     recurring,
     currency,
     locale,
+    timezone: tz,
     anchorYear: anchorY,
     anchorMonth: anchorM,
-    monthStart,
-    monthEnd,
+    monthIso,
+    windowStart: bounds.start,
+    windowEndExclusive: bounds.endExclusive,
+    days,
+    todayIso,
     monthLabel,
   }
 

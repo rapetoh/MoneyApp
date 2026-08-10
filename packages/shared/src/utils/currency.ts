@@ -161,6 +161,35 @@ export function currencySymbolFor(code: string): string {
   }
 }
 
+/**
+ * Quick-adjust chip magnitudes for the amount-correction UI (fix-plan
+ * 2.6 / audit 01-F19) — keyed by currency because a fixed `±1` step is a
+ * different-sized nudge in every currency. `±1 USD` corrects a coffee-run
+ * typo; `±1 JPY` or `±1 XAF` is smaller than the currency's own rounding
+ * noise and cannot correct anything a user would actually mis-hear. These
+ * are static, deliberately-round approximations of "a small, medium and
+ * large real-world correction" in each currency, not a live FX
+ * conversion of the USD defaults — they don't need to track exchange
+ * rates precisely, only stay in the right order of magnitude. Add an
+ * entry here (not a call-site literal) when a new currency joins
+ * `settings.tsx`'s `CURRENCIES` list.
+ */
+const ADJUST_DELTA_MAGNITUDES: Record<string, [number, number, number, number]> = {
+  JPY: [-100, 100, 500, 1000],
+  XAF: [-500, 500, 2500, 5000],
+  NGN: [-500, 500, 2500, 5000],
+  GHS: [-5, 5, 25, 50],
+}
+
+/** Default step for currencies not listed in `ADJUST_DELTA_MAGNITUDES`
+ *  (USD, EUR, GBP, CAD, CHF, AUD …) — matches the app's original
+ *  hard-coded `[-1, 1, 5, 10]`. */
+const DEFAULT_ADJUST_DELTAS: [number, number, number, number] = [-1, 1, 5, 10]
+
+export function amountAdjustDeltasFor(currencyCode: string): [number, number, number, number] {
+  return ADJUST_DELTA_MAGNITUDES[currencyCode] ?? DEFAULT_ADJUST_DELTAS
+}
+
 // Deterministic color from a string (for merchant avatar fallback)
 export function merchantColor(name: string): string {
   const colors = [

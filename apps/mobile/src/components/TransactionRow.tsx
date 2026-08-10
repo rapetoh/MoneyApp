@@ -2,7 +2,7 @@ import React from 'react'
 import { View, Text, Pressable, StyleSheet } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import type { Transaction } from '@voice-expense/shared'
-import { t, currencySymbolFor } from '@voice-expense/shared'
+import { t, sourceLabel } from '@voice-expense/shared'
 import type { Locale } from '@voice-expense/shared'
 import { MerchantAvatar } from './MerchantAvatar'
 import { Money } from './Money'
@@ -97,6 +97,21 @@ export function TransactionRow({
               </View>
             ) : null}
             {categoryName ? <Text style={styles.metaDot}>·</Text> : null}
+            {/* Engine-generated rows get the shared source-label vocabulary
+                (fix-plan 2.12) — a distinct fact from the repeat glyph
+                above, which marks "this transaction belongs to a
+                recurring rule" (`is_recurring`) whether a person or the
+                generator logged it. A `manual` row a person flagged as
+                recurring still shows only the glyph, never this label —
+                `sourceLabel` reads `transaction.source`, never
+                `is_recurring`, exactly like the shared module's own
+                contract. */}
+            {transaction.source === 'recurring_generated' ? (
+              <>
+                <Text style={styles.metaAuto}>{sourceLabel(transaction.source)}</Text>
+                <Text style={styles.metaDot}>·</Text>
+              </>
+            ) : null}
             <Text style={styles.metaTime}>{formatTime(transaction.transacted_at)}</Text>
           </View>
         </View>
@@ -109,7 +124,8 @@ export function TransactionRow({
           // Row amounts keep their original currency — a €45 dinner must
           // not render as $45. Falls back to the profile currency for
           // legacy rows without a currency_code.
-          sign={currencySymbolFor(transaction.currency_code || currency)}
+          currencyCode={transaction.currency_code || currency}
+          locale={locale}
         />
       </View>
     </Pressable>
@@ -170,6 +186,12 @@ const styles = StyleSheet.create({
   metaDot: {
     fontSize: 12,
     color: Colors.ink4 ?? Colors.textMuted,
+  },
+  metaAuto: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: Colors.ink4 ?? Colors.textMuted,
+    fontFamily: Typography.fontFamily.sansSemiBold,
   },
   metaTime: {
     fontSize: 12,

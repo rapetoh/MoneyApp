@@ -1,9 +1,25 @@
 import { Text, StyleSheet, type TextStyle } from 'react-native'
+import { formatMoneyParts } from '@voice-expense/shared'
 import { Colors, Typography } from '../theme'
 
 interface Props {
   /** Raw numeric value. Negatives render with a "−" prefix. */
   value: number
+  /** ISO 4217 currency code the amount is denominated in — e.g. the
+   *  row's own `transaction.currency_code`, or `profile.currency_code`
+   *  for an aggregate. Required: fix-plan 2.6 (audit 01-F6/05-F4/07-F3/
+   *  08-F4). The old `sign?: string` prop defaulted to `'$'`, and eleven
+   *  of thirteen call sites omitted it — every aggregate on the app
+   *  rendered a EUR/GBP/XAF/NGN profile's money in dollars while the
+   *  transaction rows directly beneath rendered correctly. There is no
+   *  safe default for this parameter; making it required makes the
+   *  omission a compile error instead of a silent wrong currency. */
+  currencyCode: string
+  /** BCP 47 locale for digit grouping and the decimal separator — e.g.
+   *  `profile.locale`. Required for the same reason as `currencyCode`
+   *  (audit 01-F21): the previous hard-coded `.toLocaleString('en-US')`
+   *  grouped every non-English profile's money in US convention. */
+  locale: string
   /** Display pixel size for the integer digits. Decimals and currency glyph scale off this. */
   size?: number
   /** If true (default), uses serif display face per DESIGN.md "money is personal, not a spreadsheet". */
@@ -12,8 +28,6 @@ interface Props {
   muted?: boolean
   /** Font weight for sans variant. Serif rendering always uses 500. */
   sansWeight?: TextStyle['fontWeight']
-  /** Currency glyph. Defaults to "$". Use "€", "£", etc. for non-USD. */
-  sign?: string
   /** Override default text color (e.g. income green, destructive rose). */
   color?: string
   /** Extra style hook for the outer Text node (margin, alignment). */
@@ -24,10 +38,16 @@ interface Props {
  * Money — matches the `Money` helper in docs/money-app/project/tokens.jsx.
  *
  * Rendering rules:
- *   - Integer part formatted with locale thousands separator ("1,250").
+ *   - Digits, grouping, decimal separator and symbol placement come from
+ *     `formatMoneyParts(value, currencyCode, locale)` (packages/shared) —
+ *     the one Intl-backed formatter both platforms consume, instead of a
+ *     hand-rolled glyph table and a hard-coded locale.
  *   - Currency glyph rendered at 58% of display size, opacity 0.55, slightly
- *     raised off the baseline so it tucks above the integer.
- *   - Decimal "." + two digits rendered at opacity 0.55 (de-emphasized).
+ *     raised off the baseline so it tucks above the integer — positioned
+ *     before or after the digits per `symbolFirst` ("$92" vs a locale
+ *     where the symbol trails the amount).
+ *   - Decimal separator + fraction digits rendered at opacity 0.55
+ *     (de-emphasized).
  *   - Tabular figures via `fontVariant: ['tabular-nums']` so columns of
  *     amounts align.
  *   - Negative values render with a Unicode minus "−" (not ASCII hyphen) for
@@ -37,18 +57,17 @@ interface Props {
  */
 export function Money({
   value,
+  currencyCode,
+  locale,
   size = 28,
   serif = true,
   muted = false,
   sansWeight = '600',
-  sign = '$',
   color,
   style,
 }: Props) {
   const isNeg = value < 0
-  const abs = Math.abs(value)
-  const [intPart, decPart] = abs.toFixed(2).split('.')
-  const intFmt = parseInt(intPart, 10).toLocaleString('en-US')
+  const { symbol, symbolFirst, integer, decimal, fraction } = formatMoneyParts(value, currencyCode, locale)
 
   const resolvedColor = color ?? (muted ? Colors.ink3 ?? Colors.textSecondary : Colors.ink ?? Colors.text)
   const family = serif ? Typography.fontFamily.serif : Typography.fontFamily.sansSemiBold
@@ -61,6 +80,12 @@ export function Money({
   const glyphSize = Math.round(size * 0.58)
   const glyphBaseline: TextStyle['textAlignVertical'] = 'center'
   const glyphLineHeight = size
+  const glyphStyle: TextStyle = {
+    opacity: 0.55,
+    fontSize: glyphSize,
+    lineHeight: glyphLineHeight,
+    textAlignVertical: glyphBaseline,
+  }
 
   return (
     <Text
@@ -79,18 +104,10 @@ export function Money({
       ]}
     >
       {isNeg && '−'}
-      <Text
-        style={{
-          opacity: 0.55,
-          fontSize: glyphSize,
-          lineHeight: glyphLineHeight,
-          textAlignVertical: glyphBaseline,
-        }}
-      >
-        {sign}
-      </Text>
-      {intFmt}
-      <Text style={{ opacity: 0.55 }}>.{decPart}</Text>
+      {symbolFirst && <Text style={glyphStyle}>{symbol}</Text>}
+      {integer}
+      {(decimal || fraction) && <Text style={{ opacity: 0.55 }}>{decimal}{fraction}</Text>}
+      {!symbolFirst && <Text style={glyphStyle}>{' ' + symbol}</Text>}
     </Text>
   )
 }

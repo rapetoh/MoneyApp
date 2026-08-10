@@ -4,11 +4,20 @@
 // EUR/GBP/XAF/JPY users see the right symbol + grouping conventions instead
 // of a hard-coded `$`.
 import { colors, font } from '../lib/theme'
+import { formatMoneyParts } from '@voice-expense/shared'
 
 type Props = {
   value: number
   currency: string
-  locale?: string
+  /** BCP 47 locale for digit grouping and the decimal separator — e.g.
+   *  `profile.locale`. Required: fix-plan 2.6 (audit 01-F21). The old
+   *  `locale = 'en'` default is the same class of defect `sign = '$'`
+   *  was on mobile — every call site already threads a real locale
+   *  (verified: none currently rely on the default), so making it
+   *  required costs nothing today and stops a future call site from
+   *  silently reintroducing English grouping under a non-English
+   *  currency. */
+  locale: string
   size?: number
   muted?: boolean
   serif?: boolean
@@ -22,7 +31,7 @@ type Props = {
 export function Money({
   value,
   currency,
-  locale = 'en',
+  locale,
   size = 28,
   muted = false,
   serif = true,
@@ -31,22 +40,10 @@ export function Money({
   color,
 }: Props) {
   const isNeg = value < 0
-  const abs = Math.abs(value)
-  const parts = new Intl.NumberFormat(locale, {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).formatToParts(abs)
-
-  const symbol = parts.find((p) => p.type === 'currency')?.value ?? ''
-  const integer = parts
-    .filter((p) => p.type === 'integer' || p.type === 'group')
-    .map((p) => p.value)
-    .join('')
-  const fraction = parts.find((p) => p.type === 'fraction')?.value ?? '00'
-  const decimal = parts.find((p) => p.type === 'decimal')?.value ?? '.'
-  const symbolFirst = parts[0]?.type === 'currency'
+  // formatMoneyParts (packages/shared/src/utils/currency.ts) is the one
+  // Intl-backed formatter both platforms consume — this used to be a
+  // hand-rolled `formatToParts` call duplicating that module exactly.
+  const { symbol, symbolFirst, integer, decimal, fraction } = formatMoneyParts(value, currency, locale)
 
   const sign = isNeg ? '−' : showPositiveSign ? '+' : ''
 

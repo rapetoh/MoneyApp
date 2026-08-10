@@ -1,9 +1,4 @@
 'use client'
-/* eslint-disable local/period-restrictions -- Stage 2 (2.4/2.14) migration
- * pending: this page's occurrence/window math hasn't been converted onto
- * packages/shared/src/domain/recurrence.ts + period.ts yet (fix-plan 2.3
- * owns the recurring-rules rewrite) — out of item 1.3's own named
- * surfaces. */
 import { useState, useEffect, useMemo } from 'react'
 import { createClient } from '../../../lib/supabase/client'
 import { colors, font, radius } from '../../../lib/theme'
@@ -11,6 +6,7 @@ import { Toolbar } from '../../../components/Toolbar'
 import { Money } from '../../../components/Money'
 import { MerchantLogo } from '../../../components/MerchantLogo'
 import { Icon } from '../../../components/Icons'
+import { ErrorState } from '../../../components/ErrorState'
 import {
   detectRecurringPatterns,
   type RecurringPatternCandidate,
@@ -21,11 +17,20 @@ import {
   nextOccurrence as sharedNextOccurrence,
   monthlyEquivalent,
   annualEquivalent,
+  chargesInWindow,
+  localDay,
+  localParts,
+  daysBetween,
+  addDays,
+  civilDateTimeToInstant,
 } from '@voice-expense/shared'
 
 type Txn = {
   id: string
   amount: number
+  amount_in_profile_currency: number | null
+  fx_rate_to_profile: number | null
+  fx_rate_date: string | null
   currency_code: string
   direction: 'debit' | 'credit'
   merchant: string | null
@@ -34,6 +39,14 @@ type Txn = {
   transacted_at: string
   is_deleted: boolean
   is_recurring: boolean
+}
+
+/** FX-aware amount for a rule's own cost normalizers (fix-plan 2.1): use
+ *  the profile-currency snapshot (migration 025) when it has landed,
+ *  never null-coalesce a pending one to 0 — a EUR rule and a USD rule
+ *  on a USD profile must not sum as if both were already dollars. */
+function fxAmount(r: RecurringRule): number {
+  return r.amount_in_profile_currency ?? r.amount
 }
 type Cat = { id: string; name: string; color?: string | null }
 
@@ -54,14 +67,8 @@ function freqLabel(f: RecurringFrequency): string {
 // domain/recurrence.ts`, fix-plan 1.5 / audit 03-F8, 04-F2, 04-F3,
 // 04-F20, 06-F22, 07-F22). This used to be the third byte-for-byte copy
 // of a `setMonth`/`setFullYear` overflow bug — a rule anchored on the
-// 31st permanently drifted to the 3rd after the first February. `tz`
-// is the browser's own zone (`Intl.DateTimeFormat().resolvedOptions()
-// .timeZone`, resolved once per render below) rather than
-// `profile.timezone`: nothing writes that column from web yet
-// (fix-plan 1.3's device-zone capture is mobile-only so far), so it
-// reads the schema default `'UTC'` for every profile and would be
-// wrong for most users — the browser's own zone is the more accurate
-// signal available on this page today.
+// 31st permanently drifted to the 3rd after the first February. `tz` is
+// `profile.timezone` (fix-plan 2.4), not the browser's own zone.
 function nextOccurrence(rule: RecurringRule, tz: string, fromDate?: Date): Date | null {
   const after = fromDate ? fromDate.toISOString() : (rule.last_generated ?? null)
   const occurrence = sharedNextOccurrence(rule, after, tz)
@@ -104,25 +111,38 @@ function writeDismissed(userId: string, s: Set<string>) {
 // `interval` — 03-F23) are imported directly from the shared module
 // above; this file no longer carries its own copy.
 
-// Walk forward N days from `from`, emitting every charge from each rule.
+// Every charge from each active rule in the next 30 days, resolved via
+// the shared engine's `chargesInWindow` (fix-plan 2.3(c) — "both writers
+// now call this one generator") instead of a hand-rolled `while (nxt &&
+// nxt <= horizon && safety < 60)` loop. `day` is a 1..30 offset from
+// today in `tz` — the grid this feeds (1..30 cells under a fixed
+// weekday header) is fix-plan 2.4's own item; this function only owns
+// the occurrence math that decides *which* day each charge lands on.
+/** The calendar date `dayOffset` (1 = today, matching `chargesIn30Days`'s
+ *  own convention) lands on, formatted for display. Noon avoids the
+ *  midnight-boundary flip a bare `new Date(instant).toLocaleDateString()`
+ *  can hit right at a DST transition. */
+function dayOffsetToLabel(dayOffset: number, tz: string, locale: string): string {
+  const todayIso = localDay(new Date().toISOString(), tz)
+  const [ty, tm, td] = todayIso.split('-').map(Number)
+  const target = addDays(ty, tm, td, dayOffset - 1)
+  const instant = civilDateTimeToInstant(target.y, target.m, target.d, 12, 0, 0, tz)
+  return new Date(instant).toLocaleDateString(locale, { month: 'short', day: 'numeric' })
+}
+
 function chargesIn30Days(rules: RecurringRule[], tz: string): Array<{ day: number; rule: RecurringRule }> {
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const horizon = new Date(today)
-  horizon.setDate(today.getDate() + 30)
+  const todayIso = localDay(new Date().toISOString(), tz)
+  const [ty, tm, td] = todayIso.split('-').map(Number)
+  const startInstant = civilDateTimeToInstant(ty, tm, td, 0, 0, 0, tz)
+  const horizon = addDays(ty, tm, td, 30)
+  const endExclusiveInstant = civilDateTimeToInstant(horizon.y, horizon.m, horizon.d, 0, 0, 0, tz)
+
+  const active = rules.filter((r) => r.is_active)
   const out: Array<{ day: number; rule: RecurringRule }> = []
-  for (const r of rules) {
-    if (!r.is_active) continue
-    let nxt = nextOccurrence(r, tz)
-    let safety = 0
-    while (nxt && nxt <= horizon && safety < 60) {
-      if (nxt >= today) {
-        const dayOffset = Math.round((nxt.getTime() - today.getTime()) / 86_400_000)
-        out.push({ day: dayOffset + 1, rule: r })
-      }
-      nxt = nextOccurrence(r, tz, nxt)
-      safety += 1
-    }
+  for (const { rule, occurrence } of chargesInWindow(active, startInstant, endExclusiveInstant, tz)) {
+    const occ = localParts(occurrence.instant, tz)
+    const dayOffset = daysBetween(ty, tm, td, occ.y, occ.m, occ.d)
+    out.push({ day: dayOffset + 1, rule })
   }
   return out
 }
@@ -134,18 +154,21 @@ export default function RecurringPage() {
   const [categories, setCategories] = useState<Cat[]>([])
   const { isPlus } = usePlus()
   const [loading, setLoading] = useState(true)
+  // Read-error state, distinct from "loaded, no recurring rules yet"
+  // (fix-plan 2.13 / audit 08-F21 family).
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [dismissed, setDismissed] = useState<Set<string>>(new Set())
-  const [profile, setProfile] = useState<{ currency_code?: string; locale?: string } | null>(null)
+  const [profile, setProfile] = useState<{ currency_code?: string; locale?: string; timezone?: string } | null>(
+    null,
+  )
   const [userId, setUserId] = useState<string | null>(null)
-  // See the `nextOccurrence` docstring above for why this is the
-  // browser's zone rather than `profile.timezone`.
-  const tz = useMemo(() => {
-    try {
-      return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
-    } catch {
-      return 'UTC'
-    }
-  }, [])
+  // profiles.timezone (fix-plan 1.3 part 1, written by `TimezoneSync` in
+  // dashboard/layout.tsx on every authenticated render) — every window
+  // this page computes (the 30-day strip below, each rule's next-charge
+  // date) now resolves in the profile's own zone rather than the
+  // browser's, so this page agrees with mobile and the Overview about
+  // which day a charge lands on (fix-plan 2.4).
+  const tz = profile?.timezone || 'UTC'
 
   async function load() {
     const { data: { user } } = await supabase.auth.getUser()
@@ -169,12 +192,14 @@ export default function RecurringPage() {
         .select('id, name, color')
         .eq('user_id', user.id)
         .eq('is_archived', false),
-      supabase.from('profiles').select('currency_code, locale').eq('id', user.id).single(),
+      supabase.from('profiles').select('currency_code, locale, timezone').eq('id', user.id).single(),
     ])
-    setRules((r.data ?? []) as RecurringRule[])
-    setTransactions((t.data ?? []) as Txn[])
-    setCategories((c.data ?? []) as Cat[])
-    setProfile(p.data)
+    const failure = r.error ?? t.error ?? c.error ?? p.error
+    setLoadError(failure ? failure.message : null)
+    if (!r.error) setRules((r.data ?? []) as RecurringRule[])
+    if (!t.error) setTransactions((t.data ?? []) as Txn[])
+    if (!c.error) setCategories((c.data ?? []) as Cat[])
+    if (!p.error) setProfile(p.data)
     setLoading(false)
   }
 
@@ -233,7 +258,21 @@ export default function RecurringPage() {
   async function acceptCandidate(c: RecurringPatternCandidate) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
-    const startsAt = new Date().toISOString()
+
+    // Anchor BOTH starts_at and last_generated to the candidate's own
+    // last-seen date (fix-plan 2.3(b)) — `starts_at` alone as "now" was
+    // a latent second bug: with no anchor_day/anchor_weekday/anchor_time
+    // columns set, the recurrence engine derives the day-of-month clamp
+    // from `starts_at` (`resolveAnchor` in packages/shared/src/domain/
+    // recurrence.ts), so a Netflix bill that always charges on the 5th,
+    // accepted on the 20th, would have clamped to the 20th forever.
+    const anchorInstant = c.lastSeenAt
+    const anchorParts = localParts(anchorInstant, tz)
+    // Reuse the template transaction's own FX snapshot rather than a
+    // fresh lookup — same amount, same currency, same day, so it's
+    // exact (fix-plan 2.1's "snapshotted on create/update").
+    const template = transactions.find((t) => t.id === c.templateTxnId)
+
     const { error } = await supabase.from('recurring_rules').insert({
       user_id: user.id,
       client_id: crypto.randomUUID(),
@@ -246,11 +285,17 @@ export default function RecurringPage() {
       note: null,
       frequency: c.frequency,
       interval: 1,
-      starts_at: startsAt,
+      starts_at: anchorInstant,
       ends_at: null,
-      last_generated: c.lastSeenAt,
+      last_generated: anchorInstant,
       is_active: true,
       template_txn_id: c.templateTxnId,
+      amount_in_profile_currency: template?.amount_in_profile_currency ?? null,
+      fx_rate_to_profile: template?.fx_rate_to_profile ?? null,
+      fx_rate_date: template?.fx_rate_date ?? null,
+      anchor_day: anchorParts.d,
+      anchor_weekday: anchorParts.weekdayIndex + 1,
+      anchor_time: `${String(anchorParts.hour).padStart(2, '0')}:${String(anchorParts.minute).padStart(2, '0')}:${String(anchorParts.second).padStart(2, '0')}`,
     })
     if (error) {
       // One active rule per (user, direction, name) — a same-merchant
@@ -275,6 +320,9 @@ export default function RecurringPage() {
               category_id: c.category_id,
               payment_method: c.payment_method,
               last_generated: c.lastSeenAt,
+              amount_in_profile_currency: template?.amount_in_profile_currency ?? null,
+              fx_rate_to_profile: template?.fx_rate_to_profile ?? null,
+              fx_rate_date: template?.fx_rate_date ?? null,
             })
             .eq('id', existing.id)
         }
@@ -302,8 +350,20 @@ export default function RecurringPage() {
   const active = rules.filter((r) => r.is_active)
   const inactive = rules.filter((r) => !r.is_active)
 
-  const monthlyTotal = active.reduce((sum, r) => sum + monthlyEquivalent(r), 0)
-  const annualTotal = active.reduce((sum, r) => sum + annualEquivalent(r), 0)
+  // Debit-only, FX-normalised (fix-plan 2.1's "Done when": a 4000/mo
+  // credit rule alongside a 15/mo debit rule must produce a hero of 15,
+  // not 4015 — this page's "Monthly"/"Annual cost" stats are this
+  // surface's hero). An active income rule no longer inflates either
+  // figure; it simply isn't counted here.
+  const outflowRules = active.filter((r) => r.direction === 'debit')
+  const monthlyTotal = outflowRules.reduce(
+    (sum, r) => sum + monthlyEquivalent({ ...r, amount: fxAmount(r) }),
+    0,
+  )
+  const annualTotal = outflowRules.reduce(
+    (sum, r) => sum + annualEquivalent({ ...r, amount: fxAmount(r) }),
+    0,
+  )
   const reviewCount = candidates.length // Detected = "to review"
 
   const currency = profile?.currency_code ?? 'USD'
@@ -322,6 +382,25 @@ export default function RecurringPage() {
 
   // Charges in next 30 days (each entry = a day-offset 1..30 with a rule).
   const charges = useMemo(() => chargesIn30Days(active, tz), [active, tz])
+
+  // Real dates for the 30-day strip's grid (fix-plan 2.4 — this is the
+  // "recurring 'Next 30 days' strip must be built from real dates with
+  // leading blanks and day-of-month labels rather than 1..30 offsets
+  // under a `M T W T F S S` header" item). `weekdayIndex` (Monday=0…
+  // Sunday=6, from `period.ts`'s `localParts`) is what lets the grid
+  // put day-offset 1 under its real weekday column instead of always
+  // starting a fresh Monday-shaped row at "today", which is what the
+  // fixed offset numbering under a static header did.
+  const next30Days = useMemo(() => {
+    const todayIso = localDay(new Date().toISOString(), tz)
+    const [ty, tm, td] = todayIso.split('-').map(Number)
+    return Array.from({ length: 30 }, (_, i) => {
+      const target = addDays(ty, tm, td, i)
+      const instant = civilDateTimeToInstant(target.y, target.m, target.d, 12, 0, 0, tz)
+      const local = localParts(instant, tz)
+      return { dayOffset: i + 1, dayOfMonth: local.d, weekdayIndex: local.weekdayIndex }
+    })
+  }, [tz])
   const chargesByDay = useMemo(() => {
     const m: Record<number, Array<RecurringRule>> = {}
     for (const c of charges) {
@@ -345,19 +424,19 @@ export default function RecurringPage() {
     }
     return { day: bestDay, sum: bestSum }
   })()
-  const heaviestDate = heaviestEntry.day
-    ? (() => {
-        const d = new Date()
-        d.setHours(0, 0, 0, 0)
-        d.setDate(d.getDate() + heaviestEntry.day - 1)
-        return d.toLocaleDateString(locale, { month: 'short', day: 'numeric' })
-      })()
-    : null
+  const heaviestDate = heaviestEntry.day ? dayOffsetToLabel(heaviestEntry.day, tz, locale) : null
 
   // "Potential savings" card content. Use the candidates the model flagged
   // as new subscriptions you might not have intended — sum them as the
   // "if you cancel" upper bound.
-  const potentialMonthly = candidates.reduce((s, c) => s + (c.frequency === 'monthly' ? c.amount : 0), 0)
+  // Derived from the same filtered set that produces `reviewCount`
+  // (fix-plan 2.1) — the old `c.frequency === 'monthly' ? c.amount : 0`
+  // silently dropped every weekly/quarterly/yearly candidate from the
+  // sum while still counting it in "N flagged" a few lines below.
+  const potentialMonthly = candidates.reduce(
+    (s, c) => s + monthlyEquivalent({ frequency: c.frequency, interval: 1, amount: c.amount }),
+    0,
+  )
   const potentialYearly = potentialMonthly * 12
 
   return (
@@ -470,6 +549,8 @@ export default function RecurringPage() {
             <div style={{ flex: 1, overflow: 'auto' }}>
               {loading ? (
                 <div style={styles.empty}>Loading…</div>
+              ) : loadError ? (
+                <ErrorState message="We couldn't load your recurring rules." detail={loadError} onRetry={load} />
               ) : sortedActive.length === 0 && inactive.length === 0 ? (
                 <div style={styles.empty}>
                   No recurring rules yet. Mark a transaction as recurring on mobile or accept a detected pattern.
@@ -478,6 +559,14 @@ export default function RecurringPage() {
                 <>
                   {sortedActive.map((r, i) => {
                     const next = nextOccurrence(r, tz)
+                    // Overdue — pending generation (fix-plan 2.1 / 03-F24):
+                    // the mechanically-next occurrence already fell in the
+                    // past, i.e. generation hasn't caught up yet. Rendered
+                    // as its own state rather than a stale past date sorted
+                    // as imminent (sort order is unaffected — a past instant
+                    // already sorts first among `sortedActive`, which is
+                    // ascending by this same value).
+                    const overdue = next != null && next.getTime() < Date.now()
                     const catName = r.category_id ? catMap[r.category_id]?.name ?? null : null
                     return (
                       <div
@@ -515,8 +604,12 @@ export default function RecurringPage() {
                         <div style={{ color: colors.ink3, fontSize: 12, textTransform: 'capitalize' }}>
                           {freqLabel(r.frequency)}
                         </div>
-                        <div style={{ color: colors.ink2, fontSize: 12 }}>
-                          {next ? next.toLocaleDateString(locale, { month: 'short', day: 'numeric' }) : '—'}
+                        <div style={{ color: overdue ? colors.accent : colors.ink2, fontSize: 12, fontWeight: overdue ? 700 : 400 }}>
+                          {overdue
+                            ? 'Overdue'
+                            : next
+                              ? next.toLocaleDateString(locale, { month: 'short', day: 'numeric' })
+                              : '—'}
                         </div>
                         <div style={{ textAlign: 'right' }}>
                           <button onClick={() => toggleActive(r)} style={styles.activePill} title="Pause">
@@ -606,12 +699,18 @@ export default function RecurringPage() {
                     {d}
                   </div>
                 ))}
-                {Array.from({ length: 30 }).map((_, i) => {
-                  const day = i + 1
-                  const items = chargesByDay[day]
+                {/* Leading blanks so day-offset 1 (today) lands under its
+                    real weekday column, exactly like Calendar.tsx's month
+                    grid — a fixed offset numbering under a static header
+                    always started a fresh "Monday" row at today instead. */}
+                {Array.from({ length: next30Days[0]?.weekdayIndex ?? 0 }).map((_, i) => (
+                  <div key={`blank-${i}`} />
+                ))}
+                {next30Days.map(({ dayOffset, dayOfMonth }) => {
+                  const items = chargesByDay[dayOffset]
                   return (
                     <div
-                      key={day}
+                      key={dayOffset}
                       style={{
                         aspectRatio: 1,
                         borderRadius: 6,
@@ -625,7 +724,7 @@ export default function RecurringPage() {
                         fontWeight: 700,
                       }}
                     >
-                      <div>{day}</div>
+                      <div>{dayOfMonth}</div>
                       {items && (
                         <div style={{ marginTop: 'auto', fontSize: 8, lineHeight: 1.1, fontWeight: 700 }}>
                           {items.length}
@@ -648,11 +747,7 @@ export default function RecurringPage() {
                   }}
                 >
                   <b style={{ color: colors.ink }}>{fmtShort(totalCharges)}</b> in charges hit before{' '}
-                  {(() => {
-                    const d = new Date()
-                    d.setDate(d.getDate() + 30)
-                    return d.toLocaleDateString(locale, { month: 'short', day: 'numeric' })
-                  })()}
+                  {dayOffsetToLabel(31, tz, locale)}
                   .
                   {heaviestDate && (
                     <>

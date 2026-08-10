@@ -79,7 +79,12 @@ export function CategoryPicker({ categories, selectedId, onSelect, onCreateCateg
         <Text style={styles.triggerChevron}>›</Text>
       </Pressable>
 
-      <Modal visible={modalVisible} animationType="slide" presentationStyle="pageSheet">
+      <Modal
+        visible={modalVisible}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setModalVisible(false)}
+      >
         <View style={styles.modal}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>{t('voice.category', locale)}</Text>

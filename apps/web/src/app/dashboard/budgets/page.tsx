@@ -1,9 +1,4 @@
 'use client'
-/* eslint-disable local/period-restrictions -- Stage 2 (2.4/2.14) migration
- * pending: this page's period window math hasn't been converted onto
- * packages/shared/src/utils/period.ts's `periodBounds` yet (fix-plan
- * 2.5 owns the budget-period rewrite) — out of item 1.3's own named
- * surfaces. */
 import { useState, useEffect, useMemo } from 'react'
 import { createClient } from '../../../lib/supabase/client'
 import { colors, font, radius, cat, type CategoryTint } from '../../../lib/theme'
@@ -12,8 +7,14 @@ import { Toolbar } from '../../../components/Toolbar'
 import { Money } from '../../../components/Money'
 import { Chip } from '../../../components/Chip'
 import { Icon } from '../../../components/Icons'
-import type { BudgetPeriod } from '@voice-expense/shared'
-import { aggAmount } from '@voice-expense/shared'
+import { ErrorState } from '../../../components/ErrorState'
+import type {
+  BudgetPeriod,
+  BudgetStatusRule,
+  BudgetStatusTransaction,
+  CategoryKind,
+} from '@voice-expense/shared'
+import { budgetStatus, localDay } from '@voice-expense/shared'
 
 const PERIODS: { value: BudgetPeriod; label: string }[] = [
   { value: 'weekly', label: 'Weekly' },
@@ -23,46 +24,23 @@ const PERIODS: { value: BudgetPeriod; label: string }[] = [
   { value: 'yearly', label: 'Yearly' },
 ]
 
-type Cat = { id: string; name: string }
+type Cat = { id: string; name: string; kind: CategoryKind }
 type Txn = {
   amount: number
   amount_in_profile_currency: number | null
   direction: 'debit' | 'credit'
   transacted_at: string
   category_id: string | null
+  recurring_rule_id: string | null
 }
 type Budget = {
   id: string
   amount: number
   period: BudgetPeriod
   category_id: string | null
+  currency_code: string
+  starts_at: string
   is_active: boolean
-}
-
-function periodStart(period: BudgetPeriod, ref = new Date()): Date {
-  const now = new Date(ref)
-  if (period === 'weekly') {
-    const day = now.getDay()
-    const diff = day === 0 ? 6 : day - 1
-    const start = new Date(now)
-    start.setDate(now.getDate() - diff)
-    start.setHours(0, 0, 0, 0)
-    return start
-  }
-  if (period === 'biweekly') {
-    const start = new Date(now)
-    start.setDate(now.getDate() - 13)
-    start.setHours(0, 0, 0, 0)
-    return start
-  }
-  if (period === 'quarterly') {
-    const q = Math.floor(now.getMonth() / 3)
-    return new Date(now.getFullYear(), q * 3, 1)
-  }
-  if (period === 'yearly') {
-    return new Date(now.getFullYear(), 0, 1)
-  }
-  return new Date(now.getFullYear(), now.getMonth(), 1)
 }
 
 export default function BudgetsPage() {
@@ -70,7 +48,10 @@ export default function BudgetsPage() {
   const [budgets, setBudgets] = useState<Budget[]>([])
   const [transactions, setTransactions] = useState<Txn[]>([])
   const [categories, setCategories] = useState<Cat[]>([])
-  const [profile, setProfile] = useState<{ currency_code?: string; locale?: string } | null>(null)
+  const [recurringRules, setRecurringRules] = useState<BudgetStatusRule[]>([])
+  const [profile, setProfile] = useState<{ currency_code?: string; locale?: string; timezone?: string } | null>(
+    null,
+  )
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [amount, setAmount] = useState('')
@@ -78,32 +59,43 @@ export default function BudgetsPage() {
   const [categoryId, setCategoryId] = useState<string>('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Read-error state, distinct from `error` above (which is the save-form's
+  // own error) and distinct from "loaded, no active budget yet" (fix-plan
+  // 2.13 / audit 08-F21 family).
+  const [loadError, setLoadError] = useState<string | null>(null)
 
   async function load() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
-    const [b, t, c, p] = await Promise.all([
+    const [b, t, c, r, p] = await Promise.all([
       supabase
         .from('budgets')
         .select('*')
         .eq('user_id', user.id)
         .eq('is_active', true)
         .order('created_at', { ascending: false }),
-      // `amount_in_profile_currency` is required — aggregations use it
-      // via `aggAmount(t)`. Without it the column comes back undefined
-      // and every total resolves to 0.
+      // `amount_in_profile_currency` is required — `budgetStatus()` uses
+      // it. `category_id`/`recurring_rule_id` are what scope a
+      // per-category budget and dedupe an already-posted recurring
+      // occurrence out of `committed` (fix-plan 2.5).
       supabase
         .from('transactions')
-        .select('amount, amount_in_profile_currency, direction, transacted_at, category_id')
+        .select('amount, amount_in_profile_currency, direction, transacted_at, category_id, recurring_rule_id')
         .eq('user_id', user.id)
         .eq('is_deleted', false),
-      supabase.from('categories').select('id, name').eq('user_id', user.id).eq('is_archived', false),
-      supabase.from('profiles').select('currency_code, locale').eq('id', user.id).single(),
+      supabase.from('categories').select('id, name, kind').eq('user_id', user.id).eq('is_archived', false),
+      // `budgetStatus()`'s `committed` figure — active debit rules due in
+      // the window that haven't posted as a transaction yet.
+      supabase.from('recurring_rules').select('*').eq('user_id', user.id).eq('is_active', true),
+      supabase.from('profiles').select('currency_code, locale, timezone').eq('id', user.id).single(),
     ])
-    setBudgets((b.data ?? []) as Budget[])
-    setTransactions((t.data ?? []) as Txn[])
-    setCategories((c.data ?? []) as Cat[])
-    setProfile(p.data)
+    const failure = b.error ?? t.error ?? c.error ?? r.error ?? p.error
+    setLoadError(failure ? failure.message : null)
+    if (!b.error) setBudgets((b.data ?? []) as Budget[])
+    if (!t.error) setTransactions((t.data ?? []) as Txn[])
+    if (!c.error) setCategories((c.data ?? []) as Cat[])
+    if (!r.error) setRecurringRules((r.data ?? []) as BudgetStatusRule[])
+    if (!p.error) setProfile(p.data)
     setLoading(false)
   }
 
@@ -148,6 +140,16 @@ export default function BudgetsPage() {
           },
           () => { void load() },
         )
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'recurring_rules',
+            filter: `user_id=eq.${user.id}`,
+          },
+          () => { void load() },
+        )
         .subscribe()
 
       cleanup = () => {
@@ -174,27 +176,32 @@ export default function BudgetsPage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
 
-    // Deactivate existing for the same scope
-    //
-    // `.eq()`'s typed overload only accepts the column's non-null value
-    // type — PostgREST has no `eq.null` semantics (that needs `.is()`), so
-    // a strictly-typed client correctly refuses `string | null` here. The
-    // cast below preserves this call's exact prior (untyped-client)
-    // behaviour rather than silently changing it: when `categoryId` is
-    // empty this still sends the literal `category_id=eq.null`, which
-    // does not match rows where `category_id IS NULL` — i.e. deactivating
-    // the existing *overall* (no-category) budget through this path is a
-    // pre-existing no-op, unrelated to typing the client. Fixing the
-    // filter to `.is('category_id', null)` when unset is a behaviour
-    // change and out of scope here.
-    await supabase
+    // Deactivate the existing active budget in the same scope (overall,
+    // or this category) — `.is('category_id', null)`, not
+    // `.eq('category_id', null)`: PostgREST's `eq.null` never matches
+    // `IS NULL`, so this deactivation was a silent no-op for every
+    // overall budget and active rows accumulated across saves, with
+    // three surfaces each picking a different one (audit 05-F5/05-F18).
+    // Dropped the `.eq('period', period)` filter too — a new *any-*
+    // period budget in this scope must retire whichever one is active
+    // now, not just one with a matching period, or two periods'
+    // budgets could both be active in the same scope at once. The
+    // partial unique index in migration 026 makes this the database's
+    // invariant, not just this code path's.
+    let deactivate = supabase
       .from('budgets')
       .update({ is_active: false })
       .eq('user_id', user.id)
       .eq('is_active', true)
-      .eq('period', period)
-      .eq('category_id', (categoryId || null) as string)
+    deactivate = categoryId ? deactivate.eq('category_id', categoryId) : deactivate.is('category_id', null)
+    const { error: deactivateErr } = await deactivate
+    if (deactivateErr) {
+      setSaving(false)
+      setError(deactivateErr.message)
+      return
+    }
 
+    const tz = profile?.timezone || 'UTC'
     const { error: err } = await supabase.from('budgets').insert({
       user_id: user.id,
       client_id: crypto.randomUUID(),
@@ -202,6 +209,15 @@ export default function BudgetsPage() {
       period,
       category_id: categoryId || null,
       is_active: true,
+      // `profile.currency_code`, not the schema default — a EUR
+      // profile's budget was silently created as `'USD'` before this,
+      // so `budgetStatus()` (which scopes by currency) never matched a
+      // recurring rule against it (fix-plan 2.5).
+      currency_code: currency,
+      // Anchors a biweekly cycle's phase to the civil day the budget
+      // was created on, in the profile's own zone, rather than
+      // Postgres's server-date default (fix-plan 2.5).
+      starts_at: localDay(new Date().toISOString(), tz),
     })
     setSaving(false)
     if (err) {
@@ -220,6 +236,25 @@ export default function BudgetsPage() {
   }
 
   const catMap = Object.fromEntries(categories.map((c) => [c.id, c]))
+  const currency = profile?.currency_code ?? 'USD'
+  const locale = profile?.locale ?? 'en'
+  // profiles.timezone (fix-plan 1.3 part 1) — every budget window on
+  // this page comes from here, through `budgetStatus()`, never a
+  // hand-rolled `new Date()` window with no end bound (audit 04-F9/
+  // 05-F5/05-F17/05-F18).
+  const tz = profile?.timezone || 'UTC'
+
+  // `budgetStatus()`'s transaction shape needs `category_kind` to tell
+  // a transfer (Savings & Investing) apart from ordinary spend — joined
+  // in here from `categories`, same pattern as dashboard/page.tsx.
+  const txnsForStatus: BudgetStatusTransaction[] = useMemo(
+    () =>
+      transactions.map((t) => ({
+        ...t,
+        category_kind: t.category_id ? catMap[t.category_id]?.kind ?? null : null,
+      })),
+    [transactions, catMap],
+  )
 
   const overall = useMemo(() => {
     // Prefer a monthly overall — that's the default shape — but fall
@@ -228,18 +263,28 @@ export default function BudgetsPage() {
     return budgets.find((b) => b.category_id === null && b.period === 'monthly') ?? budgets.find((b) => b.category_id === null)
   }, [budgets])
 
-  // Spend math must match the overall budget's period. Previously this
-  // was hardcoded to `periodStart('monthly')`, which meant a user with
-  // a weekly $500 budget compared their week's cap against a full
-  // calendar month of spending — the ring lit up at >100% almost
-  // immediately. The window now follows the budget itself.
-  const overallSpent = useMemo(() => {
-    const start = periodStart(overall?.period ?? 'monthly')
-    return transactions
-      .filter((t) => t.direction === 'debit' && new Date(t.transacted_at) >= start)
-      .reduce((s, t) => s + aggAmount(t), 0)
-  }, [transactions, overall])
+  // One shared implementation (`packages/shared/src/domain/budget.ts`,
+  // fix-plan 2.5) for both the overall ring and every per-category row
+  // below — replaces the old `periodStart()`, which had no end bound
+  // (a future-dated transaction always counted against "now") and
+  // ignored recurring rules entirely.
+  const overallStatus = useMemo(() => {
+    if (!overall) return null
+    return budgetStatus(
+      {
+        period: overall.period,
+        starts_at: overall.starts_at,
+        category_id: null,
+        currency_code: overall.currency_code,
+        amount: overall.amount,
+      },
+      txnsForStatus,
+      recurringRules,
+      tz,
+    )
+  }, [overall, txnsForStatus, recurringRules, tz])
 
+  const overallSpent = (overallStatus?.spent ?? 0) + (overallStatus?.committed ?? 0)
   const overallPct = overall ? Math.min(overallSpent / overall.amount, 1) : 0
   const overallRemaining = overall ? Math.max(0, overall.amount - overallSpent) : 0
 
@@ -249,20 +294,24 @@ export default function BudgetsPage() {
       .filter((b) => b.category_id !== null)
       .map((b) => {
         const cName = b.category_id ? catMap[b.category_id]?.name ?? '—' : '—'
-        const start = periodStart(b.period)
-        const spent = transactions
-          .filter(
-            (t) =>
-              t.direction === 'debit' &&
-              t.category_id === b.category_id &&
-              new Date(t.transacted_at) >= start,
-          )
-          .reduce((s, t) => s + aggAmount(t), 0)
+        const status = budgetStatus(
+          {
+            period: b.period,
+            starts_at: b.starts_at,
+            category_id: b.category_id,
+            currency_code: b.currency_code,
+            amount: b.amount,
+          },
+          txnsForStatus,
+          recurringRules,
+          tz,
+        )
+        const spent = status.spent + status.committed
         const pct = spent / b.amount
         return { id: b.id, name: cName, period: b.period, cap: b.amount, spent, pct }
       })
       .sort((a, b) => b.pct - a.pct)
-  }, [budgets, transactions, catMap])
+  }, [budgets, txnsForStatus, recurringRules, tz, catMap])
 
   const stats = useMemo(() => {
     let onTrack = 0
@@ -276,8 +325,6 @@ export default function BudgetsPage() {
     return { onTrack, near, over }
   }, [perCat])
 
-  const currency = profile?.currency_code ?? 'USD'
-  const locale = profile?.locale ?? 'en'
   const fmtShort = (v: number) =>
     new Intl.NumberFormat(locale, { style: 'currency', currency, maximumFractionDigits: 0 }).format(v)
 
@@ -322,9 +369,22 @@ export default function BudgetsPage() {
             </div>
             <div style={{ fontSize: 13, color: colors.ink3, marginTop: 2 }}>
               {overall ? (
+                // Three labelled numbers (fix-plan 2.5) rather than one
+                // silently-summed "spent" figure — `committed` (due
+                // recurring rules that haven't posted yet, plus any
+                // pre-logged future transaction) is real money that's
+                // going to leave, but it isn't gone yet, so it gets its
+                // own word instead of being folded invisibly into
+                // "spent".
                 <>
-                  You've used <b style={{ color: colors.ink }}>{fmtShort(overallSpent)}</b> of{' '}
-                  <b style={{ color: colors.ink }}>{fmtShort(overall.amount)}</b> {periodSuffix(overall.period)}.
+                  <b style={{ color: colors.ink }}>{fmtShort(overallStatus?.spent ?? 0)}</b> spent
+                  {(overallStatus?.committed ?? 0) > 0 && (
+                    <>
+                      {' '}
+                      · <b style={{ color: colors.ink }}>{fmtShort(overallStatus!.committed)}</b> committed
+                    </>
+                  )}
+                  {' '}· <b style={{ color: colors.ink }}>{fmtShort(overall.amount)}</b> cap {periodSuffix(overall.period)}.
                 </>
               ) : (
                 <>Set a monthly budget to start tracking.</>
@@ -419,9 +479,13 @@ export default function BudgetsPage() {
               <text x="110" y="100" textAnchor="middle" fontSize="12" fill={colors.ink3} fontWeight="600">
                 {overall ? `${Math.round(overallPct * 100)}% used` : 'No overall budget'}
               </text>
-              {/* A bare unlabeled number in a money app is ambiguous — in the
-                  no-budget state the spend figure must say what it is. */}
-              {overall ? (
+              {/* Gated behind `overall` (fix-plan 2.5's "Done when": the
+                  Budgets page with zero budgets renders no currency figure
+                  inside the ring) — an unlabelled figure here previously
+                  rendered even with no budget set, under the caption
+                  "spent this month", which is exactly the ambiguous
+                  bare-number-in-a-money-app shape this item removes. */}
+              {overall && (
                 <>
                   <text
                     x="110"
@@ -438,27 +502,15 @@ export default function BudgetsPage() {
                     of {fmtShort(overall.amount)}
                   </text>
                 </>
-              ) : (
-                <>
-                  <text
-                    x="110"
-                    y="126"
-                    textAnchor="middle"
-                    fontSize="20"
-                    fontWeight="700"
-                    fontFamily={font.display}
-                    fill={colors.ink}
-                  >
-                    {fmtShort(overallSpent)}
-                  </text>
-                  <text x="110" y="144" textAnchor="middle" fontSize="11" fill={colors.ink4} fontWeight="600">
-                    spent this month
-                  </text>
-                </>
               )}
             </svg>
             <div style={{ fontSize: 12, color: colors.ink3, textAlign: 'center', lineHeight: 1.5, padding: '0 10px' }}>
-              {overall ? (
+              {loadError ? (
+                // Distinct from "no overall budget set yet" (fix-plan 2.13 /
+                // audit 08-F21) — a failed read must not read as an
+                // invitation to set a budget that may already exist.
+                <span style={{ color: colors.destructive, fontWeight: 600 }}>Couldn't load your budget.</span>
+              ) : overall ? (
                 <>
                   {overallPct > 1 ? (
                     <>
@@ -481,6 +533,8 @@ export default function BudgetsPage() {
           <div style={styles.listCard}>
             {loading ? (
               <div style={styles.empty}>Loading…</div>
+            ) : loadError ? (
+              <ErrorState message="We couldn't load your budgets." detail={loadError} onRetry={load} />
             ) : perCat.length === 0 ? (
               <div style={styles.empty}>
                 No category budgets yet. Add one to track spending in a single area.

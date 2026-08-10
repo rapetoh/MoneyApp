@@ -8,13 +8,28 @@
  *
  * This is the backup mechanism — the primary generator is a server-side
  * Supabase Edge Function (generate-recurring) running daily via pg_cron.
+ * Both now walk the same bounded `occurrencesDue` from the shared engine
+ * (`packages/shared/src/domain/recurrence.ts`, fix-plan 2.3(c)) instead
+ * of each hand-rolling its own iteration cap.
  *
- * Duplicate prevention has two layers:
- *   1. Migration 008's partial unique index
- *      `(user_id, recurring_rule_id, transacted_at::date)` blocks any
+ * Duplicate prevention has three layers:
+ *   1. Migration 020's `idx_txn_recurring_dedup` (keyed on the resolved
+ *      `occurrence_date`, not a UTC-cast `transacted_at`) blocks any
  *      occurrence the server already wrote. SyncManager catches the
  *      23505 violation and drops the queue entry cleanly.
- *   2. `last_generated` is persisted to Supabase after EACH occurrence
+ *   2. `hasRecurringOccurrence` below — a fast local SQLite check for
+ *      the same (rule, occurrence_date) pair, so a row `pullRemote`
+ *      already brought down doesn't even reach the network layer.
+ *   3. `findLiveManualMatch` (fix-plan 2.3(a)) — before generating,
+ *      look for *any* live, non-generated transaction with a matching
+ *      merchant within +/-3 days, not just one already carrying this
+ *      rule's id. Layer 2 alone is what made the user's own
+ *      manually-logged bill invisible to the guard: it has no
+ *      `recurring_rule_id` yet, so `hasRecurringOccurrence` (and
+ *      migration 008/013's dedup index before it) never saw it. A match
+ *      here gets *linked* to the rule instead of shadowed by a second,
+ *      generated row.
+ *   4. `last_generated` is persisted to Supabase after EACH occurrence
  *      so an interrupted catch-up (app backgrounded, network drop) can
  *      resume from the right point on next launch instead of replaying
  *      from the previous synced value.
@@ -24,11 +39,15 @@ import { getCalendars } from 'expo-localization'
 import { supabase } from '../lib/supabase'
 import { upsertTransaction, hasRecurringOccurrence } from './sync/transactionStore'
 import { enqueue } from './sync/syncQueue'
-import { computeNextOccurrence } from '../hooks/useRecurringRules'
 import { getCurrentProfileCurrency } from './profileCurrency'
 import type { RecurringRule, Transaction } from '@voice-expense/shared'
-import { snapshotFx, localDay } from '@voice-expense/shared'
+import { snapshotFx, localDay, occurrencesDue, type Occurrence } from '@voice-expense/shared'
 import * as Crypto from 'expo-crypto'
+
+const DAY_MS = 24 * 60 * 60 * 1000
+/** Window (each side) `findLiveManualMatch` searches for a live,
+ *  non-generated transaction around a due occurrence's date. */
+const MANUAL_MATCH_WINDOW_DAYS = 3
 
 /** Best-effort device zone — mirrors `useTransactions.ts`'s own
  *  `getDeviceTimeZone` (fix-plan 1.3 part 1). Used to resolve
@@ -41,7 +60,35 @@ function getDeviceTimeZone(): string {
   }
 }
 
-export async function runRecurringCatchUp(userId: string): Promise<number> {
+/**
+ * A live (not soft-deleted), non-engine-generated transaction with a
+ * normalised-merchant match (case-insensitive) within +/-3 days of
+ * `occurrence`'s civil date — fix-plan 2.3(a)'s broadened duplicate
+ * guard. Returns its id so the caller can link rather than duplicate.
+ */
+async function findLiveManualMatch(
+  userId: string,
+  merchant: string,
+  occurrence: Occurrence,
+): Promise<string | null> {
+  const targetMs = new Date(occurrence.instant).getTime()
+  const from = new Date(targetMs - MANUAL_MATCH_WINDOW_DAYS * DAY_MS).toISOString()
+  const to = new Date(targetMs + MANUAL_MATCH_WINDOW_DAYS * DAY_MS).toISOString()
+  const { data } = await supabase
+    .from('transactions')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('is_deleted', false)
+    .neq('source', 'recurring_generated')
+    .ilike('merchant', merchant)
+    .gte('transacted_at', from)
+    .lte('transacted_at', to)
+    .limit(1)
+    .maybeSingle()
+  return data?.id ?? null
+}
+
+async function runRecurringCatchUpInner(userId: string): Promise<number> {
   // Fetch all active rules for this user
   const { data: rules, error } = await supabase
     .from('recurring_rules')
@@ -52,48 +99,63 @@ export async function runRecurringCatchUp(userId: string): Promise<number> {
   if (error || !rules?.length) return 0
 
   const now = new Date()
+  const nowIsoOuter = now.toISOString()
   const tz = getDeviceTimeZone()
   let generated = 0
 
   for (const rule of rules as RecurringRule[]) {
     try {
-      // Generate all missed occurrences (not just one — user may not
-      // have opened the app for several cycles)
-      let safetyLimit = 50 // prevent infinite loops
-      let next = computeNextOccurrence(rule)
+      // Every occurrence due as of "now", resolved once up front by the
+      // shared engine's own bounded walk (fix-plan 2.3(c)) rather than
+      // this file hand-rolling a `while (next && next <= now)` loop —
+      // the Edge Function now does the same via the same function.
+      const due = occurrencesDue(rule, nowIsoOuter, tz, 50)
 
-      while (next && next <= now && safetyLimit > 0) {
-        safetyLimit--
-
-        // Skip occurrences that already exist locally — typically because
-        // `pullRemote` brought down the server cron's row before catch-up
-        // ran. Without this guard the upsert would hit the partial unique
-        // index `idx_txn_recurring_dedup` and fail.
+      for (const occurrence of due) {
+        // Layer 2: already exists locally (server cron beat us to it).
         const alreadyExists = await hasRecurringOccurrence(
           userId,
           rule.id,
-          next.toISOString(),
+          occurrence.occurrenceDate,
         )
         if (alreadyExists) {
-          rule.last_generated = next.toISOString()
+          rule.last_generated = occurrence.instant
           await supabase
             .from('recurring_rules')
             .update({ last_generated: rule.last_generated })
             .eq('id', rule.id)
-          next = computeNextOccurrence(rule)
           continue
+        }
+
+        // Layer 3: a live transaction the user logged manually already
+        // covers this cycle — link it to the rule instead of shadowing
+        // it with a duplicate generated row.
+        if (rule.name) {
+          const manualMatchId = await findLiveManualMatch(userId, rule.name, occurrence)
+          if (manualMatchId) {
+            await supabase
+              .from('transactions')
+              .update({ recurring_rule_id: rule.id, occurrence_date: occurrence.occurrenceDate })
+              .eq('id', manualMatchId)
+            rule.last_generated = occurrence.instant
+            await supabase
+              .from('recurring_rules')
+              .update({ last_generated: rule.last_generated })
+              .eq('id', rule.id)
+            continue
+          }
         }
 
         const txnId = Crypto.randomUUID()
         const nowIso = now.toISOString()
-        const transactedAt = next.toISOString()
+        const transactedAt = occurrence.instant
 
         // FX snapshot for the generated occurrence (migration 011). The
         // rate is dated to the txn's transacted_at, not today — a
         // monthly bill generated today for last-month's date uses
         // last-month's rate so the historical totals stay coherent.
         const profileCurrency = getCurrentProfileCurrency()
-        const fx = await snapshotFx(transactedAt, rule.currency_code, profileCurrency, rule.amount)
+        const fx = await snapshotFx(transactedAt, rule.currency_code, profileCurrency, rule.amount, tz)
 
         const txn: Transaction = {
           id: txnId,
@@ -109,13 +171,29 @@ export async function runRecurringCatchUp(userId: string): Promise<number> {
           amount_in_profile_currency: fx?.amount_in_profile_currency ?? null,
           fx_rate_to_profile: fx?.fx_rate_to_profile ?? null,
           fx_rate_date: fx?.fx_rate_date ?? null,
+          // Which currency the snapshot above targets (migration 026,
+          // fix-plan 2.7) — `profileCurrency` when the snapshot actually
+          // filled (matches what `createTransaction`/`fxBackfill.ts`
+          // record), `null` alongside a null snapshot so this row still
+          // reads as "needs a snapshot" rather than "already correct for
+          // no currency in particular" to the backfill sweep's predicate.
+          snapshot_currency: fx ? profileCurrency : null,
           transacted_at: transactedAt,
           // transactions.local_day (migration 017, NOT NULL) — resolved
           // once here at generation time, same as `useTransactions.ts`'s
           // `createTransaction`.
           local_day: localDay(transactedAt, tz),
-          // Resolved by `upsertTransaction` from `transacted_at` on write.
-          occurrence_date: null,
+          // The engine's own resolved civil day (migration 020) — the
+          // dedup key `idx_txn_recurring_dedup` now uses. `upsertTransaction`
+          // (apps/mobile/src/services/sync/transactionStore.ts, outside
+          // this item's file ownership) still recomputes this from
+          // `transacted_at`'s UTC slice on write rather than honouring
+          // this value — same civil day for every zone at least
+          // MANUAL_MATCH_WINDOW_DAYS away from a UTC offset boundary,
+          // divergent only in the DST-edge case migration 020 exists to
+          // fix. Threading the honoured value through that write path is
+          // that file's own Stage 2 adoption.
+          occurrence_date: occurrence.occurrenceDate,
           source: 'recurring_generated',
           raw_transcript: null,
           ai_confidence: null,
@@ -139,20 +217,17 @@ export async function runRecurringCatchUp(userId: string): Promise<number> {
         // Enqueue for sync to Supabase
         await enqueue('create', txnId, txn)
 
-        // Advance last_generated on the rule so the next iteration
-        // computes the following occurrence. Persist immediately so an
-        // interruption between occurrences doesn't replay this one on
-        // next launch (the unique index would catch it, but persisting
-        // here also avoids spamming the sync queue with rows that we
-        // know will lose the race).
-        rule.last_generated = next.toISOString()
+        // Advance last_generated on the rule so an interruption between
+        // occurrences resumes from the right point on next launch.
+        // Persisted immediately rather than batched at the end of the
+        // rule's loop.
+        rule.last_generated = occurrence.instant
         await supabase
           .from('recurring_rules')
           .update({ last_generated: rule.last_generated })
           .eq('id', rule.id)
 
         generated++
-        next = computeNextOccurrence(rule)
       }
     } catch (err) {
       // This runs fire-and-forget from _layout.tsx — nothing awaits
@@ -166,4 +241,27 @@ export async function runRecurringCatchUp(userId: string): Promise<number> {
   }
 
   return generated
+}
+
+/**
+ * In-flight guard (fix-plan 2.3(d)'s "each guarded by a module-level
+ * in-flight promise"). `_layout.tsx`'s routing effect (outside this
+ * item's file ownership) fires on every navigation with no
+ * re-entrancy guard today — this is the defense that belongs to this
+ * function regardless of whether that call site is fixed, since two
+ * concurrent runs racing the same rule's `last_generated` read is a
+ * real hazard (both compute the same due occurrence, both attempt to
+ * insert it) independent of *why* they overlapped. A second call while
+ * one is already running gets the same in-flight promise rather than
+ * starting a second pass.
+ */
+let inFlight: Promise<number> | null = null
+
+export function runRecurringCatchUp(userId: string): Promise<number> {
+  if (inFlight) return inFlight
+  const run = runRecurringCatchUpInner(userId).finally(() => {
+    if (inFlight === run) inFlight = null
+  })
+  inFlight = run
+  return run
 }

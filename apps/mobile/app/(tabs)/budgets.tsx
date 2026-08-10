@@ -5,13 +5,13 @@ import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '../../src/hooks/useAuth'
 import { useProfile } from '../../src/hooks/useProfile'
 import { useTransactions } from '../../src/hooks/useTransactions'
-import { useActiveBudget, usePeriodSpend } from '../../src/hooks/useBudget'
-import { useRecurringRules, computeUpcomingRecurring } from '../../src/hooks/useRecurringRules'
+import { useActiveBudget, budgetStatusFor } from '../../src/hooks/useBudget'
+import { useRecurringRules } from '../../src/hooks/useRecurringRules'
 import { Money } from '../../src/components/Money'
 import { BudgetRing } from '../../src/components/BudgetRing'
 import { BudgetEditorModal } from '../../src/components/BudgetEditorModal'
-import { Colors, Typography } from '../../src/theme'
-import { t } from '@voice-expense/shared'
+import { Colors, Typography, useTabBarClearance } from '../../src/theme'
+import { t, localParts, daysBetween } from '@voice-expense/shared'
 import type { Locale } from '@voice-expense/shared'
 
 /**
@@ -29,20 +29,20 @@ import type { Locale } from '@voice-expense/shared'
  * The ring's progress arc is a follow-up once react-native-svg is installed
  * (see BudgetRing component notes).
  */
-function daysLeftInPeriod(period: string | undefined): number {
-  const now = new Date()
-  if (period === 'weekly') {
-    const day = now.getDay() // 0=Sun..6=Sat
-    const daysUntilNextMon = day === 0 ? 1 : 8 - day
-    return daysUntilNextMon
-  }
-  if (period === 'biweekly') {
-    // Rough: align to the start of the biweekly window we're in.
-    return 14 // conservative upper bound; tight enough for a header hint
-  }
-  // monthly (default) / quarterly / yearly: days-left in the current month.
-  const end = new Date(now.getFullYear(), now.getMonth() + 1, 0)
-  return Math.max(1, end.getDate() - now.getDate() + 1)
+/** Days remaining in `window`, counted from `nowIso`'s own civil day in
+ *  `tz` to the window's (exclusive) end civil day — the exact same
+ *  window `budgetStatusFor()` computed `spent`/`committed` from, so the
+ *  countdown and the figure beside it can never again disagree (audit
+ *  05-F17: "the number respects the period while the label says 'left
+ *  this month' and the day count is days-left-in-month" — that was two
+ *  different windows; this is one). Replaces the old `daysLeftInPeriod`,
+ *  which had its own hand-rolled weekly/biweekly/monthly cases and
+ *  silently reused the monthly case for quarterly and yearly.
+ */
+function daysLeftInWindow(windowEndExclusive: string, nowIso: string, tz: string): number {
+  const now = localParts(nowIso, tz)
+  const end = localParts(windowEndExclusive, tz)
+  return Math.max(1, daysBetween(now.y, now.m, now.d, end.y, end.m, end.d))
 }
 
 function periodLabel(period: string | undefined, locale: Locale): string {
@@ -56,28 +56,47 @@ function periodLabel(period: string | undefined, locale: Locale): string {
 }
 
 export default function BudgetsScreen() {
+  // Clears the floating tab bar (audit 01-F13, fix-plan 1.8/2.14) — replaces
+  // the hand-picked `paddingBottom: 140` literal.
+  const tabBarClearance = useTabBarClearance()
   const { user } = useAuth()
   const { profile } = useProfile(user?.id)
   const { transactions } = useTransactions(user?.id)
-  const { budget, setBudget } = useActiveBudget(user?.id)
+  // Read-error exposure (fix-plan 2.13 / audit 08-F21 family) — a failed
+  // budget read used to look exactly like "no budget set" (`budget` stays
+  // `null` either way), so the empty-state CTA below rendered for a
+  // fetch failure as readily as for a genuinely unconfigured budget.
+  const { budget, error: budgetError, setBudget, refetch: refetchBudget } = useActiveBudget(user?.id)
   const { rules: recurringRules } = useRecurringRules(user?.id)
-  const periodSpend = usePeriodSpend(budget, transactions)
   const [budgetModalVisible, setBudgetModalVisible] = useState(false)
 
   const locale = (profile?.locale ?? 'en') as Locale
   const currency = profile?.currency_code ?? 'USD'
+  // profiles.timezone (fix-plan 1.3 part 1) — every window this screen
+  // renders comes from here, never the device's own zone, so the figure
+  // and the countdown beside it always describe the same window as web.
+  const tz = profile?.timezone || 'UTC'
 
   const monthLabel = useMemo(
-    () => new Date().toLocaleDateString(locale, { month: 'long' }).toUpperCase(),
-    [locale],
-  )
-  const daysLeft = useMemo(() => daysLeftInPeriod(budget?.period), [budget?.period])
-  const upcomingRecurring = useMemo(
-    () => computeUpcomingRecurring(recurringRules, budget?.period),
-    [recurringRules, budget?.period],
+    () => new Date().toLocaleDateString(locale, { month: 'long', timeZone: tz }).toUpperCase(),
+    [locale, tz],
   )
 
-  const spent = periodSpend + upcomingRecurring
+  // The one budget-status computation (fix-plan 2.5) — replaces the
+  // separate `usePeriodSpend` + `computeUpcomingRecurring` sum, which
+  // added a correct "spent" figure to a recurring total that ignored
+  // `direction` and currency and summed only the *next* occurrence per
+  // rule regardless of the budget's own period.
+  const status = useMemo(
+    () => budgetStatusFor(budget, transactions, recurringRules, tz),
+    [budget, transactions, recurringRules, tz],
+  )
+  const daysLeft = useMemo(
+    () => (status ? daysLeftInWindow(status.window.endExclusive, new Date().toISOString(), tz) : 0),
+    [status, tz],
+  )
+
+  const spent = (status?.spent ?? 0) + (status?.committed ?? 0)
   const limit = budget?.amount ?? 0
   const remaining = Math.max(0, limit - spent)
   const over = limit > 0 && spent > limit
@@ -85,7 +104,7 @@ export default function BudgetsScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: tabBarClearance }]} showsVerticalScrollIndicator={false}>
         {/* Header row. The "+" pill opens the shared BudgetEditorModal so the
             user can set or modify the global monthly budget from this tab
             directly (user feedback — previously it jumped to Settings, which
@@ -112,25 +131,66 @@ export default function BudgetsScreen() {
           </Pressable>
         </View>
 
-        {/* Hero ring card — only when a budget is set */}
-        {limit > 0 ? (
+        {/* Hero ring card — only when a budget is set. A failed read (with
+            no budget yet loaded) gets its own error+retry state (fix-plan
+            2.13) instead of falling through to the "no budget set" CTA,
+            which used to be reachable for both a real empty budget and a
+            broken fetch alike. */}
+        {budgetError && !budget ? (
+          <View style={styles.emptyHero}>
+            <Ionicons name="alert-circle-outline" size={32} color={Colors.destructive ?? '#A94646'} />
+            <Text style={styles.emptyHeroTitle}>{t('common.load_failed', locale)}</Text>
+            <Pressable
+              style={({ pressed }) => [styles.ctaBtn, pressed && styles.ctaBtnPressed]}
+              onPress={refetchBudget}
+            >
+              <Text style={styles.ctaBtnText}>{t('common.retry', locale)}</Text>
+            </Pressable>
+          </View>
+        ) : limit > 0 ? (
           <View style={styles.heroCard}>
             <BudgetRing spent={spent} limit={limit} />
             <View style={styles.heroText}>
               <Text style={styles.heroLabel}>{periodLabel(budget?.period, locale)}</Text>
               <View style={styles.heroAmount}>
                 {over ? (
-                  <Money value={spent - limit} size={28} color={Colors.destructive ?? '#A94646'} />
+                  <Money
+                    value={spent - limit}
+                    currencyCode={currency}
+                    locale={locale}
+                    size={28}
+                    color={Colors.destructive ?? '#A94646'}
+                  />
                 ) : (
-                  <Money value={remaining} size={30} />
+                  <Money value={remaining} currencyCode={currency} locale={locale} size={30} />
                 )}
               </View>
               <View style={styles.heroOfLine}>
                 <Text style={styles.heroOfText}>
                   {over ? t('budgets.over_by', locale) : t('budgets.left_of', locale)}{' '}
                 </Text>
-                <Money value={limit} size={13} serif={false} sansWeight="600" muted />
+                <Money value={limit} currencyCode={currency} locale={locale} size={13} serif={false} sansWeight="600" muted />
               </View>
+              {/* The three labelled numbers (fix-plan 2.5) — "spent" from
+                  posted transactions and "committed" from due-but-unposted
+                  recurring rules + pre-logged future transactions are kept
+                  visibly separate rather than silently summed into one
+                  "spent" figure that overclaims what has actually left the
+                  account. */}
+              {(status?.committed ?? 0) > 0 && (
+                <View style={styles.heroOfLine}>
+                  <Money
+                    value={status!.committed}
+                    currencyCode={currency}
+                    locale={locale}
+                    size={13}
+                    serif={false}
+                    sansWeight="600"
+                    muted
+                  />
+                  <Text style={styles.heroOfText}> {t('budgets.committed', locale)}</Text>
+                </View>
+              )}
               <View style={[styles.pacePill, (over || tight) && styles.pacePillWarn]}>
                 <Text
                   style={[
@@ -177,7 +237,7 @@ export default function BudgetsScreen() {
         initialPeriod={budget?.period ?? null}
         currency={currency}
         locale={locale}
-        onSave={async (amount, period) => setBudget(amount, period, currency)}
+        onSave={async (amount, period) => setBudget(amount, period, currency, tz)}
         onClose={() => setBudgetModalVisible(false)}
       />
     </SafeAreaView>
@@ -186,7 +246,9 @@ export default function BudgetsScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
-  content: { paddingBottom: 140 },
+  // `paddingBottom` set per-instance above from `useTabBarClearance()`
+  // (audit 01-F13, fix-plan 1.8/2.14).
+  content: {},
 
   header: {
     paddingHorizontal: 22,

@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { View, Text, StyleSheet, ScrollView, Pressable, Modal } from 'react-native'
+import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import Svg, { Path, Defs, LinearGradient, Stop } from 'react-native-svg'
@@ -7,15 +7,53 @@ import { useAuth } from '../../src/hooks/useAuth'
 import { useProfile } from '../../src/hooks/useProfile'
 import { useTransactions } from '../../src/hooks/useTransactions'
 import { useCategories } from '../../src/hooks/useCategories'
+import { useRecurringRules } from '../../src/hooks/useRecurringRules'
 import { useInsightsUnlock } from '../../src/hooks/useInsightsUnlock'
+import { syncManager } from '../../src/services/sync/SyncManager'
 import { Money } from '../../src/components/Money'
 import { HistoryHeatmap } from '../../src/components/HistoryHeatmap'
-import { Colors, Typography, Hairline } from '../../src/theme'
-import { formatCurrency, t, aggAmount, type Locale } from '@voice-expense/shared'
+import { BottomSheet } from '../../src/components/BottomSheet'
+import { Colors, Typography, Hairline, useTabBarClearance } from '../../src/theme'
+import {
+  formatCurrency,
+  t,
+  addDays,
+  addMonthsClamped,
+  civilDateTimeToInstant,
+  daysBetween,
+  forecastMonthly,
+  isSpend,
+  localParts,
+  monthBounds,
+  monthIso,
+  resolveCategoryKind,
+  type CategoryKind,
+  type ForecastRule,
+  type ForecastTxn,
+  type Locale,
+} from '@voice-expense/shared'
 import type { Transaction } from '@voice-expense/shared'
 
-function monthKey(d: Date) {
-  return `${d.getFullYear()}-${String(d.getMonth()).padStart(2, '0')}`
+function pad2(n: number): string {
+  return String(n).padStart(2, '0')
+}
+function pad4(n: number): string {
+  return String(n).padStart(4, '0')
+}
+function monthKey(y: number, m: number): string {
+  return `${pad4(y)}-${pad2(m)}`
+}
+function splitMonthKey(key: string): { y: number; m: number } {
+  const [y, m] = key.split('-').map(Number)
+  return { y, m }
+}
+
+/** Display label for a civil month, resolved in `tz` regardless of the
+ *  device's own runtime zone — `civilDateTimeToInstant` + an explicit
+ *  `timeZone` option, never a `Date` getter (fix-plan 1.3). */
+function monthLabel(y: number, m: number, tz: string, locale: string, opts: Intl.DateTimeFormatOptions): string {
+  const instant = civilDateTimeToInstant(y, m, 15, 12, 0, 0, tz)
+  return new Date(instant).toLocaleDateString(locale, { ...opts, timeZone: tz })
 }
 
 /**
@@ -124,32 +162,68 @@ const trendAxisStyles = StyleSheet.create({
   },
 })
 
-// Sum debits for a date range from the full local transaction list.
-function sumDebits(txns: Transaction[], start: Date, end: Date): number {
-  const s = start.toISOString()
-  const e = end.toISOString()
-  return txns
-    .filter((tx) => !tx.is_deleted && tx.direction === 'debit' && tx.transacted_at >= s && tx.transacted_at < e)
-    .reduce((acc, tx) => acc + aggAmount(tx), 0)
+/** Sum of non-transfer debit spend (fix-plan 1.4's `isSpend` — a
+ *  Savings & Investing debit no longer inflates this the way a bare
+ *  `direction === 'debit'` filter did) in the half-open instant window
+ *  `[startInstant, endExclusiveInstant)`. */
+function spendInWindow(
+  txns: Transaction[],
+  categoryKindById: Record<string, CategoryKind>,
+  startInstant: string,
+  endExclusiveInstant: string,
+): number {
+  let total = 0
+  for (const tx of txns) {
+    if (tx.is_deleted) continue
+    if (tx.transacted_at < startInstant || tx.transacted_at >= endExclusiveInstant) continue
+    if (tx.amount_in_profile_currency == null) continue
+    const kind = tx.category_id ? categoryKindById[tx.category_id] ?? null : null
+    if (!isSpend(tx, kind)) continue
+    total += tx.amount_in_profile_currency
+  }
+  return total
 }
 
 export default function InsightsScreen() {
+  // Clears the floating tab bar (audit 01-F13, fix-plan 1.8/2.14) — replaces
+  // the hand-picked `paddingBottom: 120` literal.
+  const tabBarClearance = useTabBarClearance()
   const { user } = useAuth()
   const { profile } = useProfile(user?.id)
-  const { transactions } = useTransactions(user?.id)
+  // Read-error exposure (fix-plan 2.13 / audit 08-F21 family) — a failed
+  // read used to render identically to "nothing to show" in the
+  // categories card below (`transactions` stays `[]` either way).
+  const { transactions, error: transactionsError } = useTransactions(user?.id)
   const { categoryMap } = useCategories(user?.id)
+  const { rules } = useRecurringRules(user?.id)
 
   const locale = (profile?.locale ?? 'en') as Locale
   const currency = profile?.currency_code ?? 'USD'
+  // profiles.timezone (fix-plan 1.3) — captured from the device via
+  // expo-localization in useProfile; 'UTC' matches the column default
+  // for the rare render before that capture lands.
+  const tz = profile?.timezone || 'UTC'
 
-  const now = new Date()
-  const [selectedMonth, setSelectedMonth] = useState<Date>(
-    new Date(now.getFullYear(), now.getMonth(), 1),
-  )
+  const categoryKindById = useMemo(() => {
+    const out: Record<string, CategoryKind> = {}
+    for (const [id, c] of Object.entries(categoryMap)) {
+      // `categories.kind` carries a CHECK constraint the generated row
+      // type can't see — narrowed the same way every other CHECK-
+      // constrained column in this repo is.
+      out[id] = (c as { kind?: string }).kind as CategoryKind
+    }
+    return out
+  }, [categoryMap])
+
+  const nowInstant = useMemo(() => new Date().toISOString(), [])
+  const nowParts = useMemo(() => localParts(nowInstant, tz), [nowInstant, tz])
+  const currentMonthKey = monthKey(nowParts.y, nowParts.m)
+
+  const [selectedMonthKey, setSelectedMonthKey] = useState<string>(currentMonthKey)
   const [monthPickerOpen, setMonthPickerOpen] = useState(false)
 
-  const isCurrentMonth =
-    selectedMonth.getFullYear() === now.getFullYear() && selectedMonth.getMonth() === now.getMonth()
+  const isCurrentMonth = selectedMonthKey === currentMonthKey
+  const { y: selY, m: selM } = splitMonthKey(selectedMonthKey)
 
   // Day-3 Insights unlock welcome card. Renders on the user's first visit
   // after they cross the 3-transaction threshold. Dismissal flips the
@@ -163,58 +237,49 @@ export default function InsightsScreen() {
     void markSeen()
   }
 
-  // Last 12 months available for the picker.
+  // Last 12 months available for the picker, as "YYYY-MM" keys — no
+  // `Date` identity involved, so there is nothing to hand-roll (fix-plan
+  // 1.3's named gap for this file).
   const monthOptions = useMemo(() => {
-    const opts: Date[] = []
+    const opts: string[] = []
     for (let i = 0; i < 12; i++) {
-      opts.push(new Date(now.getFullYear(), now.getMonth() - i, 1))
+      const target = addMonthsClamped(nowParts.y, nowParts.m, 1, -i)
+      opts.push(monthKey(target.y, target.m))
     }
     return opts
-    // now.getFullYear/getMonth are stable within a session, so a no-dep list
-    // is fine and avoids re-creating the array on every re-render.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [nowParts.y, nowParts.m])
 
-  const monthStart = useMemo(
-    () => new Date(selectedMonth.getFullYear(), selectedMonth.getMonth(), 1),
-    [selectedMonth],
-  )
-  const monthEnd = useMemo(
-    () => new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() + 1, 1),
-    [selectedMonth],
-  )
+  const monthBoundsInstants = useMemo(() => monthBounds(selectedMonthKey, tz), [selectedMonthKey, tz])
+  const daysInSelectedMonth = useMemo(() => {
+    const next = addMonthsClamped(selY, selM, 1, 1)
+    return daysBetween(selY, selM, 1, next.y, next.m, next.d)
+  }, [selY, selM])
 
-  // "Spent · Apr 1 – 18" on the hero — end date is today if viewing the
+  // "Spent · Apr 1 – 18" on the hero — end day is today if viewing the
   // current month, otherwise the last day of the selected month.
-  const rangeEnd = isCurrentMonth ? now : new Date(monthEnd.getTime() - 1)
-  const rangeLabel = [
-    `${monthStart.toLocaleDateString(locale, { month: 'short' })} 1`,
-    rangeEnd.getDate().toString(),
-  ].join(' – ')
+  const rangeEndDay = isCurrentMonth ? nowParts.d : daysInSelectedMonth
+  const rangeLabel = `${monthLabel(selY, selM, tz, locale, { month: 'short' })} 1 – ${rangeEndDay}`
 
   const monthSpent = useMemo(
-    () => sumDebits(transactions, monthStart, monthEnd),
-    [transactions, monthStart, monthEnd],
+    () => spendInWindow(transactions, categoryKindById, monthBoundsInstants.start, monthBoundsInstants.endExclusive),
+    [transactions, categoryKindById, monthBoundsInstants],
   )
 
   // Prior month for the % delta pill.
-  const prevMonthStart = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() - 1, 1)
-  const prevMonthEnd = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth(), 1)
-  const prevMonthSpent = useMemo(
-    () => sumDebits(transactions, prevMonthStart, prevMonthEnd),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [transactions, selectedMonth],
+  const prevMonthTarget = useMemo(() => addMonthsClamped(selY, selM, 1, -1), [selY, selM])
+  const prevMonthBoundsInstants = useMemo(
+    () => monthBounds(monthKey(prevMonthTarget.y, prevMonthTarget.m), tz),
+    [prevMonthTarget, tz],
   )
-  const prevMonthLabel = prevMonthStart.toLocaleDateString(locale, { month: 'short' })
+  const prevMonthSpent = useMemo(
+    () => spendInWindow(transactions, categoryKindById, prevMonthBoundsInstants.start, prevMonthBoundsInstants.endExclusive),
+    [transactions, categoryKindById, prevMonthBoundsInstants],
+  )
+  const prevMonthLabel = monthLabel(prevMonthTarget.y, prevMonthTarget.m, tz, locale, { month: 'short' })
 
   // If current month in-progress, normalize the % to days-elapsed so a
   // mid-month comparison isn't misleadingly low.
-  const daysInSelectedMonth = new Date(
-    selectedMonth.getFullYear(),
-    selectedMonth.getMonth() + 1,
-    0,
-  ).getDate()
-  const daysElapsed = isCurrentMonth ? now.getDate() : daysInSelectedMonth
+  const daysElapsed = isCurrentMonth ? nowParts.d : daysInSelectedMonth
   const prevEquiv =
     isCurrentMonth && prevMonthSpent > 0
       ? (prevMonthSpent * daysElapsed) / daysInSelectedMonth
@@ -222,34 +287,45 @@ export default function InsightsScreen() {
   const deltaPct =
     prevEquiv > 0 ? Math.round(((monthSpent - prevEquiv) / prevEquiv) * 100) : null
 
-  // Categories: sum debits per category for the selected month, sorted desc.
-  const monthDebits = useMemo(() => {
-    return transactions.filter(
-      (tx) =>
-        !tx.is_deleted &&
-        tx.direction === 'debit' &&
-        tx.transacted_at >= monthStart.toISOString() &&
-        tx.transacted_at < monthEnd.toISOString(),
-    )
-  }, [transactions, monthStart, monthEnd])
-
+  // Categories: sum non-transfer debits per category for the selected
+  // month, sorted desc. The percentage denominator is the FULL total —
+  // never the top-6 subtotal (05-F36/05-F37: six displayed rows always
+  // summed to 100% regardless of how many categories actually existed)
+  // — and a truncated "Other · N categories" row carries the remainder
+  // so the visible rows + Other still add up to the real total.
   const categoryBreakdown = useMemo(() => {
     const byId: Record<string, { id: string; name: string; color: string; amount: number }> = {}
-    for (const tx of monthDebits) {
+    for (const tx of transactions) {
+      if (tx.is_deleted) continue
+      if (tx.transacted_at < monthBoundsInstants.start || tx.transacted_at >= monthBoundsInstants.endExclusive) continue
+      if (tx.amount_in_profile_currency == null) continue
+      const kind = tx.category_id ? categoryKindById[tx.category_id] ?? null : null
+      if (!isSpend(tx, kind)) continue
       const id = tx.category_id ?? '__uncategorized__'
-      const cat = tx.category_id ? categoryMap[tx.category_id] : null
-      const name = cat?.name ?? t('transactions.uncategorized', locale)
-      const color = cat?.color ?? Colors.ink4 ?? Colors.textMuted
+      const catRow = tx.category_id ? categoryMap[tx.category_id] : null
+      const name = catRow?.name ?? t('transactions.uncategorized', locale)
+      const color = catRow?.color ?? Colors.ink4 ?? Colors.textMuted
       if (!byId[id]) byId[id] = { id, name, color, amount: 0 }
-      byId[id].amount += aggAmount(tx)
+      byId[id].amount += tx.amount_in_profile_currency
     }
-    const rows = Object.values(byId).sort((a, b) => b.amount - a.amount).slice(0, 6)
-    const total = rows.reduce((s, r) => s + r.amount, 0)
-    return rows.map((r) => ({
-      ...r,
-      pct: total > 0 ? Math.round((r.amount / total) * 100) : 0,
-    }))
-  }, [monthDebits, categoryMap, locale])
+    const all = Object.values(byId).sort((a, b) => b.amount - a.amount)
+    const total = all.reduce((s, r) => s + r.amount, 0)
+    const TOP_N = 6
+    const top = all.slice(0, TOP_N)
+    const rest = all.slice(TOP_N)
+    const rows = top.map((r) => ({ ...r, pct: total > 0 ? Math.round((r.amount / total) * 100) : 0 }))
+    if (rest.length > 0) {
+      const otherAmount = rest.reduce((s, r) => s + r.amount, 0)
+      rows.push({
+        id: '__other__',
+        name: `${t('insights.other', locale)} · ${rest.length}`,
+        color: Colors.ink4 ?? Colors.textMuted,
+        amount: otherAmount,
+        pct: total > 0 ? Math.round((otherAmount / total) * 100) : 0,
+      })
+    }
+    return rows
+  }, [transactions, categoryKindById, categoryMap, monthBoundsInstants, locale])
   const maxCatPct = categoryBreakdown[0]?.pct ?? 1
 
   // 14-point mini trend of daily spend across the selected month's window.
@@ -257,50 +333,76 @@ export default function InsightsScreen() {
   // pick up a react-native-svg dep mid-Phase-D).
   const trend = useMemo(() => {
     const points: number[] = []
-    // Show up to the last 14 days of the range ending at rangeEnd.
-    const rangeDays = Math.min(
-      14,
-      Math.max(1, Math.round((rangeEnd.getTime() - monthStart.getTime()) / 86400000) + 1),
-    )
+    const rangeDays = Math.min(14, rangeEndDay)
     for (let i = rangeDays - 1; i >= 0; i--) {
-      const dStart = new Date(rangeEnd)
-      dStart.setHours(0, 0, 0, 0)
-      dStart.setDate(rangeEnd.getDate() - i)
-      const dEnd = new Date(dStart)
-      dEnd.setDate(dStart.getDate() + 1)
-      points.push(sumDebits(transactions, dStart, dEnd))
+      const dayNum = rangeEndDay - i
+      const dayStart = civilDateTimeToInstant(selY, selM, dayNum, 0, 0, 0, tz)
+      const nextDay = addDays(selY, selM, dayNum, 1)
+      const dayEnd = civilDateTimeToInstant(nextDay.y, nextDay.m, nextDay.d, 0, 0, 0, tz)
+      points.push(spendInWindow(transactions, categoryKindById, dayStart, dayEnd))
     }
     return points
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [transactions, selectedMonth])
+  }, [transactions, categoryKindById, selY, selM, rangeEndDay, tz])
   const trendMax = Math.max(...trend, 1)
+  const trendStartLabel = useMemo(() => {
+    const startDayNum = rangeEndDay - (trend.length - 1)
+    const start = civilDateTimeToInstant(selY, selM, Math.max(1, startDayNum), 12, 0, 0, tz)
+    return new Date(start).toLocaleDateString(locale, { month: 'short', day: 'numeric', timeZone: tz })
+  }, [selY, selM, rangeEndDay, trend.length, tz, locale])
+  const trendEndLabel = useMemo(() => {
+    const end = civilDateTimeToInstant(selY, selM, rangeEndDay, 12, 0, 0, tz)
+    return new Date(end).toLocaleDateString(locale, { month: 'short', day: 'numeric', timeZone: tz })
+  }, [selY, selM, rangeEndDay, tz, locale])
 
-  // Forecast: only meaningful for the current month with some data behind us.
-  // Usual = avg of the previous 3 full months; skip if we don't have that.
-  const usualMonthly = useMemo(() => {
-    const months: number[] = []
-    for (let i = 1; i <= 3; i++) {
-      const s = new Date(now.getFullYear(), now.getMonth() - i, 1)
-      const e = new Date(now.getFullYear(), now.getMonth() - i + 1, 1)
-      months.push(sumDebits(transactions, s, e))
-    }
-    const filled = months.filter((m) => m > 0)
-    return filled.length > 0 ? filled.reduce((a, b) => a + b, 0) / filled.length : 0
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [transactions])
-  const projectedMonthly = useMemo(() => {
-    if (!isCurrentMonth || daysElapsed < 1) return 0
-    return (monthSpent / daysElapsed) * daysInSelectedMonth
-  }, [isCurrentMonth, monthSpent, daysElapsed, daysInSelectedMonth])
-  const forecastDiff = projectedMonthly - usualMonthly
-  const showForecast = isCurrentMonth && usualMonthly > 0 && monthSpent > 0
+  // Forecast — the one shared entry point (fix-plan 2.11): both
+  // platforms call `forecastMonthly` with the same shape and get
+  // byte-identical gating, instead of mobile's own ad-hoc "avg of 3
+  // prior months, filter out zeros" with no distinct-day requirement.
+  const forecastTxns: ForecastTxn[] = useMemo(
+    () =>
+      transactions
+        .filter((tx) => !tx.is_deleted)
+        .map((tx) => ({
+          amount_in_profile_currency: tx.amount_in_profile_currency,
+          direction: tx.direction,
+          transacted_at: tx.transacted_at,
+          category_id: tx.category_id,
+          category_name: tx.category_id ? categoryMap[tx.category_id]?.name ?? null : null,
+          category_kind: tx.category_id ? categoryKindById[tx.category_id] ?? null : null,
+          is_recurring: tx.is_recurring,
+        })),
+    [transactions, categoryMap, categoryKindById],
+  )
+  const forecastRules: ForecastRule[] = useMemo(
+    () =>
+      rules
+        .filter((r) => r.is_active)
+        .map((r) => ({
+          frequency: r.frequency,
+          interval: r.interval ?? 1,
+          starts_at: r.starts_at,
+          ends_at: r.ends_at,
+          anchor_day: r.anchor_day,
+          anchor_weekday: r.anchor_weekday,
+          anchor_time: r.anchor_time,
+          amount: r.amount,
+          direction: r.direction,
+        })),
+    [rules],
+  )
+  const forecast = useMemo(
+    () => forecastMonthly(forecastTxns, forecastRules, nowInstant, tz),
+    [forecastTxns, forecastRules, nowInstant, tz],
+  )
+  const showForecast = isCurrentMonth && forecast.confident
+  const forecastDiff = (forecast.projected ?? 0) - (forecast.usual ?? 0)
 
   // Single-line month label used inside the forecast serif sentence.
-  const selectedMonthName = selectedMonth.toLocaleDateString(locale, { month: 'long' })
+  const selectedMonthName = monthLabel(selY, selM, tz, locale, { month: 'long' })
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: tabBarClearance }]} showsVerticalScrollIndicator={false}>
         {/* Title block — eyebrow + serif headline. Month picker is a subtle
             button in the eyebrow row so the overall page header stays calm. */}
         <View style={styles.header}>
@@ -308,7 +410,7 @@ export default function InsightsScreen() {
             <Text style={styles.eyebrow}>
               {isCurrentMonth
                 ? t('insights.eyebrow_this_month', locale)
-                : selectedMonth.toLocaleDateString(locale, { month: 'long', year: 'numeric' })}
+                : monthLabel(selY, selM, tz, locale, { month: 'long', year: 'numeric' })}
             </Text>
             <Pressable
               onPress={() => setMonthPickerOpen(true)}
@@ -362,7 +464,7 @@ export default function InsightsScreen() {
               {t('insights.spent', locale)} · {rangeLabel}
             </Text>
             <View style={styles.heroAmountRow}>
-              <Money value={monthSpent} size={52} />
+              <Money value={monthSpent} currencyCode={currency} locale={locale} size={52} />
               {deltaPct != null && (
                 <View style={styles.deltaPill}>
                   <Text style={styles.deltaPillText}>
@@ -375,12 +477,8 @@ export default function InsightsScreen() {
             <TrendSpark
               points={trend}
               max={trendMax}
-              startLabel={
-                // First point is `trend.length - 1` days before rangeEnd.
-                new Date(rangeEnd.getTime() - (trend.length - 1) * 86400000)
-                  .toLocaleDateString(locale, { month: 'short', day: 'numeric' })
-              }
-              endLabel={rangeEnd.toLocaleDateString(locale, { month: 'short', day: 'numeric' })}
+              startLabel={trendStartLabel}
+              endLabel={trendEndLabel}
               captionLabel={`${t('insights.last_n_days_prefix', locale)} ${trend.length} ${t('insights.last_n_days_suffix', locale)}`}
             />
           </View>
@@ -389,7 +487,25 @@ export default function InsightsScreen() {
         {/* Categories */}
         <View style={styles.sectionWrap}>
           <Text style={styles.sectionLabel}>{t('insights.categories', locale)}</Text>
-          {categoryBreakdown.length === 0 ? (
+          {transactionsError && categoryBreakdown.length === 0 ? (
+            // Error+retry state (fix-plan 2.13) instead of "nothing to
+            // show yet" — this section is the one place on this screen a
+            // failed read and a genuinely empty month rendered
+            // identically. `useTransactions` exposes no `refetch`, so the
+            // best available retry is re-driving the same pull it already
+            // runs on mount.
+            <View style={styles.emptyCard}>
+              <Ionicons name="alert-circle-outline" size={28} color={Colors.destructive ?? '#A94646'} style={{ marginBottom: 4 }} />
+              <Text style={styles.emptyText}>{t('common.load_failed', locale)}</Text>
+              <Pressable
+                onPress={() => user?.id && syncManager.pullRemote(user.id)}
+                style={({ pressed }) => [styles.errorRetryBtn, pressed && styles.errorRetryBtnPressed]}
+              >
+                <Ionicons name="refresh" size={14} color="#FFFFFF" />
+                <Text style={styles.errorRetryText}>{t('common.retry', locale)}</Text>
+              </Pressable>
+            </View>
+          ) : categoryBreakdown.length === 0 ? (
             <View style={styles.emptyCard}>
               <Text style={styles.emptyText}>{t('insights.empty', locale)}</Text>
             </View>
@@ -411,7 +527,7 @@ export default function InsightsScreen() {
                         </Text>
                       </View>
                       <View style={styles.catRight}>
-                        <Money value={row.amount} size={15} serif={false} sansWeight="600" />
+                        <Money value={row.amount} currencyCode={currency} locale={locale} size={15} serif={false} sansWeight="600" />
                         <Text style={styles.catPct}>{row.pct}%</Text>
                       </View>
                     </View>
@@ -430,7 +546,10 @@ export default function InsightsScreen() {
           )}
         </View>
 
-        {/* Forecast — dark ink card, only for the current month with data. */}
+        {/* Forecast — dark ink card, only for the current month once
+            `forecastMonthly` reports enough history to be confident
+            (fix-plan 2.11 — this used to render from a single day-old
+            account with no gate at all). */}
         {showForecast && (
           <View style={styles.forecastWrap}>
             <View style={styles.forecastCard}>
@@ -441,7 +560,7 @@ export default function InsightsScreen() {
               <Text style={styles.forecastLine}>
                 {t('insights.forecast_line_prefix', locale)}{' '}
                 <Text style={styles.forecastAmount}>
-                  {formatCurrency(Math.round(projectedMonthly), currency, locale)}
+                  {formatCurrency(Math.round(forecast.projected ?? 0), currency, locale)}
                 </Text>{' '}
                 {t('insights.forecast_line_suffix', locale).replace('{month}', selectedMonthName)}
               </Text>
@@ -452,6 +571,12 @@ export default function InsightsScreen() {
                     ? `${formatCurrency(Math.round(Math.abs(forecastDiff)), currency, locale)} ${t('insights.forecast_below', locale)}`
                     : `${formatCurrency(Math.round(forecastDiff), currency, locale)} ${t('insights.forecast_above', locale)}`}
               </Text>
+              {forecast.range && (
+                <Text style={styles.forecastRange}>
+                  {formatCurrency(Math.round(forecast.range.low), currency, locale)} –{' '}
+                  {formatCurrency(Math.round(forecast.range.high), currency, locale)}
+                </Text>
+              )}
             </View>
           </View>
         )}
@@ -462,40 +587,46 @@ export default function InsightsScreen() {
             drills into /more/transactions scoped to that month. */}
         <View style={styles.historyWrap}>
           <Text style={styles.historySectionLabel}>{t('insights.history', locale)}</Text>
-          <HistoryHeatmap transactions={transactions} locale={locale} />
+          <HistoryHeatmap transactions={transactions} locale={locale} currencyCode={currency} tz={tz} />
         </View>
       </ScrollView>
 
-      {/* Month picker sheet */}
-      <Modal visible={monthPickerOpen} animationType="slide" transparent>
-        <Pressable style={styles.modalBackdrop} onPress={() => setMonthPickerOpen(false)}>
-          <View style={styles.monthSheet}>
-            <Text style={styles.monthSheetTitle}>{t('insights.select_month', locale)}</Text>
-            <ScrollView>
-              {monthOptions.map((d) => {
-                const active = monthKey(d) === monthKey(selectedMonth)
-                return (
-                  <Pressable
-                    key={monthKey(d)}
-                    style={[styles.monthOption, active && styles.monthOptionActive]}
-                    onPress={() => {
-                      setSelectedMonth(d)
-                      setMonthPickerOpen(false)
-                    }}
-                  >
-                    <Text style={[styles.monthOptionText, active && styles.monthOptionTextActive]}>
-                      {d.toLocaleDateString(locale, { month: 'long', year: 'numeric' })}
-                    </Text>
-                    {active && (
-                      <Ionicons name="checkmark" size={18} color={Colors.accent ?? Colors.primary} />
-                    )}
-                  </Pressable>
-                )
-              })}
-            </ScrollView>
-          </View>
-        </Pressable>
-      </Modal>
+      {/* Month picker — rendered through the shared `<BottomSheet>`
+          (fix-plan 1.8/2.14) instead of a hand-rolled `<Modal>`. This is
+          also the fix for 01-F18: the old sheet was a plain `<View>` with
+          no `onPress` stop-propagation, so tapping anywhere in its own
+          padding (not just the backdrop) bubbled up and dismissed it —
+          `BottomSheet`'s body swallows its own touches by construction. */}
+      <BottomSheet
+        visible={monthPickerOpen}
+        onClose={() => setMonthPickerOpen(false)}
+        title={t('insights.select_month', locale)}
+        cancelLabel={t('common.cancel', locale)}
+        contentContainerStyle={styles.monthSheetContent}
+        testID="insights-month-sheet"
+      >
+        {monthOptions.map((key) => {
+          const active = key === selectedMonthKey
+          const { y, m } = splitMonthKey(key)
+          return (
+            <Pressable
+              key={key}
+              style={[styles.monthOption, active && styles.monthOptionActive]}
+              onPress={() => {
+                setSelectedMonthKey(key)
+                setMonthPickerOpen(false)
+              }}
+            >
+              <Text style={[styles.monthOptionText, active && styles.monthOptionTextActive]}>
+                {monthLabel(y, m, tz, locale, { month: 'long', year: 'numeric' })}
+              </Text>
+              {active && (
+                <Ionicons name="checkmark" size={18} color={Colors.accent ?? Colors.primary} />
+              )}
+            </Pressable>
+          )
+        })}
+      </BottomSheet>
     </SafeAreaView>
   )
 }
@@ -506,7 +637,9 @@ export default function InsightsScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
-  content: { paddingBottom: 120 },
+  // `paddingBottom` set per-instance above from `useTabBarClearance()`
+  // (audit 01-F13, fix-plan 1.8/2.14).
+  content: {},
 
   header: { paddingHorizontal: 22, paddingTop: 14, paddingBottom: 4 },
   eyebrowRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
@@ -738,6 +871,13 @@ const styles = StyleSheet.create({
     fontFamily: Typography.fontFamily.sans,
     marginTop: 8,
   },
+  forecastRange: {
+    color: '#FFFFFF',
+    opacity: 0.5,
+    fontSize: 12,
+    fontFamily: Typography.fontFamily.sans,
+    marginTop: 4,
+  },
 
   // Empty state (categories)
   emptyCard: {
@@ -753,27 +893,30 @@ const styles = StyleSheet.create({
     color: Colors.ink3 ?? Colors.textSecondary,
     textAlign: 'center',
   },
+  errorRetryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 999,
+    backgroundColor: Colors.ink ?? '#1B1915',
+  },
+  errorRetryBtnPressed: { opacity: 0.8 },
+  errorRetryText: {
+    fontFamily: Typography.fontFamily.sansSemiBold,
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
 
-  // Month picker sheet
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    justifyContent: 'flex-end',
-  },
-  monthSheet: {
-    backgroundColor: Colors.background,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    padding: 16,
-    maxHeight: '60%',
+  // Month picker sheet — backdrop/header/chrome now owned by the shared
+  // `<BottomSheet>`; only the option rows' own styles remain here.
+  monthSheetContent: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
     gap: 8,
-  },
-  monthSheetTitle: {
-    fontFamily: Typography.fontFamily.sansBold,
-    fontSize: 16,
-    color: Colors.ink ?? Colors.text,
-    textAlign: 'center',
-    paddingVertical: 8,
   },
   monthOption: {
     flexDirection: 'row',

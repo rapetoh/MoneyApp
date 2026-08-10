@@ -8,6 +8,16 @@
 // sync_upsert_transaction RPC, realtime publication, recurrence anchors +
 // occurrence_date, currency_code CHECK, categories.kind, fx-backfill cron).
 //
+// Hand-updated (not yet regenerated against production) for migration
+// 025: recurring_rules.{amount_in_profile_currency,fx_rate_to_profile,
+// fx_rate_date} (fix-plan 2.1's FX snapshot columns). Re-run the
+// generator once 025 is applied and drop this note.
+//
+// Also hand-updated (not yet regenerated) for migration 026:
+// transactions.snapshot_currency and profiles.monthly_income_currency
+// (fix-plan 2.7's re-denomination columns). Re-run the generator once
+// 026 is applied and drop this note too.
+//
 // Regenerate with `packages/shared/scripts/gen-db-types.sh` (needs the
 // `supabase` CLI + a `SUPABASE_ACCESS_TOKEN`, never the anon/service key)
 // whenever a new migration lands. CI (`.github/workflows/ci.yml`, job
@@ -330,6 +340,7 @@ export type Database = {
           id: string
           locale: string
           monthly_income: number | null
+          monthly_income_currency: string | null
           monthly_income_source: string | null
           onboarding_completed_at: string | null
           plus_status: string | null
@@ -346,6 +357,7 @@ export type Database = {
           id: string
           locale?: string
           monthly_income?: number | null
+          monthly_income_currency?: string | null
           monthly_income_source?: string | null
           onboarding_completed_at?: string | null
           plus_status?: string | null
@@ -362,6 +374,7 @@ export type Database = {
           id?: string
           locale?: string
           monthly_income?: number | null
+          monthly_income_currency?: string | null
           monthly_income_source?: string | null
           onboarding_completed_at?: string | null
           plus_status?: string | null
@@ -374,6 +387,7 @@ export type Database = {
       recurring_rules: {
         Row: {
           amount: number
+          amount_in_profile_currency: number | null
           anchor_day: number | null
           anchor_time: string | null
           anchor_weekday: number | null
@@ -384,6 +398,8 @@ export type Database = {
           direction: string
           ends_at: string | null
           frequency: string
+          fx_rate_date: string | null
+          fx_rate_to_profile: number | null
           id: string
           interval: number
           is_active: boolean
@@ -401,6 +417,7 @@ export type Database = {
         }
         Insert: {
           amount: number
+          amount_in_profile_currency?: number | null
           anchor_day?: number | null
           anchor_time?: string | null
           anchor_weekday?: number | null
@@ -411,6 +428,8 @@ export type Database = {
           direction?: string
           ends_at?: string | null
           frequency: string
+          fx_rate_date?: string | null
+          fx_rate_to_profile?: number | null
           id?: string
           interval?: number
           is_active?: boolean
@@ -428,6 +447,7 @@ export type Database = {
         }
         Update: {
           amount?: number
+          amount_in_profile_currency?: number | null
           anchor_day?: number | null
           anchor_time?: string | null
           anchor_weekday?: number | null
@@ -438,6 +458,8 @@ export type Database = {
           direction?: string
           ends_at?: string | null
           frequency?: string
+          fx_rate_date?: string | null
+          fx_rate_to_profile?: number | null
           id?: string
           interval?: number
           is_active?: boolean
@@ -538,6 +560,7 @@ export type Database = {
           raw_transcript: string | null
           recurring_frequency: string | null
           recurring_rule_id: string | null
+          snapshot_currency: string | null
           source: string
           synced_at: string | null
           transacted_at: string
@@ -570,6 +593,7 @@ export type Database = {
           raw_transcript?: string | null
           recurring_frequency?: string | null
           recurring_rule_id?: string | null
+          snapshot_currency?: string | null
           source: string
           synced_at?: string | null
           transacted_at: string
@@ -602,6 +626,7 @@ export type Database = {
           raw_transcript?: string | null
           recurring_frequency?: string | null
           recurring_rule_id?: string | null
+          snapshot_currency?: string | null
           source?: string
           synced_at?: string | null
           transacted_at?: string
@@ -658,6 +683,7 @@ export type Database = {
           raw_transcript: string | null
           recurring_frequency: string | null
           recurring_rule_id: string | null
+          snapshot_currency: string | null
           source: string
           synced_at: string | null
           transacted_at: string

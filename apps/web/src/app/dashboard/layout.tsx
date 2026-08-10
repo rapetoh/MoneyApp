@@ -12,8 +12,22 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
+  // The profile read here only backs cosmetic chrome (sidebar display
+  // name, the Plus gate) — degrade to the same "no profile row yet"
+  // rendering this file has always tolerated on failure, logged
+  // server-side, rather than crashing every route in the app. Next's
+  // error.js boundaries do not catch a throw from a layout.js in their
+  // *own* segment (only from the page.js/nested layouts below it —
+  // see the Next.js docs on error.js), so a bare `await getProfile`
+  // here would fall through `dashboard/error.tsx` entirely, to Next's
+  // unbranded default error screen. Overview and Insights, where the
+  // profile/transaction read *is* the page's content, let the same
+  // `DataFetchError` propagate to that boundary instead (fix-plan 2.13).
   const [profile, recurringResult] = await Promise.all([
-    getProfile(supabase, user.id),
+    getProfile(supabase, user.id).catch((err: unknown) => {
+      console.error('[dashboard layout] profile read failed', err)
+      return null
+    }),
     supabase
       .from('recurring_rules')
       .select('id', { count: 'exact', head: true })

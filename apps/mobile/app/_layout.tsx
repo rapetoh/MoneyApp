@@ -10,6 +10,7 @@ import { useShortcutHandler } from '../src/hooks/useShortcutHandler'
 import { seedDefaultCategories } from '../src/services/seedCategories'
 import { runRecurringCatchUp } from '../src/services/recurringCatchUp'
 import { runFxBackfill } from '../src/services/fxBackfill'
+import { runOncePerSession } from '../src/services/launchOnce'
 import { UndoProvider } from '../src/hooks/useUndo'
 import { SyncFailureBanner } from '../src/components/SyncFailureBanner'
 import { t } from '@voice-expense/shared'
@@ -110,20 +111,34 @@ export default function RootLayout() {
     }
 
     prevSegmentRef.current = segmentGroup
-
-    if (session?.user?.id) {
-      // Seed default categories for new users (no-op if categories already exist)
-      seedDefaultCategories(session.user.id)
-
-      // Generate any missed recurring transactions since last app open
-      runRecurringCatchUp(session.user.id)
-
-      // Convert any foreign-currency historical rows that pre-date the
-      // FX snapshot migration. Self-throttles to FX_BACKFILL_BATCH per
-      // launch and is a no-op once everything is filled in.
-      runFxBackfill(session.user.id)
-    }
   }, [session, loading, segments, router, profile, ready])
+
+  // Launch-scoped services — deliberately a *separate* effect keyed on the
+  // user id alone, not on `segments` (audit 07-F15). These used to live in
+  // the routing effect above, whose dependency array includes `segments`
+  // (a new array on every route change), so all three re-ran — and
+  // re-issued their Supabase round-trips — on every tab switch and every
+  // screen push; two overlapping `runRecurringCatchUp` invocations could
+  // both pass the "does this occurrence already exist" check before
+  // either had written, producing duplicate-generation churn. Each call
+  // is wrapped in `runOncePerSession` (`src/services/launchOnce.ts`) so it
+  // fires exactly once per signed-in session even if this effect somehow
+  // re-runs.
+  useEffect(() => {
+    const userId = session?.user?.id
+    if (!userId) return
+
+    // Seed default categories for new users (no-op if categories already exist)
+    runOncePerSession(`seedDefaultCategories:${userId}`, () => seedDefaultCategories(userId))
+
+    // Generate any missed recurring transactions since last app open
+    runOncePerSession(`runRecurringCatchUp:${userId}`, () => runRecurringCatchUp(userId))
+
+    // Convert any foreign-currency historical rows that pre-date the FX
+    // snapshot migration. Self-throttles to FX_BACKFILL_BATCH per launch
+    // and is a no-op once everything is filled in.
+    runOncePerSession(`runFxBackfill:${userId}`, () => runFxBackfill(userId))
+  }, [session?.user?.id])
 
   if (!ready) return null
 

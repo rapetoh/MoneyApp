@@ -32,6 +32,47 @@ const STORAGE_USER_OPTED_OUT = 'day_two_user_opted_out'
 
 const TWENTY_FOUR_HOURS_SEC = 24 * 60 * 60
 
+/**
+ * Serializes every read-cancel-schedule-write sequence below onto one
+ * chain, so two overlapping callers can never interleave.
+ *
+ * This is the fix for the owner-reported bug: four "Anything to capture?"
+ * notifications landed within 21 minutes. `scheduleDayTwo` already
+ * cancelled the previous notification before scheduling a new one, but
+ * that cancel-then-schedule sequence was not atomic — `useDayTwoDunning`
+ * fires once per transaction-count change, and a batch of transactions
+ * arriving close together (a sync merge, several quick captures) fired
+ * several overlapping `rescheduleDayTwo` calls. Two calls that both read
+ * `STORAGE_NOTIF_ID` before either had written it back both cancelled the
+ * *same* previously-scheduled id and then each scheduled a brand-new one;
+ * only the last writer's id survives in SecureStore, so every earlier
+ * "new" notification becomes an orphan — never reachable by a future
+ * cancel, since the stored id has moved on — that still fires ~24h later.
+ * Repeat that race a few times during one burst of activity and the
+ * orphans land within minutes of each other the next day.
+ *
+ * Routing `scheduleDayTwo` and `cancelDayTwo` through this queue makes the
+ * whole sequence — read stored id, cancel it, schedule the replacement,
+ * persist its id — run to completion before the next caller's sequence
+ * starts, so at most one notification is ever pending. Internal callers
+ * (`scheduleDayTwo` cancelling the previous instance as part of its own
+ * turn) use the `*Unsafe` helpers directly to avoid deadlocking on their
+ * own place in the queue.
+ */
+let chain: Promise<unknown> = Promise.resolve()
+
+function serialized<T>(fn: () => Promise<T>): Promise<T> {
+  const result = chain.then(fn, fn)
+  // The chain itself must never reject — a failed turn (e.g. a transient
+  // Notifications API error) would otherwise wedge every subsequent call
+  // behind a permanently-rejected promise.
+  chain = result.then(
+    () => undefined,
+    () => undefined,
+  )
+  return result
+}
+
 // Configure how notifications are presented while the app is foregrounded.
 // Day-2 dunning is meant to feel ambient, not aggressive — show the banner
 // + play the default sound, no badge increment (we don't use unread counts).
@@ -104,10 +145,27 @@ export async function requestDayTwoPermission(): Promise<'granted' | 'denied'> {
     : 'denied'
 }
 
-/** Schedule the dunning notification 24h from now. Cancels any
- *  previously-scheduled instance first. No-ops when permission isn't
- *  granted or the user has opted out. */
-export async function scheduleDayTwo(locale: Locale): Promise<void> {
+/** Cancel any pending Day-2 dunning notification — the actual work, not
+ *  queued. Only called directly by `scheduleDayTwoUnsafe` (as part of its
+ *  own turn on the queue) and by the public `cancelDayTwo` below (which
+ *  queues it). Do not call this directly from a new surface — call
+ *  `cancelDayTwo` instead, or two unserialized callers reintroduce the
+ *  exact race this module exists to close. */
+async function cancelDayTwoUnsafe(): Promise<void> {
+  const id = await SecureStore.getItemAsync(STORAGE_NOTIF_ID)
+  if (!id) return
+  try {
+    await Notifications.cancelScheduledNotificationAsync(id)
+  } catch {
+    // Notification might already have fired or been cleared by the OS;
+    // either way the persisted id is stale. Drop it.
+  }
+  await SecureStore.deleteItemAsync(STORAGE_NOTIF_ID)
+}
+
+/** Schedule the dunning notification 24h from now — the actual work, not
+ *  queued. See `cancelDayTwoUnsafe`'s note: call `scheduleDayTwo` instead. */
+async function scheduleDayTwoUnsafe(locale: Locale): Promise<void> {
   if (await isUserOptedOut()) return
 
   const status = await getPermissionStatus()
@@ -115,8 +173,12 @@ export async function scheduleDayTwo(locale: Locale): Promise<void> {
 
   // Cancel previous schedule if any. The id is persisted in SecureStore
   // because Notifications.getAllScheduledNotificationsAsync isn't reliable
-  // to filter on its own (other plugins may schedule too).
-  await cancelDayTwo()
+  // to filter on its own (other plugins may schedule too). Uses the
+  // unqueued helper directly — this call is itself already running inside
+  // one turn of the queue (see `scheduleDayTwo` below); routing it back
+  // through the public, queued `cancelDayTwo` would await a turn that
+  // can't start until this one finishes, i.e. deadlock.
+  await cancelDayTwoUnsafe()
 
   // Day-2 dunning is intentionally *not* a calendar trigger — we don't want
   // it pinned to a specific time of day. 24h sleep keeps the nudge tied to
@@ -139,19 +201,23 @@ export async function scheduleDayTwo(locale: Locale): Promise<void> {
   await SecureStore.setItemAsync(STORAGE_NOTIF_ID, id)
 }
 
+/** Schedule the dunning notification 24h from now. Cancels any
+ *  previously-scheduled instance first, and is safe to call concurrently
+ *  from multiple call sites — every call is serialized onto one queue
+ *  (see the module doc comment above), so overlapping callers can never
+ *  interleave a cancel with someone else's schedule and orphan a
+ *  notification. No-ops when permission isn't granted or the user has
+ *  opted out. */
+export function scheduleDayTwo(locale: Locale): Promise<void> {
+  return serialized(() => scheduleDayTwoUnsafe(locale))
+}
+
 /** Cancel any pending Day-2 dunning notification. Safe to call from any
  *  surface where new activity should reset the 24h clock (transaction
- *  save, transaction delete, app foreground). */
-export async function cancelDayTwo(): Promise<void> {
-  const id = await SecureStore.getItemAsync(STORAGE_NOTIF_ID)
-  if (!id) return
-  try {
-    await Notifications.cancelScheduledNotificationAsync(id)
-  } catch {
-    // Notification might already have fired or been cleared by the OS;
-    // either way the persisted id is stale. Drop it.
-  }
-  await SecureStore.deleteItemAsync(STORAGE_NOTIF_ID)
+ *  save, transaction delete, app foreground) — queued the same as
+ *  `scheduleDayTwo`, so a cancel and a concurrent schedule can't race. */
+export function cancelDayTwo(): Promise<void> {
+  return serialized(cancelDayTwoUnsafe)
 }
 
 /** Permission-then-schedule helper. Call after the user's first

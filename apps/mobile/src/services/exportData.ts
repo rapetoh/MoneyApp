@@ -1,8 +1,8 @@
 import { File, Paths } from 'expo-file-system'
 import * as Sharing from 'expo-sharing'
 import * as Print from 'expo-print'
-import type { Transaction, Category, Locale } from '@voice-expense/shared'
-import { t } from '@voice-expense/shared'
+import type { Transaction, Category, CategoryKind, Locale, ExportableTransaction, ExportRecurringRule, ExportRow } from '@voice-expense/shared'
+import { t, buildExport, exportSummaryJSON, localDay } from '@voice-expense/shared'
 
 /**
  * Murmur Plus — Data export.
@@ -23,7 +23,19 @@ import { t } from '@voice-expense/shared'
  * (Mail, Files, AirDrop, Messages, etc.) — Murmur never uploads any of it.
  *
  * Export is Plus-gated; that gate runs at the call site, not here. This
- * module is pure formatting + IO.
+ * module is pure formatting + IO — it does not fetch its own data, so
+ * `ExportInput` is where fix-plan 2.15's fields land: `timezone` (so a
+ * row's printed date is the *local* day, not a UTC slice of the instant
+ * — audit 04-F8) and `recurringRules` (the mobile export previously
+ * omitted rules entirely, so a user who left via the phone lost their
+ * subscription configuration on export). Both are optional/additive —
+ * the callers (`apps/mobile/app/more/{settings,privacy}.tsx`) are
+ * outside this pass's file ownership, so this ships as a shape those
+ * callers can start passing without another change here; a caller that
+ * doesn't yet still gets the correct device-zone dates (see
+ * `resolveTimezone`) and a `recurring_rules: []` key rather than a
+ * missing one (see `exportSummaryJSON`, `packages/shared/src/domain/
+ * export.ts`).
  */
 
 interface ExportInput {
@@ -31,12 +43,69 @@ interface ExportInput {
   categories: Category[]
   locale: Locale
   currency: string
+  /** IANA zone (fix-plan 1.3). Defaults to the device's own resolved
+   *  zone when omitted — accurate here in a way it wouldn't be on web,
+   *  because `profiles.timezone` is itself captured from this same
+   *  device signal (`expo-localization`'s `getCalendars()`). */
+  timezone?: string
+  recurringRules?: ExportRecurringRule[]
+  /** Inclusive local-day range (`YYYY-MM-DD`). Defaults to the full
+   *  history — earliest transaction's local day through today — which
+   *  preserves this module's existing "export everything" behaviour for
+   *  a caller that doesn't pass a range. */
+  dateFrom?: string
+  dateTo?: string
 }
 
-function categoryNameById(categories: Category[]): Map<string, string> {
-  const m = new Map<string, string>()
-  for (const c of categories) m.set(c.id, c.name)
-  return m
+function resolveTimezone(input: ExportInput): string {
+  return input.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+}
+
+/** Resolves the assembled export once per call — every format (CSV,
+ *  JSON, PDF) renders off this same result, so the header total and
+ *  every row's date/amount columns can never disagree between formats
+ *  (fix-plan 2.15). */
+function assembleExport(input: ExportInput) {
+  const tz = resolveTimezone(input)
+  const active = activeTransactions(input.transactions)
+  // `categories.kind` carries a CHECK constraint the generated row type
+  // can't see (same narrowing every other CHECK-constrained column in
+  // this repo needs — see packages/shared/src/types/category.ts).
+  const catKindById = new Map(input.categories.map((c) => [c.id, c.kind as CategoryKind]))
+  const todayLocal = localDay(new Date().toISOString(), tz)
+  const earliestInstant = active.reduce<string | null>(
+    (min, tx) => (min == null || tx.transacted_at < min ? tx.transacted_at : min),
+    null,
+  )
+  const dateFrom = input.dateFrom ?? (earliestInstant ? localDay(earliestInstant, tz) : todayLocal)
+  const dateTo = input.dateTo ?? todayLocal
+
+  const exportableTxns: ExportableTransaction[] = active.map((tx) => ({
+    id: tx.id,
+    amount: tx.amount,
+    amount_in_profile_currency: tx.amount_in_profile_currency,
+    currency_code: tx.currency_code,
+    direction: tx.direction,
+    merchant: tx.merchant,
+    note: tx.note,
+    category_id: tx.category_id,
+    category_kind: tx.category_id ? catKindById.get(tx.category_id) ?? null : null,
+    payment_method: tx.payment_method,
+    source: tx.source,
+    is_recurring: tx.is_recurring,
+    transacted_at: tx.transacted_at,
+    fx_rate_to_profile: tx.fx_rate_to_profile,
+    fx_rate_date: tx.fx_rate_date,
+  }))
+
+  return buildExport({
+    profile: { currency_code: input.currency, locale: input.locale, timezone: tz },
+    transactions: exportableTxns,
+    categories: input.categories.map((c) => ({ id: c.id, name: c.name })),
+    recurringRules: input.recurringRules,
+    dateFrom,
+    dateTo,
+  })
 }
 
 function escapeCSV(field: string | number | null): string {
@@ -52,25 +121,25 @@ function activeTransactions(t: Transaction[]): Transaction[] {
   return t.filter((tx) => !tx.is_deleted)
 }
 
-function todayStamp(): string {
-  // Local-time `YYYY-MM-DD` for the filename. Avoids surprising the user
-  // with a UTC date that doesn't match their wall clock around midnight.
-  const d = new Date()
-  return [
-    d.getFullYear(),
-    String(d.getMonth() + 1).padStart(2, '0'),
-    String(d.getDate()).padStart(2, '0'),
-  ].join('-')
+function todayStamp(tz: string): string {
+  // Local `YYYY-MM-DD` for the filename, in `tz` (fix-plan 1.3) — not a
+  // UTC slice, and not a raw `Date#getFullYear`/`getDate` read (which
+  // silently used whichever zone the runtime's own clock resolved to).
+  return localDay(new Date().toISOString(), tz)
 }
 
 // ─── CSV ─────────────────────────────────────────────────────────────────────
 
 export function buildCSV(input: ExportInput): string {
-  const cats = categoryNameById(input.categories)
+  const result = assembleExport(input)
   const header = [
     'date',
+    'time',
     'amount',
     'currency',
+    `amount_${input.currency.toLowerCase()}`,
+    'fx_rate',
+    'fx_date',
     'direction',
     'category',
     'merchant',
@@ -79,60 +148,45 @@ export function buildCSV(input: ExportInput): string {
     'is_recurring',
     'source',
   ]
-  const rows = activeTransactions(input.transactions)
-    .sort((a, b) => a.transacted_at.localeCompare(b.transacted_at))
-    .map((tx) =>
-      [
-        // ISO date trimmed to YYYY-MM-DD; Excel reads this cleanly.
-        tx.transacted_at.split('T')[0],
-        tx.amount.toFixed(2),
-        tx.currency_code,
-        tx.direction,
-        tx.category_id ? cats.get(tx.category_id) ?? '' : '',
-        tx.merchant ?? '',
-        tx.note ?? '',
-        tx.payment_method ?? '',
-        tx.is_recurring ? '1' : '0',
-        tx.source,
-      ]
-        .map(escapeCSV)
-        .join(','),
-    )
-  return [header.join(','), ...rows].join('\n') + '\n'
+  const rows = result.rows.map((r) =>
+    [
+      r.date,
+      r.time,
+      r.amount.toFixed(2),
+      r.currency,
+      r.amountInProfileCurrency != null ? r.amountInProfileCurrency.toFixed(2) : '',
+      r.fxRate ?? '',
+      r.fxDate ?? '',
+      r.direction,
+      r.category,
+      r.merchant,
+      r.note,
+      r.paymentMethod,
+      r.isRecurring ? '1' : '0',
+      r.source,
+    ]
+      .map(escapeCSV)
+      .join(','),
+  )
+  const pending = result.summary.pendingCount
+  const footer =
+    pending > 0
+      ? `\n${escapeCSV(`${pending} transaction${pending === 1 ? '' : 's'} awaiting currency conversion, excluded from ${input.currency} totals`)}`
+      : ''
+  return [header.join(','), ...rows].join('\n') + footer + '\n'
 }
 
 // ─── JSON ────────────────────────────────────────────────────────────────────
 
+/** Same shape as the web export's JSON button
+ *  (`apps/web/src/app/dashboard/export/page.tsx`'s `exportJSON`) —
+ *  both call `exportSummaryJSON()` over their own `buildExport()`
+ *  result, so the two platforms' exports carry the same top-level keys
+ *  (fix-plan 2.15), including `recurring_rules`/`categories`, which
+ *  this file omitted entirely before this item. */
 export function buildJSON(input: ExportInput): string {
-  const cats = categoryNameById(input.categories)
-  const exported_at = new Date().toISOString()
-  const items = activeTransactions(input.transactions)
-    .sort((a, b) => a.transacted_at.localeCompare(b.transacted_at))
-    .map((tx) => ({
-      id: tx.id,
-      transacted_at: tx.transacted_at,
-      amount: tx.amount,
-      currency: tx.currency_code,
-      direction: tx.direction,
-      category: tx.category_id ? cats.get(tx.category_id) ?? null : null,
-      merchant: tx.merchant,
-      merchant_domain: tx.merchant_domain,
-      note: tx.note,
-      payment_method: tx.payment_method,
-      is_recurring: tx.is_recurring,
-      source: tx.source,
-    }))
-  return JSON.stringify(
-    {
-      app: 'Murmur',
-      version: 1,
-      exported_at,
-      currency_default: input.currency,
-      transactions: items,
-    },
-    null,
-    2,
-  )
+  const payload = exportSummaryJSON(assembleExport(input))
+  return JSON.stringify(payload, null, 2)
 }
 
 // ─── PDF ─────────────────────────────────────────────────────────────────────
@@ -146,31 +200,42 @@ function escapeHTML(s: string): string {
 }
 
 function pdfHTML(input: ExportInput, locale: Locale): string {
-  const cats = categoryNameById(input.categories)
-  const rows = activeTransactions(input.transactions)
-    .sort((a, b) => b.transacted_at.localeCompare(a.transacted_at))
-    .map((tx) => {
-      const date = new Date(tx.transacted_at).toLocaleDateString(locale, {
+  const result = assembleExport(input)
+  const rows = [...result.rows]
+    .reverse()
+    .map((r: ExportRow) => {
+      // `r.date` is already the correct local day (fix-plan 1.3) — build
+      // a display string from it via `toLocaleDateString` (not a
+      // restricted getter) rather than re-deriving the day from
+      // `transacted_at` a second time in whatever zone this call
+      // happens to run in.
+      const date = new Date(`${r.date}T12:00:00Z`).toLocaleDateString(locale, {
         month: 'short',
         day: '2-digit',
         year: 'numeric',
       })
-      const amount = `${tx.direction === 'credit' ? '+' : ''}${tx.currency_code} ${tx.amount.toFixed(2)}`
-      const cat = tx.category_id ? cats.get(tx.category_id) ?? '' : ''
+      const native = `${r.direction === 'credit' ? '+' : ''}${r.currency} ${r.amount.toFixed(2)}`
+      const converted =
+        r.amountInProfileCurrency != null
+          ? `${r.direction === 'credit' ? '+' : ''}${input.currency} ${r.amountInProfileCurrency.toFixed(2)}`
+          : '—'
       return `
         <tr>
           <td>${escapeHTML(date)}</td>
-          <td>${escapeHTML(tx.merchant ?? '—')}</td>
-          <td>${escapeHTML(cat)}</td>
-          <td class="num ${tx.direction === 'credit' ? 'credit' : ''}">${escapeHTML(amount)}</td>
+          <td>${escapeHTML(r.merchant || '—')}</td>
+          <td>${escapeHTML(r.category)}</td>
+          <td class="num ${r.direction === 'credit' ? 'credit' : ''}">${escapeHTML(native)}</td>
+          <td class="num ${r.direction === 'credit' ? 'credit' : ''}">${escapeHTML(converted)}</td>
         </tr>
       `
     })
     .join('')
 
-  const total = activeTransactions(input.transactions)
-    .filter((tx) => tx.direction === 'debit')
-    .reduce((s, tx) => s + tx.amount, 0)
+  // Routed through summarize() (fix-plan 1.4) — excludes transfer-kind
+  // categories and uses the FX-converted figure, so this total
+  // reconciles with a reader manually adding the right-hand column
+  // above, never the raw (possibly mixed-currency) left-hand one.
+  const total = result.summary.expense
 
   const exported_at = new Date().toLocaleDateString(locale, {
     weekday: 'long',
@@ -178,6 +243,12 @@ function pdfHTML(input: ExportInput, locale: Locale): string {
     month: 'long',
     day: 'numeric',
   })
+
+  const pending = result.summary.pendingCount
+  const pendingNote =
+    pending > 0
+      ? `<div class="footer">${escapeHTML(`${pending} transaction${pending === 1 ? '' : 's'} awaiting currency conversion, excluded from the total above.`)}</div>`
+      : ''
 
   return `<!doctype html>
 <html><head><meta charset="utf-8"/>
@@ -224,7 +295,7 @@ function pdfHTML(input: ExportInput, locale: Locale): string {
     </div>
     <div>
       <div class="label">${escapeHTML(t('export.pdf_count_label', locale))}</div>
-      <div class="val">${activeTransactions(input.transactions).length}</div>
+      <div class="val">${result.rows.length}</div>
     </div>
   </div>
   <table>
@@ -233,10 +304,12 @@ function pdfHTML(input: ExportInput, locale: Locale): string {
       <th>${escapeHTML(t('export.col_merchant', locale))}</th>
       <th>${escapeHTML(t('export.col_category', locale))}</th>
       <th style="text-align:right">${escapeHTML(t('export.col_amount', locale))}</th>
+      <th style="text-align:right">${escapeHTML(`${t('export.col_amount', locale)} (${input.currency})`)}</th>
     </tr></thead>
     <tbody>${rows}</tbody>
   </table>
   <div class="footer">${escapeHTML(t('export.pdf_footer', locale))}</div>
+  ${pendingNote}
 </div></body></html>`
 }
 
@@ -252,7 +325,7 @@ export async function exportAndShare(
   format: ExportFormat,
   input: ExportInput,
 ): Promise<void> {
-  const stamp = todayStamp()
+  const stamp = todayStamp(resolveTimezone(input))
   const filename = `murmur-${stamp}.${format}`
 
   let uri: string

@@ -1,6 +1,5 @@
 import { colors, font } from '../../lib/theme'
-import { type LensProps, monthDebits, monthCredits, monthSummary } from './types'
-import { aggAmount } from '@voice-expense/shared'
+import { type LensProps, monthSummary } from './types'
 
 // Daily balance line over the month + per-day income / expense bars + a
 // right summary panel breaking down income, expenses, and net.
@@ -21,41 +20,24 @@ interface DayPoint {
 }
 
 export function CashflowLens({ props }: { props: LensProps }) {
-  const credits = monthCredits(props)
-  const debits = monthDebits(props)
-  // Timezone-free anchor numbers — see LensProps. Never read date getters
-  // off the serialized monthStart instant.
-  const year = props.anchorYear
-  const monthIdx = props.anchorMonth
-  const daysInMonth = new Date(year, monthIdx + 1, 0).getDate()
+  const daysInMonth = props.days.length
 
-  // Build per-day inflow/outflow and a running "balance" relative to
-  // start. The balance line tracks literal cash movement — every
-  // credit and debit, transfers included, since a Savings & Investing
-  // transfer really does leave the checking balance — so it
-  // deliberately does NOT use `summarize()`'s spend-only `expense`.
-  // The Income/Expenses/Net *stats* below the chart do, via
-  // `monthSummary` (fix-plan 1.4), so they read the same numbers as
-  // the Overview header, MindMap and Treemap for the same month.
+  // Per-day inflow/outflow and a running "balance" relative to start,
+  // read straight off `LensProps.days` — bucketed once in `dashboard/
+  // page.tsx` through `period.ts`, in the profile's own timezone
+  // (fix-plan 2.4). The balance line tracks literal cash movement —
+  // every credit and debit, transfers included, since a Savings &
+  // Investing transfer really does leave the checking balance — which
+  // is exactly what `LensDay.spendTotal`/`incomeTotal` are (raw, not
+  // transfer-excluded; see their docstring in `types.ts`). The
+  // Income/Expenses/Net *stats* below the chart use `monthSummary()`
+  // (fix-plan 1.4) instead, so they read the same numbers as the
+  // Overview header, MindMap and Treemap for the same month.
   const points: DayPoint[] = []
   let bal = 0
-  for (let d = 1; d <= daysInMonth; d++) {
-    let inAmt = 0
-    let outAmt = 0
-    for (const t of credits) {
-      const dd = new Date(t.transacted_at)
-      if (dd.getFullYear() === year && dd.getMonth() === monthIdx && dd.getDate() === d) {
-        inAmt += aggAmount(t)
-      }
-    }
-    for (const t of debits) {
-      const dd = new Date(t.transacted_at)
-      if (dd.getFullYear() === year && dd.getMonth() === monthIdx && dd.getDate() === d) {
-        outAmt += aggAmount(t)
-      }
-    }
-    bal += inAmt - outAmt
-    points.push({ d, inAmt, outAmt, bal })
+  for (const day of props.days) {
+    bal += day.incomeTotal - day.spendTotal
+    points.push({ d: day.dayOfMonth, inAmt: day.incomeTotal, outAmt: day.spendTotal, bal })
   }
 
   const summary = monthSummary(props)

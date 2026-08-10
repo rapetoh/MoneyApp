@@ -6,8 +6,7 @@
 export { parseExpenseLocally } from './localParser'
 export { parseExpense, clearParseCache } from './parser'
 export { parseScan } from './scanParser'
-export type { ScanType, ScanOptions } from './scanParser'
-export { buildAdvisorContext } from './advisor'
+export type { ScanType, ScanOptions, ScanResult } from './scanParser'
 export { getPrompt, getScanPrompt } from './prompt'
 
 // The typed parse boundary (fix-plan item 1.7). Client-safe — no Node-only

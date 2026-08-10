@@ -1,12 +1,35 @@
 import { View, Text, Pressable, StyleSheet } from 'react-native'
+import { formatMoneyParts, amountAdjustDeltasFor } from '@voice-expense/shared'
 import { Colors, Typography, Spacing, Radius } from '../theme'
 
 interface Props {
   /** Current amount as a numeric string (e.g. "12.40") */
   value: string
   onChange: (next: string) => void
-  /** Chip deltas — negative decrements, positive increments. Defaults to −$1/+$1/+$5/+$10 per DESIGN.md §5 Confirm. */
+  /** ISO 4217 currency code the amount is denominated in. Required:
+   *  fix-plan 2.6 (audit 01-F19) — a bare `$1`/`$5`/`$10` chip label on
+   *  a EUR entry sat beside a correctly-symbolled `€` amount field in
+   *  the same card. Also drives the default `deltas` magnitude table
+   *  (a ±1 JPY chip corrects nothing). */
+  currencyCode: string
+  /** BCP 47 locale for the chip labels' digit grouping. */
+  locale: string
+  /** Chip deltas — negative decrements, positive increments. Defaults to
+   *  a per-currency magnitude table (`amountAdjustDeltasFor`) rather
+   *  than a flat `[-1, 1, 5, 10]` — see that function's doc comment. */
   deltas?: number[]
+}
+
+/** `"−$1"` / `"+¥100"` / `"+₦1,000"` — sign + this currency/locale's
+ *  symbol + the delta's whole-number magnitude, in the symbol's own
+ *  before/after position. Deltas are always whole numbers by
+ *  construction (`amountAdjustDeltasFor`), so the decimal/fraction
+ *  `formatMoneyParts` would otherwise force onto every chip is dropped
+ *  here — a delta chip is not a stored amount, it doesn't need cents. */
+function deltaLabel(delta: number, currencyCode: string, locale: string): string {
+  const { symbol, symbolFirst, integer } = formatMoneyParts(Math.abs(delta), currencyCode, locale)
+  const sign = delta < 0 ? '−' : '+'
+  return symbolFirst ? `${sign}${symbol}${integer}` : `${sign}${integer} ${symbol}`
 }
 
 /**
@@ -14,7 +37,9 @@ interface Props {
  * Wrong amount is the #1 voice-parse error; a one-tap fix beats forcing the
  * keyboard open. See docs/DESIGN.md §5 "Confirm".
  */
-export function AmountAdjustChips({ value, onChange, deltas = [-1, 1, 5, 10] }: Props) {
+export function AmountAdjustChips({ value, onChange, currencyCode, locale, deltas }: Props) {
+  const resolvedDeltas = deltas ?? amountAdjustDeltasFor(currencyCode)
+
   function applyDelta(delta: number) {
     const current = parseFloat(value.replace(',', '.'))
     const safe = isNaN(current) ? 0 : current
@@ -27,8 +52,8 @@ export function AmountAdjustChips({ value, onChange, deltas = [-1, 1, 5, 10] }: 
 
   return (
     <View style={styles.row}>
-      {deltas.map((d) => {
-        const label = d < 0 ? `−$${Math.abs(d)}` : `+$${d}`
+      {resolvedDeltas.map((d) => {
+        const label = deltaLabel(d, currencyCode, locale)
         return (
           <Pressable
             key={d}

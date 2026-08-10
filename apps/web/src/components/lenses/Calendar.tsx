@@ -2,8 +2,7 @@
 import { useState } from 'react'
 import { colors, font, cat as catTokens } from '../../lib/theme'
 import { tintFor } from '../../lib/categories'
-import { type LensProps } from './types'
-import { aggAmount } from '@voice-expense/shared'
+import { type LensDay, type LensProps } from './types'
 
 function fmt(value: number, currency: string, locale: string): string {
   return new Intl.NumberFormat(locale, {
@@ -14,70 +13,54 @@ function fmt(value: number, currency: string, locale: string): string {
 }
 
 export function CalendarLens({ props }: { props: LensProps }) {
-  // Calendar identity comes from the timezone-free anchor numbers — see
-  // LensProps. Reading getMonth()/getDay() off the serialized monthStart
-  // instant shifted the whole lens a month back for every browser west of
-  // UTC (August rendered July's empty grid and a "JUL 8" day panel).
-  const year = props.anchorYear
-  const monthIdx = props.anchorMonth
-  const daysInMonth = new Date(year, monthIdx + 1, 0).getDate()
-  // Mon-first offset: Sun=0..Sat=6 -> Mon=0..Sun=6
-  const firstDow = (new Date(year, monthIdx, 1).getDay() + 6) % 7
+  // Every day's total, weekday alignment and transaction list is
+  // bucketed once in `dashboard/page.tsx` through `period.ts`, in the
+  // profile's own timezone — this lens does no date arithmetic of its
+  // own (fix-plan 2.4). Reading `getMonth()`/`getDay()` off a `Date`
+  // built in the *browser's* zone (or the server's, before that) is what
+  // shifted the whole grid a month back for any browser west of UTC —
+  // August rendered as July's empty grid under a "JUL 8" day panel, and
+  // separately misaligned the weekday header for any zone that doesn't
+  // match the browser's own (Aug 1 2026 is a Saturday; a wrong-zone
+  // browser could read it as Friday or Sunday).
+  const days = props.days
+  const max = Math.max(...days.map((d) => d.spendTotal), 1)
 
-  // Bucket totals + tx-list by day, membership judged in the viewer's own
-  // timezone (a bill paid 10pm on Aug 31 in Chicago belongs to August even
-  // though its UTC instant is September).
-  const dayTotal = new Array(daysInMonth + 1).fill(0)
-  const dayTxns: Record<number, LensProps['transactions']> = {}
-  for (const t of props.transactions) {
-    if (t.direction !== 'debit') continue
-    const d = new Date(t.transacted_at)
-    if (d.getMonth() !== monthIdx || d.getFullYear() !== year) continue
-    const day = d.getDate()
-    dayTotal[day] += aggAmount(t)
-    if (!dayTxns[day]) dayTxns[day] = []
-    dayTxns[day].push(t)
-  }
-  const max = Math.max(...dayTotal, 1)
+  // Today's cell, if the anchor month is the current one — `todayIso` is
+  // resolved server-side in the profile's zone, never `new Date()` here.
+  const isCurrentMonth = days.some((d) => d.isoDate === props.todayIso)
 
-  // Pick "today" if we're in the current month; otherwise the heaviest day
-  // as the default selected.
-  const now = new Date()
-  const isCurrentMonth = now.getMonth() === monthIdx && now.getFullYear() === year
-  let defaultSel = 1
-  if (isCurrentMonth) {
-    defaultSel = now.getDate()
-  } else {
-    let best = -1
-    for (let d = 1; d <= daysInMonth; d++) {
-      if (dayTotal[d] > best) {
-        best = dayTotal[d]
-        defaultSel = d
-      }
-    }
-  }
+  // Heaviest day for the eyebrow and the default selection when viewing
+  // a month that isn't the current one.
+  const heaviest = days.reduce<LensDay | null>(
+    (best, d) => (best == null || d.spendTotal > best.spendTotal ? d : best),
+    null,
+  )
+  const defaultSel = isCurrentMonth ? props.todayIso : (heaviest?.isoDate ?? days[0]?.isoDate ?? props.todayIso)
   const [sel, setSel] = useState(defaultSel)
 
-  // Heaviest day for the eyebrow.
-  let heaviestDay = 1
-  let heaviestVal = -1
-  for (let d = 1; d <= daysInMonth; d++) {
-    if (dayTotal[d] > heaviestVal) {
-      heaviestVal = dayTotal[d]
-      heaviestDay = d
-    }
-  }
+  // Leading blanks so day 1 lands under its real weekday column
+  // (`weekdayIndex`: Monday=0…Sunday=6, from `period.ts`), then trailing
+  // blanks to pad the grid to a whole number of weeks.
+  const cells: Array<LensDay | null> = []
+  const firstDow = days[0]?.weekdayIndex ?? 0
+  for (let i = 0; i < firstDow; i++) cells.push(null)
+  for (const d of days) cells.push(d)
+  while (cells.length % 7 !== 0) cells.push(null)
 
-  const cells: Array<{ d: number | null }> = []
-  for (let i = 0; i < firstDow; i++) cells.push({ d: null })
-  for (let d = 1; d <= daysInMonth; d++) cells.push({ d })
-  while (cells.length % 7 !== 0) cells.push({ d: null })
-
-  const selDate = new Date(year, monthIdx, sel)
-  const selWeekday = selDate.toLocaleDateString(props.locale, { weekday: 'long' })
-  const selMonthDay = selDate.toLocaleDateString(props.locale, { month: 'short', day: 'numeric' })
-  const selTxns = dayTxns[sel] ?? []
-  const selTotal = dayTotal[sel] ?? 0
+  const selDay = days.find((d) => d.isoDate === sel) ?? days[0]
+  const selWeekday = selDay
+    ? new Date(selDay.windowStart).toLocaleDateString(props.locale, { weekday: 'long', timeZone: props.timezone })
+    : ''
+  const selMonthDay = selDay
+    ? new Date(selDay.windowStart).toLocaleDateString(props.locale, {
+        month: 'short',
+        day: 'numeric',
+        timeZone: props.timezone,
+      })
+    : ''
+  const selTxns = selDay?.txns ?? []
+  const selTotal = selDay?.spendTotal ?? 0
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 14, height: 600, fontFamily: font.sans }}>
@@ -105,11 +88,11 @@ export function CalendarLens({ props }: { props: LensProps }) {
               {props.monthLabel} · daily spend
             </div>
             <div style={{ fontSize: 13, color: colors.ink3, marginTop: 4 }}>
-              {heaviestVal > 0 ? (
+              {heaviest && heaviest.spendTotal > 0 ? (
                 <>
                   Heaviest:{' '}
                   <b style={{ color: colors.ink }}>
-                    {props.monthLabel} {heaviestDay} · {fmt(heaviestVal, props.currency, props.locale)}
+                    {props.monthLabel} {heaviest.dayOfMonth} · {fmt(heaviest.spendTotal, props.currency, props.locale)}
                   </b>
                 </>
               ) : (
@@ -157,21 +140,20 @@ export function CalendarLens({ props }: { props: LensProps }) {
           ))}
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 6, flex: 1 }}>
-          {cells.map((c, i) => {
-            const day = c.d
+          {cells.map((day, i) => {
             if (!day) {
               return <div key={i} />
             }
-            const v = dayTotal[day]
+            const v = day.spendTotal
             const intensity = Math.min(0.92, v / max)
-            const isToday = isCurrentMonth && day === now.getDate()
-            const isSel = day === sel
+            const isToday = day.isoDate === props.todayIso
+            const isSel = day.isoDate === sel
             const bg = v > 0 ? `rgba(63,90,62,${0.08 + intensity * 0.7})` : colors.surface
             return (
               <button
                 key={i}
                 type="button"
-                onClick={() => setSel(day)}
+                onClick={() => setSel(day.isoDate)}
                 style={{
                   aspectRatio: 1.05,
                   borderRadius: 8,
@@ -197,7 +179,7 @@ export function CalendarLens({ props }: { props: LensProps }) {
                     color: intensity > 0.5 ? '#fff' : colors.ink2,
                   }}
                 >
-                  {day}
+                  {day.dayOfMonth}
                 </div>
                 {v > 0 && (
                   <div
@@ -299,16 +281,39 @@ export function CalendarLens({ props }: { props: LensProps }) {
                   </div>
                   <div style={{ fontSize: 11, color: colors.ink3 }}>{t.category_name ?? 'Uncategorized'}</div>
                 </div>
-                <div
-                  style={{
-                    fontFamily: font.sans,
-                    fontSize: 14,
-                    fontWeight: 600,
-                    color: colors.ink,
-                    fontVariantNumeric: 'tabular-nums',
-                  }}
-                >
-                  −{fmt(t.amount, props.currency, props.locale)}
+                <div style={{ textAlign: 'right' }}>
+                  {/* Fix-plan 2.6 (calendar day-detail raw-amount site,
+                      audit F14-class): each row renders in its OWN
+                      currency — `t.amount` was previously formatted with
+                      `props.currency` (the profile's), so a foreign-
+                      currency row showed its native number under the
+                      wrong symbol and the panel's rows visibly didn't
+                      sum to the day total above them, which sums
+                      `amount_in_profile_currency` via `LensDay.spendTotal`. */}
+                  <div
+                    style={{
+                      fontFamily: font.sans,
+                      fontSize: 14,
+                      fontWeight: 600,
+                      color: colors.ink,
+                      fontVariantNumeric: 'tabular-nums',
+                    }}
+                  >
+                    −{fmt(t.amount, t.currency_code, props.locale)}
+                  </div>
+                  {t.currency_code !== props.currency && t.amount_in_profile_currency != null && (
+                    <div
+                      style={{
+                        fontFamily: font.sans,
+                        fontSize: 11,
+                        color: colors.ink3,
+                        fontVariantNumeric: 'tabular-nums',
+                        marginTop: 1,
+                      }}
+                    >
+                      ≈ {fmt(t.amount_in_profile_currency, props.currency, props.locale)}
+                    </div>
+                  )}
                 </div>
               </div>
             )

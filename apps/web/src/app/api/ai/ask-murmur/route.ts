@@ -12,9 +12,11 @@ import {
   type ToolCallRecord,
   type ToolContext,
 } from '@voice-expense/ai/server'
-import type { AskMurmurRequest, AskMurmurResponse } from '@voice-expense/shared'
+import { localDay } from '@voice-expense/shared'
+import type { AskMurmurRequest, AskMurmurResponse, AskMurmurTransaction } from '@voice-expense/shared'
 import type { NextRequest } from 'next/server'
 import { getOpenAIEnv } from '../../../../lib/env'
+import { resolveNowUtc, resolveTimeZone } from './timeZone'
 
 const openai = new OpenAI({ apiKey: getOpenAIEnv().OPENAI_API_KEY })
 const MODEL = process.env.AI_ASK_MODEL?.trim() || 'gpt-4o'
@@ -39,11 +41,13 @@ const MAX_TOOL_ITERATIONS = 12
 /**
  * POST /api/ai/ask-murmur
  *
- * Single-attempt tool-calling reasoner. The model invokes `run_query`
- * (sandboxed JS over the user's transactions + recurring rules) and
- * `compare` to compute every figure it cites. We trust the response
- * unless ONE specific structural bug fires — a comparison-direction
- * violation — in which case we retry once with that fact surfaced.
+ * Single-attempt tool-calling reasoner. The model calls a closed set of
+ * deterministic aggregation tools (`total`, `sum_by_category`,
+ * `top_merchants`, `series`, `recurring_total`, `compare` \u2014 see
+ * `@voice-expense/ai/server`'s `askMurmurTools.ts`) to compute every
+ * figure it cites. We trust the response unless ONE specific structural
+ * bug fires \u2014 a comparison-direction violation \u2014 in which case we
+ * retry once with that fact surfaced.
  *
  * If both attempts fail or anything else throws, we fall back to a
  * dead-simple second LLM call: "summarize this user's spending in 2-3
@@ -52,7 +56,7 @@ const MAX_TOOL_ITERATIONS = 12
  *
  * Soft validation issues (numbers we couldn't trace) are logged but
  * never block the response. The architecture guarantees correctness on
- * sandbox-computed numbers; chasing the validator's false positives
+ * every tool-computed number; chasing the validator's false positives
  * caused more user-visible failures than it prevented.
  */
 export async function POST(req: NextRequest) {
@@ -74,9 +78,22 @@ export async function POST(req: NextRequest) {
     return Response.json({ error: 'question is too long' }, { status: 400 })
   }
 
-  const transactions = Array.isArray(body.transactions)
-    ? body.transactions.slice(-MAX_TRANSACTIONS)
-    : []
+  // `amount_in_profile_currency` is normalized to a real number-or-null
+  // here rather than trusted as sent \u2014 an older client build (or any
+  // caller that doesn't set it) would otherwise send `undefined`, which
+  // is not the same contract as "awaiting FX backfill" (`null`) that
+  // every tool in askMurmurTools.ts checks for (fix-plan 1.4/2.10).
+  const transactions: AskMurmurTransaction[] = (
+    Array.isArray(body.transactions) ? body.transactions : []
+  )
+    .slice(-MAX_TRANSACTIONS)
+    .map((t) => ({
+      ...t,
+      amount_in_profile_currency:
+        typeof t.amount_in_profile_currency === 'number' && Number.isFinite(t.amount_in_profile_currency)
+          ? t.amount_in_profile_currency
+          : null,
+    }))
   const recurring_rules = Array.isArray(body.recurring_rules)
     ? body.recurring_rules.slice(0, MAX_RECURRING)
     : []
@@ -99,7 +116,8 @@ export async function POST(req: NextRequest) {
     question,
     locale: (body.locale ?? 'en') as AskMurmurRequest['locale'],
     currency: (body.currency ?? 'USD').toString(),
-    today: (body.today ?? new Date().toISOString().split('T')[0]).toString(),
+    now_utc: resolveNowUtc(body.now_utc),
+    time_zone: resolveTimeZone(body.time_zone),
     monthly_income: typeof body.monthly_income === 'number' ? body.monthly_income : null,
     transactions,
     recurring_rules,
@@ -107,7 +125,8 @@ export async function POST(req: NextRequest) {
   }
 
   const ctx: ToolContext = {
-    today: askReq.today,
+    now_utc: askReq.now_utc,
+    tz: askReq.time_zone,
     currency: askReq.currency,
     monthly_income: askReq.monthly_income,
     locale: askReq.locale,
@@ -128,8 +147,10 @@ export async function POST(req: NextRequest) {
     console.log(
       '[ask-murmur] trace question=',
       JSON.stringify(askReq.question),
-      'today=',
-      askReq.today,
+      'now_utc=',
+      askReq.now_utc,
+      'time_zone=',
+      askReq.time_zone,
       'overview=',
       JSON.stringify(overview),
     )
@@ -446,10 +467,11 @@ async function runSummarizeFallback(
   ctx: ToolContext,
 ): Promise<AskMurmurResponse> {
   // Deterministic 6-month snapshot computed inline. We never call
-  // `resolveToolCall` here because the only tools registered are
-  // `run_query` and `compare`; the fallback used to ask for
-  // `top_categories` / `monthly_series`, get `Unknown tool` errors back,
-  // and hand the model a snapshot full of `null`s.
+  // `resolveToolCall` here because the registered tool catalog doesn't
+  // include a bare "give me top categories and a monthly series" call;
+  // the fallback used to ask for `top_categories` / `monthly_series`
+  // directly, get `Unknown tool` errors back, and hand the model a
+  // snapshot full of `null`s.
   const snapshot = buildSummarySnapshot(ctx)
 
   const systemPrompt = `You are Murmur, a personal-finance reader. Summarize the user's spending in 2-3 sentences in ${ctx.locale} using the snapshot below. The numbers in the snapshot are deterministic — quote them verbatim. Always include a chart if the snapshot has data: a "donut" of top categories (data: name + total) or a "line" of monthly_series (data: label + spent). If the snapshot has no data, say so plainly and offer one concrete next step.
@@ -466,7 +488,7 @@ Output STRICT JSON only:
 
 User locale: ${ctx.locale}
 User currency: ${ctx.currency}
-Today: ${ctx.today}
+Today: ${localDay(ctx.now_utc, ctx.tz)}
 
 Snapshot:
 ${JSON.stringify(snapshot)}

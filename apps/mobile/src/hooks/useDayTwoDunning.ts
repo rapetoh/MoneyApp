@@ -26,7 +26,26 @@ import {
  * cold start with already-existing transactions — only on the *transition*
  * from one count to a higher one within a session). This prevents the
  * permission dialog from popping up on every app launch.
+ *
+ * The mount-time "ensure scheduled" check below additionally guards on a
+ * *module-level* flag, not just `seenLengthRef` — this hook is called
+ * from the tabs layout, which can remount within one app launch (sign-out
+ * then sign back in, Fast Refresh in dev), resetting the ref to `null`
+ * and re-entering this branch. That's the same "re-arm on remount" shape
+ * audit `07-F15` documents for the launch-time services in
+ * `app/_layout.tsx`; `dayTwoDunning.ts`'s own scheduling queue already
+ * makes a second `rescheduleDayTwo` call harmless (see its module doc
+ * comment), but there's no reason to re-issue the read/schedule round
+ * trip on every remount when once per process lifetime is enough.
  */
+let hasEnsuredOnLaunch = false
+
+/** Test-only: resets the once-per-launch flag between test cases. Not for
+ *  use from app code — a real launch has exactly one process lifetime. */
+export function __resetDayTwoDunningLaunchGuardForTests(): void {
+  hasEnsuredOnLaunch = false
+}
+
 export function useDayTwoDunning(
   locale: Locale,
   transactions: Transaction[],
@@ -42,8 +61,12 @@ export function useDayTwoDunning(
       seenLengthRef.current = len
       // If there are already transactions, ensure dunning is scheduled
       // (covers the case where the user granted permission on a previous
-      // launch and the OS cleared scheduled notifications). Best-effort.
-      if (len > 0) void rescheduleDayTwo(locale)
+      // launch and the OS cleared scheduled notifications). Best-effort,
+      // and once per launch — see the flag's doc comment above.
+      if (len > 0 && !hasEnsuredOnLaunch) {
+        hasEnsuredOnLaunch = true
+        void rescheduleDayTwo(locale)
+      }
       return
     }
 

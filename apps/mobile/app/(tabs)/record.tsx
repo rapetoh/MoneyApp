@@ -8,7 +8,6 @@ import {
   StyleSheet,
   Alert,
   ActivityIndicator,
-  Modal,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
@@ -24,12 +23,13 @@ import { VoiceWaveform } from '../../src/components/VoiceWaveform'
 import { VoiceConfirmModal, type ConfirmedExpense } from '../../src/components/VoiceConfirmModal'
 import { ListeningView } from '../../src/components/ListeningView'
 import { RecurringToggle } from '../../src/components/RecurringToggle'
-import { Colors, Typography, Text as TextStyles, Spacing, Radius, Hairline } from '../../src/theme'
+import { BottomSheet } from '../../src/components/BottomSheet'
+import { Colors, Typography, Text as TextStyles, Spacing, Radius, Hairline, useTabBarClearance } from '../../src/theme'
 import { parseScan, ISO_4217_CODES, PAYMENT_METHOD_VALUES, deriveDirectionFromFlowType } from '@voice-expense/ai'
 import { supabase } from '../../src/lib/supabase'
 import { getApiUrl } from '../../src/hooks/useApiUrl'
-import { t, currencySymbolFor } from '@voice-expense/shared'
-import type { TransactionDirection, PaymentMethod, TransactionSource, Locale } from '@voice-expense/shared'
+import { t, currencySymbolFor, validateAmount } from '@voice-expense/shared'
+import type { TransactionDirection, PaymentMethod, TransactionSource, Locale, AmountValidation } from '@voice-expense/shared'
 import type { RecurringFrequency } from '@voice-expense/shared'
 
 const PAYMENT_METHODS: { value: PaymentMethod; key: string }[] = [
@@ -40,6 +40,22 @@ const PAYMENT_METHODS: { value: PaymentMethod; key: string }[] = [
   { value: 'bank_transfer', key: 'payment.bank_transfer' },
 ]
 
+/** Maps `validateAmount`'s typed rejection reason to a localized message —
+ *  `empty`/`not_a_number`/`not_positive` all read as the existing generic
+ *  "invalid amount" copy (the on-screen keypad can't produce most of
+ *  those shapes to begin with), while the two reasons a user actually can
+ *  hit by typing get their own copy. */
+function amountErrorMessage(reason: Extract<AmountValidation, { ok: false }>['reason'], locale: Locale): string {
+  switch (reason) {
+    case 'too_large':
+      return t('voice.amount_too_large', locale)
+    case 'too_many_decimals':
+      return t('voice.amount_too_many_decimals', locale)
+    default:
+      return t('voice.invalid_amount_msg', locale)
+  }
+}
+
 
 type Tab = 'voice' | 'manual'
 
@@ -49,6 +65,12 @@ export default function RecordScreen() {
   const { categories, createCategory } = useCategories(user?.id)
   const { createTransaction } = useTransactions(user?.id)
   const router = useRouter()
+  // Clears the floating tab bar — Record is one of its five tabs, and this
+  // screen (both the Voice/Manual layout below and the full-screen
+  // ListeningView takeover) renders underneath it. Single source of truth
+  // for the value that used to be the hand-picked literals 110/120 (audit
+  // 01-F13, fix-plan 1.8/2.14).
+  const tabBarClearance = useTabBarClearance()
 
   const userLocale = (profile?.locale ?? 'en') as Locale
   const userCurrency = profile?.currency_code ?? 'USD'
@@ -213,6 +235,12 @@ export default function RecordScreen() {
       // voice line like "spent $5"). The prior 'cash' fallback silently
       // mislabelled every card receipt as a cash transaction.
       payment_method: voice.parsedExpense?.payment_method ?? null,
+      // The AI-parsed date this expense actually happened on (fix-plan
+      // 2.8) — "yesterday", a receipt's printed date, a notification's
+      // timestamp. `undefined` (not `null`) when the parse carried none,
+      // so `createTransaction` applies its own `now` default rather than
+      // writing a literal null into a non-nullable column.
+      transacted_at: expense.transactedAt ?? undefined,
       source: transactionSource,
       raw_transcript: voice.transcript || null,
       ai_confidence: voice.parsedExpense?.confidence ?? null,
@@ -231,7 +259,13 @@ export default function RecordScreen() {
       setConfirmModalVisible(false)
       setTransactionSource('voice')
       voice.reset()
-      router.push('/(tabs)')
+      // `navigate`, not `push` (audit 01-F17/01-F23): this screen IS
+      // `/(tabs)/record`, so `push('/(tabs)')` stacked a second instance of
+      // the tabs navigator on top of itself on every single save — four
+      // captures in a row left four ghost entries a user had to `back`
+      // through. `navigate` returns to the existing tabs instance instead
+      // of stacking a new one.
+      router.navigate('/(tabs)')
     }
   }
 
@@ -259,7 +293,7 @@ export default function RecordScreen() {
       const token = sessionData?.session?.access_token ?? ''
 
       const apiBaseUrl = await getApiUrl()
-      const parsed = await parseScan({
+      const scanResult = await parseScan({
         imageBase64,
         scanType: type,
         currency: userCurrency,
@@ -267,9 +301,24 @@ export default function RecordScreen() {
         authToken: token,
       })
 
+      if (!scanResult.ok) {
+        // Rejection gets its own state (fix-plan 2.9c / audit 02-F3): a
+        // scan the model itself couldn't read must never open the confirm
+        // sheet — there is no honest amount to prefill, and for a
+        // paycheck scan the sheet would otherwise be pre-armed as
+        // recurring income for content that was never verified to be a
+        // paycheck at all. Message + a way forward, no editor.
+        Alert.alert(t('voice.scan_rejected_title', userLocale), scanResult.reason, [
+          { text: t('voice.retake', userLocale), onPress: () => handleScan(type) },
+          { text: t('voice.enter_manually', userLocale), onPress: () => setActiveTab('manual') },
+          { text: t('common.cancel', userLocale), style: 'cancel' },
+        ])
+        return
+      }
+
       // Reuse the voice confirm modal with the scan result
       setTransactionSource('scan')
-      voice.injectParsed(parsed)
+      voice.injectParsed(scanResult.expense)
       // state is now 'done' — the modal auto-opens via the auto-open check below
     } catch (err) {
       Alert.alert(t('voice.scan_failed', userLocale), err instanceof Error ? err.message : t('common.error', userLocale))
@@ -279,16 +328,20 @@ export default function RecordScreen() {
   }
 
   async function handleManualSave() {
-    const parsedAmount = parseFloat(amount.replace(',', '.'))
-    if (isNaN(parsedAmount) || parsedAmount <= 0) {
-      Alert.alert(t('voice.invalid_amount', userLocale), t('voice.invalid_amount_msg', userLocale))
+    // One shared validator (fix-plan 2.14 / audit 01-F1, 01-F34) instead of
+    // the bare `isNaN(parseFloat(...)) || <= 0` check that used to leave
+    // Save enabled — and silently do nothing — for anything over the money
+    // columns' precision or size ceiling.
+    const validation = validateAmount(amount, userCurrency)
+    if (!validation.ok) {
+      Alert.alert(t('voice.invalid_amount', userLocale), amountErrorMessage(validation.reason, userLocale))
       return
     }
     if (!user) return
 
     setManualSaving(true)
     const { error } = await createTransaction({
-      amount: parsedAmount,
+      amount: validation.amount,
       direction,
       currency_code: userCurrency,
       merchant: merchant.trim() || null,
@@ -312,7 +365,9 @@ export default function RecordScreen() {
       setPaymentMethod('cash')
       setManualIsRecurring(false)
       setManualRecurringFreq('monthly')
-      router.push('/(tabs)')
+      // See the matching comment in handleConfirmVoice — same fix, same
+      // reason (01-F17/01-F23).
+      router.navigate('/(tabs)')
     }
   }
 
@@ -327,9 +382,10 @@ export default function RecordScreen() {
         transcript={voice.interimTranscript || voice.transcript}
         detectedChips={[]}
         active={isListening}
-        onCancel={() => { voice.reset(); router.push('/(tabs)') }}
+        onCancel={() => { voice.reset(); router.navigate('/(tabs)') }}
         onStop={() => voice.stopListening()}
         locale={userLocale}
+        currencyCode={userCurrency}
       />
     )
   }
@@ -338,7 +394,7 @@ export default function RecordScreen() {
     <SafeAreaView style={styles.safe} edges={['top']}>
       {/* Page header: close + centered title */}
       <View style={styles.pageHeader}>
-        <Pressable style={styles.closeBtn} onPress={() => router.push('/(tabs)')} hitSlop={8}>
+        <Pressable style={styles.closeBtn} onPress={() => router.navigate('/(tabs)')} hitSlop={8}>
           <Ionicons name="close" size={22} color={Colors.text} />
         </Pressable>
         <Text style={styles.pageTitle}>{t('voice.page_title', userLocale as any)}</Text>
@@ -367,7 +423,7 @@ export default function RecordScreen() {
 
       {activeTab === 'voice' ? (
         /* ── VOICE TAB ── */
-        <View style={styles.voiceContainer}>
+        <View style={[styles.voiceContainer, { paddingBottom: tabBarClearance }]}>
           <View style={styles.voiceHeading}>
             <Text style={styles.voiceTitle}>{t('voice.title', userLocale as any)}</Text>
             <Text style={styles.voiceSubtitle}>{t('voice.subtitle', userLocale as any)}</Text>
@@ -455,7 +511,7 @@ export default function RecordScreen() {
         /* ── MANUAL TAB — S_Keypad layout, pinned to bottom.
             No KeyboardAvoidingView; merchant's native keyboard covers the
             keypad area (not the merchant input itself), which is fine. */
-        <View style={styles.manualContainer}>
+        <View style={[styles.manualContainer, { paddingBottom: tabBarClearance }]}>
           {/* Top cluster — anchored to top via space-between. A shrinkable
               ScrollView so that on short screens (SE/mini class) the top
               fields scroll internally instead of pushing the keypad and the
@@ -568,11 +624,11 @@ export default function RecordScreen() {
             <Pressable
               style={({ pressed }) => [
                 styles.addButton,
-                (manualSaving || !(parseFloat(amount) > 0)) && styles.addButtonDisabled,
+                (manualSaving || !validateAmount(amount, userCurrency).ok) && styles.addButtonDisabled,
                 pressed && { opacity: 0.85 },
               ]}
               onPress={handleManualSave}
-              disabled={manualSaving || !(parseFloat(amount) > 0)}
+              disabled={manualSaving || !validateAmount(amount, userCurrency).ok}
             >
               {manualSaving ? (
                 <ActivityIndicator color={Colors.white} />
@@ -587,66 +643,55 @@ export default function RecordScreen() {
           </View>
           </View>
 
-          {/* Bottom-sheet modal for advanced fields — kept out of the primary
-              entry surface so the keypad never scrolls off screen. */}
-          <Modal
+          {/* Advanced fields — rendered through the shared `<BottomSheet>`
+              (fix-plan 1.8/2.14) rather than a hand-rolled `<Modal>`, so it
+              gets `onRequestClose` (audit 01-F14), the sheet-relative KAV
+              fix (01-F37) and the same close-wiring as every other sheet
+              in the app for free instead of re-implementing all three a
+              fourth time. */}
+          <BottomSheet
             visible={moreOptionsOpen}
-            animationType="slide"
-            transparent
-            onRequestClose={() => setMoreOptionsOpen(false)}
-          >
-            <Pressable
-              style={styles.moreOptionsBackdrop}
-              onPress={() => setMoreOptionsOpen(false)}
-            >
-              <Pressable style={styles.moreOptionsSheet} onPress={(e) => e.stopPropagation()}>
-                <View style={styles.moreOptionsHeader}>
-                  <Text style={styles.moreOptionsTitle}>
-                    {t('voice.more_options', userLocale as any)}
-                  </Text>
-                  <Pressable onPress={() => setMoreOptionsOpen(false)} hitSlop={10}>
-                    <Text style={styles.moreOptionsDone}>{t('common.done', userLocale as any)}</Text>
-                  </Pressable>
-                </View>
-
-                <ScrollView
-                  contentContainerStyle={styles.moreOptionsContent}
-                  showsVerticalScrollIndicator={false}
-                  keyboardShouldPersistTaps="handled"
-                >
-                  <View style={styles.field}>
-                    <Text style={styles.label}>{t('voice.note', userLocale as any)}</Text>
-                    <TextInput
-                      style={styles.input}
-                      value={note}
-                      onChangeText={setNote}
-                      placeholder={t('voice.note_placeholder', userLocale as any)}
-                      placeholderTextColor={Colors.textMuted}
-                    />
-                  </View>
-
-                  <View style={styles.field}>
-                    <Text style={styles.label}>{t('voice.payment_method', userLocale as any)}</Text>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                      <View style={styles.chipRow}>
-                        {PAYMENT_METHODS.map((m) => (
-                          <Pressable
-                            key={m.value}
-                            style={[styles.chip, paymentMethod === m.value && styles.chipActive]}
-                            onPress={() => setPaymentMethod(m.value)}
-                          >
-                            <Text style={[styles.chipLabel, paymentMethod === m.value && styles.chipLabelActive]}>
-                              {t(m.key, userLocale as any)}
-                            </Text>
-                          </Pressable>
-                        ))}
-                      </View>
-                    </ScrollView>
-                  </View>
-                </ScrollView>
+            onClose={() => setMoreOptionsOpen(false)}
+            title={t('voice.more_options', userLocale as any)}
+            cancelLabel=""
+            headerRight={
+              <Pressable onPress={() => setMoreOptionsOpen(false)} hitSlop={10}>
+                <Text style={styles.moreOptionsDone}>{t('common.done', userLocale as any)}</Text>
               </Pressable>
-            </Pressable>
-          </Modal>
+            }
+            contentContainerStyle={styles.moreOptionsContent}
+            testID="record-more-options-sheet"
+          >
+            <View style={styles.field}>
+              <Text style={styles.label}>{t('voice.note', userLocale as any)}</Text>
+              <TextInput
+                style={styles.input}
+                value={note}
+                onChangeText={setNote}
+                placeholder={t('voice.note_placeholder', userLocale as any)}
+                placeholderTextColor={Colors.textMuted}
+              />
+            </View>
+
+            <View style={styles.field}>
+              <Text style={styles.label}>{t('voice.payment_method', userLocale as any)}</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                <View style={styles.chipRow}>
+                  {PAYMENT_METHODS.map((m) => (
+                    <Pressable
+                      key={m.value}
+                      style={[styles.chip, paymentMethod === m.value && styles.chipActive]}
+                      onPress={() => setPaymentMethod(m.value)}
+                    >
+                      <Text style={[styles.chipLabel, paymentMethod === m.value && styles.chipLabelActive]}>
+                        {t(m.key, userLocale as any)}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </ScrollView>
+            </View>
+          </BottomSheet>
         </View>
       )}
 
@@ -718,13 +763,14 @@ const styles = StyleSheet.create({
   },
   tabLabelActive: { color: Colors.white },
 
-  // Voice tab
+  // Voice tab. `paddingBottom` is set per-instance above from
+  // `useTabBarClearance()` (audit 01-F13, fix-plan 1.8/2.14) — not
+  // duplicated here as a hand-picked literal.
   voiceContainer: {
     flex: 1,
     alignItems: 'center',
     paddingHorizontal: Spacing.xl,
     paddingTop: Spacing.base,
-    paddingBottom: 110,
     justifyContent: 'space-evenly',
   },
   voiceHeading: {
@@ -819,19 +865,16 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
 
-  // Manual tab — flex layout, no scroll. Content is sized to fit in one
-  // viewport above the tab bar. Bottom padding reserves room for the
-  // translucent tab bar + FAB cluster (~110pt) so the Add button never
-  // sits under the bar.
-  // Manual layout: two clusters, one anchored to top and one to bottom
-  // via space-between. Fixed 120pt paddingBottom clears the absolute tab
-  // bar (height 68, bottom 14) + the record FAB's protrusion/shadow on
-  // every supported iPhone.
+  // Manual layout: two clusters, one anchored to top (a shrinkable
+  // ScrollView so short screens scroll internally instead of overflowing
+  // into the keypad) and one to bottom, via space-between. `paddingBottom`
+  // is set per-instance above from `useTabBarClearance()` (audit 01-F13,
+  // fix-plan 1.8/2.14) so it tracks the bar's real insets-aware position
+  // instead of a hand-picked literal.
   manualContainer: {
     flex: 1,
     paddingHorizontal: Spacing.base,
     paddingTop: 4,
-    paddingBottom: 120,
     justifyContent: 'space-between',
   },
   // flexGrow 0 keeps the space-between visual (fields at top, keypad at
@@ -977,36 +1020,9 @@ const styles = StyleSheet.create({
     color: Colors.ink3 ?? Colors.textSecondary,
   },
 
-  // Bottom-sheet modal for advanced fields — keeps them out of the
-  // primary entry surface so the keypad never scrolls off screen.
-  moreOptionsBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    justifyContent: 'flex-end',
-  },
-  moreOptionsSheet: {
-    backgroundColor: Colors.background,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    paddingTop: 8,
-    paddingBottom: 32,
-    maxHeight: '70%',
-  },
-  moreOptionsHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Spacing.base,
-    paddingVertical: 12,
-    borderBottomWidth: Hairline.width,
-    borderBottomColor: Hairline.color,
-  },
-  moreOptionsTitle: {
-    fontFamily: Typography.fontFamily.sansBold,
-    fontSize: 16,
-    fontWeight: '700',
-    color: Colors.ink ?? Colors.text,
-  },
+  // Advanced-fields sheet — chrome (backdrop, handle, header, close-wiring)
+  // now owned by the shared `<BottomSheet>`; only the sheet's own header
+  // Done label and body content styles remain here.
   moreOptionsDone: {
     fontFamily: Typography.fontFamily.sansSemiBold,
     fontSize: 15,

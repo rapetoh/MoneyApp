@@ -11,7 +11,7 @@ import {
   monthSummary,
   groupByCategory,
 } from './types'
-import { isFxPending, isSpend, classifyFlow } from '@voice-expense/shared'
+import { isFxPending, isSpend, classifyFlow, monthlyEquivalent } from '@voice-expense/shared'
 
 // XMind-style radial diagram of the user's whole financial month.
 // Center node = the user; four branches = Income / Expenses / Saved &
@@ -133,9 +133,34 @@ function buildBranches(p: LensProps, displayName: string): Branch[] {
   const expenseSubs = categorySubs(spendDebits, fmt, 4)
   const transferSubs = categorySubs(transferTxns, fmt, 4)
 
-  const recurringMonthly = p.recurring
-    .filter((r) => r.frequency === 'monthly')
-    .reduce((s, r) => s + r.amount, 0)
+  // Recurring outflow: debit-only, FX-aware, interval-aware (fix-plan
+  // 2.1 — the owner-witnessed production bug: `recurringMonthly` used
+  // to sum every *active* rule with `frequency === 'monthly'`
+  // regardless of `direction`, so an onboarding-created `credit`
+  // salary rule inflated "Recurring outflow" exactly like a
+  // subscription would; it also ignored every non-monthly rule
+  // entirely (a weekly $60 debit contributed $0 instead of ~$260/mo);
+  // and it summed raw `rule.amount` — the rule's *own* currency, never
+  // converted — against rules billed in other currencies. Fixed by
+  // filtering to `debit`, converting each rule to its monthly
+  // equivalent via `monthlyEquivalent()` (honours `interval`), and
+  // summing `amount_in_profile_currency` — never the raw multi-
+  // currency `amount` — skipping (not zero-folding) any rule whose FX
+  // snapshot hasn't landed yet, same contract as `isFxPending`/
+  // `summarize()` elsewhere in this file.
+  const recurringDebits = p.recurring.filter(
+    (r) => r.direction === 'debit' && r.amount_in_profile_currency != null,
+  )
+  const recurringMonthly = recurringDebits.reduce(
+    (s, r) =>
+      s +
+      monthlyEquivalent({
+        frequency: r.frequency,
+        interval: r.interval,
+        amount: r.amount_in_profile_currency as number,
+      }),
+    0,
+  )
   // Transfer-kind categories (the real money moved to savings/
   // investing this month) lead the branch; "Net saved" is the
   // secondary, unfloored income-minus-expense figure — a different
@@ -152,7 +177,7 @@ function buildBranches(p: LensProps, displayName: string): Branch[] {
   if (recurringMonthly > 0) {
     savedSubs.push({
       label: `Recurring outflow · ${fmt(recurringMonthly)}/mo`,
-      leaves: p.recurring.slice(0, 3).map((r) => r.name ?? 'Unnamed'),
+      leaves: recurringDebits.slice(0, 3).map((r) => r.name ?? 'Unnamed'),
     })
   }
 

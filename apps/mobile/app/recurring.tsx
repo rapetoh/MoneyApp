@@ -14,24 +14,17 @@ import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '../src/hooks/useAuth'
 import { useProfile } from '../src/hooks/useProfile'
 import { useCategories } from '../src/hooks/useCategories'
-import { useRecurringRules, computeNextOccurrence } from '../src/hooks/useRecurringRules'
+import { useRecurringRules, computeNextOccurrence, isRuleOverdue } from '../src/hooks/useRecurringRules'
 import { MerchantAvatar } from '../src/components/MerchantAvatar'
 import { Money } from '../src/components/Money'
 import { Colors, Typography, Hairline } from '../src/theme'
-import { formatCurrency, t } from '@voice-expense/shared'
+import { formatCurrency, monthlyEquivalent, t } from '@voice-expense/shared'
 import type { Locale } from '@voice-expense/shared'
 import type { RecurringRule, RecurringFrequency } from '@voice-expense/shared'
 
-// Multipliers to normalize any frequency to a monthly equivalent. Used by the
-// hero to show a single "paid monthly" number across a mixed portfolio.
-const TO_MONTHLY: Record<RecurringFrequency, number> = {
-  daily: 30,
-  weekly: 4.33,
-  biweekly: 2.17,
-  monthly: 1,
-  quarterly: 1 / 3,
-  yearly: 1 / 12,
-}
+// The hand-rolled `TO_MONTHLY` table (fix-plan 2.1) is deleted — the hero
+// below now calls the shared `monthlyEquivalent`, which honours
+// `rule.interval` (03-F23) instead of assuming every rule is interval 1.
 
 const FREQ_KEY: Record<RecurringFrequency, string> = {
   daily: 'recurring.daily',
@@ -54,17 +47,38 @@ const FREQ_SHORT: Record<RecurringFrequency, string> = {
   yearly: '/yr',
 }
 
+/** "Overdue — pending generation" (fix-plan 2.1 / 03-F24) rather than a
+ *  stale past date sorted as imminent: a rule whose mechanically-next
+ *  occurrence (from its own `last_generated`) already fell in the past
+ *  means generation hasn't caught up yet, not that nothing is due until
+ *  that date. */
 function formatNextDue(rule: RecurringRule, locale: Locale): string {
+  if (isRuleOverdue(rule)) return t('recurring.overdue', locale)
   const next = computeNextOccurrence(rule)
   if (!next) return '—'
   return next.toLocaleDateString(locale, { month: 'short', day: 'numeric' })
+}
+
+/** FX-aware monthly equivalent (fix-plan 2.1): uses the rule's own
+ *  profile-currency snapshot (migration 025) when it has landed, so a
+ *  EUR rule and a USD rule on a USD profile don't sum as if both were
+ *  already dollars. Falls back to the raw amount only while the
+ *  snapshot is pending (never null-coalesces to 0 — a pending rule is
+ *  simply not counted, same "pending, not zero" contract as
+ *  `packages/shared/src/domain/money.ts`). */
+function monthlyEquivalentFx(rule: RecurringRule): number {
+  const amount = rule.amount_in_profile_currency ?? rule.amount
+  return monthlyEquivalent({ frequency: rule.frequency, interval: rule.interval, amount })
 }
 
 export default function RecurringScreen() {
   const { user } = useAuth()
   const { profile } = useProfile(user?.id)
   const { categories } = useCategories(user?.id)
-  const { rules, loading, toggleRule, deleteRule, refetch } = useRecurringRules(user?.id)
+  // Read-error exposure (fix-plan 2.13 / audit 08-F21 family) — a failed
+  // read used to render identically to "no recurring rules yet"
+  // (`rules` stays `[]` either way).
+  const { rules, loading, error, toggleRule, deleteRule, refetch } = useRecurringRules(user?.id)
 
   // useRecurringRules fetches once on mount, but this screen stays in the
   // navigation stack between visits — so a rule created elsewhere (e.g. by
@@ -90,14 +104,26 @@ export default function RecurringScreen() {
     return m
   }, [categories])
 
-  // Monthly-equivalent total across every active rule. Yearly projection is
-  // the × 12 of that so the serif sentence reads honestly for any mix.
+  // Monthly-equivalent OUTFLOW total across every active *debit* rule —
+  // never conflated with income (fix-plan 2.1's "Done when": a 4000/mo
+  // credit rule alongside a 15/mo debit rule must produce a hero of 15,
+  // not 4015). Yearly projection is the × 12 of that so the serif
+  // sentence reads honestly for any mix.
   const monthlyTotal = useMemo(() => {
     return rules
-      .filter((r) => r.is_active)
-      .reduce((sum, r) => sum + r.amount * TO_MONTHLY[r.frequency], 0)
+      .filter((r) => r.is_active && r.direction === 'debit')
+      .reduce((sum, r) => sum + monthlyEquivalentFx(r), 0)
   }, [rules])
   const yearlyProjection = Math.round(monthlyTotal * 12)
+
+  // The credit-rule twin, rendered as its own labelled figure (never
+  // netted into or hidden behind the outflow hero above) whenever the
+  // user has at least one active income rule.
+  const inflowMonthly = useMemo(() => {
+    return rules
+      .filter((r) => r.is_active && r.direction === 'credit')
+      .reduce((sum, r) => sum + monthlyEquivalentFx(r), 0)
+  }, [rules])
 
   function handleRowPress(rule: RecurringRule) {
     // Action sheet via Alert — preserves the shipped pause/resume + delete
@@ -164,6 +190,21 @@ export default function RecurringScreen() {
 
           {loading ? (
             <ActivityIndicator color={Colors.primary} style={{ marginTop: 48 }} />
+          ) : error && rules.length === 0 ? (
+            // Error+retry state (fix-plan 2.13) instead of the "no rules
+            // yet" empty copy, which used to be reachable for a failed
+            // read exactly as readily as for a genuinely rule-free account.
+            <View style={styles.emptyState}>
+              <Ionicons name="alert-circle-outline" size={40} color={Colors.destructive ?? '#A94646'} />
+              <Text style={styles.emptyTitle}>{t('common.load_failed', locale)}</Text>
+              <Pressable
+                onPress={refetch}
+                style={({ pressed }) => [styles.retryBtn, pressed && styles.retryBtnPressed]}
+              >
+                <Ionicons name="refresh" size={14} color="#FFFFFF" />
+                <Text style={styles.retryBtnText}>{t('common.retry', locale)}</Text>
+              </Pressable>
+            </View>
           ) : rules.length === 0 ? (
             <View style={styles.emptyState}>
               <Text style={styles.emptyIcon}>🔄</Text>
@@ -172,12 +213,14 @@ export default function RecurringScreen() {
             </View>
           ) : (
             <>
-              {/* Hero: monthly total + yearly projection */}
+              {/* Hero: monthly OUTFLOW total + yearly projection. Income rules
+                  never contribute here (fix-plan 2.1) — they get their own
+                  labelled line below instead of being netted in silently. */}
               <View style={styles.heroWrap}>
                 <View style={styles.heroCard}>
                   <Text style={styles.heroEyebrow}>{t('recurring.paid_monthly', locale)}</Text>
                   <View style={styles.heroAmountRow}>
-                    <Money value={monthlyTotal} size={46} />
+                    <Money value={monthlyTotal} size={46} currencyCode={currency} locale={locale} />
                     <Text style={styles.heroPer}>{t('recurring.per_month', locale)}</Text>
                   </View>
                   <Text style={styles.heroSummary}>
@@ -187,6 +230,14 @@ export default function RecurringScreen() {
                     </Text>{' '}
                     {t('recurring.yearly_suffix', locale)}
                   </Text>
+                  {inflowMonthly > 0 && (
+                    <Text style={styles.heroInflow}>
+                      {t('recurring.inflow_monthly', locale).replace(
+                        '{amount}',
+                        formatCurrency(inflowMonthly, currency, locale),
+                      )}
+                    </Text>
+                  )}
                 </View>
               </View>
 
@@ -230,7 +281,14 @@ export default function RecurringScreen() {
                             <ActivityIndicator size="small" color={Colors.primary} />
                           ) : (
                             <>
-                              <Money value={rule.amount} size={14} serif={false} sansWeight="700" />
+                              <Money
+                                value={rule.amount}
+                                size={14}
+                                serif={false}
+                                sansWeight="700"
+                                currencyCode={rule.currency_code || currency}
+                                locale={locale}
+                              />
                               <Text style={styles.ruleFreqTag}>{FREQ_SHORT[rule.frequency]}</Text>
                             </>
                           )}
@@ -341,6 +399,12 @@ const styles = StyleSheet.create({
     color: Colors.ink ?? Colors.text,
     fontWeight: '700',
   },
+  heroInflow: {
+    fontFamily: Typography.fontFamily.sansSemiBold,
+    fontSize: 12.5,
+    color: Colors.income ?? Colors.primary,
+    marginTop: 8,
+  },
 
   sectionWrap: { paddingHorizontal: 16, paddingTop: 24 },
   sectionLabel: {
@@ -418,5 +482,22 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 20,
     marginTop: 4,
+  },
+  retryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 4,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 999,
+    backgroundColor: Colors.ink ?? '#1B1915',
+  },
+  retryBtnPressed: { opacity: 0.8 },
+  retryBtnText: {
+    fontFamily: Typography.fontFamily.sansSemiBold,
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
 })

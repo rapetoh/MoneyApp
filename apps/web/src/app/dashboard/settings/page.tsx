@@ -1,11 +1,13 @@
 'use client'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { createClient } from '../../../lib/supabase/client'
 import { colors, font, radius } from '../../../lib/theme'
 import { Toolbar } from '../../../components/Toolbar'
 import { Icon } from '../../../components/Icons'
+import { ErrorState } from '../../../components/ErrorState'
 import { usePlus } from '../../../lib/plus'
+import { changeCurrency } from '../../../lib/changeCurrency'
 import { SUPPORT_EMAIL, SUPPORT_MAILTO } from '@voice-expense/shared'
 
 const CURRENCIES = ['USD', 'EUR', 'GBP', 'CAD', 'CHF', 'JPY', 'AUD', 'XAF', 'NGN', 'GHS']
@@ -47,13 +49,39 @@ export default function SettingsPage() {
   } | null>(null)
   const [email, setEmail] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  // Read-error state (fix-plan 2.13 / audit 08-F21 family). This page had
+  // no loading/empty gate at all — a failed profile read left every field
+  // showing its blank/default value (no name, USD, English),
+  // indistinguishable from "brand-new account, nothing saved yet." The
+  // *save* path's own error surfacing (the unconditional green "Saved."
+  // bug) is a separate, write-path fix outside this item's read-only
+  // scope; this is the read path only, named `loadError` to keep both
+  // states distinct wherever both eventually exist on this page.
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [success, setSuccess] = useState(false)
+  // Write-path error state for `handleSaveAccount` (fix-plan 2.13 /
+  // audit 08-F21 family) — distinct from `loadError` above. Also used
+  // for the session-expired case: the old `if (!user) return` left
+  // `saving` stuck `true` forever with no explanation.
+  const [saveError, setSaveError] = useState<string | null>(null)
   const [active, setActive] = useState<SectionKey>('account')
 
   const [displayName, setDisplayName] = useState('')
   const [currency, setCurrency] = useState('USD')
   const [locale, setLocale] = useState('en')
+  // Currency-change flow (fix-plan 2.7, audit 05-F13/06-F8/08-F5) —
+  // mirrors `apps/mobile/app/more/settings.tsx`'s confirm/refuse
+  // contract. `txnCount` backs the confirmation copy ("this will
+  // reconvert N transactions"); `currencyConverting` blocks the picker
+  // while the batched Edge Function call is in flight; `currencyProgress`
+  // is `null` until the first batch reports back.
+  const [txnCount, setTxnCount] = useState(0)
+  const [currencyConverting, setCurrencyConverting] = useState(false)
+  const [currencyProgress, setCurrencyProgress] = useState<{ converted: number; total: number } | null>(
+    null,
+  )
+  const [currencyError, setCurrencyError] = useState<string | null>(null)
   // Stored as a string so the input behaves like a normal text field
   // (empty allowed, no spinner artifacts). Parsed on save — empty
   // string saves null so the user can clear their income.
@@ -77,32 +105,44 @@ export default function SettingsPage() {
     about: null,
   })
 
-  useEffect(() => {
-    async function load() {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-      if (!user) return
-      setEmail(user.email ?? null)
-      const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single()
-      if (data) {
-        setProfile(data)
-        setDisplayName(data.display_name ?? '')
-        setCurrency(data.currency_code ?? 'USD')
-        setLocale(data.locale ?? 'en')
-        setMonthlyIncomeInput(
-          data.monthly_income != null ? String(data.monthly_income) : '',
-        )
-        // Match migration 010's defaults if the column is missing in
-        // an older deployment (e.g. local Supabase that hasn't applied
-        // the migration yet) — analytics off, crash reports on.
-        setAnalyticsOn(data.analytics_opt_in ?? false)
-        setCrashReportingOn(data.crash_reports_opt_in ?? true)
-      }
-      setLoading(false)
+  const load = useCallback(async () => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) return
+    setEmail(user.email ?? null)
+    const [{ data, error }, countResult] = await Promise.all([
+      supabase.from('profiles').select('*').eq('id', user.id).single(),
+      supabase
+        .from('transactions')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('is_deleted', false),
+    ])
+    setTxnCount(countResult.count ?? 0)
+    if (error) {
+      setLoadError(error.message)
+    } else if (data) {
+      setLoadError(null)
+      setProfile(data)
+      setDisplayName(data.display_name ?? '')
+      setCurrency(data.currency_code ?? 'USD')
+      setLocale(data.locale ?? 'en')
+      setMonthlyIncomeInput(
+        data.monthly_income != null ? String(data.monthly_income) : '',
+      )
+      // Match migration 010's defaults if the column is missing in
+      // an older deployment (e.g. local Supabase that hasn't applied
+      // the migration yet) — analytics off, crash reports on.
+      setAnalyticsOn(data.analytics_opt_in ?? false)
+      setCrashReportingOn(data.crash_reports_opt_in ?? true)
     }
-    load()
+    setLoading(false)
   }, [])
+
+  useEffect(() => {
+    load()
+  }, [load])
 
   // Persist the privacy toggles optimistically, then write to Supabase.
   // On failure we revert the local state so the UI doesn't lie about
@@ -233,10 +273,18 @@ export default function SettingsPage() {
     e.preventDefault()
     setSaving(true)
     setSuccess(false)
+    setSaveError(null)
     const {
       data: { user },
     } = await supabase.auth.getUser()
-    if (!user) return
+    if (!user) {
+      // Session expired mid-edit — used to leave `saving` stuck `true`
+      // forever with the button reading "Saving…" and no way out
+      // (fix-plan 2.13 / audit 08-F21 family).
+      setSaving(false)
+      setSaveError('Your session expired — sign in again.')
+      return
+    }
     // Parse the income input. Strip thousands separators + currency
     // symbols the user might paste, then `Number()`. Anything that
     // fails to parse saves as null (clear). Negative numbers are
@@ -249,18 +297,72 @@ export default function SettingsPage() {
       parsedIncome = Number.isFinite(n) && n >= 0 ? n : null
     }
 
-    await supabase
+    // `currency_code` is deliberately not written here — a currency
+    // change is its own migration (`handleCurrencyChange` below), never
+    // a field on this bare label-swap form (fix-plan 2.7).
+    const { error } = await supabase
       .from('profiles')
       .update({
         display_name: displayName.trim() || null,
-        currency_code: currency,
         locale,
         monthly_income: parsedIncome,
       })
       .eq('id', user.id)
     setSaving(false)
+    if (error) {
+      // Never claim "Saved." when the write failed (fix-plan 2.13 /
+      // audit 08-F21 family) — the unconditional green success message
+      // this used to show regardless of the write's outcome.
+      setSaveError(error.message)
+      return
+    }
     setSuccess(true)
     setTimeout(() => setSuccess(false), 3000)
+  }
+
+  // Currency change as a migration, not a label swap (fix-plan 2.7,
+  // audit 05-F13/06-F8/08-F5). Used to be folded into `handleSaveAccount`
+  // as a bare `currency_code` write — every historical
+  // `amount_in_profile_currency` kept its old magnitude under a new
+  // symbol. Now: refuse outright while offline, get an explicit "this
+  // will reconvert N transactions" confirmation, then drive
+  // `change-currency` (via `lib/changeCurrency.ts`) to completion —
+  // mirrors `apps/mobile/app/more/settings.tsx`'s `handleCurrencyChange`/
+  // `runCurrencyChange` contract exactly, so the two platforms can never
+  // silently diverge into "mobile migrates, web relabels" again.
+  async function handleCurrencyChange(newCode: string) {
+    if (newCode === currency) return
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      setCurrencyError("You're offline — reconnect to change currency.")
+      return
+    }
+    const confirmed = window.confirm(
+      `Changing your currency to ${newCode} will reconvert ${txnCount} transaction${
+        txnCount === 1 ? '' : 's'
+      }, your budgets, and your monthly income at their historical exchange rates. This cannot be undone.\n\nContinue?`,
+    )
+    if (!confirmed) return
+
+    setCurrencyError(null)
+    setCurrencyConverting(true)
+    setCurrencyProgress(null)
+    const result = await changeCurrency(supabase, newCode, (progress) => setCurrencyProgress(progress))
+    setCurrencyConverting(false)
+    setCurrencyProgress(null)
+
+    if (!result.ok) {
+      setCurrencyError(
+        result.error === 'offline' ? "You're offline — reconnect to change currency." : result.error,
+      )
+      return
+    }
+
+    // The server already committed the new `profiles.currency_code`
+    // and every reconverted transaction — reload rather than just
+    // flipping local state, so this screen (and everything it reads)
+    // stops showing pre-conversion figures.
+    setCurrency(newCode)
+    await load()
   }
 
   async function handleSignOut() {
@@ -278,6 +380,14 @@ export default function SettingsPage() {
         <div style={{ fontFamily: font.serif, fontSize: 28, fontWeight: 500, color: colors.ink, letterSpacing: -0.6 }}>
           Settings
         </div>
+
+        {loadError && (
+          // Distinct from a blank/new profile (fix-plan 2.13 / audit
+          // 08-F21 family) — this page has no other loading/empty gate,
+          // so a failed read used to leave every field silently showing
+          // its default value with no indication anything failed.
+          <ErrorState compact message="We couldn't load your settings." detail={loadError} onRetry={load} />
+        )}
 
         <div style={styles.layout}>
           {/* Sub-nav */}
@@ -354,9 +464,14 @@ export default function SettingsPage() {
                 <div style={styles.formRow}>
                   <div style={{ ...styles.field, flex: 1 }}>
                     <label style={styles.label}>Currency</label>
+                    {/* Changing this fires its own confirm/migrate flow
+                        immediately (fix-plan 2.7) — it is not part of
+                        "Save changes" below, because a currency change
+                        is a data migration, never a silent relabel. */}
                     <select
                       value={currency}
-                      onChange={(e) => setCurrency(e.target.value)}
+                      onChange={(e) => void handleCurrencyChange(e.target.value)}
+                      disabled={currencyConverting}
                       style={styles.select}
                     >
                       {CURRENCIES.map((c) => (
@@ -365,6 +480,17 @@ export default function SettingsPage() {
                         </option>
                       ))}
                     </select>
+                    {currencyConverting && (
+                      <div style={styles.currencyStatus}>
+                        Converting…
+                        {currencyProgress && currencyProgress.total > 0
+                          ? ` ${currencyProgress.converted} / ${currencyProgress.total} transactions`
+                          : ''}
+                      </div>
+                    )}
+                    {!currencyConverting && currencyError && (
+                      <div style={styles.currencyStatusError}>{currencyError}</div>
+                    )}
                   </div>
                   <div style={{ ...styles.field, flex: 1 }}>
                     <label style={styles.label}>Language</label>
@@ -397,7 +523,8 @@ export default function SettingsPage() {
                   </div>
                 </div>
                 <div style={styles.actions}>
-                  {success && <span style={styles.successMsg}>Saved.</span>}
+                  {saveError && <span style={styles.saveErrorMsg}>{saveError}</span>}
+                  {!saveError && success && <span style={styles.successMsg}>Saved.</span>}
                   <button type="submit" disabled={saving || loading} style={styles.saveBtn}>
                     {saving ? 'Saving…' : 'Save changes'}
                   </button>
@@ -849,6 +976,24 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 12,
     color: colors.accent,
     fontWeight: 600,
+  },
+  saveErrorMsg: {
+    fontFamily: font.sans,
+    fontSize: 12,
+    color: colors.destructive ?? '#A94646',
+    fontWeight: 600,
+  },
+  currencyStatus: {
+    fontFamily: font.sans,
+    fontSize: 11,
+    color: colors.ink3,
+    marginTop: 6,
+  },
+  currencyStatusError: {
+    fontFamily: font.sans,
+    fontSize: 11,
+    color: colors.destructive ?? '#A94646',
+    marginTop: 6,
   },
   linkBtn: {
     fontSize: 12,

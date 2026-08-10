@@ -39,6 +39,13 @@ function rowToTransaction(row: Record<string, unknown>, tz: string): Transaction
     amount_in_profile_currency: (row.amount_in_profile_currency as number) ?? null,
     fx_rate_to_profile: (row.fx_rate_to_profile as number) ?? null,
     fx_rate_date: (row.fx_rate_date as string) ?? null,
+    // Server-only bookkeeping (migration 026, fix-plan 2.7) — not part of
+    // the local SQLite manifest, same story as `local_day` above: no
+    // local writer or reader needs "which currency was this snapshot
+    // computed for" to render anything, only `change-currency` and the
+    // FX backfill sweep's self-heal predicate do, and both operate
+    // directly against Supabase.
+    snapshot_currency: (row.snapshot_currency as string) ?? null,
     transacted_at: row.transacted_at as string,
     // Not a stored local column — see `getDeviceTimeZone`'s docstring above.
     local_day: localDay(row.transacted_at as string, tz),

@@ -1,5 +1,15 @@
 import { useState } from 'react'
-import { View, Text, StyleSheet, Pressable, TextInput, ActivityIndicator } from 'react-native'
+import {
+  View,
+  Text,
+  StyleSheet,
+  Pressable,
+  TextInput,
+  ActivityIndicator,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
+} from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
@@ -35,19 +45,33 @@ export default function IncomeScreen() {
   const [amount, setAmount] = useState('')
   const [source, setSource] = useState('')
   const [saving, setSaving] = useState(false)
+  // Write-failure surface (fix-plan 2.13 / audit 08-F21 family): this
+  // screen used to route to Today unconditionally, regardless of whether
+  // `updateProfile` actually succeeded. A failed write left
+  // `onboarding_completed_at` unset, so the layout gate immediately
+  // bounced the user back to `/(onboarding)/permissions` with no
+  // explanation — a silent loop on the app's very first screen.
+  const [error, setError] = useState<string | null>(null)
 
   const amountNum = parseFloat(amount) || 0
   const canContinue = amountNum > 0
 
   async function finishOnboarding(withIncome: boolean) {
     setSaving(true)
+    setError(null)
     const useIncome = withIncome && amountNum > 0
 
-    await updateProfile({
+    const profileSaved = await updateProfile({
       monthly_income: useIncome ? amountNum : null,
       monthly_income_source: useIncome && source.trim() ? source.trim() : null,
       onboarding_completed_at: new Date().toISOString(),
     })
+
+    if (!profileSaved) {
+      setSaving(false)
+      setError(t('onboarding.income.save_failed', locale))
+      return
+    }
 
     // When the user provides an income, wire it into the app's transaction
     // graph so it behaves like real income everywhere (History's Income
@@ -63,7 +87,7 @@ export default function IncomeScreen() {
       // trigger (migration 013) when this row syncs — atomic with the row
       // write, so onboarding can never again produce a "ghost recurring"
       // income with no rule behind it.
-      await createTransaction({
+      const { error: txnError } = await createTransaction({
         amount: amountNum,
         direction: 'credit',
         currency_code: currency,
@@ -74,6 +98,12 @@ export default function IncomeScreen() {
         is_recurring: true,
         recurring_frequency: 'monthly',
       })
+
+      if (txnError) {
+        setSaving(false)
+        setError(txnError)
+        return
+      }
     }
 
     setSaving(false)
@@ -101,109 +131,129 @@ export default function IncomeScreen() {
         </Pressable>
       </View>
 
-      <View style={styles.content}>
-        <View style={styles.iconTile}>
-          <Ionicons
-            name="trending-up"
-            size={26}
-            color={Colors.accent ?? Colors.primary}
-          />
-        </View>
-
-        <Text style={styles.headline}>{t('onboarding.income.headline', locale)}</Text>
-        <Text style={styles.lead}>{t('onboarding.income.lead', locale)}</Text>
-
-        {/* Amount display — tapping anywhere on the card focuses the hidden
-            TextInput so the native number pad slides up. Simpler than
-            porting the full on-screen keypad here. */}
-        <View style={styles.amountCard}>
-          <View style={styles.amountRow}>
-            <Text style={styles.currencyGlyph}>$</Text>
-            <TextInput
-              value={amount}
-              onChangeText={(v) => setAmount(v.replace(/[^\d.]/g, ''))}
-              placeholder="0"
-              placeholderTextColor={Colors.ink4 ?? Colors.textMuted}
-              keyboardType="decimal-pad"
-              style={styles.amountInput}
-              maxLength={9}
+      {/* Wrapped in a scroll container + a KAV mounted at the screen root
+          (fix-plan 1.8/2.14, audit 01-F1/01-F37): the old fixed, non-
+          scrolling flex column overflowed its own viewport on every iPhone
+          except the Max sizes, pushing Continue off-screen with no way to
+          reach it, and the un-dismissable decimal-pad keyboard made it
+          worse. Shape copied from `(auth)/sign-in.tsx`, which F37 calls
+          out as already correct — its `SafeAreaView` is the screen root,
+          so the KAV's `onLayout` frame is exactly the top inset and RN's
+          own parent-relative lift math is correct here (unlike the sheets
+          F37 documents, which need the `measureInWindow` fix instead). */}
+      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={styles.iconTile}>
+            <Ionicons
+              name="trending-up"
+              size={26}
+              color={Colors.accent ?? Colors.primary}
             />
           </View>
-          <Text style={styles.amountHint}>
-            {t('onboarding.income.per_month', locale)} · {currency}
+
+          <Text style={styles.headline}>{t('onboarding.income.headline', locale)}</Text>
+          <Text style={styles.lead}>{t('onboarding.income.lead', locale)}</Text>
+
+          {/* Amount display — tapping anywhere on the card focuses the hidden
+              TextInput so the native number pad slides up. Simpler than
+              porting the full on-screen keypad here. */}
+          <View style={styles.amountCard}>
+            <View style={styles.amountRow}>
+              <Text style={styles.currencyGlyph}>$</Text>
+              <TextInput
+                value={amount}
+                onChangeText={(v) => setAmount(v.replace(/[^\d.]/g, ''))}
+                placeholder="0"
+                placeholderTextColor={Colors.ink4 ?? Colors.textMuted}
+                keyboardType="decimal-pad"
+                style={styles.amountInput}
+                maxLength={9}
+              />
+            </View>
+            <Text style={styles.amountHint}>
+              {t('onboarding.income.per_month', locale)} · {currency}
+            </Text>
+          </View>
+
+          {/* Source / employer — optional. MerchantAvatar will pick up the
+              logo via domain guess ("Meta" → meta.com favicon). */}
+          <Text style={styles.fieldLabel}>
+            {t('onboarding.income.source_label', locale)}
           </Text>
-        </View>
-
-        {/* Source / employer — optional. MerchantAvatar will pick up the
-            logo via domain guess ("Meta" → meta.com favicon). */}
-        <Text style={styles.fieldLabel}>
-          {t('onboarding.income.source_label', locale)}
-        </Text>
-        <TextInput
-          value={source}
-          onChangeText={setSource}
-          placeholder={t('onboarding.income.source_placeholder', locale)}
-          placeholderTextColor={Colors.ink4 ?? Colors.textMuted}
-          style={styles.sourceInput}
-          autoCapitalize="words"
-        />
-
-        {/* Quick-pick presets */}
-        <Text style={styles.presetLabel}>{t('onboarding.income.quick_pick', locale)}</Text>
-        <View style={styles.presetRow}>
-          {PRESETS.map((p) => {
-            const active = Math.abs(amountNum - p.value) < 1
-            return (
-              <Pressable
-                key={p.label}
-                onPress={() => setAmount(String(p.value))}
-                style={({ pressed }) => [
-                  styles.presetBtn,
-                  active && styles.presetBtnActive,
-                  pressed && { opacity: 0.8 },
-                ]}
-              >
-                <Text style={[styles.presetLabelText, active && styles.presetLabelTextActive]}>
-                  {p.label}
-                </Text>
-              </Pressable>
-            )
-          })}
-        </View>
-
-        <View style={styles.privacyNote}>
-          <Ionicons
-            name="lock-closed"
-            size={14}
-            color={Colors.accent ?? Colors.primary}
-            style={{ marginTop: 1 }}
+          <TextInput
+            value={source}
+            onChangeText={setSource}
+            placeholder={t('onboarding.income.source_placeholder', locale)}
+            placeholderTextColor={Colors.ink4 ?? Colors.textMuted}
+            style={styles.sourceInput}
+            autoCapitalize="words"
           />
-          <Text style={styles.privacyText}>
-            {t('onboarding.income.privacy', locale)}
-          </Text>
+
+          {/* Quick-pick presets */}
+          <Text style={styles.presetLabel}>{t('onboarding.income.quick_pick', locale)}</Text>
+          <View style={styles.presetRow}>
+            {PRESETS.map((p) => {
+              const active = Math.abs(amountNum - p.value) < 1
+              return (
+                <Pressable
+                  key={p.label}
+                  onPress={() => setAmount(String(p.value))}
+                  style={({ pressed }) => [
+                    styles.presetBtn,
+                    active && styles.presetBtnActive,
+                    pressed && { opacity: 0.8 },
+                  ]}
+                >
+                  <Text style={[styles.presetLabelText, active && styles.presetLabelTextActive]}>
+                    {p.label}
+                  </Text>
+                </Pressable>
+              )
+            })}
+          </View>
+
+          <View style={styles.privacyNote}>
+            <Ionicons
+              name="lock-closed"
+              size={14}
+              color={Colors.accent ?? Colors.primary}
+              style={{ marginTop: 1 }}
+            />
+            <Text style={styles.privacyText}>
+              {t('onboarding.income.privacy', locale)}
+            </Text>
+          </View>
+        </ScrollView>
+
+        {/* Pinned outside the ScrollView so it can never scroll off-screen
+            or land under the keyboard — the exact failure F1 documents.
+            Continue is gated on a positive amount; the Skip button in the
+            top-right handles the "no income" intent explicitly, so
+            Continue only makes sense when there's actually something to
+            save. */}
+        <View style={styles.footer}>
+          {error && <Text style={styles.errorText}>{error}</Text>}
+          <Pressable
+            style={({ pressed }) => [
+              styles.cta,
+              (saving || !canContinue) && styles.ctaDisabled,
+              pressed && canContinue && !saving && styles.ctaPressed,
+            ]}
+            onPress={() => finishOnboarding(true)}
+            disabled={saving || !canContinue}
+          >
+            {saving ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <Text style={styles.ctaText}>{t('common.continue', locale)}</Text>
+            )}
+          </Pressable>
         </View>
-
-        <View style={{ flex: 1 }} />
-
-        {/* Continue is gated on a positive amount. The Skip button in the
-            top-right handles the "no income" intent explicitly, so Continue
-            only makes sense when there's actually something to save. */}
-        <Pressable
-          style={({ pressed }) => [
-            styles.cta,
-            (saving || !canContinue) && styles.ctaDisabled,
-            pressed && canContinue && !saving && styles.ctaPressed,
-          ]}
-          onPress={() => finishOnboarding(true)}
-          disabled={saving || !canContinue}
-        >
-          {saving ? (
-            <ActivityIndicator color="#FFFFFF" />
-          ) : (
-            <Text style={styles.ctaText}>{t('common.continue', locale)}</Text>
-          )}
-        </Pressable>
-      </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   )
 }
@@ -234,7 +284,22 @@ const styles = StyleSheet.create({
     fontFamily: Typography.fontFamily.sansBold,
   },
 
-  content: { flex: 1, paddingHorizontal: 28, paddingTop: 32, paddingBottom: 40 },
+  flex: { flex: 1 },
+  scrollContent: { paddingHorizontal: 28, paddingTop: 32, paddingBottom: 24 },
+  // Fixed footer, outside the ScrollView (fix-plan 2.14, audit 01-F1) —
+  // `SafeAreaView edges={['bottom', ...]}` on the screen root already
+  // reserves the home-indicator inset, so this doesn't add its own.
+  footer: { paddingHorizontal: 28, paddingTop: 12, paddingBottom: 4 },
+  // Write-failure message (fix-plan 2.13) — sits directly above the CTA
+  // it blocks, so the user sees why Continue didn't move them forward.
+  errorText: {
+    color: Colors.destructive ?? '#A94646',
+    fontSize: 13,
+    fontWeight: '600',
+    fontFamily: Typography.fontFamily.sansSemiBold,
+    textAlign: 'center',
+    marginBottom: 10,
+  },
 
   iconTile: {
     width: 52,

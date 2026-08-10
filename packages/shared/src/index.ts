@@ -12,14 +12,31 @@ export * from './types/recurring'
 export * from './utils/currency'
 export * from './utils/period'
 export * from './utils/fx'
+export * from './utils/validation'
 
 // Domain — money aggregation (spend/income/transfers/saved, one definition)
 export * from './domain/money'
+
+// Domain — the one export-assembly module (fix-plan 2.15)
+export * from './domain/export'
+
+// Domain — the one forecast + pattern-detection modules (fix-plan 2.11)
+export * from './domain/forecast'
+export * from './domain/patterns'
+
+// Domain — the one budget window and budget status (fix-plan 2.5)
+export * from './domain/budget'
 
 // Domain — the one recurrence engine (next-occurrence, windowing, cost
 // normalizers) and the one pattern detector, fix-plan 1.5
 export * from './domain/recurrence'
 export * from './domain/recurringPatternDetector'
+
+// Domain — the one source-label map, fix-plan 2.12
+export * from './domain/source'
+
+// Domain — the one category-suggestion resolver, fix-plan 2.9(d)
+export * from './domain/categoryResolver'
 
 // i18n
 export * from './i18n'

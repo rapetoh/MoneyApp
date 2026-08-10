@@ -16,6 +16,7 @@ import { useAuth } from '../../src/hooks/useAuth'
 import { useTransactions } from '../../src/hooks/useTransactions'
 import { useCategories } from '../../src/hooks/useCategories'
 import { useProfile } from '../../src/hooks/useProfile'
+import { syncManager } from '../../src/services/sync/SyncManager'
 import { TransactionRow } from '../../src/components/TransactionRow'
 import { Colors, Typography, Spacing, Radius, Hairline } from '../../src/theme'
 import { t, type Locale } from '@voice-expense/shared'
@@ -64,7 +65,11 @@ function groupByDate(transactions: Transaction[], locale: Locale) {
 
 export default function TransactionsScreen() {
   const { user } = useAuth()
-  const { transactions, loading } = useTransactions(user?.id)
+  // Read-error exposure (fix-plan 2.13 / audit 08-F21 family) — a failed
+  // read used to render as "No transactions match these filters", which
+  // is this screen's *actual* zero-result empty state, indistinguishable
+  // from a genuine outage.
+  const { transactions, loading, error } = useTransactions(user?.id)
   const { categories, categoryMap } = useCategories(user?.id)
   const { profile } = useProfile(user?.id)
   const [search, setSearch] = useState('')
@@ -233,6 +238,26 @@ export default function TransactionsScreen() {
 
       {loading ? (
         <ActivityIndicator color={Colors.primary} style={{ marginTop: Spacing['2xl'] }} />
+      ) : error && transactions.length === 0 ? (
+        // Error+retry state (fix-plan 2.13) — replaces "No transactions
+        // match these filters" for the case that string actually
+        // mislabels: a failed read, not a genuinely empty account. Gated
+        // on `transactions.length` (not `sections.length`) so a real
+        // zero-match search on data that *did* load keeps its own
+        // "No transactions match these filters" copy below.
+        // `useTransactions` exposes no `refetch`, so the best available
+        // retry is re-driving the same pull it already runs on mount.
+        <View style={styles.emptyState}>
+          <Ionicons name="alert-circle-outline" size={40} color={Colors.destructive ?? '#A94646'} />
+          <Text style={styles.emptyTitle}>{t('common.load_failed', locale)}</Text>
+          <Pressable
+            onPress={() => user?.id && syncManager.pullRemote(user.id)}
+            style={({ pressed }) => [styles.errorRetryBtn, pressed && styles.errorRetryBtnPressed]}
+          >
+            <Ionicons name="refresh" size={14} color="#FFFFFF" />
+            <Text style={styles.errorRetryText}>{t('common.retry', locale)}</Text>
+          </Pressable>
+        </View>
       ) : sections.length === 0 ? (
         <View style={styles.emptyState}>
           <Text style={styles.emptyIcon}>{search || selectedCategoryId ? '🔍' : '💸'}</Text>
@@ -390,7 +415,12 @@ const styles = StyleSheet.create({
   pillLabelActive: {
     color: Colors.white,
   },
-  listContent: { paddingHorizontal: Spacing.base, paddingBottom: 120 },
+  // No floating tab bar on this screen (it's a tab-less Stack push, not one
+  // of the five tabs) and `SafeAreaView edges={['bottom', ...]}` above
+  // already reserves the home-indicator inset, so this is a plain
+  // breathing-room constant, not a bar-clearance literal (audit 01-F13) —
+  // `useTabBarClearance()` would double-count the safe area here.
+  listContent: { paddingHorizontal: Spacing.base, paddingBottom: 24 },
   dateHeader: {
     fontFamily: Typography.fontFamily.sansSemiBold,
     fontSize: Typography.size.sm,
@@ -433,5 +463,22 @@ const styles = StyleSheet.create({
     fontFamily: Typography.fontFamily.sansBold,
     fontSize: Typography.size.md,
     color: Colors.text,
+  },
+  errorRetryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 4,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 999,
+    backgroundColor: Colors.ink ?? '#1B1915',
+  },
+  errorRetryBtnPressed: { opacity: 0.8 },
+  errorRetryText: {
+    fontFamily: Typography.fontFamily.sansSemiBold,
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
 })

@@ -1,12 +1,27 @@
 import React from 'react'
 import { colors, font, cat as catTokens } from '../../lib/theme'
 import { tintFor } from '../../lib/categories'
-import type { LensProps } from './types'
-import { aggAmount } from '@voice-expense/shared'
+import { type LensProps, toSummarizable } from './types'
+import { addMonthsClamped, monthBounds, summarize } from '@voice-expense/shared'
 
 // 6-month × category grid. Rows = categories. Cols = trailing 6 months.
 // Cell intensity scales with amount; trend column shows a tiny sparkline +
 // percent delta vs the prior month.
+//
+// ROOT CAUSE (fix-plan 2.11's done-when, audit 05-F36/05-F37): this used
+// to filter `t.direction !== 'debit'` and sum raw `aggAmount(t)` — no
+// transfer exclusion (a Savings & Investing debit counted as spend here
+// exactly like the MindMap bug this file's sibling fixes) — then
+// truncated to the top 8 categories by latest-month spend and labelled
+// the sum over *only those 8* "Total". A month with more than 8 active
+// categories therefore rendered a "Total" smaller than the Overview
+// header's "out" figure 600px above it. Fixed by routing every cell
+// through `summarize()` (fix-plan 1.4) per trailing month — the same
+// transfer-exclusion and FX-pending-exclusion rules the Overview header
+// uses — and by folding every category past the top 8 into an explicit
+// "Other · N categories" row instead of silently dropping it, so
+// `Total = Σ(top 8) + Other` is `summarize()`'s `expense` by
+// construction, for every month including the anchor month.
 
 function fmtShort(value: number, currency: string, locale: string): string {
   return new Intl.NumberFormat(locale, {
@@ -18,55 +33,146 @@ function fmtShort(value: number, currency: string, locale: string): string {
 
 interface MonthCol {
   label: string
-  start: Date
-  end: Date
+  /** Half-open UTC instant bounds — string comparison only, never a
+   *  `Date` (fix-plan 2.4). */
+  start: string
+  endExclusive: string
 }
 
-function buildMonths(anchorYear: number, anchorMonth: number, locale: string): MonthCol[] {
+/** Trailing 6 calendar months ending at `anchorMonthIso`, resolved
+ *  through `period.ts`'s `addMonthsClamped`/`monthBounds` in `tz` —
+ *  replaces a `new Date(anchorYear, anchorMonth - i, 1)` build, which
+ *  ran in the *browser's* local zone and could misclassify a
+ *  transaction near a month boundary relative to the profile's own zone. */
+function buildMonths(anchorMonthIso: string, tz: string, locale: string): MonthCol[] {
+  const [y, m] = anchorMonthIso.split('-').map(Number)
   const out: MonthCol[] = []
   for (let i = 5; i >= 0; i--) {
-    const ref = new Date(anchorYear, anchorMonth - i, 1)
-    const start = new Date(ref.getFullYear(), ref.getMonth(), 1)
-    const end = new Date(ref.getFullYear(), ref.getMonth() + 1, 0, 23, 59, 59, 999)
-    out.push({ label: ref.toLocaleDateString(locale, { month: 'short' }), start, end })
+    const target = addMonthsClamped(y, m, 1, -i)
+    const iso = `${String(target.y).padStart(4, '0')}-${String(target.m).padStart(2, '0')}`
+    const bounds = monthBounds(iso, tz)
+    const label = new Date(bounds.start).toLocaleDateString(locale, { month: 'short', timeZone: tz })
+    out.push({ label, start: bounds.start, endExclusive: bounds.endExclusive })
   }
   return out
 }
 
 export function MatrixLens({ props }: { props: LensProps }) {
-  // Timezone-free anchor numbers — see LensProps. Never read date getters
-  // off the serialized monthStart instant.
-  const months = buildMonths(props.anchorYear, props.anchorMonth, props.locale)
+  const months = buildMonths(props.monthIso, props.timezone, props.locale)
+  const summarizable = props.transactions.map(toSummarizable)
 
-  // Aggregate spend per (category, monthIndex).
-  const allCats = new Set<string>()
+  // Per-month category breakdown, transfer- and FX-pending-excluded —
+  // the same `summarize()` (fix-plan 1.4) the Overview header's "out"
+  // routes through, so this grid can never disagree with it (see this
+  // file's header comment).
+  const monthSummaries = months.map((m) =>
+    summarize(summarizable, { start: m.start, endExclusive: m.endExclusive }),
+  )
+
+  // Row set = every category with recorded spend in any of the 6
+  // months, keyed by category id (or the shared "uncategorized" key) —
+  // never by display name, so two categories that happen to share a
+  // name can't collapse into one row.
+  const catIds = new Set<string>()
+  for (const s of monthSummaries) {
+    for (const id of Object.keys(s.byCategory)) catIds.add(id)
+  }
+  const nameById: Record<string, string> = {}
   const matrix: Record<string, number[]> = {}
-  for (const t of props.transactions) {
-    if (t.direction !== 'debit') continue
-    const d = new Date(t.transacted_at)
-    let mIdx = -1
-    for (let i = 0; i < months.length; i++) {
-      if (d >= months[i].start && d <= months[i].end) {
-        mIdx = i
-        break
-      }
-    }
-    if (mIdx < 0) continue
-    const k = t.category_name ?? 'Uncategorized'
-    allCats.add(k)
-    if (!matrix[k]) matrix[k] = new Array(months.length).fill(0)
-    matrix[k][mIdx] += aggAmount(t)
+  for (const id of catIds) {
+    matrix[id] = monthSummaries.map((s) => s.byCategory[id]?.amount ?? 0)
+    nameById[id] =
+      monthSummaries.find((s) => s.byCategory[id])?.byCategory[id]?.categoryName ?? 'Uncategorized'
   }
 
-  // Sort by latest-month spend desc; trim to top 8 to keep the grid legible.
-  const cats = [...allCats]
-    .map((k) => ({ k, latest: matrix[k][months.length - 1] }))
-    .sort((a, b) => b.latest - a.latest)
-    .slice(0, 8)
+  // Sort by latest-month (anchor month) spend desc; the top 8 get their
+  // own row, everything past that folds into one "Other · N categories"
+  // row instead of being silently dropped — see this file's header
+  // comment for why that's what makes `Total` agree with the Overview.
+  const rankedIds = [...catIds].sort((a, b) => matrix[b][months.length - 1] - matrix[a][months.length - 1])
+  const topIds = rankedIds.slice(0, 8)
+  const otherIds = rankedIds.slice(8)
+  const otherRow = months.map((_, mi) => otherIds.reduce((s, id) => s + matrix[id][mi], 0))
+  const hasOther = otherIds.length > 0
 
-  const max = Math.max(...cats.flatMap((c) => matrix[c.k]), 1)
+  const max = Math.max(...topIds.flatMap((id) => matrix[id]), ...(hasOther ? otherRow : [0]), 1)
 
-  const totals = months.map((_, mi) => cats.reduce((s, c) => s + matrix[c.k][mi], 0))
+  // Equal to `monthSummaries[mi].expense` by construction — the sum
+  // over *every* category (top 8 + Other), never a sum over a
+  // truncated set (05-F36/05-F37). For the anchor month
+  // (`mi === months.length - 1`) this is exactly the Overview header's
+  // "out" figure for the same month (fix-plan 2.11's done-when).
+  const totals = monthSummaries.map((s) => s.expense)
+
+  // Shared row renderer — used for each of the top-8 category rows and,
+  // once more, for the trailing "Other · N categories" row, so the two
+  // never drift into two different cell layouts.
+  const renderRow = (key: string, label: string, swatch: string, row: number[]) => {
+    const last = row[row.length - 1]
+    const prev = row[row.length - 2] || 0
+    const trendUp = prev > 0 ? last > prev : false
+    const pct = prev > 0 ? Math.round(((last - prev) / prev) * 100) : null
+    return (
+      <React.Fragment key={key}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingLeft: 4 }}>
+          <span style={{ width: 10, height: 10, borderRadius: 3, background: swatch }} />
+          <span
+            style={{
+              fontSize: 13,
+              fontWeight: 600,
+              color: colors.ink2,
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+            }}
+          >
+            {label}
+          </span>
+        </div>
+        {row.map((v, mi) => {
+          const intensity = v / max
+          return (
+            <div
+              key={mi}
+              style={{
+                background: `rgba(63,90,62,${0.06 + intensity * 0.6})`,
+                borderRadius: 6,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 12,
+                fontWeight: 700,
+                color: intensity > 0.5 ? '#fff' : colors.ink2,
+                fontVariantNumeric: 'tabular-nums',
+                minHeight: 36,
+              }}
+            >
+              {v > 0 ? fmtShort(v, props.currency, props.locale) : ''}
+            </div>
+          )
+        })}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 4,
+            fontSize: 11,
+            fontWeight: 700,
+            color: trendUp ? '#A94646' : colors.accent,
+          }}
+        >
+          <Sparkline values={row} color={trendUp ? '#A94646' : colors.accent} />
+          {pct != null && (
+            <span>
+              {trendUp ? '↑' : '↓'}
+              {Math.abs(pct)}%
+            </span>
+          )}
+        </div>
+      </React.Fragment>
+    )
+  }
 
   return (
     <div
@@ -137,80 +243,17 @@ export function MatrixLens({ props }: { props: LensProps }) {
           Trend
         </div>
 
-        {cats.map((c) => {
-          const row = matrix[c.k]
-          const last = row[row.length - 1]
-          const prev = row[row.length - 2] || 0
-          const trendUp = prev > 0 ? last > prev : false
-          const pct = prev > 0 ? Math.round(((last - prev) / prev) * 100) : null
-          return (
-            <React.Fragment key={c.k}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingLeft: 4 }}>
-                <span
-                  style={{
-                    width: 10,
-                    height: 10,
-                    borderRadius: 3,
-                    background: catTokens[tintFor(c.k)].fg,
-                  }}
-                />
-                <span
-                  style={{
-                    fontSize: 13,
-                    fontWeight: 600,
-                    color: colors.ink2,
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                  }}
-                >
-                  {c.k}
-                </span>
-              </div>
-              {row.map((v, mi) => {
-                const intensity = v / max
-                return (
-                  <div
-                    key={mi}
-                    style={{
-                      background: `rgba(63,90,62,${0.06 + intensity * 0.6})`,
-                      borderRadius: 6,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: 12,
-                      fontWeight: 700,
-                      color: intensity > 0.5 ? '#fff' : colors.ink2,
-                      fontVariantNumeric: 'tabular-nums',
-                      minHeight: 36,
-                    }}
-                  >
-                    {v > 0 ? fmtShort(v, props.currency, props.locale) : ''}
-                  </div>
-                )
-              })}
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 4,
-                  fontSize: 11,
-                  fontWeight: 700,
-                  color: trendUp ? '#A94646' : colors.accent,
-                }}
-              >
-                <Sparkline values={row} color={trendUp ? '#A94646' : colors.accent} />
-                {pct != null && (
-                  <span>
-                    {trendUp ? '↑' : '↓'}
-                    {Math.abs(pct)}%
-                  </span>
-                )}
-              </div>
-            </React.Fragment>
-          )
-        })}
+        {topIds.map((id) => renderRow(id, nameById[id], catTokens[tintFor(nameById[id])].fg, matrix[id]))}
+        {/* Everything past the top 8, folded into one row rather than
+            dropped — this is what makes `Total` below agree with the
+            Overview header's "out" (fix-plan 2.11's done-when). */}
+        {hasOther &&
+          renderRow(
+            '__matrix_other_row__',
+            `Other · ${otherIds.length} categor${otherIds.length === 1 ? 'y' : 'ies'}`,
+            colors.ink4,
+            otherRow,
+          )}
 
         {/* Totals row */}
         <div
@@ -245,7 +288,7 @@ export function MatrixLens({ props }: { props: LensProps }) {
         ))}
         <div />
       </div>
-      {cats.length === 0 && (
+      {topIds.length === 0 && !hasOther && (
         <div style={{ fontSize: 13, color: colors.ink3, padding: '40px 20px', textAlign: 'center' }}>
           Not enough history yet to draw a 6-month matrix.
         </div>

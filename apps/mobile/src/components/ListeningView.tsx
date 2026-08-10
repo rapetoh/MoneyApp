@@ -10,8 +10,8 @@ import {
 import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Money } from './Money'
-import { Colors, Typography } from '../theme'
-import { t, type Locale } from '@voice-expense/shared'
+import { Colors, Typography, useTabBarClearance } from '../theme'
+import { t, currencySymbolFor, type Locale } from '@voice-expense/shared'
 
 interface Props {
   /** The live interim transcript coming out of useVoice. */
@@ -25,6 +25,9 @@ interface Props {
   /** Called when the user taps the stop square. */
   onStop: () => void
   locale: Locale
+  /** Profile currency — what a just-detected amount is denominated in
+   *  until the parse resolves a currency of its own. */
+  currencyCode: string
 }
 
 // Bar heights lifted from BigWaveform in docs/money-app/project/mobile-screens-1.jsx.
@@ -160,9 +163,18 @@ export function ListeningView({
   onCancel,
   onStop,
   locale,
+  currencyCode,
 }: Props) {
   const detectedAmount = useMemo(() => extractAmount(transcript), [transcript])
   const insets = useSafeAreaInsets()
+  // This full-screen takeover renders underneath the Record tab's floating
+  // tab bar (it swaps in for the Record screen's normal content, not for
+  // the whole Tabs navigator) — `useTabBarClearance()` replaces the
+  // hand-picked `paddingBottom: 110` literal (audit 01-F13) the same way
+  // it does everywhere else, and covers the "give it real insets, not an
+  // 8pt guess" half of fix-plan 2.14 that `insets.top` above already
+  // covers for the header.
+  const tabBarClearance = useTabBarClearance()
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
@@ -189,9 +201,9 @@ export function ListeningView({
         <Text style={styles.heroLabel}>{t('listening.detected', locale)}</Text>
         <View style={styles.heroAmount}>
           {detectedAmount != null ? (
-            <Money value={detectedAmount} size={92} />
+            <Money value={detectedAmount} size={92} currencyCode={currencyCode} locale={locale} />
           ) : (
-            <Text style={styles.heroPlaceholder}>$—</Text>
+            <Text style={styles.heroPlaceholder}>{`${currencySymbolFor(currencyCode)}—`}</Text>
           )}
         </View>
 
@@ -218,7 +230,7 @@ export function ListeningView({
       <View style={{ flex: 1 }} />
 
       {/* Waveform + stop button */}
-      <View style={styles.bottom}>
+      <View style={[styles.bottom, { paddingBottom: tabBarClearance }]}>
         <BigWaveform />
         <Pressable
           style={({ pressed }) => [styles.stopButton, pressed && styles.stopButtonPressed]}
@@ -327,10 +339,10 @@ const styles = StyleSheet.create({
     gap: 6,
   },
 
-  // Bottom
+  // Bottom. `paddingBottom` is set per-instance above from
+  // `useTabBarClearance()` (audit 01-F13, fix-plan 1.8/2.14).
   bottom: {
     paddingHorizontal: 20,
-    paddingBottom: 110,
     alignItems: 'center',
     gap: 36,
   },

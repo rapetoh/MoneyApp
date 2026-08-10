@@ -93,13 +93,25 @@ export function useTransactions(userId: string | undefined) {
   // are idempotent per user and only the first caller actually does
   // network work; every instance still gets its own SQLite read via
   // `loadLocal` and the `DataEvents` listener below.
+  //
+  // Read-error exposure (fix-plan 2.13 / audit 08-F21 family): `error`
+  // was declared above and never once set — `pullRemote`'s `{ ok }`
+  // result (fix-plan 1.6's "an outbox that can report failure") was
+  // discarded here, so a remote read that failed while the device was
+  // online looked identical to "already synced, nothing new." Being
+  // offline (`!syncManager.online`) is the ordinary, already-handled
+  // case — the local SQLite read above already rendered whatever synced
+  // up to now — so only a pull attempted *while online* that still came
+  // back `ok: false` counts as a real failure worth surfacing.
   useEffect(() => {
     if (!userId) return
 
     setLoading(true)
+    setError(null)
     syncManager.startRealtime(userId)
     loadLocal().then(() => {
-      syncManager.pullRemote(userId).then(() => {
+      syncManager.pullRemote(userId).then((result) => {
+        setError(!result.ok && syncManager.online ? 'Could not refresh from the server.' : null)
         loadLocal()
       })
     })
@@ -114,7 +126,7 @@ export function useTransactions(userId: string | undefined) {
 
   async function createTransaction(
     fields: Pick<Transaction, 'amount' | 'direction' | 'currency_code' | 'merchant' | 'note' | 'category_id' | 'payment_method'> &
-      Partial<Pick<Transaction, 'source' | 'raw_transcript' | 'ai_confidence' | 'is_recurring' | 'recurring_rule_id' | 'recurring_frequency' | 'merchant_domain'>>,
+      Partial<Pick<Transaction, 'source' | 'raw_transcript' | 'ai_confidence' | 'is_recurring' | 'recurring_rule_id' | 'recurring_frequency' | 'merchant_domain' | 'transacted_at'>>,
   ): Promise<MutationResult> {
     if (!userId) return { id: null, status: 'rejected', error: 'Not authenticated' }
 
@@ -142,31 +154,52 @@ export function useTransactions(userId: string | undefined) {
     const now = new Date().toISOString()
     const clientId = Crypto.randomUUID()
 
+    // The instant this transaction actually happened at — fix-plan 2.8
+    // (audit 02-F8/04-F7/04-F24/07-F7/08-F3). Every parser already
+    // computes this (the prompt asks for it, the scan prompt reads the
+    // printed receipt date, the notification listener derives it from
+    // the notification timestamp) but until now this function's field
+    // type didn't even accept it, so `transacted_at` was unconditionally
+    // `now` regardless of what was parsed — a voice log of "yesterday"
+    // landed today, and receipt scanning (whose entire value is catching
+    // up on old receipts) was date-blind. Defaults to `now` only when the
+    // caller has no date to offer (manual entry, or a parse that carried
+    // none).
+    const transactedAt = fields.transacted_at ?? now
+
     // Same zone for both the FX snapshot's rate date and `local_day`
     // below — computed once so the two can't disagree about which civil
     // day this transaction belongs to.
     const tz = getDeviceTimeZone()
 
-    // FX snapshot (migration 011). Same-currency → 1.0 short-circuits
-    // without a network call. Different currency → frankfurter.app
-    // lookup; on failure the row saves without the snapshot and gets
-    // picked up by the backfill sweep on next online launch. `tz`
-    // (fix-plan 1.3 part 2 adoption, `fx.ts:79`) dates the rate to the
-    // *civil* day the transaction belongs to, not a bare UTC slice.
+    // FX snapshot (migration 011), dated to the transaction's own
+    // resolved date, not wall-clock `now` — fix-plan 2.8: those two used
+    // to agree only by accident (both were unconditionally `now`), so
+    // backdating a foreign-currency transaction would have silently
+    // converted it at *today's* rate instead of the rate on the day it
+    // actually happened. Same-currency → 1.0 short-circuits without a
+    // network call. Different currency → frankfurter.app lookup; on
+    // failure the row saves without the snapshot and gets picked up by
+    // the backfill sweep on next online launch. `tz` (fix-plan 1.3 part 2
+    // adoption, `fx.ts:79`) dates the rate to the *civil* day the
+    // transaction belongs to, not a bare UTC slice.
     const profileCurrency = getCurrentProfileCurrency()
-    const fx = await snapshotFx(now, fields.currency_code, profileCurrency, fields.amount, tz)
+    const fx = await snapshotFx(transactedAt, fields.currency_code, profileCurrency, fields.amount, tz)
 
     // transactions.local_day (migration 017, NOT NULL) — the civil day
     // this transaction belongs to in the user's zone, resolved once here
-    // at create time and never recomputed by a reader (fix-plan 1.3 part
-    // 3). Not part of the local SQLite manifest yet (Stage 2 adoption for
-    // reads — `transactionStore.ts`'s `rowToTransaction` recomputes it
-    // from `transacted_at` on the way back out instead), so this is the
-    // one true answer: it rides both the local `Transaction` object below
-    // and the sync payload, and `sync_upsert_transaction` (migration 018)
+    // at create time from the transaction's own resolved date (fix-plan
+    // 2.8 — previously this was `localDay(now, tz)`, which dated a
+    // backdated parse to *today's* civil day instead of its own) and
+    // never recomputed by a reader (fix-plan 1.3 part 3). Not part of the
+    // local SQLite manifest yet (Stage 2 adoption for reads —
+    // `transactionStore.ts`'s `rowToTransaction` recomputes it from
+    // `transacted_at` on the way back out instead), so this is the one
+    // true answer: it rides both the local `Transaction` object below and
+    // the sync payload, and `sync_upsert_transaction` (migration 018)
     // writes the client's own answer instead of falling back to its
     // server-side recompute.
-    const localDayValue = localDay(now, tz)
+    const localDayValue = localDay(transactedAt, tz)
 
     const txn: Transaction = {
       id: clientId,
@@ -182,7 +215,13 @@ export function useTransactions(userId: string | undefined) {
       amount_in_profile_currency: fx?.amount_in_profile_currency ?? null,
       fx_rate_to_profile: fx?.fx_rate_to_profile ?? null,
       fx_rate_date: fx?.fx_rate_date ?? null,
-      transacted_at: now,
+      // Which currency the snapshot above targets (migration 026,
+      // fix-plan 2.7's `snapshot_currency`) — `profileCurrency` when the
+      // snapshot actually filled, `null` alongside a null snapshot so
+      // this row still reads as "needs a snapshot" to `fxBackfill.ts`'s
+      // self-heal predicate rather than "already correct".
+      snapshot_currency: fx ? profileCurrency : null,
+      transacted_at: transactedAt,
       local_day: localDayValue,
       // Resolved by `upsertTransaction` from `transacted_at` on write,
       // same as every other local writer — see its docstring.

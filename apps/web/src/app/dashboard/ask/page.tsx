@@ -1,9 +1,5 @@
 'use client'
-/* eslint-disable local/period-restrictions -- Stage 2 (2.4/2.14) migration
- * pending: this page's window math hasn't been converted onto
- * packages/shared/src/utils/period.ts yet (fix-plan 2.10 owns Ask
- * Murmur's window handling) — out of item 1.3's own named surfaces. */
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { createClient } from '../../../lib/supabase/client'
 import { colors, font, radius } from '../../../lib/theme'
 import { Toolbar } from '../../../components/Toolbar'
@@ -12,6 +8,7 @@ import { Icon } from '../../../components/Icons'
 import { PaywallGate } from '../../../components/PaywallGate'
 import { ThinkingDots } from '../../../components/ThinkingDots'
 import { AskChart } from '../../../components/AskChart'
+import { ErrorState } from '../../../components/ErrorState'
 import { usePlus } from '../../../lib/plus'
 import {
   loadMostRecentConversation,
@@ -21,6 +18,9 @@ import {
   appendUserMessage,
   appendAssistantMessage,
   softDeleteConversation,
+  addDays,
+  civilDateTimeToInstant,
+  localParts,
   type AskConversationRow,
   type AskMessageRow,
 } from '@voice-expense/shared'
@@ -35,6 +35,17 @@ import type {
   Transaction,
   Category,
 } from '@voice-expense/shared'
+
+// fix-plan 1.3 — period.ts doesn't export a canned "N days ago" bound, so
+// this composes one from the exported day-arithmetic primitives rather
+// than hand-rolling `Date#setDate`/`Date#getDate` (audit 04-F4's class of
+// defect — a rolling window computed in whatever zone the *browser*
+// happens to render in instead of the user's own `profile.timezone`).
+function daysAgoInstant(nowIso: string, tz: string, nDays: number): string {
+  const { y, m, d } = localParts(nowIso, tz)
+  const past = addDays(y, m, d, -nDays)
+  return civilDateTimeToInstant(past.y, past.m, past.d, 0, 0, 0, tz)
+}
 
 // "Try also" suggestions — surfaced in the right rail in summary mode and
 // as quick-start chips on the empty state. Clicking one fires it as a new
@@ -105,11 +116,27 @@ export default function AskMurmurPage() {
   const [authed, setAuthed] = useState(false)
   const [userId, setUserId] = useState<string | null>(null)
   const [profile, setProfile] = useState<
-    { currency_code?: string; locale?: Locale; monthly_income?: number | null } | null
+    {
+      currency_code?: string
+      locale?: Locale
+      monthly_income?: number | null
+      /** fix-plan 1.3 — anchors `today` and every rolling window below in
+       *  the user's own zone instead of the browser's. `'UTC'` matches
+       *  the column default for the rare render before capture lands
+       *  (see `TimezoneSync` in dashboard/layout.tsx). */
+      timezone?: string
+    } | null
   >(null)
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [rules, setRules] = useState<RecurringRule[]>([])
   const [categories, setCategories] = useState<Category[]>([])
+  // Read-error state (fix-plan 2.13 / audit 08-F21 family). This page has
+  // no separate list body — a failed read used to render as an honest-
+  // looking "0 voice expenses / 0 income deposits / 0 recurring bills" in
+  // the Sources Used panel below, indistinguishable from a genuinely
+  // empty account, while Ask silently reasoned over an incomplete (or
+  // empty) context with no indication anything was wrong.
+  const [loadError, setLoadError] = useState<string | null>(null)
 
   // Conversation state
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null)
@@ -129,6 +156,57 @@ export default function AskMurmurPage() {
   const [listening, setListening] = useState(false)
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null)
 
+  const load = useCallback(async () => {
+    const { data: { session } } = await supabase.auth.getSession()
+    const user = session?.user
+    if (!user) return
+    setAuthed(true)
+    setUserId(user.id)
+    const [p, t, r, c, mostRecent, convs] = await Promise.all([
+      supabase.from('profiles').select('*').eq('id', user.id).single(),
+      supabase
+        .from('transactions')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('is_deleted', false)
+        .order('transacted_at', { ascending: false }),
+      supabase.from('recurring_rules').select('*').eq('user_id', user.id),
+      supabase.from('categories').select('*').eq('user_id', user.id).eq('is_archived', false),
+      loadMostRecentConversation(supabase, user.id),
+      listConversations(supabase, user.id, 30),
+    ])
+    // `locale` carries a CHECK constraint (`en`/`fr`/`es`/`pt`) that the
+    // generated Database row type can't see — codegen only reads column
+    // types — so it comes back as a bare `string`. Narrowed to `Locale`
+    // here, same as every other CHECK-constrained column in
+    // packages/shared/src/types/*.ts.
+    setProfile(
+      p.data
+        ? {
+            currency_code: p.data.currency_code,
+            locale: p.data.locale as Locale,
+            monthly_income: p.data.monthly_income,
+            timezone: p.data.timezone,
+          }
+        : null,
+    )
+    // `loadMostRecentConversation`/`listConversations` throw on failure
+    // rather than resolving `{ error }` (see askStorage.ts) — a rejection
+    // there surfaces as an unhandled promise rejection today, unchanged
+    // by this pass; the three direct `supabase.from(...)` reads are what
+    // this item owns.
+    const failure = p.error ?? t.error ?? r.error ?? c.error
+    setLoadError(failure ? failure.message : null)
+    if (!t.error) setTransactions((t.data ?? []) as Transaction[])
+    if (!r.error) setRules((r.data ?? []) as RecurringRule[])
+    if (!c.error) setCategories((c.data ?? []) as Category[])
+    setConversations(convs)
+    if (mostRecent) {
+      setActiveConversationId(mostRecent.conversation.id)
+      setThread(messagesToThread(mostRecent.messages))
+    }
+  }, [])
+
   useEffect(() => {
     const SR = getSpeechRecognitionCtor()
     if (SR) {
@@ -146,48 +224,6 @@ export default function AskMurmurPage() {
       r.onerror = () => setListening(false)
       recognitionRef.current = r
       setMicSupported(true)
-    }
-    async function load() {
-      const { data: { session } } = await supabase.auth.getSession()
-      const user = session?.user
-      if (!user) return
-      setAuthed(true)
-      setUserId(user.id)
-      const [p, t, r, c, mostRecent, convs] = await Promise.all([
-        supabase.from('profiles').select('*').eq('id', user.id).single(),
-        supabase
-          .from('transactions')
-          .select('*')
-          .eq('user_id', user.id)
-          .eq('is_deleted', false)
-          .order('transacted_at', { ascending: false }),
-        supabase.from('recurring_rules').select('*').eq('user_id', user.id),
-        supabase.from('categories').select('*').eq('user_id', user.id).eq('is_archived', false),
-        loadMostRecentConversation(supabase, user.id),
-        listConversations(supabase, user.id, 30),
-      ])
-      // `locale` carries a CHECK constraint (`en`/`fr`/`es`/`pt`) that the
-      // generated Database row type can't see — codegen only reads column
-      // types — so it comes back as a bare `string`. Narrowed to `Locale`
-      // here, same as every other CHECK-constrained column in
-      // packages/shared/src/types/*.ts.
-      setProfile(
-        p.data
-          ? {
-              currency_code: p.data.currency_code,
-              locale: p.data.locale as Locale,
-              monthly_income: p.data.monthly_income,
-            }
-          : null,
-      )
-      setTransactions((t.data ?? []) as Transaction[])
-      setRules((r.data ?? []) as RecurringRule[])
-      setCategories((c.data ?? []) as Category[])
-      setConversations(convs)
-      if (mostRecent) {
-        setActiveConversationId(mostRecent.conversation.id)
-        setThread(messagesToThread(mostRecent.messages))
-      }
     }
     load()
   }, [])
@@ -220,17 +256,23 @@ export default function AskMurmurPage() {
   }
 
   function buildRequest(q: string, history: AskMurmurHistoryTurn[]): AskMurmurRequest {
-    const cutoff = new Date()
-    cutoff.setDate(cutoff.getDate() - 90)
-    const cutoffIso = cutoff.toISOString()
+    const tz = profile?.timezone || 'UTC'
+    const nowIso = new Date().toISOString()
+    const cutoffIso = daysAgoInstant(nowIso, tz, 90)
     const catById = new Map<string, string>()
     for (const c of categories) catById.set(c.id, c.name)
     const filtered = transactions
       .filter((t) => !t.is_deleted && t.transacted_at >= cutoffIso)
       .sort((a, b) => a.transacted_at.localeCompare(b.transacted_at))
       .slice(-500)
+    // `amount_in_profile_currency` is part of the wire contract
+    // (packages/shared/src/types/ai.ts, fix-plan 2.10) — sending the
+    // real FX-converted figure, never the raw same-name `amount`, is
+    // what stops a foreign-currency row from summing as its raw
+    // (wrong-currency) amount server-side.
     const wireTxns: AskMurmurTransaction[] = filtered.map((t) => ({
       amount: t.amount,
+      amount_in_profile_currency: t.amount_in_profile_currency ?? null,
       direction: t.direction,
       merchant: t.merchant ?? null,
       category_name: t.category_id ? catById.get(t.category_id) ?? null : null,
@@ -249,7 +291,13 @@ export default function AskMurmurPage() {
       question: q.trim(),
       locale: (profile?.locale ?? 'en') as Locale,
       currency: profile?.currency_code ?? 'USD',
-      today: new Date().toISOString().split('T')[0],
+      // The user's own clock reading + own IANA zone (fix-plan 1.3/2.10)
+      // — the server resolves every window ("today", "this month", ...)
+      // from these two fields, never from a bare date string re-parsed
+      // as UTC midnight, which is what let an 8pm Central "today"
+      // resolve to tomorrow's (empty) UTC day.
+      now_utc: nowIso,
+      time_zone: tz,
       monthly_income: profile?.monthly_income ?? null,
       transactions: wireTxns,
       recurring_rules: wireRules,
@@ -414,9 +462,7 @@ export default function AskMurmurPage() {
 
   // Sources Used panel data — reflects what the model has access to.
   const sources = (() => {
-    const ninetyAgo = new Date()
-    ninetyAgo.setDate(ninetyAgo.getDate() - 90)
-    const ninetyAgoIso = ninetyAgo.toISOString()
+    const ninetyAgoIso = daysAgoInstant(new Date().toISOString(), profile?.timezone || 'UTC', 90)
     const recentTxns = transactions.filter((t) => !t.is_deleted && t.transacted_at >= ninetyAgoIso)
     const voiceCount = transactions.filter((t) => t.source === 'voice' && !t.is_deleted).length
     const incomeCount = recentTxns.filter((t) => t.direction === 'credit').length
@@ -509,6 +555,13 @@ export default function AskMurmurPage() {
         <div style={{ fontSize: 13, color: colors.ink3, marginLeft: 42 }}>
           Plans, projections, and what-ifs — based strictly on your transactions, income, and budgets. Never general advice.
         </div>
+
+        {loadError && (
+          // Distinct from "new account, nothing to reason over yet" (fix-plan
+          // 2.13 / audit 08-F21 family) — Ask must not silently answer from
+          // an incomplete or empty context with no indication the read failed.
+          <ErrorState compact message="We couldn't load your data. Ask Murmur may be missing context." detail={loadError} onRetry={load} />
+        )}
 
         {/* Search bar */}
         <form

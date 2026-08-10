@@ -13,10 +13,19 @@ import { Colors, Typography, Radius, Hairline } from '../theme'
 import { t, currencySymbolFor, type Locale } from '@voice-expense/shared'
 import type { BudgetPeriod } from '@voice-expense/shared'
 
+// All five `BudgetPeriod` values (fix-plan 2.5 — "Ship all five periods
+// in `BudgetEditorModal`"). Quarterly/yearly were missing here entirely,
+// so there was no way to *create* a quarterly or yearly budget on
+// mobile even though `packages/shared/src/utils/period.ts` and the web
+// picker both already supported them — a quarterly budget could only be
+// set on web, then rendered (wrongly — see `useBudget.ts`'s old
+// `usePeriodSpend`) on mobile.
 const BUDGET_PERIODS: { value: BudgetPeriod; key: string }[] = [
   { value: 'weekly', key: 'settings.period_weekly' },
   { value: 'biweekly', key: 'settings.period_biweekly' },
   { value: 'monthly', key: 'settings.period_monthly' },
+  { value: 'quarterly', key: 'settings.period_quarterly' },
+  { value: 'yearly', key: 'settings.period_yearly' },
 ]
 
 interface Props {
@@ -74,7 +83,12 @@ export function BudgetEditorModal({
   }
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={onClose}
+    >
       <View style={styles.modal}>
         <View style={styles.modalHeader}>
           <Pressable onPress={onClose} hitSlop={8}>

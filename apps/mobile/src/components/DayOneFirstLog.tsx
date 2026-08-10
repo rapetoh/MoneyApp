@@ -1,6 +1,6 @@
 import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
-import { Colors, Typography, Hairline } from '../theme'
+import { Colors, Typography, Hairline, useTabBarClearance } from '../theme'
 import { t, type Locale } from '@voice-expense/shared'
 
 interface Props {
@@ -32,9 +32,14 @@ const EXAMPLE_KEYS = [
  * instead" escape hatch) is preserved.
  */
 export function DayOneFirstLog({ locale, onSkip, onTypeInstead }: Props) {
+  // Rendered inside the Today tab, underneath the floating tab bar —
+  // `useTabBarClearance()` replaces the hand-picked `paddingBottom: 120`
+  // literal (audit 01-F13, fix-plan 1.8/2.14).
+  const tabBarClearance = useTabBarClearance()
+
   return (
     <ScrollView
-      contentContainerStyle={styles.content}
+      contentContainerStyle={[styles.content, { paddingBottom: tabBarClearance }]}
       showsVerticalScrollIndicator={false}
     >
       {/* Top row — progress eyebrow + Skip */}
@@ -91,7 +96,8 @@ export function DayOneFirstLog({ locale, onSkip, onTypeInstead }: Props) {
 }
 
 const styles = StyleSheet.create({
-  content: { paddingBottom: 120 },
+  // `paddingBottom` set per-instance above from `useTabBarClearance()`.
+  content: {},
 
   topRow: {
     paddingHorizontal: 20,

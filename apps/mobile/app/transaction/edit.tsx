@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
+  Animated,
   View,
   Text,
   TextInput,
@@ -9,8 +10,6 @@ import {
   Alert,
   ActivityIndicator,
   Keyboard,
-  KeyboardAvoidingView,
-  Platform,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useLocalSearchParams, useRouter } from 'expo-router'
@@ -23,8 +22,9 @@ import { getTransactionById } from '../../src/services/sync/transactionStore'
 import { CategoryPicker } from '../../src/components/CategoryPicker'
 import { RecurringToggle } from '../../src/components/RecurringToggle'
 import { NumericAccessory, NUMERIC_ACCESSORY_ID } from '../../src/components/NumericAccessory'
+import { useKeyboardLift } from '../../src/hooks/useKeyboardLift'
 import { Colors, Typography, Spacing, Radius } from '../../src/theme'
-import { t, currencySymbolFor } from '@voice-expense/shared'
+import { t, currencySymbolFor, validateAmount } from '@voice-expense/shared'
 import type { Transaction, TransactionDirection, PaymentMethod, Locale, RecurringFrequency } from '@voice-expense/shared'
 
 const PAYMENT_METHODS: { value: PaymentMethod; key: string }[] = [
@@ -67,6 +67,17 @@ export default function EditTransactionScreen() {
   const [isRecurring, setIsRecurring] = useState(false)
   const [frequency, setFrequency] = useState<RecurringFrequency>('monthly')
 
+  // Correct keyboard-avoidance (audit 01-F37): this screen is mounted
+  // below a native header inside a `presentation: 'modal'` card, so RN's
+  // own `KeyboardAvoidingView` under-lifts by that header + card offset —
+  // it computes its lift from a parent-relative `onLayout` frame compared
+  // against a window-space keyboard coordinate, and "parent-relative" here
+  // is not "screen-relative". `useKeyboardLift` measures this view's real
+  // window position instead, so the lift is correct regardless of the
+  // header/presentation offset above it.
+  const contentRef = useRef<View>(null)
+  const lift = useKeyboardLift(contentRef)
+
   useEffect(() => {
     if (!id) return
     getTransactionById(id).then((data) => {
@@ -92,11 +103,23 @@ export default function EditTransactionScreen() {
   }, [id])
 
   async function handleSave() {
-    const parsedAmount = parseFloat(amount.replace(',', '.'))
-    if (isNaN(parsedAmount) || parsedAmount <= 0) {
-      Alert.alert(t('voice.invalid_amount', locale), t('voice.invalid_amount_msg', locale))
+    // One shared validator (fix-plan 2.14 / audit 01-F1, 01-F34) instead of
+    // the bare `isNaN(parseFloat(...)) || <= 0` check — this screen's
+    // amount field is free-text (no keypad guarding decimal places the
+    // way Manual entry's does), so it's the one edit path that can
+    // actually reach `too_large`/`too_many_decimals`.
+    const validation = validateAmount(amount, txn?.currency_code ?? currency)
+    if (!validation.ok) {
+      const message =
+        validation.reason === 'too_large'
+          ? t('voice.amount_too_large', locale)
+          : validation.reason === 'too_many_decimals'
+            ? t('voice.amount_too_many_decimals', locale)
+            : t('voice.invalid_amount_msg', locale)
+      Alert.alert(t('voice.invalid_amount', locale), message)
       return
     }
+    const parsedAmount = validation.amount
     if (!txn) return
 
     // Look up the linked rule. Template txns (the original "this is
@@ -184,10 +207,12 @@ export default function EditTransactionScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
+      {/* `marginBottom: lift` shrinks this column by the keyboard's real
+          overlap (see `useKeyboardLift` above) — same effect as KAV's
+          'padding' behavior (the ScrollView gives way, the footer stays
+          pinned to the new, higher bottom edge) but driven from a
+          measured window position instead of RN's parent-relative one. */}
+      <Animated.View ref={contentRef} style={[styles.flex, { marginBottom: lift }]}>
         <ScrollView
           style={styles.scroll}
           contentContainerStyle={styles.content}
@@ -312,7 +337,7 @@ export default function EditTransactionScreen() {
             )}
           </Pressable>
         </View>
-      </KeyboardAvoidingView>
+      </Animated.View>
       <NumericAccessory onDone={() => Keyboard.dismiss()} />
     </SafeAreaView>
   )
@@ -321,6 +346,7 @@ export default function EditTransactionScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.background },
+  flex: { flex: 1 },
   scroll: { flex: 1 },
   content: { padding: Spacing.base, gap: Spacing.base, paddingBottom: Spacing.lg },
   // Pinned outside the ScrollView (F23) — same shape as

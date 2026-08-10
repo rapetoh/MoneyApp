@@ -400,3 +400,76 @@ export function annualEquivalent(rule: {
 }): number {
   return monthlyEquivalent(rule) * 12
 }
+
+/**
+ * Shape `recurringFlowInWindow` needs from a rule beyond `RecurrenceInput`
+ * — a rule's own FX snapshot (fix-plan 2.1's `amount_in_profile_currency`/
+ * `fx_rate_to_profile`/`fx_rate_date`, migration 025), mirroring
+ * `SummarizableTransaction` in `packages/shared/src/domain/money.ts`.
+ */
+export interface RecurringFlowInput extends RecurrenceInput {
+  direction: 'debit' | 'credit'
+  /** Snapshotted in the profile's currency at rule create/update time.
+   *  Null means "awaiting conversion" — never treated as 0 (mirrors
+   *  `isFxPending`/`summarize()` in money.ts). */
+  amount_in_profile_currency?: number | null
+}
+
+/**
+ * Every occurrence of every `debit`-direction rule in
+ * `[startInstant, endExclusiveInstant)`, summed in the profile's currency
+ * — the direction-filtered, FX-normalised, every-occurrence replacement
+ * for `computeUpcomingRecurring` (fix-plan 2.1's "Why now": that function
+ * summed raw `rule.amount` across currencies and counted only the *next*
+ * occurrence, so a weekly $60 rule contributed $60 to a monthly window
+ * instead of $240-$300, and an income rule inflated "spend"). Composes
+ * `chargesInWindow` (one call per occurrence, not per rule) with each
+ * rule's own FX snapshot rather than a fresh lookup per occurrence —
+ * projecting a future occurrence at the rule's last-known rate is the
+ * same approximation `monthlyEquivalent` already makes for a single
+ * occurrence.
+ *
+ * `pendingCount` is occurrences whose rule has no FX snapshot yet —
+ * excluded from `total`, never folded in as 0, same contract as
+ * `summarize()`/`sumInProfileCurrency()` in money.ts and fx.ts.
+ */
+export function recurringOutflowInWindow<R extends RecurringFlowInput>(
+  rules: readonly R[],
+  startInstant: string,
+  endExclusiveInstant: string,
+  tz: string,
+): { total: number; pendingCount: number } {
+  return flowInWindow(rules, 'debit', startInstant, endExclusiveInstant, tz)
+}
+
+/** `recurringOutflowInWindow`'s `credit`-direction twin — the "you'll
+ *  receive" figure a caller renders as its own labelled total rather
+ *  than netting it into (or, worse, subtracting it from) spend. */
+export function recurringInflowInWindow<R extends RecurringFlowInput>(
+  rules: readonly R[],
+  startInstant: string,
+  endExclusiveInstant: string,
+  tz: string,
+): { total: number; pendingCount: number } {
+  return flowInWindow(rules, 'credit', startInstant, endExclusiveInstant, tz)
+}
+
+function flowInWindow<R extends RecurringFlowInput>(
+  rules: readonly R[],
+  direction: 'debit' | 'credit',
+  startInstant: string,
+  endExclusiveInstant: string,
+  tz: string,
+): { total: number; pendingCount: number } {
+  const filtered = rules.filter((r) => r.direction === direction)
+  let cents = 0
+  let pendingCount = 0
+  for (const { rule } of chargesInWindow(filtered, startInstant, endExclusiveInstant, tz)) {
+    if (rule.amount_in_profile_currency == null) {
+      pendingCount++
+      continue
+    }
+    cents += Math.round(rule.amount_in_profile_currency * 100)
+  }
+  return { total: cents / 100, pendingCount }
+}

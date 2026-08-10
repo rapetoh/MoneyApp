@@ -223,6 +223,7 @@ function fullTransaction(overrides: Partial<Transaction> = {}): Transaction {
     amount_in_profile_currency: 46.13,
     fx_rate_to_profile: 1.0854,
     fx_rate_date: '2026-08-09',
+    snapshot_currency: 'USD',
     transacted_at: now,
     local_day: '2026-08-09',
     occurrence_date: null,

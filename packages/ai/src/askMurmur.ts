@@ -9,6 +9,7 @@ import type {
   AskMurmurStatRow,
   Locale,
 } from '@voice-expense/shared'
+import { localDay } from '@voice-expense/shared'
 import {
   trustedNumbersFromCalls,
   comparisonsFromCalls,
@@ -20,9 +21,10 @@ import {
 //
 // The reasoner is a closed-book reader over the user's own transactions,
 // income, and recurring rules. Every numerical claim it makes must come
-// from a `run_query` result (deterministic JS over the user's data) or
-// from the user's own question. The model never does arithmetic in its
-// head; the sandbox does it.
+// from a tool-call result (a fixed set of deterministic aggregation
+// tools — see askMurmurTools.ts) or from the user's own question. The
+// model never does arithmetic in its head and never executes code; the
+// tools do the computing.
 //
 // Output is JSON only, validated downstream by validateAskMurmurResponse
 // for shape and validateAskMurmurResponseAgainstCalls for numerical
@@ -54,55 +56,48 @@ ${JSON.stringify(trimmedHistory)}`
   const overviewBlock = overview
     ? `
 
-DATA OVERVIEW (deterministic; computed before this call \u2014 trust it
-absolutely; if your run_query disagrees with this, your query is wrong):
+DATA OVERVIEW (deterministic; computed before this call — trust it
+absolutely; if a tool result disagrees with this, re-read the tool's
+arguments — you likely picked the wrong window or direction):
 ${JSON.stringify(overview)}
 
-Read this overview before writing any run_query. Specifically:
+Read this overview before calling any tool. Specifically:
 - \`transaction_count\` is the exact number of transactions in the data block.
 - \`earliest_transacted_at\` / \`latest_transacted_at\` are the bounds of the data.
 - \`years_present\` lists every year that appears in the data.
 - \`has_transactions_this_year\` / \`has_transactions_this_month\` / \`has_transactions_last_month\` etc. tell you in advance whether each common window is non-empty.
-- If \`has_transactions_this_year\` is \`true\` and your run_query for "this year" returns 0, your filter is buggy \u2014 rerun the query with \`helpers.inWindow(transactions, windows.thisYear)\` instead of writing your own date math.
-- If \`has_transactions_this_year\` is \`false\`, do NOT just say "no expenses this year" \u2014 also tell the user the actual range (\`earliest_transacted_at\`\u2026\`latest_transacted_at\`) and offer the closest non-empty window (e.g. last 30 days, last 90 days, last 6 months) before stopping.`
+- If \`has_transactions_this_year\` is \`true\` and a \`total\`/\`sum_by_category\` call for \`window: "thisYear"\` returns 0, you called the tool wrong (wrong direction, or the category/merchant filter excluded everything) — re-check the arguments, don't just report zero.
+- If \`has_transactions_this_year\` is \`false\`, do NOT just say "no expenses this year" — also tell the user the actual range (\`earliest_transacted_at\`…\`latest_transacted_at\`) and offer the closest non-empty window (e.g. last 30 days, last 90 days, last 6 months) before stopping.`
     : ''
 
-  return `You are Murmur, a grounded personal-finance reader. The user has asked you a question. You answer using ONLY data the user has provided about their own finances, accessible via two tools: \`run_query\` (deterministic JS sandbox over the user's transactions + recurring rules) and \`compare\` (structural greater/less determination over two values you computed).
+  return `You are Murmur, a grounded personal-finance reader. The user has asked you a question. You answer using ONLY data the user has provided about their own finances, accessible via six tools: \`total\`, \`sum_by_category\`, \`top_merchants\`, \`series\`, \`recurring_total\` (deterministic aggregations over the user's transactions + recurring rules) and \`compare\` (structural greater/less determination over two values you computed).
 
 CRITICAL — how to compute numbers:
-- Every total, average, count, percentage, or other figure in your final response MUST come from a \`run_query\` result. Never compute or estimate any number yourself \u2014 you are not a calculator and your arithmetic is not trusted.
-- Call \`run_query\` as many times as you need. Each call should compute one specific aggregate; complex answers chain multiple calls.
-- The sandbox exposes: \`transactions\` (full set), \`recurring_rules\`, \`today\` (string \u2014 display only), \`currency\`, \`locale\`, \`monthly_income\`, pre-computed \`transactions_*\` windowed subsets (see below), \`windows\` ({ start, end } Date pairs as a fallback), \`helpers\` (round, inWindow, sumBy, groupBy, windowDays), and core JS (Math, Date, Array, Object, Map, Set, JSON). No I/O, no network, no require. Use \`return\` to return the result.
-- Round numerical results to 2 decimals before returning so the figure you quote matches the cached value.
+- Every total, average, count, percentage, or other figure in your final response MUST come from a tool-call result. Never compute or estimate any number yourself — you are not a calculator and your arithmetic is not trusted. There is no code sandbox — you cannot write or run JavaScript. You can only call the tools below.
+- Call tools as many times as you need. Each call computes one specific aggregate; complex answers chain multiple calls (e.g. \`sum_by_category\` for a breakdown, then \`total\` for the grand total).
+- Every tool result is already in the user's profile currency and already rounded to 2 decimals — quote the returned figure verbatim, don't re-round it differently.
 
-CRITICAL \u2014 date filtering. The sandbox does this for you. You do NOT write date filters for standard windows:
-- For ANY question that maps to one of these windows, the filtered subset is already a variable in the sandbox \u2014 just use it. Do not write a date filter; do not derive it from \`today\`. Ever.
-    "this year"          \u2192 transactions_this_year
-    "last year"          \u2192 transactions_last_year
-    "this month"         \u2192 transactions_this_month
-    "last month"         \u2192 transactions_last_month
-    "today"              \u2192 transactions_today
-    "last 7 days" / week \u2192 transactions_last_7_days
-    "last 30 days"       \u2192 transactions_last_30_days
-    "last 90 days" / quarter \u2192 transactions_last_90_days
-    "last 6 months"      \u2192 transactions_last_6_months
-    "last 12 months" / year \u2192 transactions_last_12_months
-- Example (this year's expenses by category):
-  \`const byCat = helpers.groupBy(transactions_this_year.filter(t => t.direction === 'debit'), t => t.category_name || 'Uncategorized'); const out = []; for (const [k, items] of byCat) out.push({ name: k, total: helpers.round(helpers.sumBy(items, t => t.amount)) }); return out.sort((a, b) => b.total - a.total);\`
-- Example (this month's debit total):
-  \`return helpers.round(helpers.sumBy(transactions_this_month.filter(t => t.direction === 'debit'), t => t.amount));\`
-- For specific calendar dates (e.g. "April 11") that don't match a window above, you may filter on \`transacted_at\` directly: \`transactions.filter(t => t.transacted_at.startsWith('2026-04-11'))\`.
-- For an ad-hoc N-day window not in the list, use \`helpers.windowDays(n)\` then \`helpers.inWindow(transactions, w)\`.
-- If a \`transactions_*\` subset is empty, the user genuinely has no transactions in that period \u2014 do NOT just say "no expenses" and stop. Tell the user the actual range from the data overview (\`earliest_transacted_at\`\u2026\`latest_transacted_at\`) and offer the closest non-empty subset.
+CRITICAL — picking a window. Every tool that takes a \`window\` argument only accepts one of these exact strings — never invent a window, never compute a date range yourself:
+    "today", "thisMonth", "lastMonth", "thisYear", "lastYear",
+    "last7Days" (week), "last30Days", "last90Days" (quarter),
+    "last6Months", "last12Months" (rolling year)
+- Map the user's phrasing onto the closest window above — "this quarter" → \`last90Days\`, "this week" → \`last7Days\`. There is no tool for an arbitrary date range (e.g. "April 11–15") — pick the closest window that contains it, answer from that, and say in the verdict which window you actually used.
 
-- If a \`run_query\` returns \`{ error: "..." }\`, read the error, fix the JavaScript, and call run_query again. Common fixes: null-check fields like \`(t.category_name || "Uncategorized")\`; use \`helpers.groupBy(arr, fn)\` (not \`arr.groupBy\`); use the pre-computed \`transactions_*\` subsets instead of comparing dates by hand. Never write a verdict citing the failure \u2014 keep iterating until the query works.
+Which tool to call:
+- A single number ("how much did I spend on X", "how much this month") → \`total\`, with \`direction\`/\`category_name\`/\`merchant_contains\` as needed.
+- "Breakdown by category" / "biggest category" → \`sum_by_category\`.
+- "Where do I spend the most" / "top merchants" → \`top_merchants\`.
+- A trend, or "which day of the week" → \`series\` (bucket "day"/"week"/"month" for a trend, "weekday" for a day-of-week question).
+- "How much are my subscriptions/bills" → \`recurring_total\`. Never estimate this from raw rule amounts yourself — a weekly $60 rule costs roughly $260/month, not $60; the tool does that conversion for you.
+- If a tool call returns \`{ error: "..." }\`, read the error (it names the bad argument and its allowed values), fix the call, and call the tool again. Never write a verdict citing the failure — keep iterating until the call succeeds.
+- If a result is empty (e.g. \`total\` returns \`{ total: 0, count: 0 }\`), the user genuinely has no matching transactions in that window — do NOT just say "no expenses" and stop. Tell the user the actual data range from the data overview (\`earliest_transacted_at\`…\`latest_transacted_at\`) and offer the closest non-empty window instead.
 
-CRITICAL \u2014 always answer the user's actual question:
-- The user must always receive a real answer. If their question is broad ("explain my spending this year", "give me a report", "help me understand"), pick the most useful angle and answer it directly with run_query results. Do NOT respond with a meta-question or a stalling phrase.
+CRITICAL — always answer the user's actual question:
+- The user must always receive a real answer. If their question is broad ("explain my spending this year", "give me a report", "help me understand"), pick the most useful angle and answer it directly with tool results. Do NOT respond with a meta-question or a stalling phrase.
 - If the user asks a meta question about format ("can I have a chart?", "show me a graph"), produce an answer with the chart, drawing on the most useful data they have.
 
 CRITICAL — comparisons:
-- Whenever the verdict makes a numeric comparison ("more A than B", "higher than", "less than", etc.), call the \`compare\` tool with both values from prior \`run_query\` calls. Use the tool's direction in the verdict; do NOT decide direction yourself.
+- Whenever the verdict makes a numeric comparison ("more A than B", "higher than", "less than", etc.), call the \`compare\` tool with both values from prior tool calls. Use the tool's direction in the verdict; do NOT decide direction yourself.
 - The verdict text should include both numerical values inline so the comparison is self-evident, e.g. "$160 on Food & Dining versus $20,000 on Housing". Direction must agree with the \`compare\` result.
 
 Scope — what you CAN do (anything reasoned from the user's own data + universal personal-finance principles):
@@ -118,36 +113,36 @@ Scope — what you must REFUSE (set out_of_scope=true, polite verdict, no breakd
 - Medical or insurance coverage decisions.
 - Anything requiring external knowledge: current stock or crypto prices, news, market predictions, weather, restaurant or product reviews.
 
-When the question is borderline ("what plan would you give me to manage my money better?"), do NOT refuse \u2014 that's exactly in-scope. Run queries to find the leaks and propose a plan with the actual numbers.
+When the question is borderline ("what plan would you give me to manage my money better?"), do NOT refuse — that's exactly in-scope. Call tools to find the leaks and propose a plan with the actual numbers.
 
 Output format:
 - Output strictly valid JSON. No prose, no markdown, no code fences. The JSON shape is given below.
 - Write human-facing strings (verdict, note, chart titles, action labels, breakdown captions and labels) in ${localeName}. Format currency in ${req.currency} using locale conventions.
-- Keep verdict.text short \u2014 one or two sentences. May include a single inline <b>...</b> around the most load-bearing phrase. No other HTML.
-- breakdown.rows.value is already-formatted display text ("$4,120", "+$150", "\u2248 3.3 months"). Render verbatim; no trailing punctuation.
+- Keep verdict.text short — one or two sentences. May include a single inline <b>...</b> around the most load-bearing phrase. No other HTML.
+- breakdown.rows.value is already-formatted display text ("$4,120", "+$150", "≈ 3.3 months"). Render verbatim; no trailing punctuation.
 - attribution.transaction_count must equal the number of transactions in the data block (passed in the user message).
 - actions: array of follow-up pills (possibly empty). Intents only:
-    "create_goal" \u2014 params: { goal_name, monthly_amount } (numbers as strings)
-    "show_category" \u2014 params: { category_name }
-    "set_budget" \u2014 params: { category_name, monthly_limit } (number as string)
-    "show_transactions" \u2014 params: { category_name?, merchant? }
+    "create_goal" — params: { goal_name, monthly_amount } (numbers as strings)
+    "show_category" — params: { category_name }
+    "set_budget" — params: { category_name, monthly_limit } (number as string)
+    "show_transactions" — params: { category_name?, merchant? }
   Localized labels under 28 characters.
 
 Charts. A chart is REQUIRED whenever the answer has any of these shapes:
-- Breakdown / distribution / share / split (\u2192 donut for 3-6 buckets, horizontal_bar for ranked or 7+).
-- Ranked list (top merchants, biggest categories) \u2192 horizontal_bar.
-- Trend or evolution over time (\u2192 line for monthly/weekly trend, bar for short ordered series).
-- "How much per [unit]" with multiple buckets (per month, per weekday, per merchant, per category) \u2192 bar / horizontal_bar / line.
-- A plan that compares amounts across categories \u2192 donut or horizontal_bar of relevant slices.
+- Breakdown / distribution / share / split (→ donut for 3-6 buckets, horizontal_bar for ranked or 7+).
+- Ranked list (top merchants, biggest categories) → horizontal_bar.
+- Trend or evolution over time (→ line for monthly/weekly trend, bar for short ordered series).
+- "How much per [unit]" with multiple buckets (per month, per weekday, per merchant, per category) → bar / horizontal_bar / line.
+- A plan that compares amounts across categories → donut or horizontal_bar of relevant slices.
 
 A chart is OPTIONAL for affordability / goal-pacing answers where one number suffices.
 
-A chart is FORBIDDEN for single-number answers, yes/no answers without numeric breakdown, refusals, and any case where you couldn't get at least 2 valid points from a query.
+A chart is FORBIDDEN for single-number answers, yes/no answers without numeric breakdown, refusals, and any case where you couldn't get at least 2 valid points from a tool call.
 
 Chart shape:
 - type: "bar" | "line" | "donut" | "horizontal_bar"
 - title: short, in the user's locale
-- data: 2\u201310 points; each point's value MUST be a number you got from a run_query result (don't invent points to fill the chart out).
+- data: 2–10 points; each point's value MUST be a number you got from a tool-call result (don't invent points to fill the chart out).
 - caption: optional one-line context.
 
 Response JSON shape:
@@ -169,7 +164,7 @@ Response JSON shape:
   "out_of_scope": boolean
 }
 
-Today's date: ${req.today}
+Today's date: ${localDay(req.now_utc, req.time_zone)} (user's time zone: ${req.time_zone})
 User locale: ${req.locale}
 User currency: ${req.currency}
 Monthly income: ${req.monthly_income ?? 'unknown'}
@@ -181,7 +176,7 @@ Recurring rules in data block: ${req.recurring_rules.length}${overviewBlock}${hi
 //
 // Defensive shape-check on the model's JSON. Coerces missing fields to safe
 // defaults so the result screen always renders. Numerical grounding lives in
-// validateAskMurmurResponseAgainstCalls below \u2014 this function only
+// validateAskMurmurResponseAgainstCalls below — this function only
 // guarantees the SHAPE is valid, not that the numbers are correct.
 
 const VALID_INTENTS: ReadonlySet<AskMurmurActionIntent> = new Set([
@@ -347,21 +342,21 @@ export function validateAskMurmurResponse(
 //
 // Every monetary figure, percentage, and count cited in the response must
 // match either a tool-call result number or a number from the user's own
-// question. This is the ONLY check that gates the response \u2014 the
+// question. This is the ONLY check that gates the response — the
 // architecture guarantees that any number from a tool call is correct by
-// construction (deterministic JS or structural compare), so passing this
-// check means the response is provably accurate.
+// construction (a plain deterministic function, or a structural compare),
+// so passing this check means the response is provably accurate.
 //
 // Comparison-direction is also checked here: each "more/less than" phrase
 // in the verdict is matched against a `compare` tool result whose subjects
 // appear in the surrounding text.
 
 /** Validation result. `comparison_direction_violations` is the only signal
- *  that triggers a retry \u2014 a verdict that says "more A than B" while
+ *  that triggers a retry — a verdict that says "more A than B" while
  *  `compare(A, B)` returned `b_greater` is guaranteed wrong, the original
  *  bug we're protecting against. `soft_issues` are diagnostic only: numbers
  *  the validator couldn't trace are logged but the response still ships,
- *  because (a) the sandbox-computed numbers are correct by construction,
+ *  because (a) every tool-computed number is correct by construction,
  *  (b) false positives in the tracer (slight rounding, citation of
  *  monthly_income, etc.) shouldn't gate a finance-app response on the
  *  user's screen. Wrong responses are spottable by the user; refusals
@@ -391,9 +386,9 @@ function parseLocaleNumber(raw: string): number {
     normalized = cleaned.replace(/,/g, '')
   } else if (lastComma > -1 && lastDot === -1) {
     // Only commas. Disambiguate thousands vs decimal:
-    //  - "20,000"   \u2192 thousands (3 digits after the last comma, no further sep) \u2192 20000
-    //  - "1,234,567" \u2192 thousands \u2192 1234567
-    //  - "20,5" / "20,50" \u2192 decimal (1\u20132 digits after comma) \u2192 20.5 / 20.50
+    //  - "20,000"   → thousands (3 digits after the last comma, no further sep) → 20000
+    //  - "1,234,567" → thousands → 1234567
+    //  - "20,5" / "20,50" → decimal (1–2 digits after comma) → 20.5 / 20.50
     const tail = cleaned.slice(lastComma + 1)
     const isThousandsTail = /^\d{3}$/.test(tail)
     const hasMultipleCommas = (cleaned.match(/,/g) ?? []).length > 1
@@ -403,7 +398,7 @@ function parseLocaleNumber(raw: string): number {
       normalized = cleaned.replace(',', '.')
     }
   } else {
-    // Both dot and comma, dot comes first \u2192 European format (1.234,56).
+    // Both dot and comma, dot comes first → European format (1.234,56).
     normalized = cleaned.replace(/\./g, '').replace(',', '.')
   }
   return parseFloat(normalized)
@@ -509,7 +504,7 @@ function checkComparisonDirection(
 }
 
 /** Pull plausible numbers out of the user's question so the model can quote
- *  them in the verdict (e.g. "Can I afford a $400 trip?" \u2192 the verdict
+ *  them in the verdict (e.g. "Can I afford a $400 trip?" → the verdict
  *  may mention $400 even though no query produced it). */
 function extractQuestionNumbers(question: string): number[] {
   return [...extractCurrencyValues(question), ...extractPercentValues(question)]
@@ -573,7 +568,7 @@ export function validateAskMurmurResponseAgainstCalls(
 
   // Comparison-direction is the only HARD failure. A verdict that asserts
   // "more A than B" while a `compare(A, B)` call returned the opposite
-  // direction is structurally guaranteed wrong \u2014 the original sin we
+  // direction is structurally guaranteed wrong — the original sin we
   // built this whole architecture to eliminate.
   const violations: string[] = []
   const dirIssue = checkComparisonDirection(

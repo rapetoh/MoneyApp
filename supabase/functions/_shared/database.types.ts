@@ -309,6 +309,7 @@ export type Database = {
           id: string
           locale: string
           monthly_income: number | null
+          monthly_income_currency: string | null
           monthly_income_source: string | null
           onboarding_completed_at: string | null
           plus_status: string | null
@@ -325,6 +326,7 @@ export type Database = {
           id: string
           locale?: string
           monthly_income?: number | null
+          monthly_income_currency?: string | null
           monthly_income_source?: string | null
           onboarding_completed_at?: string | null
           plus_status?: string | null
@@ -341,6 +343,7 @@ export type Database = {
           id?: string
           locale?: string
           monthly_income?: number | null
+          monthly_income_currency?: string | null
           monthly_income_source?: string | null
           onboarding_completed_at?: string | null
           plus_status?: string | null
@@ -517,6 +520,7 @@ export type Database = {
           raw_transcript: string | null
           recurring_frequency: string | null
           recurring_rule_id: string | null
+          snapshot_currency: string | null
           source: string
           synced_at: string | null
           transacted_at: string
@@ -549,6 +553,7 @@ export type Database = {
           raw_transcript?: string | null
           recurring_frequency?: string | null
           recurring_rule_id?: string | null
+          snapshot_currency?: string | null
           source: string
           synced_at?: string | null
           transacted_at: string
@@ -581,6 +586,7 @@ export type Database = {
           raw_transcript?: string | null
           recurring_frequency?: string | null
           recurring_rule_id?: string | null
+          snapshot_currency?: string | null
           source?: string
           synced_at?: string | null
           transacted_at?: string

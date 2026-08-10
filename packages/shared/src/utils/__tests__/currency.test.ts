@@ -5,6 +5,7 @@ import {
   formatMoneyParts,
   formatCurrency,
   currencySymbolFor,
+  amountAdjustDeltasFor,
 } from '../currency'
 
 describe('roundCents — half-away-from-zero (05-F32)', () => {
@@ -92,5 +93,27 @@ describe('currencySymbolFor — unchanged, still used directly by mobile call si
     expect(currencySymbolFor('USD')).toBe('$')
     expect(currencySymbolFor('NGN')).toBe('₦')
     expect(currencySymbolFor('XAF')).toBe('CFA ')
+  })
+})
+
+describe('amountAdjustDeltasFor — per-currency chip magnitudes (audit 01-F19)', () => {
+  it('a ±1 step is meaningless in JPY — scales up, not the USD default', () => {
+    const deltas = amountAdjustDeltasFor('JPY')
+    expect(deltas).not.toEqual([-1, 1, 5, 10])
+    expect(Math.abs(deltas[0])).toBeGreaterThan(1)
+  })
+
+  it('falls back to the ±1/5/10 default for an unlisted currency', () => {
+    expect(amountAdjustDeltasFor('USD')).toEqual([-1, 1, 5, 10])
+    expect(amountAdjustDeltasFor('CAD')).toEqual([-1, 1, 5, 10])
+  })
+
+  it('every entry pairs a negative decrement with a positive increment first', () => {
+    for (const code of ['JPY', 'XAF', 'NGN', 'GHS', 'USD']) {
+      const [first, second] = amountAdjustDeltasFor(code)
+      expect(first).toBeLessThan(0)
+      expect(second).toBeGreaterThan(0)
+      expect(Math.abs(first)).toBe(second)
+    }
   })
 })

@@ -294,33 +294,70 @@ const EN_ROWS: GoldenCorpusRow[] = [
     { direction: 'credit', amount: 2150, isRecurringSuggestion: true },
     { category_suggestion: 'Income', recurring_frequency_suggestion: 'biweekly' },
   ),
-  passingRow('en-refund', 'en', 'Amazon refunded me $34.20 for a return', {
-    direction: 'credit',
-    amount: 34.2,
-    isRecurringSuggestion: false,
-  }),
-  passingRow('en-roommate', 'en', 'Got $75 back from my roommate for utilities', {
-    direction: 'credit',
-    amount: 75,
-    isRecurringSuggestion: false,
-  }),
+  // flowType pinned 'refund' (fix-plan 2.9a: "refunds ... → inflow") —
+  // distinct from plain 'income' so a future refund-specific surface
+  // (e.g. netting refunds out of a merchant's spend total) has a real
+  // signal to key off, not just the direction.
+  passingRow(
+    'en-refund',
+    'en',
+    'Amazon refunded me $34.20 for a return',
+    { direction: 'credit', amount: 34.2, isRecurringSuggestion: false, flowType: 'refund' },
+  ),
+  // flowType pinned 'reimbursement' (fix-plan 2.9a: "'X paid me back' →
+  // inflow").
+  passingRow(
+    'en-roommate',
+    'en',
+    'Got $75 back from my roommate for utilities',
+    { direction: 'credit', amount: 75, isRecurringSuggestion: false, flowType: 'reimbursement' },
+  ),
+  // flowType pinned 'transfer_out' (fix-plan 2.9a: "investment
+  // contributions ... → outflow" — the 401k companion to the Schwab
+  // headline row, same rule, a different recurring cadence).
   passingRow(
     'en-401k',
     'en',
     'I contribute $300 to my 401k every paycheck',
-    { direction: 'debit', amount: 300, isRecurringSuggestion: true },
+    { direction: 'debit', amount: 300, isRecurringSuggestion: true, flowType: 'transfer_out' },
     { category_suggestion: 'Savings & Investing', recurring_frequency_suggestion: 'biweekly' },
   ),
-  passingRow('en-atm', 'en', 'Took $60 out of the ATM', {
-    direction: 'debit',
-    amount: 60,
-    isRecurringSuggestion: false,
-  }),
-  passingRow('en-amex', 'en', 'Paid off $420.55 on my Amex this month', {
-    direction: 'debit',
-    amount: 420.55,
-    isRecurringSuggestion: false,
-  }),
+  // flowType pinned 'expense' (fix-plan 2.9a: "ATM withdrawals →
+  // outflow" — prompt.ts's "expense" bullet now names this explicitly so
+  // the model doesn't reach for "transfer_out" or misfire toward
+  // "income" on a topic-vocabulary guess).
+  passingRow(
+    'en-atm',
+    'en',
+    'Took $60 out of the ATM',
+    { direction: 'debit', amount: 60, isRecurringSuggestion: false, flowType: 'expense' },
+  ),
+  // flowType pinned 'expense' (fix-plan 2.9a: "credit-card and loan
+  // payments ... → outflow").
+  passingRow(
+    'en-amex',
+    'en',
+    'Paid off $420.55 on my Amex this month',
+    { direction: 'debit', amount: 420.55, isRecurringSuggestion: false, flowType: 'expense' },
+  ),
+  // flowType pinned 'refund' (fix-plan 2.9a: "cashback ... → inflow" —
+  // previously entirely unrepresented in the corpus).
+  passingRow(
+    'en-cashback',
+    'en',
+    'Got $15 cashback from my credit card this month',
+    { direction: 'credit', amount: 15, isRecurringSuggestion: false, flowType: 'refund' },
+  ),
+  // flowType pinned 'transfer_in' (fix-plan 2.9a: "transfers both
+  // directions" — the inbound half of the Schwab row above; previously
+  // entirely unrepresented in the corpus).
+  passingRow(
+    'en-stock-sale',
+    'en',
+    'I sold some of my Tesla stock and $500 landed back in my checking account',
+    { direction: 'credit', amount: 500, isRecurringSuggestion: false, flowType: 'transfer_in' },
+    { merchant: null, note: 'Tesla stock' },
+  ),
   passingRow(
     'en-car-payment',
     'en',
@@ -414,6 +451,7 @@ const FR_ROWS: GoldenCorpusRow[] = [
     direction: 'credit',
     amount: 21.3,
     isRecurringSuggestion: false,
+    flowType: 'refund',
   }),
   passingRow(
     'fr-electricite',
@@ -426,6 +464,7 @@ const FR_ROWS: GoldenCorpusRow[] = [
     direction: 'debit',
     amount: 40,
     isRecurringSuggestion: false,
+    flowType: 'expense',
   }),
   passingRow(
     'fr-salle-de-sport',
@@ -489,6 +528,7 @@ const ES_ROWS: GoldenCorpusRow[] = [
     direction: 'credit',
     amount: 19.5,
     isRecurringSuggestion: false,
+    flowType: 'refund',
   }),
   passingRow(
     'es-electricidad',
@@ -501,6 +541,7 @@ const ES_ROWS: GoldenCorpusRow[] = [
     direction: 'debit',
     amount: 50,
     isRecurringSuggestion: false,
+    flowType: 'expense',
   }),
   passingRow(
     'es-gimnasio',
@@ -564,6 +605,7 @@ const PT_ROWS: GoldenCorpusRow[] = [
     direction: 'credit',
     amount: 20.1,
     isRecurringSuggestion: false,
+    flowType: 'refund',
   }),
   passingRow(
     'pt-luz',
@@ -576,6 +618,7 @@ const PT_ROWS: GoldenCorpusRow[] = [
     direction: 'debit',
     amount: 45,
     isRecurringSuggestion: false,
+    flowType: 'expense',
   }),
 ]
 

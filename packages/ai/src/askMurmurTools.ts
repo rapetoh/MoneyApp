@@ -1,37 +1,87 @@
-// Tool-calling architecture for Ask Murmur \u2014 code execution edition.
+// Tool-calling architecture for Ask Murmur — closed-toolset edition.
 //
-// The model never does arithmetic. It writes JavaScript that runs in a
-// sandboxed VM over the user's transactions and recurring rules; the
-// sandbox returns deterministic JSON results which the model quotes
-// verbatim in its final response. Every number in the response must trace
-// back to either a query result or the user's own question; anything else
-// is rejected by the validator.
+// The model never does arithmetic and never executes code. It composes
+// calls to a fixed set of parameterised aggregation tools over the user's
+// transactions and recurring rules; each tool is a plain deterministic
+// function with a narrow, typed argument shape. Every number in the
+// model's response must trace back to a tool result or the user's own
+// question; anything else is rejected by the validator (askMurmur.ts).
 //
-// Two tools:
-//   run_query \u2014 open-ended JS sandbox over the user's data. Covers any
-//     numeric computation we couldn't predict in advance.
-//   compare    \u2014 structural comparison of two values the model computed.
-//     Forces the verdict's "more A than B" direction to be correct.
+// fix-plan 2.10 ("Ask Murmur reasons over the same numbers as the rest of
+// the app") replaced this module's original `node:vm` sandbox — the
+// model used to write arbitrary JavaScript that ran in a hardened VM
+// context sharing `Object.prototype` with the Next.js server process.
+// That was a real code-execution surface for a well-behaved model to
+// trust, not an adversarial one to defend against. The tools below
+// remove the surface entirely rather than hardening the VM further: the
+// aggregations Ask Murmur needs are enumerable (total, per-category
+// breakdown, top merchants, a time series, recurring-commitment total,
+// structural comparison), so there is no open-ended computation left
+// that a closed toolset can't express. Nothing in this file calls
+// `eval`, `Function`, or any VM API — there is no interpreter here to
+// escape.
 //
-// Sandbox security: Node `vm.runInContext` with a hardened context (no
-// `process`, no `require`, no `Function` constructor, no I/O, no network),
-// 1s timeout, 50KB result size cap. The model is gpt-4o, not adversarial,
-// so we trust intent and lock down capability. Upgrade path is
-// `isolated-vm` (separate V8 isolate) if prompt-injection becomes a real
-// threat.
+// Six tools:
+//   total            — sum over a window, optionally filtered by
+//                       direction / category / merchant substring.
+//   sum_by_category   — per-category totals over a window, sorted.
+//   top_merchants     — ranked merchant totals over a window.
+//   series            — a time series bucketed by day/week/month/weekday.
+//   recurring_total   — normalized monthly/annual recurring commitment.
+//   compare           — structural comparison of two values the model
+//                        computed via the tools above. Forces the
+//                        verdict's "more A than B" direction to be
+//                        correct.
+//
+// Every date window is built from `packages/shared/src/utils/period.ts`
+// (fix-plan 1.3) — civil-day arithmetic in the user's own IANA zone, not
+// process-local `Date` getters, which previously ran in whatever zone
+// the *process* happened to be in (Vercel's UTC in production, but the
+// *test*/*dev* runner's own zone otherwise), not the user's. Every
+// monetary figure routes through `t.amount_in_profile_currency`
+// (fix-plan 1.4/2.10) — never raw `amount`, which is what let a €50
+// dinner count as $50 once the wire contract added a second currency.
 
-import vm from 'node:vm'
 import type {
   AskMurmurRecurringRule,
   AskMurmurTransaction,
+  RecurringFrequency,
+} from '@voice-expense/shared'
+import {
+  addDays,
+  addMonthsClamped,
+  civilDateTimeToInstant,
+  isSpend,
+  localDay,
+  localParts,
+  monthBounds,
+  monthIso,
+  monthlyEquivalent,
+  periodBounds,
+  resolveCategoryKind,
+  roundCents,
+  summarize,
+  weekStart,
+  weekdayLabels,
+  type SummarizableTransaction,
 } from '@voice-expense/shared'
 
-const SANDBOX_TIMEOUT_MS = 1000
-const MAX_CODE_LENGTH = 4000
-const MAX_RESULT_BYTES = 50_000
+/** Cap on a single tool result's serialized size — defense against a
+ *  pathological `series` call producing an unreasonable number of
+ *  buckets. In practice every tool's output is bounded by the payload
+ *  cap (≤ 500 transactions, ≤ 50 recurring rules) and stays a few KB at
+ *  most; this is a backstop, not a real constraint under normal use. */
+const MAX_TOOL_RESULT_BYTES = 50_000
 
 export interface ToolContext {
-  today: string
+  /** Full ISO 8601 instant for "now" — see `AskMurmurRequest.now_utc`. */
+  now_utc: string
+  /** IANA zone every window below resolves in — see
+   *  `AskMurmurRequest.time_zone`. The API route validates this before
+   *  constructing a `ToolContext`; this module additionally falls back
+   *  to `'UTC'` on anything `Intl` rejects, so a bad value degrades to
+   *  UTC math instead of throwing partway through a request. */
+  tz: string
   currency: string
   monthly_income: number | null
   locale: string
@@ -51,63 +101,149 @@ function round2(n: number): number {
   return Math.round(n * 100) / 100
 }
 
-// ─── Date windows ────────────────────────────────────────────────────────────
-//
-// Pre-computed `{ start, end }` Date pairs the model can hand straight to
-// `helpers.inWindow` without writing any date math. The model used to
-// write `new Date(today).getMonth()` while `today` was a string — the
-// query came back empty, the model reported "no expenses this month"
-// even when one existed in the data. Removing the date math from the
-// model's responsibility is the structural fix.
+// ─── Time zone resolution ───────────────────────────────────────────────
 
-interface DateWindow { start: Date; end: Date }
+const VALID_TZ_CACHE = new Map<string, boolean>()
 
-function buildWindows(todayStr: string): Record<string, DateWindow> {
-  const parsed = new Date(todayStr)
-  const today = Number.isNaN(parsed.getTime()) ? new Date() : parsed
-  const y = today.getFullYear()
-  const m = today.getMonth()
-  const d = today.getDate()
-
-  const startOfDay = (date: Date) => {
-    const dd = new Date(date)
-    dd.setHours(0, 0, 0, 0)
-    return dd
+function isValidTimeZone(tz: string): boolean {
+  const cached = VALID_TZ_CACHE.get(tz)
+  if (cached !== undefined) return cached
+  let ok = true
+  try {
+    // eslint-disable-next-line no-new -- probing whether `tz` throws is the point.
+    new Intl.DateTimeFormat('en-US', { timeZone: tz })
+  } catch {
+    ok = false
   }
+  VALID_TZ_CACHE.set(tz, ok)
+  return ok
+}
 
-  const startOfToday = new Date(y, m, d, 0, 0, 0, 0)
-  const endOfToday = new Date(y, m, d, 23, 59, 59, 999)
+/** Resolves `ctx.tz` to a zone `Intl` will actually accept, falling back
+ *  to `'UTC'`. Called at every entry point that reads `ctx.tz` so a bad
+ *  value never reaches `period.ts` and throws mid-request. */
+function resolveTz(tz: string): string {
+  return tz && isValidTimeZone(tz) ? tz : 'UTC'
+}
 
-  const startOfThisMonth = new Date(y, m, 1, 0, 0, 0, 0)
-  const endOfThisMonth = new Date(y, m + 1, 0, 23, 59, 59, 999)
-  const startOfLastMonth = new Date(y, m - 1, 1, 0, 0, 0, 0)
-  const endOfLastMonth = new Date(y, m, 0, 23, 59, 59, 999)
-  const startOfThisYear = new Date(y, 0, 1, 0, 0, 0, 0)
-  const endOfThisYear = new Date(y, 11, 31, 23, 59, 59, 999)
-  const startOfLastYear = new Date(y - 1, 0, 1, 0, 0, 0, 0)
-  const endOfLastYear = new Date(y - 1, 11, 31, 23, 59, 59, 999)
+// ─── Date windows ───────────────────────────────────────────────────────
+//
+// Pre-computed `{ start, end }` Date pairs every tool filters against.
+// Half-open `[start, end)` — `end` is exclusive — built from
+// `packages/shared/src/utils/period.ts`. Boundaries are civil-day
+// arithmetic in `tz`, not process-local `Date` getters.
 
-  const last7 = startOfDay(new Date(endOfToday.getTime() - 6 * 86_400_000))
-  const last30 = startOfDay(new Date(endOfToday.getTime() - 29 * 86_400_000))
-  const last90 = startOfDay(new Date(endOfToday.getTime() - 89 * 86_400_000))
-  const startOfLast6Months = new Date(y, m - 5, 1, 0, 0, 0, 0)
-  const startOfLast12Months = new Date(y, m - 11, 1, 0, 0, 0, 0)
+export interface DateWindow {
+  start: Date
+  end: Date
+}
 
-  return {
-    today: { start: startOfToday, end: endOfToday },
-    thisMonth: { start: startOfThisMonth, end: endOfThisMonth },
-    lastMonth: { start: startOfLastMonth, end: endOfLastMonth },
-    thisYear: { start: startOfThisYear, end: endOfThisYear },
-    lastYear: { start: startOfLastYear, end: endOfLastYear },
-    last7Days: { start: last7, end: endOfToday },
-    last30Days: { start: last30, end: endOfToday },
-    last90Days: { start: last90, end: endOfToday },
-    last6Months: { start: startOfLast6Months, end: endOfToday },
-    last12Months: { start: startOfLast12Months, end: endOfToday },
+function toDate(iso: string): Date {
+  return new Date(iso)
+}
+
+/** Resolves `nowUtcStr` to its civil parts in `tz`. Falls back to the
+ *  real current instant when `nowUtcStr` doesn't parse. `tz` is assumed
+ *  already resolved (see `resolveTz`) — safe to re-use on the fallback
+ *  branch without risking a second throw. */
+function resolveNowParts(nowUtcStr: string, tz: string): { y: number; m: number; d: number } {
+  try {
+    return localParts(nowUtcStr, tz)
+  } catch {
+    return localParts(new Date().toISOString(), tz)
   }
 }
 
-function inWindow<T extends { transacted_at?: string | null }>(arr: T[], w: DateWindow): T[] {
+function dayWindow(y: number, m: number, d: number, tz: string): DateWindow {
+  const start = civilDateTimeToInstant(y, m, d, 0, 0, 0, tz)
+  const next = addDays(y, m, d, 1)
+  const end = civilDateTimeToInstant(next.y, next.m, next.d, 0, 0, 0, tz)
+  return { start: toDate(start), end: toDate(end) }
+}
+
+/** Half-open window covering the `n` civil days up to and including
+ *  `(y, m, d)`, e.g. `trailingDaysWindow(..., 7)` is "today plus the 6
+ *  days before it". */
+function trailingDaysWindow(y: number, m: number, d: number, tz: string, n: number): DateWindow {
+  const startDay = addDays(y, m, d, -(n - 1))
+  const start = civilDateTimeToInstant(startDay.y, startDay.m, startDay.d, 0, 0, 0, tz)
+  const end = dayWindow(y, m, d, tz).end
+  return { start: toDate(start), end }
+}
+
+function monthWindow(y: number, m: number, tz: string): DateWindow {
+  const bounds = monthBounds(monthIsoStr(y, m), tz)
+  return { start: toDate(bounds.start), end: toDate(bounds.endExclusive) }
+}
+
+function pad2(n: number): string {
+  return String(n).padStart(2, '0')
+}
+function pad4(n: number): string {
+  return String(n).padStart(4, '0')
+}
+function monthIsoStr(y: number, m: number): string {
+  return `${pad4(y)}-${pad2(m)}`
+}
+
+function yearWindow(y: number, tz: string): DateWindow {
+  // periodBounds('yearly', ...) only needs *an* instant inside the target
+  // year to resolve the full Jan 1 – Dec 31 span — June 15 at noon is
+  // arbitrary and safely clear of any DST-transition edge case.
+  const anchorInstant = civilDateTimeToInstant(y, 6, 15, 12, 0, 0, tz)
+  const bounds = periodBounds('yearly', anchorInstant, tz)
+  return { start: toDate(bounds.start), end: toDate(bounds.endExclusive) }
+}
+
+/** Half-open window from the first of the month `n` months before
+ *  `(y, m)` through the end of `(y, m, d)` — e.g. `monthsAgoWindow(2026,
+ *  5, 3, tz, 5)` is "last 6 months" (the 5 months before May, plus May
+ *  itself through the 3rd). */
+function monthsAgoWindow(y: number, m: number, d: number, tz: string, n: number): DateWindow {
+  const startMonth = addMonthsClamped(y, m, 1, -n)
+  const bounds = monthBounds(monthIsoStr(startMonth.y, startMonth.m), tz)
+  return { start: toDate(bounds.start), end: dayWindow(y, m, d, tz).end }
+}
+
+export const WINDOW_NAMES = [
+  'today',
+  'thisMonth',
+  'lastMonth',
+  'thisYear',
+  'lastYear',
+  'last7Days',
+  'last30Days',
+  'last90Days',
+  'last6Months',
+  'last12Months',
+] as const
+
+export type WindowName = (typeof WINDOW_NAMES)[number]
+
+/** Every window a tool call can name, resolved from `nowUtcStr` in `tz`.
+ *  Exported for its own unit test — the worked example fix-plan 2.10
+ *  names directly (`now_utc='2026-01-01T02:00:00Z'`, `America/Chicago`
+ *  → a December window) is a `buildWindows` test, not an end-to-end one. */
+export function buildWindows(nowUtcStr: string, tz: string): Record<WindowName, DateWindow> {
+  const resolvedTz = resolveTz(tz)
+  const { y, m, d } = resolveNowParts(nowUtcStr, resolvedTz)
+  const prevMonth = addMonthsClamped(y, m, 1, -1)
+
+  return {
+    today: dayWindow(y, m, d, resolvedTz),
+    thisMonth: monthWindow(y, m, resolvedTz),
+    lastMonth: monthWindow(prevMonth.y, prevMonth.m, resolvedTz),
+    thisYear: yearWindow(y, resolvedTz),
+    lastYear: yearWindow(y - 1, resolvedTz),
+    last7Days: trailingDaysWindow(y, m, d, resolvedTz, 7),
+    last30Days: trailingDaysWindow(y, m, d, resolvedTz, 30),
+    last90Days: trailingDaysWindow(y, m, d, resolvedTz, 90),
+    last6Months: monthsAgoWindow(y, m, d, resolvedTz, 5),
+    last12Months: monthsAgoWindow(y, m, d, resolvedTz, 11),
+  }
+}
+
+function inWindow<T extends { transacted_at?: string | null }>(arr: readonly T[], w: DateWindow): T[] {
   if (!w || !(w.start instanceof Date) || !(w.end instanceof Date)) return []
   const startMs = w.start.getTime()
   const endMs = w.end.getTime()
@@ -115,171 +251,303 @@ function inWindow<T extends { transacted_at?: string | null }>(arr: T[], w: Date
   for (const item of arr) {
     if (!item || typeof item.transacted_at !== 'string') continue
     const t = new Date(item.transacted_at).getTime()
-    if (Number.isFinite(t) && t >= startMs && t <= endMs) out.push(item)
+    if (Number.isFinite(t) && t >= startMs && t < endMs) out.push(item)
   }
   return out
 }
 
-// ─── Sandbox ─────────────────────────────────────────────────────────────────
+// ─── Argument parsing ────────────────────────────────────────────────────
 //
-// Hardened context. The model gets enough JS surface to filter / aggregate
-// arrays but no door to side-effects.
+// Every tool argument is validated on the way in. A bad value throws with
+// a message that names the field and the allowed values — the same
+// self-correction loop the old sandbox's `{ error: "..." }` result gave
+// the model (see askMurmur.ts's prompt: "read the error, fix it, call the
+// tool again").
 
-function buildSandboxContext(ctx: ToolContext): vm.Context {
-  const w = buildWindows(ctx.today)
-  const txns = ctx.transactions ?? []
-  // Pre-computed windowed subsets. These remove date math from the
-  // model's responsibility entirely \u2014 it picks a variable instead of
-  // writing a filter. Every common time window the model is likely to
-  // need is here as a ready-made array. This is the structural fix for
-  // the date-window bug class (model writes buggy date filter \u2192
-  // returns 0 \u2192 reports "no expenses this period").
-  const transactions_today = inWindow(txns, w.today)
-  const transactions_this_month = inWindow(txns, w.thisMonth)
-  const transactions_last_month = inWindow(txns, w.lastMonth)
-  const transactions_this_year = inWindow(txns, w.thisYear)
-  const transactions_last_year = inWindow(txns, w.lastYear)
-  const transactions_last_7_days = inWindow(txns, w.last7Days)
-  const transactions_last_30_days = inWindow(txns, w.last30Days)
-  const transactions_last_90_days = inWindow(txns, w.last90Days)
-  const transactions_last_6_months = inWindow(txns, w.last6Months)
-  const transactions_last_12_months = inWindow(txns, w.last12Months)
-
-  const sandbox: Record<string, unknown> = {
-    // Data the model is reasoning over.
-    transactions: ctx.transactions,
-    recurring_rules: ctx.recurring_rules,
-    today: ctx.today,
-    currency: ctx.currency,
-    locale: ctx.locale,
-    monthly_income: ctx.monthly_income,
-    // Pre-computed windowed subsets. The model uses these instead of
-    // writing date filters. Every name maps directly to a windows.* key.
-    transactions_today,
-    transactions_this_month,
-    transactions_last_month,
-    transactions_this_year,
-    transactions_last_year,
-    transactions_last_7_days,
-    transactions_last_30_days,
-    transactions_last_90_days,
-    transactions_last_6_months,
-    transactions_last_12_months,
-    // Pure stdlib the model needs for analytics. Anything not listed here is
-    // not reachable from inside the sandbox.
-    Math,
-    Number,
-    Date,
-    Array,
-    Object,
-    String,
-    Boolean,
-    Map,
-    Set,
-    JSON,
-    parseFloat,
-    parseInt,
-    isFinite,
-    isNaN,
-    // Pre-computed { start, end } Date windows. Mostly a fallback for
-    // ad-hoc filtering \u2014 prefer the `transactions_*` subsets above
-    // for any standard window. The model is told never to write date
-    // math from `today` (which is a string).
-    windows: w,
-    // A few small helpers so common patterns don't bloat the model's code.
-    helpers: {
-      // Round to n decimal places (default 2). The model should round before
-      // returning so the validator's quoted figure matches exactly.
-      round: (v: number, decimals = 2) => {
-        const m = Math.pow(10, decimals)
-        return Math.round(v * m) / m
-      },
-      // Filter items by a pre-computed window. Use this instead of writing
-      // date comparisons by hand.
-      inWindow: (arr: unknown, win: DateWindow) => {
-        if (!Array.isArray(arr)) return []
-        return inWindow(arr as Array<{ transacted_at?: string | null }>, win)
-      },
-      // Inclusive day-window bounds (Date objects). Kept for back-compat
-      // with prompts that still call it; prefer `windows.lastNDays`.
-      windowDays: (n: number) => {
-        const end = new Date()
-        end.setHours(23, 59, 59, 999)
-        const start = new Date(end.getTime() - (n - 1) * 86_400_000)
-        start.setHours(0, 0, 0, 0)
-        return { start, end }
-      },
-      // Sum a numeric field across an array.
-      sumBy: <T,>(arr: T[], pick: (x: T) => number) =>
-        arr.reduce((acc, x) => acc + (pick(x) || 0), 0),
-      // Group an array by a key function. Returns Map<key, items[]>.
-      groupBy: <T, K>(arr: T[], key: (x: T) => K) => {
-        const m = new Map<K, T[]>()
-        for (const x of arr) {
-          const k = key(x)
-          const list = m.get(k) ?? []
-          list.push(x)
-          m.set(k, list)
-        }
-        return m
-      },
-    },
-    // No console: the sandbox shouldn't be doing I/O. `return` the result.
+function parseWindowName(v: unknown): WindowName {
+  if (typeof v === 'string' && (WINDOW_NAMES as readonly string[]).includes(v)) {
+    return v as WindowName
   }
+  throw new Error(`"window" must be one of ${WINDOW_NAMES.join(', ')}; got ${JSON.stringify(v)}`)
+}
 
-  const context = vm.createContext(sandbox, {
-    // Disable runtime code generation (eval, new Function) inside the
-    // sandbox so the model can't construct an escape via eval-string-tricks.
-    codeGeneration: { strings: false, wasm: false },
+function parseDirection(v: unknown): 'debit' | 'credit' | undefined {
+  if (v == null) return undefined
+  if (v === 'debit' || v === 'credit') return v
+  throw new Error(`"direction" must be "debit" or "credit"; got ${JSON.stringify(v)}`)
+}
+
+function parseOptionalString(v: unknown): string | undefined {
+  if (v == null) return undefined
+  if (typeof v === 'string' && v.trim()) return v.trim()
+  return undefined
+}
+
+function parseLimit(v: unknown, fallback: number, max: number): number {
+  if (v == null) return fallback
+  const n = Math.trunc(Number(v))
+  if (!Number.isFinite(n) || n < 1) return fallback
+  return Math.min(n, max)
+}
+
+// ─── Shared row filter ───────────────────────────────────────────────────
+
+interface RowFilter {
+  window: WindowName
+  direction?: 'debit' | 'credit'
+  category_name?: string
+  merchant_contains?: string
+}
+
+interface FilteredRows {
+  /** Rows in the window/filter whose FX snapshot has landed — the only
+   *  rows any tool sums. */
+  rows: AskMurmurTransaction[]
+  /** Rows that matched the window/filter but have no
+   *  `amount_in_profile_currency` yet — excluded from every total,
+   *  never silently folded in as 0 (mirrors `summarize()`'s
+   *  `pendingCount`, fix-plan 1.4). */
+  pendingCount: number
+}
+
+function filterRows(
+  ctx: ToolContext,
+  windows: Record<WindowName, DateWindow>,
+  filter: RowFilter,
+): FilteredRows {
+  let rows = inWindow(ctx.transactions ?? [], windows[filter.window])
+  if (filter.direction) rows = rows.filter((t) => t.direction === filter.direction)
+  if (filter.category_name) {
+    const target = filter.category_name.toLowerCase()
+    rows = rows.filter((t) => (t.category_name ?? '').toLowerCase() === target)
+  }
+  if (filter.merchant_contains) {
+    const needle = filter.merchant_contains.toLowerCase()
+    rows = rows.filter((t) => (t.merchant ?? '').toLowerCase().includes(needle))
+  }
+  let pendingCount = 0
+  const resolved: AskMurmurTransaction[] = []
+  for (const t of rows) {
+    if (t.amount_in_profile_currency == null) {
+      pendingCount++
+      continue
+    }
+    resolved.push(t)
+  }
+  return { rows: resolved, pendingCount }
+}
+
+function amountOf(t: AskMurmurTransaction): number {
+  return t.amount_in_profile_currency as number
+}
+
+// ─── total ────────────────────────────────────────────────────────────────
+
+interface TotalArgs extends RowFilter {}
+
+function parseTotalArgs(args: Record<string, unknown>): TotalArgs {
+  return {
+    window: parseWindowName(args.window),
+    direction: parseDirection(args.direction),
+    category_name: parseOptionalString(args.category_name),
+    merchant_contains: parseOptionalString(args.merchant_contains),
+  }
+}
+
+function totalTool(args: TotalArgs, ctx: ToolContext, windows: Record<WindowName, DateWindow>): unknown {
+  const { rows, pendingCount } = filterRows(ctx, windows, args)
+  const total = rows.reduce((acc, t) => acc + amountOf(t), 0)
+  return {
+    total: roundCents(total),
+    count: rows.length,
+    pending_conversion_count: pendingCount,
+  }
+}
+
+// ─── sum_by_category ────────────────────────────────────────────────────
+
+interface SumByCategoryArgs {
+  window: WindowName
+  direction?: 'debit' | 'credit'
+}
+
+function parseSumByCategoryArgs(args: Record<string, unknown>): SumByCategoryArgs {
+  return { window: parseWindowName(args.window), direction: parseDirection(args.direction) }
+}
+
+function sumByCategoryTool(
+  args: SumByCategoryArgs,
+  ctx: ToolContext,
+  windows: Record<WindowName, DateWindow>,
+): unknown {
+  const direction = args.direction ?? 'debit'
+  const { rows, pendingCount } = filterRows(ctx, windows, { window: args.window, direction })
+  const byCat = new Map<string, { total: number; count: number }>()
+  for (const t of rows) {
+    const key = t.category_name || 'Uncategorized'
+    const bucket = byCat.get(key) ?? { total: 0, count: 0 }
+    bucket.total += amountOf(t)
+    bucket.count += 1
+    byCat.set(key, bucket)
+  }
+  const categories = Array.from(byCat.entries())
+    .map(([category_name, v]) => ({ category_name, total: roundCents(v.total), count: v.count }))
+    .sort((a, b) => b.total - a.total)
+  return { categories, pending_conversion_count: pendingCount }
+}
+
+// ─── top_merchants ──────────────────────────────────────────────────────
+
+interface TopMerchantsArgs {
+  window: WindowName
+  direction?: 'debit' | 'credit'
+  category_name?: string
+  limit: number
+}
+
+function parseTopMerchantsArgs(args: Record<string, unknown>): TopMerchantsArgs {
+  return {
+    window: parseWindowName(args.window),
+    direction: parseDirection(args.direction),
+    category_name: parseOptionalString(args.category_name),
+    limit: parseLimit(args.limit, 5, 20),
+  }
+}
+
+function topMerchantsTool(
+  args: TopMerchantsArgs,
+  ctx: ToolContext,
+  windows: Record<WindowName, DateWindow>,
+): unknown {
+  const direction = args.direction ?? 'debit'
+  const { rows, pendingCount } = filterRows(ctx, windows, {
+    window: args.window,
+    direction,
+    category_name: args.category_name,
   })
-  return context
+  const byMerchant = new Map<string, { total: number; count: number }>()
+  for (const t of rows) {
+    const key = t.merchant?.trim() || 'Unknown'
+    const bucket = byMerchant.get(key) ?? { total: 0, count: 0 }
+    bucket.total += amountOf(t)
+    bucket.count += 1
+    byMerchant.set(key, bucket)
+  }
+  const merchants = Array.from(byMerchant.entries())
+    .map(([merchant, v]) => ({ merchant, total: roundCents(v.total), count: v.count }))
+    .sort((a, b) => b.total - a.total)
+    .slice(0, args.limit)
+  return { merchants, pending_conversion_count: pendingCount }
 }
 
-// ─── run_query resolver ──────────────────────────────────────────────────────
+// ─── series ─────────────────────────────────────────────────────────────
 
-function runQuery(args: { code: string; description?: string }, ctx: ToolContext): unknown {
-  const code = typeof args.code === 'string' ? args.code : ''
-  if (!code.trim()) throw new Error('run_query: code is empty')
-  if (code.length > MAX_CODE_LENGTH) {
-    throw new Error(`run_query: code exceeds ${MAX_CODE_LENGTH} chars`)
-  }
+const SERIES_BUCKETS = ['day', 'week', 'month', 'weekday'] as const
+type SeriesBucket = (typeof SERIES_BUCKETS)[number]
 
-  // Wrap the model's snippet in an IIFE so a `return` statement is valid at
-  // the top level of the snippet. The model writes "return ..." style code.
-  const wrapped = `(function () { 'use strict'; ${code} })()`
-
-  const sandboxCtx = buildSandboxContext(ctx)
-  let raw: unknown
-  try {
-    raw = vm.runInContext(wrapped, sandboxCtx, {
-      timeout: SANDBOX_TIMEOUT_MS,
-      displayErrors: false,
-    })
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'sandbox error'
-    throw new Error(`run_query failed: ${message}`)
-  }
-
-  // Round-trip through JSON to (1) verify the result is serializable,
-  // (2) enforce the size cap, (3) drop any prototype shenanigans before
-  // returning to the caller.
-  let json: string
-  try {
-    json = JSON.stringify(raw ?? null)
-  } catch {
-    throw new Error('run_query: result is not JSON-serializable')
-  }
-  if (json.length > MAX_RESULT_BYTES) {
-    throw new Error(`run_query: result exceeds ${MAX_RESULT_BYTES} bytes`)
-  }
-  return JSON.parse(json)
+interface SeriesArgs {
+  window: WindowName
+  bucket: SeriesBucket
+  direction?: 'debit' | 'credit'
 }
 
-// ─── compare resolver ────────────────────────────────────────────────────────
+function parseSeriesArgs(args: Record<string, unknown>): SeriesArgs {
+  const bucket = args.bucket
+  if (typeof bucket !== 'string' || !(SERIES_BUCKETS as readonly string[]).includes(bucket)) {
+    throw new Error(`"bucket" must be one of ${SERIES_BUCKETS.join(', ')}; got ${JSON.stringify(bucket)}`)
+  }
+  return {
+    window: parseWindowName(args.window),
+    bucket: bucket as SeriesBucket,
+    direction: parseDirection(args.direction),
+  }
+}
+
+function seriesTool(args: SeriesArgs, ctx: ToolContext, windows: Record<WindowName, DateWindow>): unknown {
+  const direction = args.direction ?? 'debit'
+  const tz = resolveTz(ctx.tz)
+  const { rows, pendingCount } = filterRows(ctx, windows, { window: args.window, direction })
+
+  const byBucket = new Map<string, { total: number; count: number; order: number }>()
+  for (const t of rows) {
+    let key: string
+    let order: number
+    if (args.bucket === 'day') {
+      key = localDay(t.transacted_at, tz)
+      order = Date.parse(`${key}T00:00:00Z`)
+    } else if (args.bucket === 'week') {
+      key = weekStart(t.transacted_at, tz)
+      order = Date.parse(`${key}T00:00:00Z`)
+    } else if (args.bucket === 'month') {
+      key = monthIso(t.transacted_at, tz)
+      order = Date.parse(`${key}-01T00:00:00Z`)
+    } else {
+      const parts = localParts(t.transacted_at, tz)
+      key = String(parts.weekdayIndex)
+      order = parts.weekdayIndex
+    }
+    const bucket = byBucket.get(key) ?? { total: 0, count: 0, order }
+    bucket.total += amountOf(t)
+    bucket.count += 1
+    byBucket.set(key, bucket)
+  }
+
+  const weekdayLabelSet = args.bucket === 'weekday' ? weekdayLabels(ctx.locale, 'short') : null
+  const points = Array.from(byBucket.entries())
+    .map(([key, v]) => ({
+      label: weekdayLabelSet ? weekdayLabelSet[Number(key)] : key,
+      total: roundCents(v.total),
+      count: v.count,
+      order: v.order,
+    }))
+    .sort((a, b) => a.order - b.order)
+    .map(({ order: _order, ...rest }) => rest)
+
+  return { points, pending_conversion_count: pendingCount }
+}
+
+// ─── recurring_total ────────────────────────────────────────────────────
+
+const VALID_FREQUENCIES: ReadonlySet<string> = new Set([
+  'daily',
+  'weekly',
+  'biweekly',
+  'monthly',
+  'quarterly',
+  'yearly',
+])
+
+interface RecurringTotalArgs {
+  direction?: 'debit' | 'credit'
+}
+
+function parseRecurringTotalArgs(args: Record<string, unknown>): RecurringTotalArgs {
+  return { direction: parseDirection(args.direction) }
+}
+
+function recurringTotalTool(args: RecurringTotalArgs, ctx: ToolContext): unknown {
+  const direction = args.direction ?? 'debit'
+  const rules = (ctx.recurring_rules ?? []).filter(
+    (r) => r.direction === direction && VALID_FREQUENCIES.has(r.frequency),
+  )
+  const normalized = rules
+    .map((r) => ({
+      name: r.name?.trim() || 'Unnamed',
+      monthly_amount: roundCents(
+        monthlyEquivalent({ frequency: r.frequency as RecurringFrequency, interval: 1, amount: r.amount }),
+      ),
+    }))
+    .sort((a, b) => b.monthly_amount - a.monthly_amount)
+  const monthly_total = roundCents(normalized.reduce((acc, r) => acc + r.monthly_amount, 0))
+  return { rules: normalized, monthly_total, annual_total: roundCents(monthly_total * 12) }
+}
+
+// ─── compare ────────────────────────────────────────────────────────────
 //
 // Structural comparison-direction guarantee. The model passes two values it
-// computed via run_query; this tool returns which is greater. The validator
-// then checks any "more X than Y" phrase in the verdict against this result.
+// computed via an earlier tool call; this tool returns which is greater.
+// The validator then checks any "more X than Y" phrase in the verdict
+// against this result.
 
 interface ComparePayload {
   label: string
@@ -307,58 +575,120 @@ function compareTool(args: { a: ComparePayload; b: ComparePayload }) {
   }
 }
 
-// ─── Catalog (OpenAI function-calling format) ────────────────────────────────
+// ─── Catalog (OpenAI function-calling format) ──────────────────────────
+
+const WINDOW_ENUM_DESCRIPTION =
+  'One of: "today", "thisMonth", "lastMonth", "thisYear", "lastYear", "last7Days" (last 7 calendar days incl. today), "last30Days", "last90Days" (last quarter), "last6Months", "last12Months" (rolling last year). Always pick one of these — never compute your own date range.'
 
 export const TOOLS = [
   {
     type: 'function' as const,
     function: {
-      name: 'run_query',
-      description: [
-        "Run JavaScript over the user's transactions and recurring rules to compute any aggregate, filter, breakdown, or comparison.",
-        'The code runs in a sandboxed VM. Inside the sandbox these variables are available:',
-        '  transactions: Array<{ amount: number, direction: "debit" | "credit", merchant: string|null, category_name: string|null, transacted_at: ISO string, is_recurring: boolean }> \u2014 the FULL dataset, no date filter applied.',
-        '',
-        '  PRE-COMPUTED windowed subsets (use these for ANY question about a standard time window \u2014 NEVER write your own date filter for these):',
-        '    transactions_today',
-        '    transactions_this_month',
-        '    transactions_last_month',
-        '    transactions_this_year',
-        '    transactions_last_year',
-        '    transactions_last_7_days',
-        '    transactions_last_30_days',
-        '    transactions_last_90_days',
-        '    transactions_last_6_months',
-        '    transactions_last_12_months',
-        '  Each is the same shape as `transactions`, already filtered to that window. So "this year\'s expenses by category" is `transactions_this_year`, not a filter you write.',
-        '',
-        '  recurring_rules: Array<{ name: string|null, amount: number, direction: "debit" | "credit", frequency: "daily"|"weekly"|"biweekly"|"monthly"|"quarterly"|"yearly" }>',
-        '  today: ISO date string (display only \u2014 do NOT do date math from this string)',
-        '  currency: e.g. "USD"',
-        '  locale: e.g. "en"',
-        '  monthly_income: number|null',
-        '  windows: { start, end } Date pairs (today, thisMonth, lastMonth, thisYear, lastYear, last7Days, last30Days, last90Days, last6Months, last12Months) \u2014 fallback for ad-hoc filtering. Prefer the transactions_* subsets above whenever the question maps to one.',
-        '  helpers: {',
-        '    round(v, dec=2),',
-        '    inWindow(items, window) \u2014 ad-hoc filter for a non-standard window only,',
-        '    sumBy(arr, pick), groupBy(arr, key),',
-        '    windowDays(n) \u2014 ad-hoc N-day window if windows.* doesn\'t cover what you need',
-        '  }',
-        'Plus core JS: Math, Number, Date, Array, Object, Map, Set, JSON, parseFloat, parseInt.',
-        'Use a `return` statement to return the result. The result must be JSON-serializable.',
-        'Use this for EVERY numeric computation \u2014 totals, filters, percentages, top-N, time series, anything. Never do arithmetic in the verdict yourself.',
-      ].join('\n'),
+      name: 'total',
+      description:
+        'Sum of transactions in a time window, in the user’s profile currency, optionally filtered by direction/category/merchant. Use for any single-number "how much" question.',
       parameters: {
         type: 'object',
-        required: ['code', 'description'],
+        required: ['window'],
         properties: {
-          code: {
+          window: { type: 'string', enum: WINDOW_NAMES, description: WINDOW_ENUM_DESCRIPTION },
+          direction: {
             type: 'string',
-            description: 'JavaScript code with a return statement. Max 4000 chars. 1s timeout.',
+            enum: ['debit', 'credit'],
+            description: 'Omit for both. "debit" = spend, "credit" = income.',
           },
-          description: {
+          category_name: {
             type: 'string',
-            description: 'One-line summary of what this query computes (for logging).',
+            description: 'Exact category name to filter to, e.g. "Food & Dining".',
+          },
+          merchant_contains: {
+            type: 'string',
+            description: 'Case-insensitive substring match on merchant name, e.g. "starbucks".',
+          },
+        },
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'sum_by_category',
+      description:
+        'Per-category totals in a time window, sorted highest first. Use for "breakdown by category" / "biggest category" questions.',
+      parameters: {
+        type: 'object',
+        required: ['window'],
+        properties: {
+          window: { type: 'string', enum: WINDOW_NAMES, description: WINDOW_ENUM_DESCRIPTION },
+          direction: {
+            type: 'string',
+            enum: ['debit', 'credit'],
+            description: 'Default "debit" (spend). Pass "credit" for an income breakdown.',
+          },
+        },
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'top_merchants',
+      description:
+        'Top merchants by total in a time window, sorted highest first. Use for "where do I spend the most" / "top merchants" questions.',
+      parameters: {
+        type: 'object',
+        required: ['window'],
+        properties: {
+          window: { type: 'string', enum: WINDOW_NAMES, description: WINDOW_ENUM_DESCRIPTION },
+          direction: { type: 'string', enum: ['debit', 'credit'], description: 'Default "debit".' },
+          category_name: {
+            type: 'string',
+            description: 'Optional exact category name to narrow to, e.g. top merchants within "Food & Dining".',
+          },
+          limit: { type: 'number', description: 'Max merchants to return, 1–20. Default 5.' },
+        },
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'series',
+      description:
+        'A time series bucketed by day, week, month, or weekday within a window. Use for trend / "how has this changed" / "which day of the week" questions.',
+      parameters: {
+        type: 'object',
+        required: ['window', 'bucket'],
+        properties: {
+          window: { type: 'string', enum: WINDOW_NAMES, description: WINDOW_ENUM_DESCRIPTION },
+          bucket: {
+            type: 'string',
+            enum: SERIES_BUCKETS,
+            description:
+              'How to group points. "weekday" groups by Monday–Sunday regardless of date, for "which day do I spend most" questions.',
+          },
+          direction: { type: 'string', enum: ['debit', 'credit'], description: 'Default "debit".' },
+        },
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'recurring_total',
+      description:
+        'Normalized monthly + annual total of the user’s active recurring rules (each rule’s frequency converted to its monthly-equivalent cost), plus the per-rule breakdown. Use for "how much do my subscriptions cost" / "recurring bills" questions — never estimate this from raw rule amounts yourself; a weekly rule’s monthly cost is not its raw amount.',
+      parameters: {
+        type: 'object',
+        properties: {
+          direction: {
+            type: 'string',
+            enum: ['debit', 'credit'],
+            description: 'Default "debit" (bills). Pass "credit" for recurring income like salary.',
           },
         },
         additionalProperties: false,
@@ -371,7 +701,7 @@ export const TOOLS = [
       name: 'compare',
       description: [
         'Determine which of two values is greater, equal, or smaller. Use this whenever your final verdict states "more A than B" / "higher than" / "less than" so the direction is structurally guaranteed correct.',
-        'Pass values you computed via run_query. Each side is { label, value }.',
+        'Pass values you computed via an earlier tool call. Each side is { label, value }.',
       ].join('\n'),
       parameters: {
         type: 'object',
@@ -402,7 +732,7 @@ export const TOOLS = [
   },
 ]
 
-// ─── Dispatch ────────────────────────────────────────────────────────────────
+// ─── Dispatch ───────────────────────────────────────────────────────────
 
 export function resolveToolCall(
   name: string,
@@ -410,14 +740,44 @@ export function resolveToolCall(
   ctx: ToolContext,
 ): { ok: true; result: unknown } | { ok: false; error: string } {
   try {
-    const safeArgs = (args && typeof args === 'object' ? (args as Record<string, unknown>) : {})
-    if (name === 'run_query') {
-      return { ok: true, result: runQuery(safeArgs as { code: string; description?: string }, ctx) }
+    const safeArgs = args && typeof args === 'object' ? (args as Record<string, unknown>) : {}
+    const windows = buildWindows(ctx.now_utc, ctx.tz)
+
+    let result: unknown
+    switch (name) {
+      case 'total':
+        result = totalTool(parseTotalArgs(safeArgs), ctx, windows)
+        break
+      case 'sum_by_category':
+        result = sumByCategoryTool(parseSumByCategoryArgs(safeArgs), ctx, windows)
+        break
+      case 'top_merchants':
+        result = topMerchantsTool(parseTopMerchantsArgs(safeArgs), ctx, windows)
+        break
+      case 'series':
+        result = seriesTool(parseSeriesArgs(safeArgs), ctx, windows)
+        break
+      case 'recurring_total':
+        result = recurringTotalTool(parseRecurringTotalArgs(safeArgs), ctx)
+        break
+      case 'compare':
+        result = compareTool(safeArgs as unknown as { a: ComparePayload; b: ComparePayload })
+        break
+      default:
+        return { ok: false, error: `Unknown tool: ${name}` }
     }
-    if (name === 'compare') {
-      return { ok: true, result: compareTool(safeArgs as { a: ComparePayload; b: ComparePayload }) }
+
+    // Round-trip through JSON to (1) verify the result is serializable and
+    // (2) enforce the size cap — the same two guarantees the old sandbox's
+    // `run_query` gave every result, minus the "drop prototype
+    // shenanigans" clause, which no longer applies: there is no `raw`
+    // value here that could carry one. Every result above is built from
+    // plain object/array literals this function constructs itself.
+    const json = JSON.stringify(result ?? null)
+    if (json.length > MAX_TOOL_RESULT_BYTES) {
+      return { ok: false, error: `${name}: result exceeds ${MAX_TOOL_RESULT_BYTES} bytes` }
     }
-    return { ok: false, error: `Unknown tool: ${name}` }
+    return { ok: true, result: JSON.parse(json) }
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : 'tool failed' }
   }
@@ -462,14 +822,23 @@ export function comparisonsFromCalls(
   return out
 }
 
-// ─── Data overview ───────────────────────────────────────────────────────────
+// ─── Data overview ─────────────────────────────────────────────────────────────
 //
 // Deterministic, model-readable snapshot of the transaction set. Injected
 // into the system prompt so the model has ground truth (count, date range,
-// totals) before writing any query. When the model later writes a buggy
-// date filter and gets 0 results, this overview is the receipt the
+// totals) before calling a single tool. When the model later gets an
+// empty result for a windowed question, this overview is the receipt the
 // retry-hint uses to call the model out: "you said no transactions this
 // year, but the overview shows N transactions in 2026."
+//
+// `total_debit`/`total_credit`/`pending_conversion_count` route through
+// `packages/shared/src/domain/money.ts`'s `summarize()` (fix-plan 1.4) so
+// they agree with every other totals-rendering surface in the app instead
+// of a raw `t.amount` sum. This is still computed from the (client-
+// truncated, ≤ 90-day / ≤ 500-row) payload rather than a fresh database
+// read — moving it server-side is a separate fix-plan 2.10 clause outside
+// this pass's scope — so an account whose *only* activity in a window
+// falls outside the payload still under-reports for that window.
 
 export interface AskMurmurDataOverview {
   transaction_count: number
@@ -481,6 +850,11 @@ export interface AskMurmurDataOverview {
   credit_count: number
   total_debit: number
   total_credit: number
+  /** Non-zero when some in-payload transactions are missing their FX
+   *  snapshot (`amount_in_profile_currency` null) — those are excluded
+   *  from `total_debit`/`total_credit` rather than silently counted as
+   *  0, same rule `summarize()` applies everywhere else (fix-plan 1.4). */
+  pending_conversion_count: number
   /** Pre-computed for the model so it doesn't have to discover empty
    *  windows by trial-and-error. */
   has_transactions_this_year: boolean
@@ -493,7 +867,17 @@ export interface AskMurmurDataOverview {
   years_present: number[]
 }
 
+function toSummarizable(t: AskMurmurTransaction): SummarizableTransaction {
+  return {
+    amount_in_profile_currency: t.amount_in_profile_currency,
+    direction: t.direction,
+    transacted_at: t.transacted_at,
+    category_name: t.category_name,
+  }
+}
+
 export function buildDataOverview(ctx: ToolContext): AskMurmurDataOverview {
+  const tz = resolveTz(ctx.tz)
   const txns = ctx.transactions ?? []
   if (txns.length === 0) {
     return {
@@ -506,6 +890,7 @@ export function buildDataOverview(ctx: ToolContext): AskMurmurDataOverview {
       credit_count: 0,
       total_debit: 0,
       total_credit: 0,
+      pending_conversion_count: 0,
       has_transactions_this_year: false,
       has_transactions_this_month: false,
       has_transactions_last_month: false,
@@ -519,38 +904,35 @@ export function buildDataOverview(ctx: ToolContext): AskMurmurDataOverview {
   let latest: string | null = null
   let debitCount = 0
   let creditCount = 0
-  let totalDebit = 0
-  let totalCredit = 0
   const years = new Set<number>()
 
   for (const t of txns) {
     if (typeof t.transacted_at === 'string') {
       if (earliest === null || t.transacted_at < earliest) earliest = t.transacted_at
       if (latest === null || t.transacted_at > latest) latest = t.transacted_at
-      const d = new Date(t.transacted_at)
-      if (!Number.isNaN(d.getTime())) years.add(d.getFullYear())
+      years.add(localParts(t.transacted_at, tz).y)
     }
-    const amt = Number(t.amount) || 0
-    if (t.direction === 'credit') {
-      creditCount += 1
-      totalCredit += amt
-    } else {
-      debitCount += 1
-      totalDebit += amt
-    }
+    if (t.direction === 'credit') creditCount += 1
+    else debitCount += 1
   }
 
-  const w = buildWindows(ctx.today)
+  // `expense`/`income` exclude transfer-kind categories (Savings &
+  // Investing, by name-match) and use the FX-converted amount, same as
+  // every other totals-rendering surface (fix-plan 1.4).
+  const summary = summarize(txns.map(toSummarizable))
+
+  const w = buildWindows(ctx.now_utc, tz)
   return {
     transaction_count: txns.length,
     earliest_transacted_at: earliest,
     latest_transacted_at: latest,
-    earliest_year: earliest ? new Date(earliest).getFullYear() : null,
-    latest_year: latest ? new Date(latest).getFullYear() : null,
+    earliest_year: earliest ? localParts(earliest, tz).y : null,
+    latest_year: latest ? localParts(latest, tz).y : null,
     debit_count: debitCount,
     credit_count: creditCount,
-    total_debit: round2(totalDebit),
-    total_credit: round2(totalCredit),
+    total_debit: summary.expense,
+    total_credit: summary.income,
+    pending_conversion_count: summary.pendingCount,
     has_transactions_this_year: inWindow(txns, w.thisYear).length > 0,
     has_transactions_this_month: inWindow(txns, w.thisMonth).length > 0,
     has_transactions_last_month: inWindow(txns, w.lastMonth).length > 0,
@@ -560,14 +942,15 @@ export function buildDataOverview(ctx: ToolContext): AskMurmurDataOverview {
   }
 }
 
-// ─── Summary snapshot for runSummarizeFallback ───────────────────────────────
+// ─── Summary snapshot for runSummarizeFallback ───────────────────────────
 //
 // Deterministic 6-month aggregation used by the summarize fallback when the
 // primary tool-calling attempt produces an empty verdict. Computed inline so
-// the fallback never depends on tools that aren't registered in
-// `resolveToolCall` (a real bug in the previous shape — it called
-// `top_categories` and `monthly_series` which don't exist, silently
-// produced null snapshots, and the model had nothing to summarize).
+// the fallback never depends on the OpenAI tool loop at all.
+//
+// Category/monthly totals below exclude transfer-kind categories (via
+// `isSpend`) and use the FX-converted amount — fix-plan 1.4, same rule
+// `buildDataOverview` applies.
 
 export interface AskMurmurSummarySnapshot {
   top_categories_6m: Array<{ name: string; total: number }>
@@ -578,31 +961,30 @@ export interface AskMurmurSummarySnapshot {
 }
 
 export function buildSummarySnapshot(ctx: ToolContext): AskMurmurSummarySnapshot {
-  const windows = buildWindows(ctx.today)
+  const tz = resolveTz(ctx.tz)
+  const windows = buildWindows(ctx.now_utc, tz)
   const recent = inWindow(ctx.transactions, windows.last6Months).filter(
-    (t) => t.direction === 'debit',
+    (t) => t.amount_in_profile_currency != null && isSpend(t, resolveCategoryKind(t.category_name, null)),
   )
 
   const byCat = new Map<string, number>()
   for (const t of recent) {
     const k = t.category_name || 'Uncategorized'
-    byCat.set(k, (byCat.get(k) ?? 0) + (Number(t.amount) || 0))
+    byCat.set(k, (byCat.get(k) ?? 0) + amountOf(t))
   }
   const top_categories_6m = Array.from(byCat.entries())
-    .map(([name, total]) => ({ name, total: round2(total) }))
+    .map(([name, total]) => ({ name, total: roundCents(total) }))
     .sort((a, b) => b.total - a.total)
     .slice(0, 6)
 
   const monthly = new Map<string, number>()
   for (const t of recent) {
-    const dd = new Date(t.transacted_at)
-    if (Number.isNaN(dd.getTime())) continue
-    const key = `${dd.getFullYear()}-${String(dd.getMonth() + 1).padStart(2, '0')}`
-    monthly.set(key, (monthly.get(key) ?? 0) + (Number(t.amount) || 0))
+    const key = monthIso(t.transacted_at, tz)
+    monthly.set(key, (monthly.get(key) ?? 0) + amountOf(t))
   }
   const monthly_series_6m = Array.from(monthly.entries())
     .sort(([a], [b]) => (a < b ? -1 : 1))
-    .map(([label, spent]) => ({ label, spent: round2(spent) }))
+    .map(([label, spent]) => ({ label, spent: roundCents(spent) }))
 
   return {
     top_categories_6m,

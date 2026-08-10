@@ -12,6 +12,7 @@ import { Chip } from '../../../components/Chip'
 import { Money } from '../../../components/Money'
 import { Icon } from '../../../components/Icons'
 import { MonthPicker } from '../../../components/MonthPicker'
+import { ErrorState } from '../../../components/ErrorState'
 import { currentMonthIso } from '../../../lib/monthIso'
 
 type Txn = {
@@ -118,6 +119,9 @@ export default function TransactionsPage() {
   // param so the default view is "All time" rather than "current month".
   const monthFilterActive = !!monthParam && /^\d{4}-\d{2}$/.test(monthParam)
   const [loading, setLoading] = useState(true)
+  // Read-error state, distinct from "loaded, zero rows" (fix-plan 2.13 /
+  // audit 08-F21 family) — see `load()` below for which query sets it.
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [search, setSearch] = useState(initialQ)
   const [filter, setFilter] = useState<FilterKey>(filterParam)
 
@@ -164,9 +168,22 @@ export default function TransactionsPage() {
         .eq('is_archived', false),
       supabase.from('profiles').select('currency_code, locale, timezone').eq('id', user.id).single(),
     ])
-    setTransactions((txns.data ?? []) as Txn[])
-    setCategories((cats.data ?? []) as Cat[])
-    setProfile(prof.data)
+    // The transactions query is the one this whole page renders — a
+    // failure there must not read as "no transactions match these
+    // filters" (fix-plan 2.13 / audit 08-F21). Categories/profile
+    // failing is secondary (labels/currency formatting degrade, the
+    // table itself can still render), so they don't block the page, but
+    // still surface as the same error if transactions themselves loaded
+    // fine — better than silently mislabelling every row.
+    const failure = txns.error ?? cats.error ?? prof.error
+    if (failure) {
+      setLoadError(failure.message)
+    } else {
+      setLoadError(null)
+    }
+    if (!txns.error) setTransactions((txns.data ?? []) as Txn[])
+    if (!cats.error) setCategories((cats.data ?? []) as Cat[])
+    if (!prof.error) setProfile(prof.data)
     setLoading(false)
   }, [])
 
@@ -722,6 +739,8 @@ export default function TransactionsPage() {
           <div style={styles.tableBody}>
             {loading ? (
               <div style={styles.empty}>Loading…</div>
+            ) : loadError ? (
+              <ErrorState message="We couldn't load your transactions." detail={loadError} onRetry={load} />
             ) : filtered.length === 0 ? (
               <div style={styles.empty}>No transactions match these filters.</div>
             ) : (

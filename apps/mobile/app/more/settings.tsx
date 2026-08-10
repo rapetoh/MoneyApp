@@ -19,8 +19,10 @@ import { useAuth, signOut } from '../../src/hooks/useAuth'
 import { useProfile } from '../../src/hooks/useProfile'
 import { useTransactions } from '../../src/hooks/useTransactions'
 import { useActiveBudget } from '../../src/hooks/useBudget'
+import { useRecurringRules } from '../../src/hooks/useRecurringRules'
 import { useNotificationListener } from '../../src/hooks/useNotificationListener'
 import { useApiUrl } from '../../src/hooks/useApiUrl'
+import { changeCurrency } from '../../src/services/profileCurrency'
 import { SetGroup, SetRow } from '../../src/components/SettingsList'
 import { BudgetEditorModal } from '../../src/components/BudgetEditorModal'
 import { IncomeEditorModal } from '../../src/components/IncomeEditorModal'
@@ -39,8 +41,8 @@ import {
   retryDeadLetterEntry,
   type QueueEntry,
 } from '../../src/services/sync/syncQueue'
-import { Colors, Typography, Radius, Hairline } from '../../src/theme'
-import { t, type Locale } from '@voice-expense/shared'
+import { Colors, Typography, Radius, Hairline, Spacing } from '../../src/theme'
+import { t, formatMoney, type Locale } from '@voice-expense/shared'
 import type { BudgetPeriod } from '@voice-expense/shared'
 import { useRouter } from 'expo-router'
 
@@ -71,10 +73,11 @@ const BUDGET_PERIODS: { value: BudgetPeriod; key: string }[] = [
  */
 export default function SettingsScreen() {
   const { user } = useAuth()
-  const { profile, updateProfile } = useProfile(user?.id)
+  const { profile, updateProfile, refetch: refetchProfile } = useProfile(user?.id)
   const { transactions } = useTransactions(user?.id)
   const { categories } = useCategories(user?.id)
   const { budget, setBudget } = useActiveBudget(user?.id)
+  const { rules: recurringRules } = useRecurringRules(user?.id)
   const router = useRouter()
   const { isPlus } = usePlusStatus()
 
@@ -87,6 +90,13 @@ export default function SettingsScreen() {
   const [apiUrlModal, setApiUrlModal] = useState(false)
   const [apiUrlInput, setApiUrlInput] = useState('')
   const { apiUrl, setApiUrl, resetApiUrl, defaultUrl } = useApiUrl()
+
+  // Currency-change flow (fix-plan 2.7) — `currencyConverting` blocks the
+  // picker from being dismissed mid-run and gates the progress row below;
+  // `currencyProgress` is `null` until the first batch reports back, so
+  // the row reads "Converting…" before any counts exist yet.
+  const [currencyConverting, setCurrencyConverting] = useState(false)
+  const [currencyProgress, setCurrencyProgress] = useState<{ converted: number; total: number } | null>(null)
 
   const locale = (profile?.locale ?? 'en') as Locale
   const currency = profile?.currency_code ?? 'USD'
@@ -170,6 +180,13 @@ export default function SettingsScreen() {
         categories,
         locale,
         currency,
+        // fix-plan 2.15: the mobile export previously omitted recurring
+        // rules and the profile's own zone entirely — a user who left via
+        // the phone lost their subscription configuration on export, and
+        // every date column fell back to the device's resolved zone
+        // rather than `profiles.timezone`, which can disagree with it.
+        recurringRules,
+        timezone: profile?.timezone || undefined,
       })
       setExportPickerOpen(false)
     } catch (err) {
@@ -196,13 +213,21 @@ export default function SettingsScreen() {
     BUDGET_PERIODS.find((p) => p.value === (budget?.period ?? 'monthly'))?.key ??
     'settings.period_monthly'
   const periodLabel = t(periodKey, locale)
-  const budgetDisplay = budget ? `${currency} ${budget.amount.toFixed(0)} / ${periodLabel}` : '—'
+  // The shared formatter (fix-plan 2.6) — replaces the `"${currency}
+  // ${amount.toFixed(0)}"` concatenation, which printed the raw ISO code
+  // instead of a currency glyph and ignored the user's own locale.
+  const budgetDisplay = budget ? `${formatMoney(budget.amount, currency, locale)} / ${periodLabel}` : '—'
 
   // Income row detail: "$7,000 · Microsoft" or "$7,000" if no source, or "—"
-  // if the user skipped income entry during onboarding.
+  // if the user skipped income entry during onboarding. Same shared-
+  // formatter fix as `budgetDisplay` above — the old `toLocaleString
+  // ('en-US', ...)` hard-coded US grouping for every locale. Exact
+  // precision, not `compact` — 1.4's precision policy reserves `compact`
+  // for chart axes; a settings row showing the user's own figure back to
+  // them is a precise amount, the same class as a hero or a row.
   const incomeAmountFmt =
     profile?.monthly_income != null
-      ? `${currency} ${profile.monthly_income.toLocaleString('en-US', { maximumFractionDigits: 0 })}`
+      ? formatMoney(profile.monthly_income, currency, locale)
       : null
   const incomeDisplay = incomeAmountFmt
     ? profile?.monthly_income_source
@@ -226,6 +251,62 @@ export default function SettingsScreen() {
     await updateProfile({ display_name: nameInput.trim() })
     setNameModal(false)
     setNameInput('')
+  }
+
+  // Currency-change flow (fix-plan 2.7, audit 05-F13/06-F8/08-F5). Used
+  // to be `await updateProfile({ currency_code: c })` — a bare label
+  // swap that kept every historical `amount_in_profile_currency` at its
+  // old magnitude under a new symbol. Now: refuse outright while
+  // offline, get an explicit "this will reconvert N transactions"
+  // confirmation, then drive `change-currency` (via
+  // `services/profileCurrency.ts`) to completion before the picker
+  // closes — a currency change is a data migration, never a silent
+  // relabel.
+  function handleCurrencyChange(newCode: string) {
+    if (newCode === currency) {
+      setCurrencyModal(false)
+      return
+    }
+    if (!syncManager.online) {
+      Alert.alert(
+        t('settings.currency_offline_title', locale),
+        t('settings.currency_offline_body', locale),
+      )
+      return
+    }
+    Alert.alert(
+      t('settings.currency_confirm_title', locale),
+      `${t('settings.currency_confirm_body_prefix', locale)} ${txnCount} ${t('settings.currency_confirm_body_suffix', locale)}`,
+      [
+        { text: t('common.cancel', locale), style: 'cancel' },
+        {
+          text: t('settings.currency_confirm_action', locale),
+          onPress: () => runCurrencyChange(newCode),
+        },
+      ],
+    )
+  }
+
+  async function runCurrencyChange(newCode: string) {
+    setCurrencyConverting(true)
+    setCurrencyProgress(null)
+    const result = await changeCurrency(newCode, (progress) => setCurrencyProgress(progress))
+    setCurrencyConverting(false)
+    setCurrencyProgress(null)
+
+    if (!result.ok) {
+      Alert.alert(t('settings.currency_failed_title', locale), result.error)
+      return
+    }
+
+    // The server already committed the new `profiles.currency_code` and
+    // every reconverted transaction — pull both down so this screen (and
+    // every other local-first read of `transactions`) stops showing the
+    // pre-conversion snapshot instead of waiting for the next natural
+    // sync pass.
+    await refetchProfile()
+    if (user?.id) await syncManager.pullRemote(user.id)
+    setCurrencyModal(false)
   }
 
   const { permissionGranted, recheckPermission, requestPermission } = useNotificationListener(
@@ -468,7 +549,12 @@ export default function SettingsScreen() {
           Tapping kicks off `runExport`, which builds the file, writes it
           to the cache directory, and hands it to the system share sheet.
           The modal closes on success; failures show an Alert. */}
-      <Modal visible={exportPickerOpen} animationType="slide" presentationStyle="pageSheet">
+      <Modal
+        visible={exportPickerOpen}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setExportPickerOpen(false)}
+      >
         <SafeAreaView style={styles.modal} edges={['top', 'bottom', 'left', 'right']}>
           <View style={styles.modalHeader}>
             <Pressable onPress={() => setExportPickerOpen(false)}>
@@ -504,35 +590,59 @@ export default function SettingsScreen() {
       </Modal>
 
       {/* Currency modal */}
-      <Modal visible={currencyModal} animationType="slide" presentationStyle="pageSheet">
+      <Modal
+        visible={currencyModal}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        // Blocked while a conversion is in flight — dismissing mid-run
+        // would just hide the progress, not stop the request already
+        // running server-side, and re-opening Settings would show a
+        // currency picker with no way to tell a run is still going.
+        onRequestClose={() => !currencyConverting && setCurrencyModal(false)}
+      >
         <View style={styles.modal}>
           <View style={styles.modalHeader}>
-            <Pressable onPress={() => setCurrencyModal(false)}>
-              <Text style={styles.modalCancel}>{t('common.cancel', locale)}</Text>
+            <Pressable onPress={() => !currencyConverting && setCurrencyModal(false)}>
+              <Text style={[styles.modalCancel, currencyConverting && styles.modalCancelDisabled]}>
+                {t('common.cancel', locale)}
+              </Text>
             </Pressable>
             <Text style={styles.modalTitle}>{t('settings.currency', locale)}</Text>
             <View style={{ width: 60 }} />
           </View>
-          {CURRENCIES.map((c, i) => (
-            <View key={c}>
-              {i > 0 && <View style={styles.rowDivider} />}
-              <Pressable
-                style={styles.localeRow}
-                onPress={async () => {
-                  await updateProfile({ currency_code: c })
-                  setCurrencyModal(false)
-                }}
-              >
-                <Text style={styles.localeLabel}>{c}</Text>
-                {currency === c && <Text style={styles.localeCheck}>✓</Text>}
-              </Pressable>
+          {currencyConverting ? (
+            <View style={styles.currencyProgressWrap}>
+              <ActivityIndicator color={Colors.accent} size="large" />
+              <Text style={styles.currencyProgressLabel}>
+                {t('settings.currency_converting', locale)}
+              </Text>
+              {currencyProgress && currencyProgress.total > 0 && (
+                <Text style={styles.currencyProgressCount}>
+                  {currencyProgress.converted} / {currencyProgress.total}
+                </Text>
+              )}
             </View>
-          ))}
+          ) : (
+            CURRENCIES.map((c, i) => (
+              <View key={c}>
+                {i > 0 && <View style={styles.rowDivider} />}
+                <Pressable style={styles.localeRow} onPress={() => handleCurrencyChange(c)}>
+                  <Text style={styles.localeLabel}>{c}</Text>
+                  {currency === c && <Text style={styles.localeCheck}>✓</Text>}
+                </Pressable>
+              </View>
+            ))
+          )}
         </View>
       </Modal>
 
       {/* Locale modal */}
-      <Modal visible={localeModal} animationType="slide" presentationStyle="pageSheet">
+      <Modal
+        visible={localeModal}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setLocaleModal(false)}
+      >
         <View style={styles.modal}>
           <View style={styles.modalHeader}>
             <Pressable onPress={() => setLocaleModal(false)}>
@@ -561,7 +671,12 @@ export default function SettingsScreen() {
 
       {/* API URL modal — dev-client builds only, like the Developer group above */}
       {__DEV__ && (
-        <Modal visible={apiUrlModal} animationType="slide" presentationStyle="pageSheet">
+        <Modal
+          visible={apiUrlModal}
+          animationType="slide"
+          presentationStyle="pageSheet"
+          onRequestClose={() => setApiUrlModal(false)}
+        >
           <View style={styles.modal}>
             <View style={styles.modalHeader}>
               <Pressable onPress={() => setApiUrlModal(false)}>
@@ -615,7 +730,12 @@ export default function SettingsScreen() {
       )}
 
       {/* Name modal */}
-      <Modal visible={nameModal} animationType="slide" presentationStyle="pageSheet">
+      <Modal
+        visible={nameModal}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setNameModal(false)}
+      >
         <View style={styles.modal}>
           <View style={styles.modalHeader}>
             <Pressable onPress={() => setNameModal(false)}>
@@ -801,6 +921,27 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: Colors.ink3 ?? Colors.textSecondary,
     width: 60,
+  },
+  modalCancelDisabled: {
+    opacity: 0.35,
+  },
+  currencyProgressWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+    paddingVertical: Spacing.xl,
+  },
+  currencyProgressLabel: {
+    fontFamily: Typography.fontFamily.sansSemiBold,
+    fontSize: 15,
+    fontWeight: '600',
+    color: Colors.ink ?? Colors.text,
+  },
+  currencyProgressCount: {
+    fontFamily: Typography.fontFamily.sans,
+    fontSize: 13,
+    color: Colors.ink3 ?? Colors.textSecondary,
+    fontVariant: ['tabular-nums'],
   },
   modalDone: {
     fontFamily: Typography.fontFamily.sansSemiBold,

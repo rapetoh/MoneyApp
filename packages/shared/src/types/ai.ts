@@ -93,6 +93,16 @@ import type { Locale } from '../i18n'
  *  fields. Date is ISO so the model can reason about recency. */
 export interface AskMurmurTransaction {
   amount: number
+  /** Amount converted to the user's profile currency — mirrors
+   *  `Transaction.amount_in_profile_currency`
+   *  (packages/shared/src/types/transaction.ts). Null on a row still
+   *  awaiting its FX snapshot. Every aggregation the reasoner performs
+   *  must sum this field, never `amount` — fix-plan 2.10: a €50 dinner
+   *  summed by raw `amount` counted as $50, silently contradicting
+   *  every other totals-rendering surface in the app, which routes
+   *  through this same field via `packages/shared/src/domain/money.ts`'s
+   *  `summarize()`. */
+  amount_in_profile_currency: number | null
   direction: 'debit' | 'credit'
   merchant: string | null
   category_name: string | null
@@ -123,9 +133,20 @@ export interface AskMurmurRequest {
   question: string
   locale: Locale
   currency: string
-  /** ISO date of "today" in the user's timezone. Anchors any "this month",
-   *  "next month" reasoning. */
-  today: string
+  /** Full ISO 8601 instant for "now" as the client's clock reads it, e.g.
+   *  "2026-09-01T01:00:00Z" — fix-plan 2.10. Replaces the old date-only
+   *  `today` field, which the server re-parsed as UTC midnight and read
+   *  back with local `Date` getters: an 8pm Central "today" resolved to
+   *  tomorrow's (empty) UTC day. Every window ("today", "this month",
+   *  "last 90 days", ...) is resolved from this instant through
+   *  `time_zone` below — never taken as a date string on its own. */
+  now_utc: string
+  /** IANA time zone the windows above resolve in, e.g.
+   *  "America/Chicago" — the user's own zone (`profile.timezone` on
+   *  web, the device zone on mobile), never the reading process's zone
+   *  (Vercel's UTC in production, the dev/test runner's own zone
+   *  otherwise). */
+  time_zone: string
   monthly_income: number | null
   /** Cap: last 90 days, max 500 entries (oldest dropped client-side). */
   transactions: AskMurmurTransaction[]

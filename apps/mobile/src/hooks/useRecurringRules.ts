@@ -2,43 +2,18 @@ import { useEffect, useState, useCallback } from 'react'
 import { getCalendars } from 'expo-localization'
 import * as Crypto from 'expo-crypto'
 import { supabase } from '../lib/supabase'
+import { getCurrentProfileCurrency } from '../services/profileCurrency'
 import type { RecurringRule, RecurringFrequency } from '@voice-expense/shared'
 import type { BudgetPeriod } from '@voice-expense/shared'
-import { nextOccurrence as sharedNextOccurrence } from '@voice-expense/shared'
-
-// ─── Period bounds ────────────────────────────────────────────────────────────
-
-function getPeriodBounds(period: BudgetPeriod | undefined, now: Date): { start: Date; end: Date } {
-  const start = new Date(now)
-  const end = new Date(now)
-
-  switch (period) {
-    case 'weekly':
-      const day = start.getDay()
-      start.setDate(start.getDate() - day)
-      end.setDate(start.getDate() + 6)
-      break
-    case 'biweekly':
-      start.setDate(start.getDate() - 13)
-      break
-    case 'quarterly':
-      const q = Math.floor(start.getMonth() / 3)
-      start.setMonth(q * 3, 1)
-      end.setMonth(q * 3 + 3, 0)
-      break
-    case 'yearly':
-      start.setMonth(0, 1)
-      end.setMonth(11, 31)
-      break
-    default: // monthly
-      start.setDate(1)
-      end.setMonth(end.getMonth() + 1, 0)
-  }
-
-  start.setHours(0, 0, 0, 0)
-  end.setHours(23, 59, 59, 999)
-  return { start, end }
-}
+import {
+  nextOccurrence as sharedNextOccurrence,
+  periodBounds,
+  monthBounds,
+  monthIso,
+  localParts,
+  recurringOutflowInWindow,
+  snapshotFx,
+} from '@voice-expense/shared'
 
 // ─── Next occurrence ──────────────────────────────────────────────────────────
 //
@@ -49,6 +24,11 @@ function getPeriodBounds(period: BudgetPeriod | undefined, now: Date): { start: 
 // a rule anchored on the 31st permanently drifted to the 3rd after the
 // first February. This file used to be one of three byte-for-byte
 // copies of that bug; it is now a thin adapter over the shared engine.
+//
+// `getPeriodBounds` (the fourth hand-rolled window regime the audit
+// found — `biweekly` ended *today*, so nothing future was ever
+// in-window, and `weekly` could span 38 days across a month boundary,
+// fix-plan 2.1) is deleted outright in favour of `periodBounds` below.
 
 /** Best-effort device zone for the many existing call sites
  *  (`recurringCatchUp.ts`, `app/recurring.tsx`, `app/transaction/
@@ -89,26 +69,55 @@ export function computeNextOccurrence(
   return occurrence ? new Date(occurrence.instant) : null
 }
 
+/**
+ * True when the rule's mechanically-next occurrence (from its own
+ * `last_generated`/`starts_at`, *not* fast-forwarded to "now") already
+ * fell in the past — i.e. generation hasn't caught up yet. Display
+ * surfaces (fix-plan 2.1) use this to render an explicit "Overdue —
+ * pending generation" state instead of sorting a stale past date as
+ * the next imminent charge.
+ */
+export function isRuleOverdue(rule: RecurringRule, tz: string = deviceTimeZone()): boolean {
+  const strictNext = computeNextOccurrence(rule, undefined, tz)
+  return strictNext != null && strictNext.getTime() < Date.now()
+}
+
 // ─── Upcoming amount for Safe to Spend ───────────────────────────────────────
 
+/**
+ * Debit-only, FX-normalised, every-occurrence recurring spend in the
+ * budget `period` containing "now" — the shared-engine replacement for
+ * the four defects `computeUpcomingRecurring` had (fix-plan 2.1's "Why
+ * now"): it summed raw `rule.amount` across currencies, counted only
+ * the *next* occurrence (so a weekly rule contributed 1/4 of what it
+ * should), and its own hand-rolled window regime had a `biweekly`
+ * branch that ended *today* (nothing future was ever in-window) and a
+ * `weekly` branch that could span 38 days across a month boundary.
+ *
+ * `anchorInstant` fixes a `biweekly` period's phase (`budgets.starts_at`
+ * — `packages/shared/src/utils/period.ts`'s `periodBounds` throws
+ * without one). Neither current caller (`app/(tabs)/index.tsx`,
+ * `app/(tabs)/budgets.tsx`) threads the active budget's `starts_at`
+ * through yet — that's those screens' own Stage 2 adoption, outside
+ * this hook's file ownership — so a missing anchor for a biweekly
+ * budget falls back to the calendar month rather than throwing on
+ * every Home/Budgets render.
+ */
 export function computeUpcomingRecurring(
   rules: RecurringRule[],
   period: BudgetPeriod | undefined,
+  opts: { anchorInstant?: string; tz?: string } = {},
 ): number {
-  const now = new Date()
-  const { start, end } = getPeriodBounds(period, now)
-
-  return rules
-    // Upcoming *spend*: only debit rules belong here. Credit rules (salary,
-    // pension) counted as spend would inflate the committed number by the
-    // user's own income — visible from the first onboarding-created rule.
-    .filter((r) => r.is_active && r.direction === 'debit')
-    .reduce((sum, rule) => {
-      const next = computeNextOccurrence(rule)
-      if (!next) return sum
-      if (next >= start && next <= end) return sum + rule.amount
-      return sum
-    }, 0)
+  const tz = opts.tz ?? deviceTimeZone()
+  const now = new Date().toISOString()
+  let bounds
+  try {
+    bounds = periodBounds(period ?? 'monthly', now, tz, opts.anchorInstant)
+  } catch {
+    bounds = monthBounds(monthIso(now, tz), tz)
+  }
+  const { total } = recurringOutflowInWindow(rules, bounds.start, bounds.endExclusive, tz)
+  return total
 }
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
@@ -116,15 +125,27 @@ export function computeUpcomingRecurring(
 export function useRecurringRules(userId: string | undefined) {
   const [rules, setRules] = useState<RecurringRule[]>([])
   const [loading, setLoading] = useState(true)
+  // Read-error exposure (fix-plan 2.13 / audit 08-F21 family): this fetch
+  // used to discard `error` entirely, so a failed read rendered exactly
+  // like "no recurring rules yet" everywhere this hook is consumed. The
+  // prior `rules` are left in place on a failed read rather than cleared,
+  // and `error` is exposed so a caller can render a real error state with
+  // retry instead of the false empty one.
+  const [error, setError] = useState<string | null>(null)
 
   const fetch = useCallback(async () => {
     if (!userId) return
-    const { data } = await supabase
+    const { data, error: fetchError } = await supabase
       .from('recurring_rules')
       .select('*')
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
-    setRules((data as RecurringRule[]) ?? [])
+    if (fetchError) {
+      setError(fetchError.message)
+    } else {
+      setRules((data as RecurringRule[]) ?? [])
+      setError(null)
+    }
     setLoading(false)
   }, [userId])
 
@@ -142,6 +163,51 @@ export function useRecurringRules(userId: string | undefined) {
     template_txn_id?: string | null
   }): Promise<RecurringRule | null> {
     if (!userId) return null
+
+    // Anchor + FX snapshot (fix-plan 2.3(b) / 2.1). When this rule
+    // templates an existing transaction (the only caller today,
+    // `acceptPattern`, always passes one — a pattern candidate's
+    // `templateTxnId` is its *newest* occurrence, i.e. `lastSeenAt`),
+    // anchor `starts_at`/`last_generated` to that transaction's own
+    // date instead of "now": generating from "now" onward is what let
+    // an accepted candidate spanning Jun-Aug back-generate a duplicate
+    // for a month the user had already logged manually. Reusing the
+    // template's own FX snapshot (rather than a fresh lookup) is exact
+    // — same amount, same currency, same day — and avoids a second
+    // network round-trip.
+    let anchorInstant = new Date().toISOString()
+    let fxSnapshot: {
+      amount_in_profile_currency: number | null
+      fx_rate_to_profile: number | null
+      fx_rate_date: string | null
+    } = { amount_in_profile_currency: null, fx_rate_to_profile: null, fx_rate_date: null }
+
+    if (params.template_txn_id) {
+      const { data: template } = await supabase
+        .from('transactions')
+        .select('transacted_at, amount_in_profile_currency, fx_rate_to_profile, fx_rate_date')
+        .eq('id', params.template_txn_id)
+        .maybeSingle()
+      if (template?.transacted_at) {
+        anchorInstant = template.transacted_at
+        fxSnapshot = {
+          amount_in_profile_currency: template.amount_in_profile_currency ?? null,
+          fx_rate_to_profile: template.fx_rate_to_profile ?? null,
+          fx_rate_date: template.fx_rate_date ?? null,
+        }
+      }
+    }
+    if (fxSnapshot.amount_in_profile_currency == null) {
+      // No template (or its snapshot hasn't landed yet) — fresh lookup
+      // against the profile's own currency, same as every other
+      // write-time snapshot in the app (migration 011).
+      const profileCurrency = getCurrentProfileCurrency()
+      const tz = deviceTimeZone()
+      const fx = await snapshotFx(anchorInstant, params.currency_code, profileCurrency, params.amount, tz)
+      if (fx) fxSnapshot = fx
+    }
+    const anchorParts = localParts(anchorInstant, deviceTimeZone())
+
     const { data, error } = await supabase
       .from('recurring_rules')
       .insert({
@@ -156,24 +222,23 @@ export function useRecurringRules(userId: string | undefined) {
         note: params.note,
         frequency: params.frequency,
         interval: 1,
-        starts_at: new Date().toISOString(),
+        starts_at: anchorInstant,
         // NOT the `last_generated: now()` workaround 03-F32 describes —
-        // the shared engine now correctly treats `starts_at` as the
-        // first occurrence when `last_generated` is null (`nextOccurrence
-        // (rule, null, tz) === starts_at`), so this line is no longer
-        // covering for a semantic gap. It stays because this call site
-        // is exclusively `acceptPattern` (above), which always carries a
-        // real `template_txn_id` — an already-logged transaction. Setting
-        // `last_generated: null` here would make `starts_at` (= now)
-        // immediately due, and the very next catch-up run would generate
-        // a *second* transaction for today on top of the one the pattern
-        // was detected from — 03-F12's back-generated-duplicate hazard,
-        // whose guard is a different, not-yet-landed item. Once that
-        // guard exists, this can become `last_generated: null` and stop
-        // silently skipping the cycle the rule was created in.
-        last_generated: new Date().toISOString(),
+        // the shared engine correctly treats `starts_at` as the first
+        // occurrence when `last_generated` is null (`nextOccurrence
+        // (rule, null, tz) === starts_at`). Anchoring both to the
+        // template's own date (or "now" when there is none) means the
+        // generators produce the *next* occurrence after whatever was
+        // already observed, never a back-dated duplicate of it.
+        last_generated: anchorInstant,
         template_txn_id: params.template_txn_id ?? null,
         is_active: true,
+        amount_in_profile_currency: fxSnapshot.amount_in_profile_currency,
+        fx_rate_to_profile: fxSnapshot.fx_rate_to_profile,
+        fx_rate_date: fxSnapshot.fx_rate_date,
+        anchor_day: anchorParts.d,
+        anchor_weekday: anchorParts.weekdayIndex + 1,
+        anchor_time: `${String(anchorParts.hour).padStart(2, '0')}:${String(anchorParts.minute).padStart(2, '0')}:${String(anchorParts.second).padStart(2, '0')}`,
       })
       .select()
       .single()
@@ -201,6 +266,12 @@ export function useRecurringRules(userId: string | undefined) {
               frequency: params.frequency,
               category_id: params.category_id,
               payment_method: params.payment_method,
+              // Re-snapshotted on update (fix-plan 2.1's "snapshotted on
+              // create/update") — the merged-in amount is the price
+              // change itself, so the old rate no longer applies.
+              amount_in_profile_currency: fxSnapshot.amount_in_profile_currency,
+              fx_rate_to_profile: fxSnapshot.fx_rate_to_profile,
+              fx_rate_date: fxSnapshot.fx_rate_date,
             })
             .eq('id', existing.id)
           await fetch()
@@ -244,9 +315,26 @@ export function useRecurringRules(userId: string | undefined) {
       >
     >,
   ) {
-    await supabase.from('recurring_rules').update(changes).eq('id', id)
+    let payload: typeof changes & {
+      amount_in_profile_currency?: number | null
+    } = changes
+    // Amount changed: re-derive the FX snapshot in place from the rule's
+    // own already-known rate (mirrors `updateAmountSnapshot` in
+    // `apps/mobile/src/services/sync/transactionStore.ts` for a
+    // transaction's amount edit) rather than a fresh network lookup —
+    // fix-plan 2.1's "snapshotted on create/update".
+    if (changes.amount != null) {
+      const current = rules.find((r) => r.id === id)
+      if (current?.fx_rate_to_profile != null) {
+        payload = {
+          ...changes,
+          amount_in_profile_currency: Math.round(changes.amount * current.fx_rate_to_profile * 100) / 100,
+        }
+      }
+    }
+    await supabase.from('recurring_rules').update(payload).eq('id', id)
     await fetch()
   }
 
-  return { rules, loading, createRule, toggleRule, deleteRule, updateRule, refetch: fetch }
+  return { rules, loading, error, createRule, toggleRule, deleteRule, updateRule, refetch: fetch }
 }

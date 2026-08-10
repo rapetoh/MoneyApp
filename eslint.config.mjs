@@ -45,6 +45,10 @@ import { builtinRules } from 'eslint/use-at-your-own-risk'
 const localRules = {
   rules: {
     'period-restrictions': builtinRules.get('no-restricted-syntax'),
+    // See the `MOBILE_CLEARANCE_RESTRICTIONS` comment below for why the
+    // `paddingBottom` selector needs this same independent-severity
+    // treatment, split off from the rest of `MOBILE_PRESENTATION_RESTRICTIONS`.
+    'mobile-clearance-restrictions': builtinRules.get('no-restricted-syntax'),
   },
 }
 
@@ -114,25 +118,32 @@ const CLIENT_BOUNDARY_RESTRICTIONS = [
   },
 ]
 
-// --- 1.8 / Stage 4: mobile presentation primitives --------------------------
-// NOTE on this bundle specifically: ESLint flat config merges multiple
-// config objects matching the same files by rule *key*, not by selector —
-// a later object's `no-restricted-syntax` entirely replaces an earlier
-// one's for that file set, it does not merge selector-by-selector. That
-// means every selector below shares the one severity switch in the Tier-3
-// block at the bottom of this file; they can't be flipped independently
-// without giving one of them its own rule name. Practically: this whole
-// bundle stays 'off' until BOTH conditions hold — the `paddingBottom`
-// selector needs the Stage 2 sweep of the 14 sites onto
-// `useTabBarClearance()` (src/theme/chrome.ts, built by 1.8) done, and the
-// `<Text>` selector needs Stage 4's i18n routing done. Landing 1.8 alone
-// does not make it safe to flip this to 'error'.
-const MOBILE_PRESENTATION_RESTRICTIONS = [
+// --- 1.8/2.14: tab-bar / safe-area clearance literals -----------------------
+// Given its own rule name (`local/mobile-clearance-restrictions`) rather
+// than sharing `no-restricted-syntax` with `MOBILE_PRESENTATION_RESTRICTIONS`
+// below — ESLint flat config merges multiple config objects matching the
+// same files by rule *key*, not by selector, so a shared key can only ever
+// carry one severity for every selector inside it (same reason
+// `period-restrictions` got its own alias). This selector is independently
+// safe to flip to 'error' now that item 2.14 has swept the ten
+// `paddingBottom >= 100` sites (fourteen call sites total across 1.8+2.14)
+// onto `useTabBarClearance()` / `insets.bottom + 24` — the `<Text>` i18n
+// selector below is a different item (Stage 4) with its own, much larger,
+// remaining surface, so it stays on its own switch and stays 'off'.
+const MOBILE_CLEARANCE_RESTRICTIONS = [
   {
     selector: "Property[key.name='paddingBottom'] > Literal[value>=100]",
     message:
       'A `paddingBottom` >= 100 is almost always a hand-tuned safe-area/keyboard workaround (audit 01-F13). Use `useTabBarClearance()` / `insets.bottom + 24` from src/theme/chrome.ts (added by item 1.8).',
   },
+]
+
+// --- Stage 4: mobile i18n ---------------------------------------------------
+// Stays 'off' — routing every literal `<Text>` string through `t()` is
+// Stage 4's own, much larger, item. Kept under the shared `no-restricted-
+// syntax` key (see the Tier-3 block below) since nothing has flipped that
+// key's severity yet.
+const MOBILE_I18N_RESTRICTIONS = [
   {
     selector: "JSXElement[openingElement.name.name='Text'] > JSXText[value=/\\S/]",
     message:
@@ -188,11 +199,15 @@ export default tseslint.config(
     plugins: { local: localRules },
     rules: {
       'local/period-restrictions': ['error', ...PERIOD_RESTRICTIONS],
+      // Item 2.14's own switch — flipped now that the paddingBottom sweep
+      // is clean (verified by grep across apps/mobile immediately before
+      // this flip; see the item's commit).
+      'local/mobile-clearance-restrictions': ['error', ...MOBILE_CLEARANCE_RESTRICTIONS],
       'no-restricted-syntax': [
         'off',
         ...MONEY_RESTRICTIONS,
         ...CLIENT_BOUNDARY_RESTRICTIONS,
-        ...MOBILE_PRESENTATION_RESTRICTIONS,
+        ...MOBILE_I18N_RESTRICTIONS,
       ],
     },
   },
@@ -208,23 +223,20 @@ export default tseslint.config(
   // `eslint-disable` at their own top instead of an entry here — this
   // block is only for files outside that ownership, where a config-level
   // override is how the debt gets marked without editing a file another
-  // item owns.
+  // item owns. (`packages/ai/src/advisor.ts` carried this exemption too,
+  // until fix-plan 2.11 deleted the file outright — zero callers.)
+  //
+  // `apps/mobile/app/(tabs)/index.tsx` graduated off this list (Stage 2
+  // verifier pass): `isSameDay`/`mondayIndex`/`weeklySpendBars`/
+  // `daysLeftInMonth` are gone, replaced by `period.ts`'s `localParts`/
+  // `localDay`/`monthBounds`/`daysBetween`/`addDays`, all `tz`-aware.
+  //
+  // `apps/mobile/src/services/askMurmurClient.ts` graduated off this list
+  // too (fix-plan 2.10): its cutoff-date `Date#setDate`/`Date#getDate`
+  // pair is gone, replaced by `period.ts`'s `localParts`/`addDays`/
+  // `civilDateTimeToInstant`.
   {
-    files: [
-      'apps/web/src/components/lenses/Calendar.tsx',
-      'apps/web/src/components/lenses/Cashflow.tsx',
-      'apps/web/src/components/lenses/Matrix.tsx',
-      'packages/ai/src/advisor.ts',
-      'packages/ai/src/askMurmurTools.ts',
-      'apps/mobile/app/(tabs)/budgets.tsx',
-      'apps/mobile/app/(tabs)/index.tsx',
-      'apps/mobile/app/(tabs)/insights.tsx',
-      'apps/mobile/app/more/transactions.tsx',
-      'apps/mobile/src/hooks/useBudget.ts',
-      'apps/mobile/src/hooks/useRecurringRules.ts',
-      'apps/mobile/src/services/askMurmurClient.ts',
-      'apps/mobile/src/services/exportData.ts',
-    ],
+    files: ['apps/mobile/app/more/transactions.tsx'],
     plugins: { local: localRules },
     rules: {
       // Stage 2 (2.4/2.14) migration pending.

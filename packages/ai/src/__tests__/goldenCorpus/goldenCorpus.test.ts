@@ -98,6 +98,17 @@ describe('golden corpus', () => {
 // comment for why. Named here as `it.todo` so they stay visible in
 // `turbo test` output until Stage 2 adopts them as real component tests.
 describe('mobile-layer parse bugs (not exercisable from packages/ai)', () => {
+  // Fixed at HEAD (fix-plan item 2.9c): `parseScan` no longer returns a
+  // plain `ParsedExpense` when the model reports `needs_clarification` —
+  // it returns `{ ok: false, reason }` instead (see scanParser.test.ts's
+  // "ok: false" describe block, which pins the packages/ai half of this
+  // directly). `handleScan` now branches on `scanResult.ok` and shows a
+  // retake/enter-manually message instead of calling `voice.injectParsed`
+  // — see `apps/mobile/app/(tabs)/record.tsx`'s `handleScan`. Left as
+  // `it.todo` here (not flipped to a real assertion) because mounting
+  // `record.tsx` itself — camera/router/auth/voice hooks and all — is
+  // still not exercisable from this package; a real regression test for
+  // the mobile branch belongs in an `apps/mobile` component test.
   it.todo(
     'F3: apps/mobile/app/(tabs)/record.tsx handleScan must not open the confirm sheet when parseScan reports needs_clarification (audit 02-ai-parsing-and-scan.md#F3)',
   )

@@ -17,7 +17,11 @@ export function KPI({
   label: string
   value: number
   currency: string
-  locale?: string
+  // Required — fix-plan 2.6: forwarded straight to `Money`, whose own
+  // `locale` is required for the same reason (audit 01-F21). An
+  // optional prop here would just move the silent-English-grouping
+  // omission up one component instead of closing it.
+  locale: string
   delta?: number
   sub?: string
   small?: boolean

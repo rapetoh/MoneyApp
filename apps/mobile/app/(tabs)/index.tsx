@@ -7,91 +7,76 @@ import { useAuth } from '../../src/hooks/useAuth'
 import { useTransactions } from '../../src/hooks/useTransactions'
 import { useCategories } from '../../src/hooks/useCategories'
 import { useProfile } from '../../src/hooks/useProfile'
-import { useActiveBudget, usePeriodSpend } from '../../src/hooks/useBudget'
-import { useRecurringRules, computeUpcomingRecurring } from '../../src/hooks/useRecurringRules'
+import { useActiveBudget, budgetStatusFor } from '../../src/hooks/useBudget'
+import { useRecurringRules } from '../../src/hooks/useRecurringRules'
 import { RecurringPatternBanner } from '../../src/components/RecurringPatternBanner'
 import type { RecurringPatternCandidate } from '../../src/services/recurringPatternDetector'
 import { usePlusStatus } from '../../src/hooks/usePlusStatus'
+import { syncManager } from '../../src/services/sync/SyncManager'
 import { TransactionRow } from '../../src/components/TransactionRow'
 import { Money, MoneyLabel } from '../../src/components/Money'
 import { MiniBars } from '../../src/components/MiniBars'
 import { DayOneFirstLog } from '../../src/components/DayOneFirstLog'
-import { Colors, Typography, Spacing } from '../../src/theme'
-import { t, aggAmount } from '@voice-expense/shared'
+import { Colors, Typography, Spacing, useTabBarClearance } from '../../src/theme'
+import {
+  t,
+  aggAmount,
+  formatMoney,
+  localParts,
+  localDay,
+  monthBounds,
+  monthIso,
+  daysBetween,
+  addDays,
+  civilDateTimeToInstant,
+} from '@voice-expense/shared'
 import type { Locale, Transaction } from '@voice-expense/shared'
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Helpers
+// Helpers — all civil-date math routes through packages/shared/src/utils/
+// period.ts (fix-plan 1.3/2.4); `Date` is only ever used as scratch space
+// handed to `Intl`-backed formatters (`toLocaleDateString(..., { timeZone })`),
+// never read via a local getter.
 // ─────────────────────────────────────────────────────────────────────────────
 
-function isSameDay(a: Date, b: Date): boolean {
-  return (
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate()
-  )
-}
-
-/** JS getDay() returns 0=Sun..6=Sat; we want 0=Mon..6=Sun for MiniBars. */
-function mondayIndex(date: Date): number {
-  const d = date.getDay()
-  return d === 0 ? 6 : d - 1
-}
-
-/** Last 7 days of spending indexed Mon..Sun. */
-function weeklySpendBars(txns: Transaction[]): number[] {
-  const today = new Date()
-  const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate())
-  // The oldest bar is 6 days ago from the start of week. We anchor the rightmost
-  // bar to *today's day-of-week* so the chart always reads Mon → Sun with today
-  // highlighted at the correct column.
-  const todayDow = mondayIndex(today)
-  const values = Array(7).fill(0) as number[]
-  for (const txn of txns) {
-    if (txn.is_deleted || txn.direction !== 'debit') continue
-    const d = new Date(txn.transacted_at)
-    const diff = Math.floor((startOfToday.getTime() - new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()) / 86400000)
-    if (diff < 0 || diff > todayDow) continue
-    const idx = todayDow - diff
-    values[idx] += txn.amount
-  }
-  return values
-}
-
-function daysLeftInMonth(date: Date): number {
-  const endOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0)
-  return Math.max(1, endOfMonth.getDate() - date.getDate() + 1)
-}
-
 /**
- * Groups today + yesterday + everything older. Mirrors the mockup's
- * "Today · Friday" / "Yesterday · Thursday" sectioning.
+ * Groups today + yesterday + everything older, in `tz`. Mirrors the
+ * mockup's "Today · Friday" / "Yesterday · Thursday" sectioning. Bucket
+ * keys for "older" days are the transaction's own `YYYY-MM-DD` local day
+ * (`localDay`), which sorts lexicographically the same as chronologically
+ * — no `Date#getTime()` needed to order them.
  */
 interface Section {
   key: string
   label: string
   data: Transaction[]
 }
-function groupForToday(txns: Transaction[], locale: Locale): Section[] {
-  const now = new Date()
-  const yest = new Date(now)
-  yest.setDate(yest.getDate() - 1)
+function groupForToday(txns: Transaction[], locale: Locale, nowIso: string, tz: string): Section[] {
+  const today = localParts(nowIso, tz)
+  const todayDayIso = localDay(nowIso, tz)
+  const yestCivil = addDays(today.y, today.m, today.d, -1)
+  // Noon anchor (not midnight) so the instant this resolves to can never
+  // land on the adjacent civil day across a DST transition.
+  const yestInstant = civilDateTimeToInstant(yestCivil.y, yestCivil.m, yestCivil.d, 12, 0, 0, tz)
+  const yestDayIso = localDay(yestInstant, tz)
+
   const buckets = new Map<string, { label: string; items: Transaction[] }>()
 
   for (const txn of txns) {
     if (txn.is_deleted) continue
+    const dayIso = localDay(txn.transacted_at, tz)
     const d = new Date(txn.transacted_at)
     let key: string
     let label: string
-    if (isSameDay(d, now)) {
+    if (dayIso === todayDayIso) {
       key = 'today'
-      label = `${t('transactions.today', locale)} · ${d.toLocaleDateString(locale, { weekday: 'long' })}`
-    } else if (isSameDay(d, yest)) {
+      label = `${t('transactions.today', locale)} · ${d.toLocaleDateString(locale, { weekday: 'long', timeZone: tz })}`
+    } else if (dayIso === yestDayIso) {
       key = 'yesterday'
-      label = `${t('transactions.yesterday', locale)} · ${d.toLocaleDateString(locale, { weekday: 'long' })}`
+      label = `${t('transactions.yesterday', locale)} · ${d.toLocaleDateString(locale, { weekday: 'long', timeZone: tz })}`
     } else {
-      key = d.toDateString()
-      label = d.toLocaleDateString(locale, { weekday: 'long', month: 'long', day: 'numeric' })
+      key = dayIso
+      label = d.toLocaleDateString(locale, { weekday: 'long', month: 'long', day: 'numeric', timeZone: tz })
     }
     const bucket = buckets.get(key) ?? { label, items: [] }
     bucket.items.push(txn)
@@ -108,13 +93,51 @@ function groupForToday(txns: Transaction[], locale: Locale): Section[] {
     }
   }
   // Older days — keep up to 2 more sections so Today stays scannable, with a
-  // clear path to More → History for the full list.
-  const older: Section[] = []
-  for (const [k, v] of buckets) {
-    older.push({ key: k, label: v.label, data: v.items })
-  }
-  older.sort((a, b) => new Date(b.data[0].transacted_at).getTime() - new Date(a.data[0].transacted_at).getTime())
+  // clear path to More → History for the full list. Keys here are always
+  // `YYYY-MM-DD`, so a plain string comparison is chronological order too.
+  const older: Section[] = Array.from(buckets, ([k, v]) => ({ key: k, label: v.label, data: v.items }))
+  older.sort((a, b) => (a.key < b.key ? 1 : a.key > b.key ? -1 : 0))
   return [...sorted, ...older.slice(0, 2)]
+}
+
+/** Last 7 days of spending indexed Mon..Sun, in `tz`. The rightmost bar is
+ *  always today's own weekday column (`localParts(nowIso, tz).weekdayIndex`
+ *  — already Monday=0..Sunday=6, `period.ts`'s `WEEK_START` convention). */
+function weeklySpendBars(txns: Transaction[], nowIso: string, tz: string): number[] {
+  const today = localParts(nowIso, tz)
+  const values = Array(7).fill(0) as number[]
+  for (const txn of txns) {
+    if (txn.is_deleted || txn.direction !== 'debit') continue
+    const txnParts = localParts(txn.transacted_at, tz)
+    // Civil days between the transaction's own local day and today's —
+    // positive when today is later, exactly the "how many days ago" the
+    // original device-local version computed, but zone-correct.
+    const diff = daysBetween(txnParts.y, txnParts.m, txnParts.d, today.y, today.m, today.d)
+    if (diff < 0 || diff > today.weekdayIndex) continue
+    const idx = today.weekdayIndex - diff
+    values[idx] += aggAmount(txn)
+  }
+  return values
+}
+
+/** Days left in the current *calendar* month, in `tz` — the countdown this
+ *  card's "left this month" caption actually describes (a quick-glance
+ *  monthly snapshot, independent of whatever period the user's budget is
+ *  configured on; the Budgets tab's own hero renders the budget's real
+ *  period-aligned countdown via `budgetStatusFor()`/`daysLeftInWindow`). */
+function daysLeftInMonth(nowIso: string, tz: string): number {
+  const bounds = monthBounds(monthIso(nowIso, tz), tz)
+  const now = localParts(nowIso, tz)
+  const end = localParts(bounds.endExclusive, tz)
+  return Math.max(1, daysBetween(now.y, now.m, now.d, end.y, end.m, end.d))
+}
+
+/** Compact budget-header amount: "$473" — the shared formatter's
+ *  `precision: 'compact'` mode (no decimals for a quick-glance figure),
+ *  replacing the deleted four-case `$/€/£/¥` glyph ternary and the
+ *  hard-coded `toLocaleString('en-US')` grouping (audit 01-F6/01-F21). */
+function formatBudgetShort(amount: number, currency: string, locale: string): string {
+  return formatMoney(amount, currency, locale, { precision: 'compact' })
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -122,12 +145,18 @@ function groupForToday(txns: Transaction[], locale: Locale): Section[] {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function TodayScreen() {
+  // Clears the floating tab bar (audit 01-F13, fix-plan 1.8/2.14) — replaces
+  // the hand-picked `paddingBottom: 140` literal.
+  const tabBarClearance = useTabBarClearance()
   const { user } = useAuth()
-  const { transactions, loading } = useTransactions(user?.id)
+  // Read-error exposure (fix-plan 2.13 / audit 08-F21 family) — both hooks
+  // already expose `error`; this screen is the one that wasn't consuming
+  // it, so a failed read rendered identically to "no transactions yet" /
+  // "no budget set" instead of a real error-with-retry state.
+  const { transactions, loading, error: transactionsError } = useTransactions(user?.id)
   const { categoryMap } = useCategories(user?.id)
   const { profile } = useProfile(user?.id)
-  const { budget } = useActiveBudget(user?.id)
-  const periodSpend = usePeriodSpend(budget, transactions)
+  const { budget, error: budgetError, refetch: refetchBudget } = useActiveBudget(user?.id)
   const { rules: recurringRules, createRule } = useRecurringRules(user?.id)
   const router = useRouter()
 
@@ -156,33 +185,57 @@ export default function TodayScreen() {
 
   const locale = (profile?.locale ?? 'en') as Locale
   const currency = profile?.currency_code ?? 'USD'
+  // profiles.timezone (fix-plan 1.3) — every window/label this screen
+  // renders comes from here, never the device's own zone, so this screen
+  // agrees with Budgets/Insights/web about which day/month/week a
+  // transaction belongs to.
+  const tz = profile?.timezone || 'UTC'
 
-  const sections = useMemo(() => groupForToday(transactions, locale), [transactions, locale])
-  const weekly = useMemo(() => weeklySpendBars(transactions), [transactions])
-  const todayDow = useMemo(() => mondayIndex(new Date()), [])
-  const daysLeft = useMemo(() => daysLeftInMonth(new Date()), [])
+  // Frozen for the life of this mount (mirrors `insights.tsx`'s own
+  // `nowInstant`) rather than recomputed every render — every date-derived
+  // value below stays internally consistent within one render pass.
+  const nowInstant = useMemo(() => new Date().toISOString(), [])
+
+  const sections = useMemo(
+    () => groupForToday(transactions, locale, nowInstant, tz),
+    [transactions, locale, nowInstant, tz],
+  )
+  const weekly = useMemo(() => weeklySpendBars(transactions, nowInstant, tz), [transactions, nowInstant, tz])
+  const todayDow = useMemo(() => localParts(nowInstant, tz).weekdayIndex, [nowInstant, tz])
+  const daysLeft = useMemo(() => daysLeftInMonth(nowInstant, tz), [nowInstant, tz])
   const monthLabel = useMemo(
-    () => new Date().toLocaleDateString(locale, { month: 'long' }).toUpperCase(),
-    [locale],
+    () => new Date(nowInstant).toLocaleDateString(locale, { month: 'long', timeZone: tz }).toUpperCase(),
+    [locale, tz, nowInstant],
   )
   const spentToday = useMemo(() => {
-    const now = new Date()
+    const todayDayIso = localDay(nowInstant, tz)
     return transactions
-      .filter((t) => !t.is_deleted && t.direction === 'debit' && isSameDay(new Date(t.transacted_at), now))
-      .reduce((sum, t) => sum + aggAmount(t), 0)
-  }, [transactions])
-  const upcomingRecurring = useMemo(
-    () => computeUpcomingRecurring(recurringRules, budget?.period),
-    [recurringRules, budget?.period],
+      .filter((tx) => !tx.is_deleted && tx.direction === 'debit' && localDay(tx.transacted_at, tz) === todayDayIso)
+      .reduce((sum, tx) => sum + aggAmount(tx), 0)
+  }, [transactions, nowInstant, tz])
+
+  // The one budget-status computation (fix-plan 2.5/2.1) — replaces the
+  // deleted `usePeriodSpend(budget, transactions)` two-argument legacy
+  // path plus `computeUpcomingRecurring`, whose four defects (summed raw
+  // `rule.amount` across currencies, counted only the *next* occurrence,
+  // and derived its window from a `biweekly` branch that ended *today*)
+  // are exactly what `budgetStatusFor` fixes. Clamped at 0 for this
+  // quick-glance caption the same way the deleted code was — `budgets.tsx`
+  // is where an over-budget figure gets its own explicit "over by" state.
+  const budgetStatus = useMemo(
+    () => budgetStatusFor(budget, transactions, recurringRules, tz),
+    [budget, transactions, recurringRules, tz],
   )
-  const leftThisPeriod = budget?.amount != null ? Math.max(0, budget.amount - periodSpend - upcomingRecurring) : null
+  const leftThisPeriod = budgetStatus ? Math.max(0, budgetStatus.remaining) : null
 
   // Day-1 coach surface: show until the user has logged anything, unless they
   // tap Skip this session. Persistence is intentionally not wired — if the
   // user quits without logging, the hint reappears next launch, which is the
-  // right behavior (the goal is "get them over the first-log hump").
+  // right behavior (the goal is "get them over the first-log hump"). Never
+  // shown on a failed read — a read failure with zero cached rows is not
+  // the same fact as "you haven't logged anything yet" (fix-plan 2.13).
   const [daySkipped, setDaySkipped] = useState(false)
-  const showDayOne = !loading && transactions.length === 0 && !daySkipped
+  const showDayOne = !loading && transactions.length === 0 && !transactionsError && !daySkipped
 
   if (showDayOne) {
     return (
@@ -207,7 +260,7 @@ export default function TodayScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, { paddingBottom: tabBarClearance }]}
         showsVerticalScrollIndicator={false}
       >
         {/* Header — APRIL / Today + Ask Murmur entry + History entry. Two
@@ -240,19 +293,34 @@ export default function TodayScreen() {
           </View>
         </View>
 
-        {/* Budget one-liner */}
-        {leftThisPeriod != null && (
-          <View style={styles.budgetLine}>
-            <Text style={styles.budgetLeft}>
-              <Text style={styles.budgetLeftAccent}>
-                {formatBudgetShort(leftThisPeriod, currency)}
+        {/* Budget one-liner — a visible error+retry state (fix-plan 2.13)
+            when the budget itself failed to load, rather than silently
+            falling through to "no budget set" (`leftThisPeriod == null`
+            reads identically for both otherwise). */}
+        {budgetError && !budget ? (
+          <Pressable
+            onPress={refetchBudget}
+            style={({ pressed }) => [styles.budgetErrorLine, pressed && styles.budgetErrorLinePressed]}
+          >
+            <Ionicons name="alert-circle-outline" size={14} color={Colors.destructive ?? '#A94646'} />
+            <Text style={styles.budgetErrorText}>
+              {t('common.load_failed', locale)} · {t('common.retry', locale)}
+            </Text>
+          </Pressable>
+        ) : (
+          leftThisPeriod != null && (
+            <View style={styles.budgetLine}>
+              <Text style={styles.budgetLeft}>
+                <Text style={styles.budgetLeftAccent}>
+                  {formatBudgetShort(leftThisPeriod, currency, locale)}
+                </Text>
+                <Text style={styles.budgetLeftRest}> {t('home.left_this_month', locale)}</Text>
               </Text>
-              <Text style={styles.budgetLeftRest}> {t('home.left_this_month', locale)}</Text>
-            </Text>
-            <Text style={styles.budgetRight}>
-              {daysLeft} {t('home.days_to_go', locale)}
-            </Text>
-          </View>
+              <Text style={styles.budgetRight}>
+                {daysLeft} {t('home.days_to_go', locale)}
+              </Text>
+            </View>
+          )
         )}
 
         {/* "New pattern detected" recurring banner — Plus-gated. Free users
@@ -272,7 +340,7 @@ export default function TodayScreen() {
           <View style={{ flex: 1 }}>
             <MoneyLabel>{t('home.spent_today', locale)}</MoneyLabel>
             <View style={{ marginTop: 4 }}>
-              <Money value={spentToday} size={32} />
+              <Money value={spentToday} size={32} currencyCode={currency} locale={locale} />
             </View>
           </View>
           <MiniBars values={weekly} todayIndex={todayDow} />
@@ -281,6 +349,18 @@ export default function TodayScreen() {
         {/* List */}
         {loading ? (
           <ActivityIndicator color={Colors.primary} style={styles.loading} />
+        ) : transactionsError && sections.length === 0 ? (
+          <View style={styles.errorState}>
+            <Ionicons name="alert-circle-outline" size={32} color={Colors.destructive ?? '#A94646'} />
+            <Text style={styles.errorTitle}>{t('common.load_failed', locale)}</Text>
+            <Pressable
+              onPress={() => user?.id && syncManager.pullRemote(user.id)}
+              style={({ pressed }) => [styles.errorRetryBtn, pressed && styles.errorRetryBtnPressed]}
+            >
+              <Ionicons name="refresh" size={14} color="#FFFFFF" />
+              <Text style={styles.errorRetryText}>{t('common.retry', locale)}</Text>
+            </Pressable>
+          </View>
         ) : sections.length === 0 ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyIcon}>💸</Text>
@@ -315,26 +395,14 @@ export default function TodayScreen() {
   )
 }
 
-/** Compact budget-header amount: "$473" (no decimals — this is a quick-glance surface). */
-function formatBudgetShort(amount: number, currency: string): string {
-  // If it's a clean integer display, drop the decimals. Otherwise show the
-  // integer only (budgets rarely need cents in a header).
-  const glyph =
-    currency === 'USD' || currency === 'CAD' || currency === 'AUD' ? '$' :
-    currency === 'EUR' ? '€' :
-    currency === 'GBP' ? '£' :
-    currency === 'JPY' ? '¥' : currency + ' '
-  return `${glyph}${Math.round(amount).toLocaleString('en-US')}`
-}
-
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
     backgroundColor: Colors.background,
   },
-  content: {
-    paddingBottom: 140, // clear the floating tab bar
-  },
+  // `paddingBottom` set per-instance above from `useTabBarClearance()`
+  // (audit 01-F13, fix-plan 1.8/2.14).
+  content: {},
 
   // APRIL / Today row
   header: {
@@ -410,6 +478,25 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
 
+  // Budget error+retry line (fix-plan 2.13) — same slot as `budgetLine`,
+  // rendered instead of it when the budget read itself failed.
+  budgetErrorLine: {
+    marginHorizontal: 24,
+    marginTop: 4,
+    marginBottom: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'flex-start',
+  },
+  budgetErrorLinePressed: { opacity: 0.6 },
+  budgetErrorText: {
+    fontSize: 13,
+    fontFamily: Typography.fontFamily.sansSemiBold,
+    fontWeight: '600',
+    color: Colors.destructive ?? '#A94646',
+  },
+
   // Spent today card
   spentCard: {
     marginHorizontal: 22,
@@ -462,5 +549,37 @@ const styles = StyleSheet.create({
     fontSize: Typography.size.sm,
     color: Colors.ink3 ?? Colors.textSecondary,
     textAlign: 'center',
+  },
+
+  // Read-failure state (fix-plan 2.13) — replaces the transactions-empty
+  // state when zero rows is the *symptom of a failed read*, not the
+  // honest "nothing logged yet" fact.
+  errorState: {
+    alignItems: 'center',
+    paddingTop: Spacing['3xl'],
+    paddingHorizontal: Spacing['2xl'],
+    gap: Spacing.sm,
+  },
+  errorTitle: {
+    fontFamily: Typography.fontFamily.sansBold,
+    fontSize: Typography.size.md,
+    color: Colors.ink ?? Colors.text,
+  },
+  errorRetryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 4,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 999,
+    backgroundColor: Colors.ink ?? '#1B1915',
+  },
+  errorRetryBtnPressed: { opacity: 0.8 },
+  errorRetryText: {
+    fontFamily: Typography.fontFamily.sansSemiBold,
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
 })

@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, Pressable, ActivityIndicator } from 'react-nati
 import * as SecureStore from 'expo-secure-store'
 import { Ionicons } from '@expo/vector-icons'
 import { Colors, Typography, Hairline } from '../theme'
-import { t, type Locale } from '@voice-expense/shared'
+import { t, formatMoney, type Locale } from '@voice-expense/shared'
 import type { Transaction, RecurringRule } from '@voice-expense/shared'
 import {
   detectRecurringPatterns,
@@ -112,7 +112,11 @@ export function RecurringPatternBanner({
   }
 
   const frequencyLabel = t(`recurring.${candidate.frequency}`, locale).toLowerCase()
-  const amountDisplay = `${candidate.currency_code} ${candidate.amount.toFixed(2)}`
+  // The shared formatter (fix-plan 2.6) — replaces the hand-rolled
+  // `"USD 42.00"` concatenation, which printed the raw ISO code instead
+  // of a currency glyph and ignored the user's own grouping/decimal
+  // convention.
+  const amountDisplay = formatMoney(candidate.amount, candidate.currency_code, locale)
 
   return (
     <View style={styles.wrap}>

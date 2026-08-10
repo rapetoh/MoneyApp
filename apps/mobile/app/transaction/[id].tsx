@@ -267,7 +267,8 @@ export default function TransactionDetailScreen() {
                 value={amountSign * txn.amount}
                 size={56}
                 color={isCredit ? Colors.income : Colors.ink ?? Colors.text}
-                sign={currencySymbolFor(txn.currency_code || currency)}
+                currencyCode={txn.currency_code || currency}
+                locale={locale}
               />
             </View>
             {categoryName && (

@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '../../src/hooks/useAuth'
 import { useProfile } from '../../src/hooks/useProfile'
-import { Colors, Typography, Spacing, Radius, Hairline } from '../../src/theme'
+import { Colors, Typography, Spacing, Radius, Hairline, useTabBarClearance } from '../../src/theme'
 import { t, type Locale } from '@voice-expense/shared'
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name']
@@ -26,6 +26,9 @@ export default function MoreScreen() {
   const { profile } = useProfile(user?.id)
   const locale = (profile?.locale ?? 'en') as Locale
   const router = useRouter()
+  // Clears the floating tab bar (audit 01-F13, fix-plan 1.8/2.14) — replaces
+  // the hand-picked `paddingBottom: 120` literal.
+  const tabBarClearance = useTabBarClearance()
 
   const sections: { title: string; rows: Row[] }[] = [
     {
@@ -89,7 +92,7 @@ export default function MoreScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, { paddingBottom: tabBarClearance }]}
         showsVerticalScrollIndicator={false}
       >
         <Text style={styles.title}>{t('more.title', locale)}</Text>
@@ -135,10 +138,11 @@ export default function MoreScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
+  // `paddingBottom` set per-instance above from `useTabBarClearance()`
+  // (audit 01-F13, fix-plan 1.8/2.14).
   content: {
     padding: Spacing.base,
     gap: Spacing.lg,
-    paddingBottom: 120,
   },
   title: {
     fontFamily: Typography.fontFamily.serif,

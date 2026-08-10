@@ -15,9 +15,25 @@ import { NumericAccessory, NUMERIC_ACCESSORY_ID } from './NumericAccessory'
 import { RecurringToggle } from './RecurringToggle'
 import { AmountAdjustChips } from './AmountAdjustChips'
 import { Colors, Typography, Spacing, Radius } from '../theme'
-import { merchantColor, t, currencySymbolFor } from '@voice-expense/shared'
+import { merchantColor, t, currencySymbolFor, formatMoney, resolveCategorySuggestion } from '@voice-expense/shared'
 import type { ParsedExpense, Locale, Category } from '@voice-expense/shared'
 import type { RecurringFrequency } from '@voice-expense/shared'
+
+/** Pulls the numeric readings a clarifying question names — "Was that
+ *  $4.50 or $450?" → [4.5, 450] — so the sheet can offer them as
+ *  tappable choices instead of a static advisory the user has to resolve
+ *  by hand-editing the amount field below (fix-plan 2.9b: "rendered as a
+ *  two-button choice, not an advisory card"). `prompt.ts` always phrases
+ *  this as a two-option question naming both readings, so at most two
+ *  numbers are ever meaningful here; more than two is left unrendered
+ *  (the question text itself still shows) rather than guessed at. */
+export function extractClarificationAmounts(question: string): number[] {
+  const matches = question.match(/\d+(?:[.,]\d+)?/g) ?? []
+  const amounts = matches
+    .map((m) => parseFloat(m.replace(',', '.')))
+    .filter((n) => Number.isFinite(n) && n > 0)
+  return amounts.length === 2 ? amounts : []
+}
 
 interface Props {
   visible: boolean
@@ -40,6 +56,14 @@ export interface ConfirmedExpense {
   currency: string
   isRecurring: boolean
   recurringFrequency: RecurringFrequency
+  /** The AI-parsed date this expense actually happened on — "yesterday",
+   *  a receipt's printed date, a notification's timestamp (fix-plan 2.8,
+   *  audit 02-F8/04-F7/04-F24/07-F7/08-F3). `null` when the parse
+   *  carried no date (or there is no parse at all, e.g. manual entry),
+   *  in which case the caller's `createTransaction` defaults to now —
+   *  it never gets silently overwritten with now when a real date was
+   *  parsed, which is what every save path did before this. */
+  transactedAt: string | null
 }
 
 const DIRECTION_OPTIONS: { value: 'debit' | 'credit'; key: string }[] = [
@@ -81,20 +105,14 @@ export function VoiceConfirmModal({
       }
     }
 
-    if (parsedExpense.category_suggestion) {
-      const suggestion = parsedExpense.category_suggestion.trim().toLowerCase()
-      let match = categories.find((c) => c.name.toLowerCase() === suggestion)
-      if (!match) match = categories.find((c) => c.name.toLowerCase().includes(suggestion))
-      if (!match) match = categories.find((c) => suggestion.includes(c.name.toLowerCase()))
-      if (!match) {
-        const suggestionWords = suggestion.split(/[\s&,]+/).filter((w) => w.length > 2)
-        match = categories.find((c) => {
-          const catWords = c.name.toLowerCase().split(/[\s&,]+/).filter((w) => w.length > 2)
-          return suggestionWords.some((sw) => catWords.some((cw) => sw === cw || sw.includes(cw) || cw.includes(sw)))
-        }) ?? undefined
-      }
-      if (match) setCategoryId(match.id)
-    }
+    // Canonical resolver (fix-plan 2.9d) — exact, then curated synonyms,
+    // then whole-word token overlap with a minimum score. The inline
+    // substring cascade this replaces filed "Rent" under "Entertainment"
+    // because 'entertainment'.includes('rent'). resolveCategorySuggestion
+    // returns null rather than a low-confidence guess, leaving the
+    // category unselected for the user to pick.
+    const resolved = resolveCategorySuggestion(parsedExpense.category_suggestion, categories)
+    if (resolved) setCategoryId(resolved.category.id)
   }, [parsedExpense, categories])
 
   useEffect(() => {
@@ -129,6 +147,7 @@ export function VoiceConfirmModal({
       currency: parsedExpense?.currency ?? 'USD',
       isRecurring,
       recurringFrequency,
+      transactedAt: parsedExpense?.transacted_at ?? null,
     })
   }
 
@@ -170,6 +189,30 @@ export function VoiceConfirmModal({
       {parsedExpense?.needs_clarification && parsedExpense.clarifying_question && (
         <View style={styles.clarifyCard}>
           <Text style={styles.clarifyQuestion}>{parsedExpense.clarifying_question}</Text>
+          {/* An actual choice, not just an advisory to read and then go
+              hand-edit the amount field below (fix-plan 2.9b). Only
+              renders when the question names exactly two readings, which
+              is the only shape prompt.ts ever produces. */}
+          {extractClarificationAmounts(parsedExpense.clarifying_question).length > 0 && (
+            <View style={styles.clarifyChoiceRow}>
+              {extractClarificationAmounts(parsedExpense.clarifying_question).map((value) => {
+                const formatted = formatMoney(value, parsedExpense.currency, locale)
+                const selected = parseFloat(amount.replace(',', '.')) === value
+                return (
+                  <Pressable
+                    key={value}
+                    style={[styles.clarifyChoiceBtn, selected && styles.clarifyChoiceBtnActive]}
+                    onPress={() => setAmount(String(value))}
+                    accessibilityRole="button"
+                  >
+                    <Text style={[styles.clarifyChoiceText, selected && styles.clarifyChoiceTextActive]}>
+                      {formatted}
+                    </Text>
+                  </Pressable>
+                )
+              })}
+            </View>
+          )}
         </View>
       )}
 
@@ -210,7 +253,12 @@ export function VoiceConfirmModal({
             inputAccessoryViewID={NUMERIC_ACCESSORY_ID}
           />
         </View>
-        <AmountAdjustChips value={amount} onChange={setAmount} />
+        <AmountAdjustChips
+          value={amount}
+          onChange={setAmount}
+          currencyCode={parsedExpense?.currency ?? 'USD'}
+          locale={locale}
+        />
       </View>
 
       {/* Merchant */}
@@ -329,6 +377,32 @@ const styles = StyleSheet.create({
     fontFamily: Typography.fontFamily.sansSemiBold,
     fontSize: Typography.size.sm,
     color: '#7A5C00',
+  },
+  clarifyChoiceRow: {
+    flexDirection: 'row',
+    gap: Spacing.xs,
+    marginTop: Spacing.xs,
+  },
+  clarifyChoiceBtn: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderRadius: Radius.sm,
+    backgroundColor: Colors.card,
+    borderWidth: 1,
+    borderColor: '#F0D080',
+  },
+  clarifyChoiceBtnActive: {
+    backgroundColor: '#7A5C00',
+    borderColor: '#7A5C00',
+  },
+  clarifyChoiceText: {
+    fontFamily: Typography.fontFamily.sansSemiBold,
+    fontSize: Typography.size.sm,
+    color: '#7A5C00',
+  },
+  clarifyChoiceTextActive: {
+    color: Colors.white,
   },
   // "Bordered in accent + soft glow and labeled 'Amount · tap to edit'" per DESIGN.md §5 Confirm.
   // Wrong amount is the #1 voice-parse error; this card's emphasis draws the eye to it.

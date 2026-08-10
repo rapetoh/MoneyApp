@@ -1,15 +1,10 @@
 'use client'
-/* eslint-disable local/period-restrictions -- Stage 2 (2.4/2.14) migration
- * pending: `shift()` and the 24-month dropdown build below still hand-roll
- * calendar math in the browser's own local zone (fix-plan 2.4 owns this
- * component's full surfaces-list entry, "MonthPicker.tsx:60-96") — only
- * the `currentMonthIso(tz)` comparison item 1.3 touches directly is
- * threaded through `period.ts`; the rest is unconverted debt. */
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
 import { colors, font } from '../lib/theme'
 import { currentMonthIso } from '../lib/monthIso'
 import { Icon } from './Icons'
+import { addMonthsClamped, monthBounds } from '@voice-expense/shared'
 
 // Month picker for the Overview toolbar. Renders as "April 2026 ▼"; click
 // opens a dropdown of the last 24 months. Also supports keyboard prev/next
@@ -28,11 +23,10 @@ export function MonthPicker({
   /** Format: "YYYY-MM". Anchor month. */
   selected: string
   locale: string
-  /** IANA zone (`profile.timezone`) — threaded through only for the
-   *  "is this the current month" check below (fix-plan 1.3's
-   *  `monthIso.ts` no longer has an implicit default). The rest of this
-   *  component's Date math (`shift`, the 24-month dropdown build) is
-   *  unconverted Stage 2 (2.4) debt — see `eslint.config.mjs`. */
+  /** IANA zone (`profile.timezone`) — every month computation in this
+   *  component (the "is this the current month" check, `shift()`, and
+   *  the 24-month dropdown build) routes through `period.ts` with this
+   *  zone, never the browser's own local getters (fix-plan 1.3/2.4). */
   tz: string
   /**
    * When true, the picker has a "clear" affordance that removes ?month=
@@ -85,27 +79,43 @@ export function MonthPicker({
     setOpen(false)
   }
 
-  function shift(months: number) {
-    const [y, m] = selected.split('-').map(Number)
-    const d = new Date(y, m - 1 + months, 1)
-    pickMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`)
+  // `deltaMonths` calendar months from `monthIsoStr` — pure civil-date
+  // arithmetic via `addMonthsClamped` (day is always 1 here, so the
+  // month-end clamp never engages; this is the same primitive the
+  // recurrence engine uses for "one month after"). No `Date` involved,
+  // so this is exact regardless of which zone the browser happens to
+  // be in.
+  function shiftMonthIso(monthIsoStr: string, deltaMonths: number): string {
+    const [y, m] = monthIsoStr.split('-').map(Number)
+    const shifted = addMonthsClamped(y, m, 1, deltaMonths)
+    return `${String(shifted.y).padStart(4, '0')}-${String(shifted.m).padStart(2, '0')}`
   }
 
-  const [yy, mm] = selected.split('-').map(Number)
-  const selDate = new Date(yy, mm - 1, 1)
-  const monthLabel = selDate.toLocaleDateString(locale, { month: 'long', year: 'numeric' })
-  const label = cleared ? clearLabel : monthLabel
+  // Localized "April 2026" label for a `YYYY-MM` — resolved through
+  // `monthBounds(monthIsoStr, tz)`'s own start instant and formatted
+  // with an explicit `timeZone`, so the civil month displayed is always
+  // the one `tz` (the profile's zone) means, never whatever the
+  // browser's own local zone would read the same instant as.
+  function monthIsoLabel(monthIsoStr: string): string {
+    const bounds = monthBounds(monthIsoStr, tz)
+    return new Date(bounds.start).toLocaleDateString(locale, { month: 'long', year: 'numeric', timeZone: tz })
+  }
 
-  // Build the dropdown options: trailing 24 months, newest first.
+  function shift(months: number) {
+    pickMonth(shiftMonthIso(selected, months))
+  }
+
+  const label = cleared ? clearLabel : monthIsoLabel(selected)
+
+  // Build the dropdown options: trailing 24 months, newest first,
+  // anchored on the current month in `tz` — not the browser's own
+  // `new Date()`, which can disagree with the profile's zone about
+  // which month is "current" near a month boundary.
   const options: Array<{ iso: string; label: string }> = []
-  const now = new Date()
+  const thisMonthIso = currentMonthIso(tz)
   for (let i = 0; i < 24; i++) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
-    const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-    options.push({
-      iso,
-      label: d.toLocaleDateString(locale, { month: 'long', year: 'numeric' }),
-    })
+    const iso = shiftMonthIso(thisMonthIso, -i)
+    options.push({ iso, label: monthIsoLabel(iso) })
   }
 
   return (
