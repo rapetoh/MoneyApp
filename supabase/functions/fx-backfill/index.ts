@@ -62,6 +62,7 @@ interface PendingRow {
   amount: number
   currency_code: string
   transacted_at: string
+  local_day: string
 }
 
 Deno.serve(async (req) => {
@@ -85,7 +86,7 @@ Deno.serve(async (req) => {
 
   const { data: rows, error: fetchError } = await supabase
     .from('transactions')
-    .select('id, user_id, amount, currency_code, transacted_at')
+    .select('id, user_id, amount, currency_code, transacted_at, local_day')
     .eq('is_deleted', false)
     .is('amount_in_profile_currency', null)
     .order('transacted_at', { ascending: false })
@@ -153,7 +154,11 @@ Deno.serve(async (req) => {
 
   for (const row of pending) {
     const profileCurrency = await getProfileCurrency(row.user_id)
-    const date = row.transacted_at.slice(0, 10)
+    // local_day (migration 017) is the transaction's resolved civil day in
+    // the user's zone — the same day fx.ts's client-side sweep now rates
+    // against. Using the UTC slice of transacted_at here would price
+    // evening US transactions at the next day's rate.
+    const date = row.local_day
     const rate = await fetchRate(date, row.currency_code, profileCurrency)
     if (rate == null) {
       // Leave the row NULL — the next scheduled run (or the mobile
