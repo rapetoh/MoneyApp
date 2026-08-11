@@ -17,7 +17,7 @@ tracked in the user's personal plan file (`~/.claude/plans/breezy-painting-zephy
 |---|---|---|
 | A | Brand + visual refresh (rename → Murmur, sage palette, serif amounts, refreshed shadows, tab bar polish) | **Complete (Apr 18, 2026 — commit 845d8fb)** |
 | B | IA reshuffle (Today / Insights / FAB / Budgets / More) | **Complete (Apr 18, 2026 — commits e79ccef + 6be5a86)** |
-| C | Capture flow polish (amount-as-hero, adjust chips, rose [unclear] tag, undo snackbar) | **In progress (Apr 18, 2026)** |
+| C | Capture flow polish (amount-as-hero, adjust chips, rose [unclear] tag, undo snackbar) | **Complete (Aug 11, 2026 — superseded by the voice-capture in-place redesign, see dated entry below)** |
 | D | New screens (Day-1 guided, Budgets tab, Privacy Center, Paywall, History heatmap) | Not started |
 | E | Ask Murmur (grounded Q&A replacing the chat-style AI Advisor from v1.0) | Not started |
 | F | Lazy identity + auth reshuffle (no sign-in at launch) | Not started |
@@ -26,7 +26,39 @@ tracked in the user's personal plan file (`~/.claude/plans/breezy-painting-zephy
 | I | Desktop companion (Electron-wrap apps/web + QR pairing) | Not started |
 | J | Docs update (ongoing, every phase) | Continuous |
 
-**Locked decisions (April 18, 2026)**:
+**Voice-capture in-place redesign (implemented Aug 11, 2026)** — source of
+truth: `docs/voice redesign/` (screenshot + Claude Design HTML, artboards
+11, 14, 14a–14c, 15). Full artboard→code mapping and every judgment call in
+[voice redesign/IMPLEMENTATION.md](./voice%20redesign/IMPLEMENTATION.md). Summary:
+
+- **Mic FAB no longer navigates.** A custom `tabBarButton` opens an
+  in-place capture overlay (14a) over whatever screen is showing, owned by
+  `VoiceSessionProvider` (`src/hooks/useVoiceSession.tsx`) mounted at the
+  root. Stop → parse → result sheet (14b) rises in place; Edit expands the
+  same sheet (14c); save → undo snackbar (15). Voice, scan, iOS Shortcut,
+  and Android notification captures all funnel through this one sheet —
+  the old double-mounted `VoiceConfirmModal` is gone.
+- **Manual entry moved out of the mic flow** to a + pill on Today's header
+  → Quick entry (`app/transaction/new.tsx`, artboard 11 — the old stub
+  redirect is now the real screen). Receipt/paycheck scan lives there.
+- **`/(tabs)/record` is a bridge route only** — it preserves every
+  pre-redesign deep link (`voiceexpense://shortcut`, `?tab=manual`,
+  bare) and forwards into the new surfaces. `useShortcutHandler` is
+  unchanged, so existing installed Shortcuts keep working.
+- **Tab bar restyled to the artboard-14 spec**: whiter blur pill, labels,
+  ink active tint (no filled sage square), ink 58pt FAB.
+- **Auto-save**: voice-only, high-confidence (≥ 0.75), no-clarification
+  parses save themselves after a 2.6s countdown ("tap to hold" pauses);
+  every save path now shows the Saved-with-Undo snackbar (undo = the
+  existing soft delete).
+- **Deliberately not built** (mockup implies capability the app doesn't
+  have): live merchant/category chips while speaking (parse runs
+  post-stop; the amount chip is live via the local regex), transcript
+  "tap to replay" (no audio file ever exists), merchant suggestion chips
+  (parser returns one merchant), date/time editing (row is read-only —
+  no date picker exists anywhere yet; follow-up), and the mockup's
+  "nothing uploaded" copy (transcript does go to the parse API; the
+  existing honest "Processed securely" line stays).
 - **Monetization**: mobile free forever; Murmur Plus $3.99/mo or $29.99/yr unlocks Ask Murmur + auto recurring + export + desktop. **Superseded Aug 9, 2026 (fix-plan 3.1)**: no purchase flow exists yet on any platform, so the price and the "Upgrade" CTA are gone from the product until IAP/Stripe ships — see the dated entry below. The feature bundle (Ask Murmur + auto recurring + export + desktop) is unchanged; only "there is a working checkout for it today" was false.
 - **Storage**: Supabase-first; no CloudKit rewrite. Privacy story via on-device voice + transcript-only sync + explicit controls.
 - **Auth**: all 3 providers preserved (Apple + Google + email); lazy identity — no sign-in wall at launch.
@@ -922,9 +954,18 @@ Each pushes as a card on top of the tab bar; the bar hides on push, matches the 
 - Ask Murmur full implementation — Phase E.
 - Settings screen visual refresh — picked up naturally when Settings is next touched.
 
-### Phase C — Capture flow polish (in progress April 18, 2026)
+### Phase C — Capture flow polish (completed Aug 11, 2026)
 
 Design reference: [DESIGN.md](./DESIGN.md) §3 Motion + §5 Confirm + §5 Today.
+
+> **Update Aug 11, 2026** — the voice-capture in-place redesign (see the
+> dated entry in "Murmur redesign" above and
+> [voice redesign/IMPLEMENTATION.md](./voice%20redesign/IMPLEMENTATION.md))
+> closed out this phase and superseded several artifacts named below:
+> `ListeningView`, `VoiceWaveform`, and `VoiceConfirmModal` were replaced by
+> `VoiceCaptureOverlay`, `LiveWaveform`, and `VoiceResultSheet` (all owned
+> by `VoiceSessionProvider`), and the "undo for save" deferral shipped —
+> every create path now shows the Saved-with-Undo snackbar.
 
 **New components:**
 - [apps/mobile/src/components/AmountAdjustChips.tsx](../apps/mobile/src/components/AmountAdjustChips.tsx) — pill row of `−$1 +$1 +$5 +$10` buttons beneath the amount input. Tap applies the delta, rounds to 2 decimals, clamps at 0. Wrong amount is the #1 voice-parse error; a one-tap fix beats reopening the keyboard.

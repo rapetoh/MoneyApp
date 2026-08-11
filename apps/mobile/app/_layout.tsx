@@ -1,25 +1,21 @@
-import { useEffect, useRef, useState, useCallback } from 'react'
-import { Alert } from 'react-native'
+import { useEffect, useRef } from 'react'
 import { Stack, useRouter, useSegments } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import * as SplashScreen from 'expo-splash-screen'
 import { useFonts } from 'expo-font'
 import { useAuth } from '../src/hooks/useAuth'
 import { useProfile } from '../src/hooks/useProfile'
-import { useCategories } from '../src/hooks/useCategories'
-import { useTransactions } from '../src/hooks/useTransactions'
 import { syncManager } from '../src/services/sync/SyncManager'
 import { useShortcutHandler } from '../src/hooks/useShortcutHandler'
-import { useNotificationListener } from '../src/hooks/useNotificationListener'
 import { runRecurringCatchUp } from '../src/services/recurringCatchUp'
 import { runFxBackfill } from '../src/services/fxBackfill'
 import { registerDevice } from '../src/services/sync/deviceRegistry'
 import { runOncePerSession } from '../src/services/launchOnce'
 import { UndoProvider } from '../src/hooks/useUndo'
+import { VoiceSessionProvider } from '../src/hooks/useVoiceSession'
 import { SyncFailureBanner } from '../src/components/SyncFailureBanner'
-import { VoiceConfirmModal, type ConfirmedExpense } from '../src/components/VoiceConfirmModal'
 import { t } from '@voice-expense/shared'
-import type { Locale, ParsedExpense } from '@voice-expense/shared'
+import type { Locale } from '@voice-expense/shared'
 
 SplashScreen.preventAutoHideAsync()
 
@@ -61,47 +57,11 @@ export default function RootLayout() {
   // Handles voiceexpense://shortcut?amount=XX&merchant=... deep links from iOS Shortcuts
   useShortcutHandler()
 
-  // Android payment-notification capture (fix-plan 3.4 / audit 07-F10,
-  // 08-F20, 02-F34). Mounted here — not in the Settings screen, which has
-  // no way to navigate — so a detected payment can reach a confirm sheet.
-  // `categories`/`createTransaction` are a dedicated instance for this
-  // root-level capture flow, independent of whatever screen is on top.
-  const { categories, createCategory } = useCategories(session?.user?.id)
-  const { createTransaction } = useTransactions(session?.user?.id)
-  const [notifCapture, setNotifCapture] = useState<ParsedExpense | null>(null)
-  const [notifSaving, setNotifSaving] = useState(false)
-
-  useNotificationListener(
-    useCallback((parsed: ParsedExpense) => setNotifCapture(parsed), []),
-  )
-
-  const handleConfirmNotification = useCallback(
-    async (expense: ConfirmedExpense) => {
-      setNotifSaving(true)
-      const { error } = await createTransaction({
-        amount: expense.amount,
-        direction: expense.direction,
-        currency_code: expense.currency,
-        merchant: expense.merchant,
-        note: expense.note,
-        category_id: expense.categoryId,
-        merchant_domain: notifCapture?.merchant_domain ?? null,
-        payment_method: notifCapture?.payment_method ?? null,
-        transacted_at: expense.transactedAt ?? undefined,
-        source: 'notification_listener',
-        ai_confidence: notifCapture?.confidence ?? null,
-        is_recurring: expense.isRecurring,
-        recurring_frequency: expense.isRecurring ? expense.recurringFrequency : null,
-      })
-      setNotifSaving(false)
-      if (error) {
-        Alert.alert(t('common.error', locale), error)
-        return
-      }
-      setNotifCapture(null)
-    },
-    [createTransaction, notifCapture, locale],
-  )
+  // Android payment-notification capture (fix-plan 3.4) now lives inside
+  // VoiceSessionProvider — the same root-level result sheet serves voice,
+  // scan, Shortcut, and notification captures, so there is exactly one
+  // confirm surface mounted instead of the two competing VoiceConfirmModal
+  // mounts this file and the Record screen used to hold.
 
   useEffect(() => {
     syncManager.start()
@@ -212,6 +172,7 @@ export default function RootLayout() {
 
   return (
     <UndoProvider>
+      <VoiceSessionProvider>
       <StatusBar style="dark" backgroundColor="#FBFAF7" />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(auth)" />
@@ -229,9 +190,10 @@ export default function RootLayout() {
         <Stack.Screen
           name="transaction/new"
           options={{
-            headerShown: true,
-            headerTitle: t('nav.add_expense', locale),
-            headerBackTitle: t('common.back', locale),
+            // Quick entry draws its own Cancel · title · mic header
+            // (artboard 11, docs/voice redesign), so the native modal
+            // header is suppressed.
+            headerShown: false,
             presentation: 'modal',
           }}
         />
@@ -317,21 +279,7 @@ export default function RootLayout() {
       {/* App-wide failure surface for the sync outbox (fix-plan 1.6 point
           4) — renders nothing unless something is dead-lettered. */}
       <SyncFailureBanner locale={locale} />
-      {/* Confirm sheet for an Android payment notification (fix-plan 3.4) —
-          the same component the Record screen uses for voice/scan, mounted
-          here because this is the level that can react to a detected
-          payment regardless of which screen is on top. */}
-      <VoiceConfirmModal
-        visible={notifCapture !== null}
-        transcript=""
-        parsedExpense={notifCapture}
-        categories={categories}
-        onCreateCategory={createCategory}
-        onConfirm={handleConfirmNotification}
-        onDismiss={() => setNotifCapture(null)}
-        saving={notifSaving}
-        locale={locale}
-      />
+      </VoiceSessionProvider>
     </UndoProvider>
   )
 }

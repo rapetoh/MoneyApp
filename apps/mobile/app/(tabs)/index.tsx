@@ -243,15 +243,8 @@ export default function TodayScreen() {
         <DayOneFirstLog
           locale={locale}
           onSkip={() => setDaySkipped(true)}
-          onTypeInstead={() =>
-            router.push({
-              pathname: '/(tabs)/record',
-              // _nonce forces uniqueness on repeat taps so Record's
-              // useFocusEffect re-syncs to Manual each time instead of
-              // being deduped by expo-router.
-              params: { tab: 'manual', _nonce: Date.now().toString() },
-            })
-          }
+          // Straight to Quick entry — the manual flow's post-redesign home.
+          onTypeInstead={() => router.push('/transaction/new')}
         />
       </SafeAreaView>
     )
@@ -263,15 +256,23 @@ export default function TodayScreen() {
         contentContainerStyle={[styles.content, { paddingBottom: tabBarClearance }]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header — APRIL / Today + Ask Murmur entry + History entry. Two
-            sibling icon pills on the right so Ask is a primary surface
-            instead of being buried two taps deep under More. */}
+        {/* Header — APRIL / Today + manual entry + Ask Murmur + History.
+            The + pill (voice redesign) is the old manual flow's new home:
+            the mic FAB is now the default way to log, and typing lives
+            here beside the existing AI entry. */}
         <View style={styles.header}>
           <View>
             <Text style={styles.monthTag}>{monthLabel}</Text>
             <Text style={styles.title}>{t('transactions.today', locale)}</Text>
           </View>
           <View style={styles.headerActions}>
+            <Pressable
+              style={({ pressed }) => [styles.headerIconBtn, pressed && styles.headerIconBtnPressed]}
+              onPress={() => router.push('/transaction/new')}
+              accessibilityLabel={t('nav.add_expense', locale)}
+            >
+              <Ionicons name="add" size={20} color={Colors.ink2 ?? Colors.textSecondary} />
+            </Pressable>
             <Pressable
               style={({ pressed }) => [styles.headerIconBtn, pressed && styles.headerIconBtnPressed]}
               onPress={() => router.push('/more/ask')}

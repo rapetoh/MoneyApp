@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router'
-import { View, StyleSheet } from 'react-native'
+import { View, Pressable, StyleSheet } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { BlurView } from 'expo-blur'
 import { Ionicons } from '@expo/vector-icons'
@@ -8,6 +8,7 @@ import { useProfile } from '../../src/hooks/useProfile'
 import { useTransactions } from '../../src/hooks/useTransactions'
 import { useInsightsUnlock } from '../../src/hooks/useInsightsUnlock'
 import { useDayTwoDunning } from '../../src/hooks/useDayTwoDunning'
+import { useVoiceSession } from '../../src/hooks/useVoiceSession'
 import { Colors, Typography, TAB_BAR_HEIGHT, TAB_BAR_BOTTOM_OFFSET } from '../../src/theme'
 import { t, type Locale } from '@voice-expense/shared'
 
@@ -23,22 +24,33 @@ function TabIcon({
   badge?: boolean
 }) {
   return (
-    <View style={[styles.tabIconWrap, focused && styles.tabIconWrapActive]}>
+    <View style={styles.tabIconWrap}>
       <Ionicons
         name={name}
         size={22}
-        color={focused ? Colors.white : Colors.textSecondary}
+        color={focused ? Colors.ink : Colors.ink4}
       />
       {badge && <View style={styles.tabBadge} />}
     </View>
   )
 }
 
-function RecordIcon() {
+/** The center mic FAB. Since the voice redesign (docs/voice redesign,
+ *  artboard 14a) it no longer navigates to a Record screen — it opens the
+ *  in-place capture overlay over whatever tab is showing. The `record`
+ *  route stays registered as a bridge for old deep links only. */
+function RecordFab({ label }: { label: string }) {
+  const { openVoice } = useVoiceSession()
   return (
-    <View style={styles.recordButton}>
+    <Pressable
+      style={({ pressed }) => [styles.recordButton, pressed && styles.recordButtonPressed]}
+      onPress={openVoice}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      hitSlop={6}
+    >
       <Ionicons name="mic" size={26} color={Colors.white} />
-    </View>
+    </Pressable>
   )
 }
 
@@ -81,8 +93,11 @@ export default function TabsLayout() {
             style={styles.tabBarBlur}
           />
         ),
-        tabBarActiveTintColor: Colors.primary,
-        tabBarInactiveTintColor: Colors.textSecondary,
+        // Ink-on-quiet active state per the voice-redesign tab bar
+        // (docs/voice redesign, artboard 14) — no filled pill behind the
+        // active icon anymore; active reads as ink, inactive as ink4.
+        tabBarActiveTintColor: Colors.ink,
+        tabBarInactiveTintColor: Colors.ink4,
         tabBarLabelStyle: styles.tabLabel,
       }}
     >
@@ -112,8 +127,10 @@ export default function TabsLayout() {
         name="record"
         options={{
           title: '',
-          tabBarIcon: () => <RecordIcon />,
-          tabBarLabel: () => null,
+          // Custom button: opens the in-place voice overlay instead of
+          // navigating. The route itself survives only as a redirect bridge
+          // for pre-redesign deep links (see app/(tabs)/record.tsx).
+          tabBarButton: () => <RecordFab label={t('voice.tap_to_record', locale)} />,
         }}
       />
       <Tabs.Screen
@@ -179,7 +196,9 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     borderRadius: 34,
     overflow: 'hidden',
-    backgroundColor: 'rgba(255,255,255,0.55)',
+    // Whiter tint per the voice-redesign bar (mockup: rgba(255,255,255,0.84)
+    // over backdrop blur) — the old 0.55 read muddy over busy content.
+    backgroundColor: 'rgba(255,255,255,0.84)',
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: 'rgba(40,36,28,0.08)',
   },
@@ -195,9 +214,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  tabIconWrapActive: {
-    backgroundColor: Colors.primary,
-  },
   // Day-3 Insights unlock dot — small sage circle in the upper-right of the
   // Insights tab icon. Vanishes the first time the user opens Insights.
   tabBadge: {
@@ -211,18 +227,23 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: Colors.white,
   },
+  // Ink FAB per the voice-redesign bar (artboard 14) — 58pt, raised above
+  // the pill, near-black instead of sage.
   recordButton: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: Colors.primary,
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    backgroundColor: Colors.ink,
     alignItems: 'center',
     justifyContent: 'center',
+    alignSelf: 'center',
     marginTop: -10,
-    shadowColor: Colors.primary,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 12,
+    marginHorizontal: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.28,
+    shadowRadius: 20,
     elevation: 10,
   },
+  recordButtonPressed: { opacity: 0.85 },
 })

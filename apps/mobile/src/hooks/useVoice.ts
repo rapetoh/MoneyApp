@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
+import { Animated } from 'react-native'
 import {
   ExpoSpeechRecognitionModule,
   useSpeechRecognitionEvent,
@@ -16,6 +17,14 @@ export interface UseVoiceReturn {
   interimTranscript: string
   parsedExpense: ParsedExpense | null
   errorMessage: string | null
+  /** Mic input level, 0..1, updated ~every 80ms while listening. An
+   *  Animated.Value (not React state) on purpose: the capture overlay's
+   *  waveform consumes it via listener without re-rendering the provider
+   *  tree at metering frequency. */
+  volumeLevel: Animated.Value
+  /** Wall-clock ms the last parse took (stop → parsed). Null until a
+   *  parse completes; display-only ("1.8s" badge on the result sheet). */
+  parseDurationMs: number | null
   startListening: (locale: string) => Promise<void>
   stopListening: () => void
   reset: () => void
@@ -32,8 +41,21 @@ export function useVoice(
   const [interimTranscript, setInterimTranscript] = useState('')
   const [parsedExpense, setParsedExpense] = useState<ParsedExpense | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [parseDurationMs, setParseDurationMs] = useState<number | null>(null)
   const finalTranscriptRef = useRef('')
   const lastInterimRef = useRef('')
+  const volumeLevel = useRef(new Animated.Value(0)).current
+  const parseStartRef = useRef(0)
+  // Session generation — bumped by every startListening / injectParsed /
+  // reset. An async parse only writes its result if its generation is
+  // still current, so a scan/Shortcut/notification inject arriving while
+  // an older voice parse is in flight can never be overwritten by it.
+  const sessionGenRef = useRef(0)
+  // True between start() and the recognizer's own end/error events.
+  const recognizerActiveRef = useRef(false)
+  // Set when an inject aborts an in-progress recognition — tells the
+  // end/error handlers to swallow that session instead of parsing it.
+  const discardRecognitionRef = useRef(false)
 
   // Use refs so the speech-end callback always reads the latest values
   const categoriesRef = useRef(userCategories)
@@ -60,7 +82,19 @@ export function useVoice(
     }
   })
 
+  // Mic level for the live waveform. The module reports floats in −2..10
+  // where anything below 0 is inaudible; normalize to 0..1.
+  useSpeechRecognitionEvent('volumechange', (event) => {
+    volumeLevel.setValue(Math.min(Math.max(event.value / 10, 0), 1))
+  })
+
   useSpeechRecognitionEvent('end', () => {
+    volumeLevel.setValue(0)
+    recognizerActiveRef.current = false
+    if (discardRecognitionRef.current) {
+      discardRecognitionRef.current = false
+      return
+    }
     // iOS sometimes fires 'end' without ever setting isFinal=true.
     // Fall back to the last interim transcript so nothing is lost.
     const final = finalTranscriptRef.current || lastInterimRef.current
@@ -82,6 +116,12 @@ export function useVoice(
   })
 
   useSpeechRecognitionEvent('error', (event) => {
+    recognizerActiveRef.current = false
+    if (discardRecognitionRef.current) {
+      // Deliberately aborted by an inject — not an error the user sees.
+      // The matching 'end' event clears the flag.
+      return
+    }
     // 'no-speech' on real devices = user opened the mic and didn't say
     // anything. Still worth surfacing so the user knows why nothing
     // happened; we classify it alongside the silent-end case above.
@@ -96,7 +136,9 @@ export function useVoice(
 
   const runParse = useCallback(
     async (text: string) => {
+      const gen = sessionGenRef.current
       setState('processing')
+      parseStartRef.current = Date.now()
       try {
         const { data: sessionData } = await supabase.auth.getSession()
         const token = sessionData?.session?.access_token ?? ''
@@ -113,9 +155,14 @@ export function useVoice(
           userId,
         })
 
+        // A newer session (inject / reset / fresh recording) superseded
+        // this parse while it was in flight — drop it.
+        if (gen !== sessionGenRef.current) return
+        setParseDurationMs(Date.now() - parseStartRef.current)
         setParsedExpense(result)
         setState('done')
       } catch (err) {
+        if (gen !== sessionGenRef.current) return
         setErrorMessage(err instanceof Error ? err.message : 'Parsing failed')
         setState('error')
       }
@@ -131,6 +178,8 @@ export function useVoice(
       return
     }
 
+    sessionGenRef.current++
+    discardRecognitionRef.current = false
     finalTranscriptRef.current = ''
     setTranscript('')
     setInterimTranscript('')
@@ -138,11 +187,15 @@ export function useVoice(
     setErrorMessage(null)
     setState('listening')
 
+    recognizerActiveRef.current = true
     ExpoSpeechRecognitionModule.start({
       lang: locale,
       continuous: false,
       interimResults: true,
       maxAlternatives: 1,
+      // Display telemetry only — drives the capture overlay's waveform.
+      // No effect on recognition or parsing.
+      volumeChangeEventOptions: { enabled: true, intervalMillis: 80 },
     })
   }, [])
 
@@ -151,23 +204,40 @@ export function useVoice(
   }, [])
 
   const reset = useCallback(() => {
+    sessionGenRef.current++
+    if (recognizerActiveRef.current) {
+      discardRecognitionRef.current = true
+      ExpoSpeechRecognitionModule.abort()
+    }
     setState('idle')
     setTranscript('')
     setInterimTranscript('')
     setParsedExpense(null)
     setErrorMessage(null)
+    setParseDurationMs(null)
     finalTranscriptRef.current = ''
-  }, [])
+    volumeLevel.setValue(0)
+  }, [volumeLevel])
 
   /**
-   * Inject a parsed result directly (used by scan flow to reuse VoiceConfirmModal).
-   * Sets state to 'done' so the modal opens automatically.
+   * Inject a parsed result directly (scan flow, iOS Shortcut, Android
+   * notification listener). Sets state to 'done' so VoiceSessionProvider
+   * presents the shared result sheet.
    */
   const injectParsed = useCallback((parsed: ParsedExpense) => {
+    // Supersede any in-flight session: bump the generation (stale parse
+    // completions drop themselves) and abort an active recognizer so its
+    // end-of-speech parse can't overwrite this injected result.
+    sessionGenRef.current++
+    if (recognizerActiveRef.current) {
+      discardRecognitionRef.current = true
+      ExpoSpeechRecognitionModule.abort()
+    }
     setParsedExpense(parsed)
     setTranscript('')
     setInterimTranscript('')
     setErrorMessage(null)
+    setParseDurationMs(null)
     setState('done')
   }, [])
 
@@ -177,6 +247,8 @@ export function useVoice(
     interimTranscript,
     parsedExpense,
     errorMessage,
+    volumeLevel,
+    parseDurationMs,
     startListening,
     stopListening,
     reset,
