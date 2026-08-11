@@ -30,11 +30,24 @@ export class MissingEnvError extends Error {
   }
 }
 
-function readRequired<K extends string>(keys: readonly K[]): Record<K, string> {
+// CAPTURED AS LITERALS, at module scope, on purpose: bundlers (Next for
+// the browser bundle, Metro for Expo) replace only the exact token
+// `process.env.NEXT_PUBLIC_X` at build time. A computed read
+// (`process.env[key]`) is invisible to that replacement and evaluates to
+// `undefined` in every browser bundle even when the deployment sets the
+// variable — which took the deployed dashboard down with a client-side
+// MissingEnvError on every page load (and, same class, crashed TestFlight
+// build #6 on launch). Validation below operates on these captured
+// values, never on dynamic keys.
+const RAW_NEXT_PUBLIC_SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
+const RAW_NEXT_PUBLIC_SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+function readRequired<K extends string>(
+  entries: readonly (readonly [K, string | undefined])[],
+): Record<K, string> {
   const values = {} as Record<K, string>
   const missing: K[] = []
-  for (const key of keys) {
-    const value = process.env[key]
+  for (const [key, value] of entries) {
     if (!value) {
       missing.push(key)
     } else {
@@ -50,8 +63,6 @@ export interface SupabaseEnv {
   NEXT_PUBLIC_SUPABASE_ANON_KEY: string
 }
 
-const SUPABASE_ENV_KEYS = ['NEXT_PUBLIC_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_ANON_KEY'] as const
-
 let cachedSupabaseEnv: SupabaseEnv | null = null
 
 /** Validated once per module instance, then cached — every call site
@@ -60,7 +71,10 @@ let cachedSupabaseEnv: SupabaseEnv | null = null
  *  clients are created. */
 export function getSupabaseEnv(): SupabaseEnv {
   if (!cachedSupabaseEnv) {
-    cachedSupabaseEnv = readRequired(SUPABASE_ENV_KEYS)
+    cachedSupabaseEnv = readRequired([
+      ['NEXT_PUBLIC_SUPABASE_URL', RAW_NEXT_PUBLIC_SUPABASE_URL],
+      ['NEXT_PUBLIC_SUPABASE_ANON_KEY', RAW_NEXT_PUBLIC_SUPABASE_ANON_KEY],
+    ] as const)
   }
   return cachedSupabaseEnv
 }
@@ -69,17 +83,17 @@ export interface OpenAIEnv {
   OPENAI_API_KEY: string
 }
 
-const OPENAI_ENV_KEYS = ['OPENAI_API_KEY'] as const
-
 let cachedOpenAIEnv: OpenAIEnv | null = null
 
 /** Server-only — see file header. Every AI route calls this at module
  *  scope so a missing key fails that route's first request with a named
  *  error instead of an opaque OpenAI SDK crash on the first
- *  `chat.completions.create` call. */
+ *  `chat.completions.create` call. (Server processes have a real
+ *  `process.env`, but the literal-capture rule is applied here too so
+ *  this module has exactly one access pattern.) */
 export function getOpenAIEnv(): OpenAIEnv {
   if (!cachedOpenAIEnv) {
-    cachedOpenAIEnv = readRequired(OPENAI_ENV_KEYS)
+    cachedOpenAIEnv = readRequired([['OPENAI_API_KEY', process.env.OPENAI_API_KEY]] as const)
   }
   return cachedOpenAIEnv
 }

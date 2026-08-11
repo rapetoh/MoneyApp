@@ -291,6 +291,22 @@ export default tseslint.config(
       'local/mobile-price-restrictions': ['error', ...MOBILE_PRICE_RESTRICTIONS],
     },
   },
+  // Computed process.env reads are invisible to build-time env inlining in
+  // EVERY bundler this repo ships through (Metro for the phone, Next for
+  // the browser). Build #6 crashed on launch and the deployed dashboard
+  // threw client-side from the same pattern — enforce literal access
+  // everywhere bundled code lives, not just apps/mobile.
+  {
+    files: ['apps/web/src/**/*.{ts,tsx}', 'packages/**/src/**/*.ts'],
+    // Tests run in Node, where process.env is a real mutable object —
+    // dynamic manipulation there is the standard way to exercise env
+    // validation and never ships in a bundle.
+    ignores: ['**/__tests__/**', '**/*.test.*'],
+    plugins: { local: localRules },
+    rules: {
+      'local/mobile-env-restrictions': ['error', ...MOBILE_ENV_RESTRICTIONS],
+    },
+  },
   // --- 1.3 Stage-2 debt: pre-existing call sites outside this item's own
   // surfaces list (apps/mobile/src/components/HistoryHeatmap.tsx's
   // weekday labels, apps/web/src/lib/monthIso.ts, dashboard/page.tsx +
