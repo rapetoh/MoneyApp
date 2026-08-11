@@ -173,17 +173,25 @@ function buildBranches(p: LensProps, displayName: string): Branch[] {
       leaves: [],
     })
   }
+  const planSubs: Array<{ label: string; leaves: string[] }> = p.recurring
+    .slice(0, 4)
+    .map((r) => ({
+      label: `${r.name ?? 'Unnamed'} · ${fmt(r.amount)}`,
+      leaves: [r.frequency],
+    }))
+  // The committed-monthly roll-up lives under PLAN, with the rules it
+  // summarises — NOT under "Saved & invested". It mixes bill commitments
+  // (Xtream) with investing commitments (Schwab); only its investing
+  // slice has anything to do with saving, and the owner rightly flagged
+  // an expense commitment appearing inside the savings branch as
+  // illogical. Plan is the branch that answers "what happens next
+  // month"; this is that branch's headline number.
   if (recurringMonthly > 0) {
-    savedSubs.push({
-      label: `Recurring outflow · ${fmt(recurringMonthly)}/mo`,
-      leaves: recurringDebits.slice(0, 3).map((r) => r.name ?? 'Unnamed'),
+    planSubs.push({
+      label: `Committed · ${fmt(recurringMonthly)}/mo`,
+      leaves: [],
     })
   }
-
-  const planSubs = p.recurring.slice(0, 4).map((r) => ({
-    label: `${r.name ?? 'Unnamed'} · ${fmt(r.amount)}`,
-    leaves: [r.frequency],
-  }))
 
   void displayName
 
