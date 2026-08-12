@@ -168,3 +168,17 @@ The owner's first TestFlight session surfaced four real defects:
    are wider/brighter so they register as a glow rather than a hairline.
    Cosmetic fix in the same pass: no duplicated category chip on the
    merchant card when the parse has no merchant.
+
+**Build 9 follow-up (same day):** the edge "glow" rendered as a solid
+picture-frame band — RN has no inset box-shadow, and the borderWidth
+approximation was flat-out wrong against the reference (the Claude app's
+feathered voice glow, which the mockup's `VoiceEdge` reproduces with
+three inset shadows: 2.5px edge line + 18/60/120px blur halos at
+1.7s/2.3s/3.1s breathing loops). Rebuilt as `VoiceEdgeGlow`
+(src/components/VoiceEdgeGlow.tsx): each shadow becomes a stack of
+concentric SVG strokes following the shadow's gaussian falloff —
+edge-bright, feathering to nothing — with the mockup's exact loop
+timings, plus a fourth copy of the inner halo whose opacity is driven by
+the live mic level (the design bundle's own "drive the innermost layer
+off the mic amplitude buffer" note). No new dependency; react-native-svg
+was already in the app.

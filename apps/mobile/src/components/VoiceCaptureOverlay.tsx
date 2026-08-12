@@ -11,6 +11,7 @@ import {
 import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { LiveWaveform } from './LiveWaveform'
+import { VoiceEdgeGlow } from './VoiceEdgeGlow'
 import { Colors, Typography } from '../theme'
 import { t, formatMoney, type Locale } from '@voice-expense/shared'
 
@@ -44,51 +45,6 @@ function extractAmount(text: string): number | null {
   if (!match) return null
   const val = parseFloat(match[1].replace(',', '.'))
   return isNaN(val) || val <= 0 ? null : val
-}
-
-/** One pulsing edge-glow layer. Insets are negative so the rounded corners
- *  bleed off-screen and the visible glow hugs the physical screen edge on
- *  every corner shape. */
-function EdgeGlowLayer({
-  inset,
-  borderWidth,
-  maxOpacity,
-  minOpacity,
-  durationMs,
-}: {
-  inset: number
-  borderWidth: number
-  maxOpacity: number
-  minOpacity: number
-  durationMs: number
-}) {
-  const opacity = useRef(new Animated.Value(maxOpacity)).current
-  useEffect(() => {
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(opacity, { toValue: minOpacity, duration: durationMs / 2, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-        Animated.timing(opacity, { toValue: maxOpacity, duration: durationMs / 2, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-      ]),
-    )
-    loop.start()
-    return () => loop.stop()
-  }, [opacity, maxOpacity, minOpacity, durationMs])
-  return (
-    <Animated.View
-      pointerEvents="none"
-      style={{
-        position: 'absolute',
-        top: inset,
-        left: inset,
-        right: inset,
-        bottom: inset,
-        borderRadius: 56,
-        borderWidth,
-        borderColor: Colors.accent,
-        opacity,
-      }}
-    />
-  )
 }
 
 function PulsingDot() {
@@ -188,15 +144,12 @@ export function VoiceCaptureOverlay({
       {/* Scrim over whatever screen the user was on */}
       <View style={styles.scrim} />
 
-      {/* Reactive screen-edge glow — three stacked pulsing layers, wide
-          enough to read as a glow bleeding in from the screen edge, not a
-          hairline border (build 8 was too faint to register). */}
+      {/* Reactive screen-edge glow — the mockup's three inset-shadow
+          layers rendered as feathered SVG falloff (solid borders read as
+          a picture frame — build 9's mistake). Inner halo flares with
+          the mic level. */}
       {phase !== 'error' && (
-        <>
-          <EdgeGlowLayer inset={-2} borderWidth={4} maxOpacity={1} minOpacity={0.5} durationMs={1400} />
-          <EdgeGlowLayer inset={-5} borderWidth={18} maxOpacity={0.4} minOpacity={0.16} durationMs={2100} />
-          <EdgeGlowLayer inset={-10} borderWidth={40} maxOpacity={0.22} minOpacity={0.08} durationMs={2900} />
-        </>
+        <VoiceEdgeGlow level={volumeLevel} active={phase === 'listening'} />
       )}
 
       <View style={[styles.content, { paddingTop: insets.top + 14, paddingBottom: insets.bottom + 18 }]}>
