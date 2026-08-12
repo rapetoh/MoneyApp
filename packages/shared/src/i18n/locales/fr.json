@@ -457,7 +457,6 @@
   "voice.redo": "Refaire",
   "voice.save_expense": "Enregistrer la dépense",
   "voice.save_income": "Enregistrer le revenu",
-  "voice.autosave_hint": "Enregistrement dans {s}s · touchez pour suspendre",
   "voice.edit": "Modifier",
   "voice.edit_expense": "Modifier la dépense",
   "voice.edit_income": "Modifier le revenu",

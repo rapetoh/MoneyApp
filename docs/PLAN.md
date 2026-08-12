@@ -47,10 +47,12 @@ truth: `docs/voice redesign/` (screenshot + Claude Design HTML, artboards
   unchanged, so existing installed Shortcuts keep working.
 - **Tab bar restyled to the artboard-14 spec**: whiter blur pill, labels,
   ink active tint (no filled sage square), ink 58pt FAB.
-- **Auto-save**: voice-only, high-confidence (≥ 0.75), no-clarification
-  parses save themselves after a 2.6s countdown ("tap to hold" pauses);
-  every save path now shows the Saved-with-Undo snackbar (undo = the
-  existing soft delete).
+- **Auto-save: implemented, then removed by owner decision** (Aug 11
+  evening, after build 10 — a 2-3s countdown doesn't leave time to
+  verify the parse; the result sheet now waits for an explicit
+  Save/Edit/discard). Every save path still shows the Saved-with-Undo
+  snackbar (undo = the existing soft delete). Do not resurrect the
+  countdown.
 - **Deliberately not built** (mockup implies capability the app doesn't
   have): live merchant/category chips while speaking (parse runs
   post-stop; the amount chip is live via the local regex), transcript

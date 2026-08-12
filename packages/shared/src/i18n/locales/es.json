@@ -457,7 +457,6 @@
   "voice.redo": "Rehacer",
   "voice.save_expense": "Guardar gasto",
   "voice.save_income": "Guardar ingreso",
-  "voice.autosave_hint": "Guardando en {s}s · toca para pausar",
   "voice.edit": "Editar",
   "voice.edit_expense": "Editar gasto",
   "voice.edit_income": "Editar ingreso",

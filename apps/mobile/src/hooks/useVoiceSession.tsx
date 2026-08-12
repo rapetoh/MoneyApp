@@ -178,12 +178,6 @@ export function VoiceSessionProvider({ children }: { children: ReactNode }) {
   }, [dismissAll, router])
 
   const parsed = voice.parsedExpense
-  const autoSaveEligible =
-    source === 'voice' &&
-    parsed != null &&
-    !parsed.needs_clarification &&
-    parsed.confidence >= 0.75 &&
-    parsed.amount > 0
 
   const api = useMemo<VoiceSessionApi>(() => ({ openVoice, presentParsed }), [openVoice, presentParsed])
 
@@ -214,7 +208,6 @@ export function VoiceSessionProvider({ children }: { children: ReactNode }) {
           onSave={handleSave}
           onDismiss={dismissAll}
           onRedo={source === 'voice' ? handleRedo : undefined}
-          autoSave={autoSaveEligible}
           saving={saving}
           locale={locale}
           timezone={timezone}

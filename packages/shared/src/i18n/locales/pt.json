@@ -457,7 +457,6 @@
   "voice.redo": "Refazer",
   "voice.save_expense": "Salvar despesa",
   "voice.save_income": "Salvar receita",
-  "voice.autosave_hint": "Salvando em {s}s · toque para pausar",
   "voice.edit": "Editar",
   "voice.edit_expense": "Editar despesa",
   "voice.edit_income": "Editar receita",

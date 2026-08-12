@@ -73,15 +73,10 @@ interface Props {
   onDismiss: () => void
   /** Present only for voice sessions — hides the Redo control otherwise. */
   onRedo?: () => void
-  /** Voice-only, high-confidence sessions auto-commit after a short
-   *  countdown ("Saving in 2s · tap to hold"); undo is the recovery. */
-  autoSave: boolean
   saving: boolean
   locale: Locale
   timezone: string
 }
-
-const AUTOSAVE_MS = 2600
 
 const PAYMENT_METHODS: { value: PaymentMethod; key: string }[] = [
   { value: 'cash', key: 'payment.cash' },
@@ -109,7 +104,6 @@ export function VoiceResultSheet({
   onSave,
   onDismiss,
   onRedo,
-  autoSave,
   saving,
   locale,
   timezone,
@@ -137,45 +131,6 @@ export function VoiceResultSheet({
     if (resolved) setCategoryId((cur) => cur ?? resolved.category.id)
   }, [parsed.category_suggestion, categories])
 
-  // ── Auto-save countdown ────────────────────────────────────────────────
-  const [countdownActive, setCountdownActive] = useState(autoSave)
-  const [remainingS, setRemainingS] = useState(Math.ceil(AUTOSAVE_MS / 1000))
-  const progress = useRef(new Animated.Value(0)).current
-  const autoSaveFired = useRef(false)
-
-  useEffect(() => {
-    if (!countdownActive) return
-    const startedAt = Date.now()
-    const anim = Animated.timing(progress, {
-      toValue: 1,
-      duration: AUTOSAVE_MS,
-      easing: Easing.linear,
-      useNativeDriver: false,
-    })
-    anim.start(({ finished }) => {
-      if (finished && !autoSaveFired.current) {
-        autoSaveFired.current = true
-        handleSave()
-      }
-    })
-    const tick = setInterval(() => {
-      setRemainingS(Math.max(1, Math.ceil((AUTOSAVE_MS - (Date.now() - startedAt)) / 1000)))
-    }, 250)
-    return () => {
-      anim.stop()
-      clearInterval(tick)
-    }
-     
-  }, [countdownActive])
-
-  /** "Tap to hold" — any touch on the sheet pauses the countdown for good. */
-  function pauseAutoSave() {
-    if (countdownActive) {
-      setCountdownActive(false)
-      progress.stopAnimation()
-    }
-  }
-
   // ── Entrance + edit-expansion ──────────────────────────────────────────
   const slideIn = useRef(new Animated.Value(60)).current
   const fadeIn = useRef(new Animated.Value(0)).current
@@ -200,7 +155,6 @@ export function VoiceResultSheet({
   } | null>(null)
 
   function enterEdit() {
-    pauseAutoSave()
     editSnapshot.current = { amount, merchant, note, direction, categoryId, paymentMethod, isRecurring, recurringFrequency }
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut)
     setMode('edit')
@@ -241,15 +195,14 @@ export function VoiceResultSheet({
     [parsed.transacted_at, timezone],
   )
 
-  // One save per sheet, ever — the countdown finishing and a Save tap in
-  // the same beat must not write two rows (the row is created locally
-  // *before* the server answers, so double-submit means duplicates).
+  // One save per sheet, ever — a double Save tap must not write two rows
+  // (the row is created locally *before* the server answers, so
+  // double-submit means duplicates).
   const submittedRef = useRef(false)
 
   async function handleSave() {
     if (!canSave || saving || submittedRef.current) return
     submittedRef.current = true
-    pauseAutoSave()
 
     let finalCategoryId = categoryId
     if (!finalCategoryId && parsed.category_suggestion) {
@@ -298,20 +251,17 @@ export function VoiceResultSheet({
   const clarify = parsed.needs_clarification && parsed.clarifying_question ? parsed.clarifying_question : null
   const clarifyChoices = clarify ? extractClarificationAmounts(clarify) : []
 
-  const progressWidth = progress.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] })
-
   return (
     <View style={StyleSheet.absoluteFill}>
-      {/* Backdrop — a tap pauses a running countdown; otherwise it dismisses. */}
+      {/* Backdrop — tap dismisses. */}
       <Pressable
         style={[styles.backdrop, mode === 'edit' && styles.backdropEdit]}
-        onPress={() => (countdownActive ? pauseAutoSave() : onDismiss())}
+        onPress={onDismiss}
         accessibilityLabel={t('common.cancel', locale)}
       />
 
       <Animated.View
         ref={sheetRef}
-        onTouchStart={pauseAutoSave}
         style={[
           styles.sheet,
           mode === 'edit' && { height: editHeight },
@@ -346,8 +296,8 @@ export function VoiceResultSheet({
               <Money value={isNaN(parsedAmount) ? 0 : parsedAmount} size={56} currencyCode={currency} locale={locale} />
             </View>
 
-            {/* Clarification — pauses auto-save by construction (autoSave is
-                never enabled for a parse that needs clarification). */}
+            {/* Clarification — a two-choice amount question when the parse
+                was ambiguous. */}
             {clarify && (
               <View style={styles.clarifyCard}>
                 <Text style={styles.clarifyQuestion}>{clarify}</Text>
@@ -451,17 +401,6 @@ export function VoiceResultSheet({
               </Pressable>
             </View>
 
-            {/* Auto-save hint */}
-            {countdownActive && !saving && (
-              <View style={styles.autosaveRow}>
-                <View style={styles.autosaveTrack}>
-                  <Animated.View style={[styles.autosaveFill, { width: progressWidth }]} />
-                </View>
-                <Text style={styles.autosaveLabel}>
-                  {t('voice.autosave_hint', locale).replace('{s}', String(remainingS))}
-                </Text>
-              </View>
-            )}
           </View>
         ) : (
           /* ── 14c: expanded edit ── */
@@ -867,31 +806,6 @@ const styles = StyleSheet.create({
     letterSpacing: -0.2,
   },
   pressed: { opacity: 0.85 },
-  autosaveRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingHorizontal: 22,
-    paddingTop: 14,
-  },
-  autosaveTrack: {
-    flex: 1,
-    height: 3,
-    borderRadius: 2,
-    backgroundColor: Colors.surface2,
-    overflow: 'hidden',
-  },
-  autosaveFill: {
-    height: '100%',
-    borderRadius: 2,
-    backgroundColor: Colors.accent,
-  },
-  autosaveLabel: {
-    fontSize: 11.5,
-    fontWeight: '600',
-    fontFamily: Typography.fontFamily.sansSemiBold,
-    color: Colors.ink3,
-  },
 
   // ── Clarification ──
   clarifyCard: {

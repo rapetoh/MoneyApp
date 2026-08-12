@@ -457,7 +457,6 @@
   "voice.redo": "Redo",
   "voice.save_expense": "Save expense",
   "voice.save_income": "Save income",
-  "voice.autosave_hint": "Saving in {s}s · tap to hold",
   "voice.edit": "Edit",
   "voice.edit_expense": "Edit expense",
   "voice.edit_income": "Edit income",

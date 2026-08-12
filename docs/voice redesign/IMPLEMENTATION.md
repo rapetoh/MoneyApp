@@ -72,10 +72,13 @@ keep working.
   detection would be new parsing logic. The amount chip is derived locally
   by the same regex the old ListeningView used; the full result arrives with
   the sheet ~1–2s later.
-- **Auto-save ("Saving in 2s · tap to hold") — implemented**, voice-only,
-  gated on confidence ≥ 0.75 and no clarification needed. Any touch on the
-  sheet pauses it permanently. Undo snackbar is the recovery (the design's
-  own sticky: "Undo is non-negotiable").
+- **Auto-save ("Saving in 2s · tap to hold") — implemented, then REMOVED
+  by owner decision (Aug 11, 2026, after testing build 10).** Two-three
+  seconds is not enough time to verify a parse; the countdown pressured
+  the user during exactly the moment the sheet exists for. The result
+  sheet now waits indefinitely — Save, Edit, or discard, at the user's
+  pace. Do not resurrect the countdown. The undo snackbar stays (it
+  covers mis-taps on Save).
 - **"Tap to replay" (14c) — dropped.** No audio file ever exists (on-device
   STT, transcript-only). The transcript card stays, the replay affordance
   does not.
