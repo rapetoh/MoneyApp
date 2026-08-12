@@ -65,7 +65,7 @@ export default function QuickEntryScreen() {
   const { categories, createCategory } = useCategories(user?.id)
   const { createTransaction } = useTransactions(user?.id)
   const { showUndo } = useUndo()
-  const { openVoice, presentParsed } = useVoiceSession()
+  const { presentParsed } = useVoiceSession()
   const router = useRouter()
 
   const userLocale = (profile?.locale ?? 'en') as Locale
@@ -96,13 +96,6 @@ export default function QuickEntryScreen() {
       if (decIdx >= 0 && prev.length - decIdx - 1 >= 2) return prev
       return prev + key
     })
-  }
-
-  function switchToVoice() {
-    // The voice overlay is a root-level layer, which iOS draws *behind* a
-    // native modal — dismiss this modal first, then open the overlay.
-    router.navigate('/(tabs)')
-    openVoice()
   }
 
   async function handleScan(type: 'receipt' | 'paycheck') {
@@ -149,9 +142,9 @@ export default function QuickEntryScreen() {
         return
       }
 
-      // Same layering rule as switchToVoice: the result sheet lives at the
-      // root, so dismiss this native modal and let the sheet rise over
-      // Today (exactly the 14b pattern).
+      // The result sheet lives at the root, and iOS draws root layers
+      // *behind* a native modal — dismiss this modal and let the sheet
+      // rise over Today (exactly the 14b pattern).
       presentParsed(scanResult.expense, 'scan')
       router.navigate('/(tabs)')
     } catch (err) {
@@ -208,21 +201,18 @@ export default function QuickEntryScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-      {/* Header — Cancel · Quick entry · mic (artboard 11) */}
+      {/* Header — Cancel · Quick entry. No mic here (owner decision,
+          Aug 11): the tab-bar FAB is the one voice entry point; a second
+          mic inside the manual sheet was noise. Flex side slots keep the
+          title optically centered. */}
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} hitSlop={10} accessibilityRole="button">
-          <Text style={styles.headerCancel}>{t('common.cancel', userLocale)}</Text>
-        </Pressable>
+        <View style={styles.headerSide}>
+          <Pressable onPress={() => router.back()} hitSlop={10} accessibilityRole="button">
+            <Text style={styles.headerCancel}>{t('common.cancel', userLocale)}</Text>
+          </Pressable>
+        </View>
         <Text style={styles.headerTitle}>{t('voice.quick_entry', userLocale)}</Text>
-        <Pressable
-          style={({ pressed }) => [styles.headerMic, pressed && { opacity: 0.7 }]}
-          onPress={switchToVoice}
-          hitSlop={8}
-          accessibilityRole="button"
-          accessibilityLabel={t('voice.tap_to_record', userLocale)}
-        >
-          <Ionicons name="mic" size={18} color={Colors.accent} />
-        </Pressable>
+        <View style={styles.headerSide} />
       </View>
 
       <View style={styles.body}>
@@ -441,13 +431,8 @@ const styles = StyleSheet.create({
   // The one nav-title in this screen — the design system's preset, not a
   // hand-assembled copy (typography.ts: "use these instead").
   headerTitle: TextStyles.navTitle,
-  headerMic: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: Colors.accentSoft,
-    alignItems: 'center',
-    justifyContent: 'center',
+  headerSide: {
+    flex: 1,
   },
   body: {
     flex: 1,

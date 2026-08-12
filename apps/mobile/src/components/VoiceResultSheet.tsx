@@ -20,7 +20,6 @@ import { MerchantAvatar } from './MerchantAvatar'
 import { AmountAdjustChips } from './AmountAdjustChips'
 import { RecurringToggle } from './RecurringToggle'
 import { NumericAccessory, NUMERIC_ACCESSORY_ID } from './NumericAccessory'
-import { useKeyboardLift } from '../hooks/useKeyboardLift'
 import { Colors, Typography, Spacing, Radius } from '../theme'
 import {
   merchantColor,
@@ -176,11 +175,6 @@ export function VoiceResultSheet({
     setMode('confirm')
   }
 
-  // Keyboard lift — same measureInWindow strategy as the shared BottomSheet
-  // (audit 01-F37), via the extracted hook.
-  const sheetRef = useRef<View>(null)
-  const lift = useKeyboardLift(sheetRef, true)
-
   // ── Save ───────────────────────────────────────────────────────────────
   const parsedAmount = parseFloat(amount.replace(',', '.'))
   const canSave = amount.length > 0 && !isNaN(parsedAmount) && parsedAmount > 0
@@ -261,13 +255,12 @@ export function VoiceResultSheet({
       />
 
       <Animated.View
-        ref={sheetRef}
         style={[
           styles.sheet,
           mode === 'edit' && { height: editHeight },
           {
             opacity: fadeIn,
-            transform: [{ translateY: Animated.add(slideIn, Animated.multiply(lift, -1)) }],
+            transform: [{ translateY: slideIn }],
           },
         ]}
       >
@@ -423,6 +416,14 @@ export function VoiceResultSheet({
               keyboardShouldPersistTaps="handled"
               keyboardDismissMode="on-drag"
               showsVerticalScrollIndicator={false}
+              // Keyboard avoidance without a second animation driver on
+              // the sheet node: build 11 crashed the moment the keyboard
+              // appeared because the JS-driven keyboard lift shared a
+              // transform with the native-driven entrance animation
+              // (mixed-driver exception, fatal in release). iOS grows the
+              // scroll insets natively; Android's adjustResize raises the
+              // bottom-anchored sheet with the window.
+              automaticallyAdjustKeyboardInsets
             >
               {/* Amount — active field */}
               <View style={styles.editAmountCard}>

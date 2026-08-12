@@ -65,8 +65,10 @@ keep working.
 
 - **Keyboard icon in 14a — kept.** Once the overlay is up, the + button is
   unreachable; the keyboard button is the only one-tap "I can't talk right
-  now" escape (cancels the recording, opens Quick entry). Mirrored by the
-  mic button in Quick entry's header.
+  now" escape (cancels the recording, opens Quick entry). The mirror-image
+  mic in Quick entry's header was removed by owner decision (Aug 11,
+  build 11 feedback): the tab-bar FAB is the one voice entry point —
+  don't duplicate it.
 - **Live chips while speaking — amount only.** The mockup shows live
   merchant/category/type chips; our parsing runs after stop, and live entity
   detection would be new parsing logic. The amount chip is derived locally
@@ -171,6 +173,21 @@ The owner's first TestFlight session surfaced four real defects:
    are wider/brighter so they register as a glow rather than a hairline.
    Cosmetic fix in the same pass: no duplicated category chip on the
    merchant card when the parse has no merchant.
+
+**Build 11 follow-ups (same day):**
+
+- **Crash on focusing any field in the expanded edit sheet.** The sheet's
+  entrance animation ran on the native driver while `useKeyboardLift`'s
+  JS-driven value shared the same transform — a mixed-driver exception,
+  fatal in release, guaranteed on first keyboard show (the hook's own doc
+  comment warns of exactly this). Fixed by removing the custom lift from
+  the sheet entirely: the edit ScrollView uses iOS's native
+  `automaticallyAdjustKeyboardInsets` and Android's window `adjustResize`,
+  leaving a single animation driver on the sheet node. Rule for this
+  codebase: never combine `useKeyboardLift`'s value with a node that has
+  native-driven animations — apply it to a plain layout node only.
+- **Mic removed from Quick entry's header** (owner decision — see the
+  keyboard-icon judgment call above).
 
 **Build 9 follow-up (same day):** the edge "glow" rendered as a solid
 picture-frame band — RN has no inset box-shadow, and the borderWidth
