@@ -61,7 +61,7 @@ export function VoiceSessionProvider({ children }: { children: ReactNode }) {
   const speechLocale = profile?.voice_language ?? LOCALE_TO_BCP47[locale] ?? 'en-US'
   const categoryNames = useMemo(() => categories.map((c) => c.name), [categories])
 
-  const voice = useVoice(currency, categoryNames, locale)
+  const voice = useVoice(currency, categoryNames, locale, timezone)
   const [source, setSource] = useState<TransactionSource>('voice')
   const [saving, setSaving] = useState(false)
 
@@ -141,7 +141,12 @@ export function VoiceSessionProvider({ children }: { children: ReactNode }) {
     setSaving(false)
 
     if (result.error && result.status === 'rejected') {
+      // The row was already written locally (offline-first) — the sheet
+      // must close anyway, or a second Save writes a duplicate row (this
+      // exact trap produced the twin $6.00 rows in TestFlight build 8).
+      // The sync-failure banner owns retry/discard for the rejected write.
       Alert.alert(t('common.error', locale), result.error)
+      dismissAll()
       return
     }
 

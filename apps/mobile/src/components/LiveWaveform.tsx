@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { Animated, StyleSheet, View } from 'react-native'
+import { Animated, Easing, StyleSheet, View } from 'react-native'
 import { Colors } from '../theme'
 
 interface Props {
@@ -19,68 +19,79 @@ const SEED = [
   0.92, 0.48, 0.34, 0.7, 0.8, 0.44, 0.56, 0.66, 0.38, 0.86,
 ]
 
-const FLOOR_SCALE = 0.18
+const SETTLED_SCALE = 0.28
 
-/**
- * Voice-reactive waveform for the 14a capture overlay. The whole silhouette
- * breathes with the real mic level (`volumechange` events, ~80ms cadence),
- * smoothed through a single Animated value so the metering cadence never
- * causes React re-renders. If a platform never emits volume events (the
- * module supports them on both, but a device audio session can decline),
- * a gentle idle pulse takes over after 700ms of silence so the overlay
- * still visibly reads as "live".
- */
-export function LiveWaveform({ level, active, height = 56 }: Props) {
-  const smoothed = useRef(new Animated.Value(FLOOR_SCALE)).current
-  const lastEventAt = useRef(0)
+/** One bar: its own perpetual scaleY loop (the mockup's `waveBar`
+ *  keyframes — 0.28 ↔ 1, staggered duration and phase per bar), all on
+ *  the native driver. `boost` multiplies on top so real mic level makes
+ *  the whole field swell without ever being a precondition for motion. */
+function Bar({ index, height, active, boost }: { index: number; height: number; active: boolean; boost: Animated.Value }) {
+  const loop = useRef(new Animated.Value(SETTLED_SCALE)).current
 
   useEffect(() => {
     if (!active) {
-      Animated.timing(smoothed, { toValue: FLOOR_SCALE, duration: 220, useNativeDriver: true }).start()
+      Animated.timing(loop, { toValue: SETTLED_SCALE, duration: 240, useNativeDriver: true }).start()
       return
     }
+    // Mockup timing: 0.7s + (i % 5) * 0.14s per full cycle, phase-shifted
+    // by (i % 7) * 70ms so neighboring bars never move in unison.
+    const half = (700 + (index % 5) * 140) / 2
+    const anim = Animated.loop(
+      Animated.sequence([
+        Animated.timing(loop, { toValue: 1, duration: half, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(loop, { toValue: SETTLED_SCALE, duration: half, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      ]),
+    )
+    const starter = setTimeout(() => anim.start(), (index % 7) * 70)
+    return () => {
+      clearTimeout(starter)
+      anim.stop()
+    }
+  }, [active, index, loop])
 
+  return (
+    <Animated.View
+      style={[
+        styles.bar,
+        {
+          height: Math.max(4, Math.round(SEED[index % SEED.length] * height)),
+          transform: [{ scaleY: Animated.multiply(loop, boost) }],
+        },
+      ]}
+    />
+  )
+}
+
+/**
+ * Voice-reactive waveform for the 14a capture overlay. The bars dance
+ * continuously while listening — motion is never gated on volume events
+ * (build 8 gated everything on metering and read as frozen when a device
+ * session declined to emit it). Real mic level, when it arrives, swells
+ * the whole field via a shared amplitude multiplier.
+ */
+export function LiveWaveform({ level, active, height = 56 }: Props) {
+  const boost = useRef(new Animated.Value(1)).current
+
+  useEffect(() => {
+    if (!active) {
+      boost.setValue(1)
+      return
+    }
     const sub = level.addListener(({ value }) => {
-      lastEventAt.current = Date.now()
-      Animated.timing(smoothed, {
-        toValue: FLOOR_SCALE + value * (1 - FLOOR_SCALE),
+      Animated.timing(boost, {
+        // Silence = 65% amplitude (still clearly alive), full voice = 120%.
+        toValue: 0.65 + Math.min(Math.max(value, 0), 1) * 0.55,
         duration: 110,
         useNativeDriver: true,
       }).start()
     })
-
-    // Idle-pulse fallback — only engages when no volume event has arrived
-    // recently, so real metering always wins.
-    let pulseUp = true
-    const fallback = setInterval(() => {
-      if (Date.now() - lastEventAt.current < 700) return
-      pulseUp = !pulseUp
-      Animated.timing(smoothed, {
-        toValue: pulseUp ? 0.45 : 0.24,
-        duration: 640,
-        useNativeDriver: true,
-      }).start()
-    }, 700)
-
-    return () => {
-      level.removeListener(sub)
-      clearInterval(fallback)
-    }
-  }, [active, level, smoothed])
+    return () => level.removeListener(sub)
+  }, [active, level, boost])
 
   return (
     <View style={[styles.row, { height }]} pointerEvents="none">
-      {SEED.map((s, i) => (
-        <Animated.View
-          key={i}
-          style={[
-            styles.bar,
-            {
-              height: Math.max(4, Math.round(s * height)),
-              transform: [{ scaleY: smoothed }],
-            },
-          ]}
-        />
+      {SEED.map((_, i) => (
+        <Bar key={i} index={i} height={height} active={active} boost={boost} />
       ))}
     </View>
   )

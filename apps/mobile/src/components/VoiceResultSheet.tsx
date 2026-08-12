@@ -29,6 +29,7 @@ import {
   formatMoney,
   resolveCategorySuggestion,
   localDay,
+  normalizeParsedTransactedAt,
 } from '@voice-expense/shared'
 import type { ParsedExpense, Locale, Category, PaymentMethod, RecurringFrequency } from '@voice-expense/shared'
 
@@ -230,8 +231,24 @@ export function VoiceResultSheet({
   const parsedAmount = parseFloat(amount.replace(',', '.'))
   const canSave = amount.length > 0 && !isNaN(parsedAmount) && parsedAmount > 0
 
+  // A date-only / midnight-UTC parse ("today", a receipt's printed date)
+  // is repaired before it touches the display or the save payload — a raw
+  // midnight-UTC instant reads as *yesterday evening* in any zone west of
+  // UTC (TestFlight build 8). Null means "the parse carried no real date"
+  // → createTransaction defaults to now.
+  const normalizedTransactedAt = useMemo(
+    () => normalizeParsedTransactedAt(parsed.transacted_at, timezone, new Date().toISOString()),
+    [parsed.transacted_at, timezone],
+  )
+
+  // One save per sheet, ever — the countdown finishing and a Save tap in
+  // the same beat must not write two rows (the row is created locally
+  // *before* the server answers, so double-submit means duplicates).
+  const submittedRef = useRef(false)
+
   async function handleSave() {
-    if (!canSave || saving) return
+    if (!canSave || saving || submittedRef.current) return
+    submittedRef.current = true
     pauseAutoSave()
 
     let finalCategoryId = categoryId
@@ -250,7 +267,7 @@ export function VoiceResultSheet({
       isRecurring,
       recurringFrequency,
       paymentMethod,
-      transactedAt: parsed.transacted_at ?? null,
+      transactedAt: normalizedTransactedAt,
     })
   }
 
@@ -263,16 +280,19 @@ export function VoiceResultSheet({
   const categoryColor = selectedCategory ? (selectedCategory.color ?? merchantColor(selectedCategory.name)) : null
 
   const whenLabel = useMemo(() => {
-    const iso = parsed.transacted_at ?? new Date().toISOString()
     const nowIso = new Date().toISOString()
+    const iso = normalizedTransactedAt ?? nowIso
     const sameDay = localDay(iso, timezone) === localDay(nowIso, timezone)
     const d = new Date(iso)
     const day = sameDay
       ? t('transactions.today', locale)
       : d.toLocaleDateString(locale, { month: 'short', day: 'numeric', timeZone: timezone })
     const time = d.toLocaleTimeString(locale, { hour: 'numeric', minute: '2-digit', timeZone: timezone })
-    return `${day} · ${time}`
-  }, [parsed.transacted_at, timezone, locale])
+    // A repaired date-only parse has no honest time of day — show just the
+    // day for it rather than a fabricated noon.
+    const dateOnly = normalizedTransactedAt != null && parsed.transacted_at !== normalizedTransactedAt
+    return dateOnly ? day : `${day} · ${time}`
+  }, [normalizedTransactedAt, parsed.transacted_at, timezone, locale])
 
   const directionKey = direction === 'credit' ? 'voice.income_label' : 'voice.expense'
   const clarify = parsed.needs_clarification && parsed.clarifying_question ? parsed.clarifying_question : null
@@ -368,7 +388,10 @@ export function VoiceResultSheet({
                   {merchant.trim() || selectedCategory?.name || t(directionKey, locale)}
                 </Text>
                 <View style={styles.merchantMeta}>
-                  {selectedCategory && (
+                  {/* When there is no merchant the title above IS the
+                      category name — repeating it as a chip read as a
+                      glitch (build 8: "Food & Dining / Food & Dining"). */}
+                  {selectedCategory && merchant.trim().length > 0 && (
                     <View style={[styles.categoryChip, { backgroundColor: (categoryColor ?? Colors.accent) + '22' }]}>
                       <View style={[styles.categoryDot, { backgroundColor: categoryColor ?? Colors.accent }]} />
                       <Text style={[styles.categoryChipText, { color: categoryColor ?? Colors.accent }]} numberOfLines={1}>
@@ -377,7 +400,7 @@ export function VoiceResultSheet({
                     </View>
                   )}
                   <Text style={styles.metaTime} numberOfLines={1}>
-                    {selectedCategory ? '· ' : ''}
+                    {selectedCategory && merchant.trim().length > 0 ? '· ' : ''}
                     {whenLabel}
                   </Text>
                 </View>

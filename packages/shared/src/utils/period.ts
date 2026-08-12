@@ -484,3 +484,36 @@ export function weekdayLabels(
   const rotate = (WEEK_START - 1 + 7) % 7
   return [...mondayFirst.slice(rotate), ...mondayFirst.slice(0, rotate)]
 }
+
+/**
+ * Normalizes an AI-parsed `transacted_at` that carries no real time of day.
+ *
+ * The parse prompt hands the model a bare civil date ("Use today
+ * 2026-08-11 if no date mentioned"), and receipt scans read printed
+ * dates — so the model routinely returns a date-only value, which
+ * `Date` parsing treats as **midnight UTC**. Rendered in any zone west
+ * of UTC that instant belongs to the *previous* civil day: a "$6 today"
+ * log surfaced as "Aug 10 · 7:00 PM" under YESTERDAY (found in
+ * TestFlight build 8, 2026-08-11).
+ *
+ * Deterministic repair, no AI-behavior change:
+ *   - A value with real time-of-day information passes through untouched.
+ *   - A date-only / midnight-UTC value naming **today** (in `tz`) returns
+ *     `null` — the caller's create path defaults to now, the honest
+ *     moment the user actually logged it.
+ *   - A date-only value naming any **other** civil day anchors at noon in
+ *     `tz` (noon, not midnight, so no DST transition can shift it across
+ *     a day boundary — same anchor the Today screen uses).
+ */
+export function normalizeParsedTransactedAt(
+  iso: string | null | undefined,
+  tz: string,
+  nowIso: string,
+): string | null {
+  if (!iso) return null
+  const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})(?:T00:00(?::00(?:\.0+)?)?(?:Z|\+00:00)?)?$/)
+  if (!m) return iso
+  const civil = `${m[1]}-${m[2]}-${m[3]}`
+  if (civil === localDay(nowIso, tz)) return null
+  return civilDateTimeToInstant(Number(m[1]), Number(m[2]), Number(m[3]), 12, 0, 0, tz)
+}

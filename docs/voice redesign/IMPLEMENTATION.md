@@ -133,3 +133,38 @@ keep working.
 
 `turbo run typecheck test` — 9/9 tasks green (107 mobile tests); `eslint` —
 0 errors; `knip` — clean.
+
+## Build 8 field defects → fixed for build 9 (Aug 11, 2026)
+
+The owner's first TestFlight session surfaced four real defects:
+
+1. **Every save dead-lettered** (`function uuid_generate_v4() does not
+   exist`). Server bug, not client: `sync_upsert_transaction` (migration
+   018) pins `search_path = public, pg_temp` while Supabase keeps
+   uuid-ossp in the `extensions` schema — the RPC's first-ever real
+   execution was this session. Fixed in production immediately
+   (migration 030: `gen_random_uuid()`, pg_catalog); repo file mirrors it.
+   Existing dead-lettered items sync on "Retry All" with no app update.
+2. **"$6 today" displayed as "Aug 10 · 7:00 PM" under YESTERDAY.** Two
+   stacked date bugs, both fixed: (a) the parse API derived "today" from
+   the *server's UTC clock* (wrong day after ~7 PM in the Americas) — the
+   client now sends `todayCivilDate` in the user's timezone and the route
+   validates + uses it; (b) a date-only parse reads as midnight UTC =
+   previous evening locally — `normalizeParsedTransactedAt`
+   (packages/shared/period.ts, unit-tested) passes real times through,
+   maps date-only-today to null (→ save defaults to now), and anchors
+   other date-only days at noon in the user's zone.
+3. **Duplicate rows after a failed save.** The row is written locally
+   before the server answers; the sheet stayed open after a rejected
+   sync, so Save could fire again. The sheet now closes after every
+   completed save attempt (the sync banner owns retry/discard), and a
+   `submittedRef` makes the sheet one-shot even if the auto-save timer
+   and a Save tap land in the same beat.
+4. **Listening animation read as dead.** Build 8 gated all waveform
+   motion on `volumechange` metering; when a device session doesn't emit
+   it, the bars froze. The bars now run the mockup's own `waveBar` loop
+   continuously while listening (staggered per bar, native driver) with
+   mic level as an amplitude multiplier on top, and the edge glow layers
+   are wider/brighter so they register as a glow rather than a hairline.
+   Cosmetic fix in the same pass: no duplicated category chip on the
+   merchant card when the parse has no merchant.

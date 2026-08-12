@@ -10,6 +10,7 @@ import {
   periodBounds,
   addMonthsClamped,
   weekdayLabels,
+  normalizeParsedTransactedAt,
 } from '../period'
 
 describe('WEEK_START', () => {
@@ -232,5 +233,40 @@ describe('RSC / sync-boundary serialization rule — plain strings and numbers o
     // boundary). If this stops erroring, the signature regressed to
     // accepting `Date` again.
     localDay(new Date('2026-08-15T00:00:00Z'), 'UTC')
+  })
+})
+
+describe('normalizeParsedTransactedAt', () => {
+  const tz = 'America/Chicago'
+  // 2026-08-11 18:59 CDT (UTC-5) → 2026-08-11T23:59:00Z
+  const now = '2026-08-11T23:59:00Z'
+
+  it('null/undefined pass through as null', () => {
+    expect(normalizeParsedTransactedAt(null, tz, now)).toBeNull()
+    expect(normalizeParsedTransactedAt(undefined, tz, now)).toBeNull()
+  })
+
+  it('a real time of day passes through untouched', () => {
+    expect(normalizeParsedTransactedAt('2026-08-10T14:30:00Z', tz, now)).toBe('2026-08-10T14:30:00Z')
+    expect(normalizeParsedTransactedAt('2026-08-11T09:41:00-05:00', tz, now)).toBe('2026-08-11T09:41:00-05:00')
+  })
+
+  it("date-only naming today (user tz) → null so the caller defaults to now", () => {
+    expect(normalizeParsedTransactedAt('2026-08-11', tz, now)).toBeNull()
+    expect(normalizeParsedTransactedAt('2026-08-11T00:00:00Z', tz, now)).toBeNull()
+    expect(normalizeParsedTransactedAt('2026-08-11T00:00:00.000Z', tz, now)).toBeNull()
+    expect(normalizeParsedTransactedAt('2026-08-11T00:00+00:00', tz, now)).toBeNull()
+  })
+
+  it('date-only naming another day anchors at noon in the user tz', () => {
+    // Noon Aug 10 in Chicago (CDT, UTC-5) = 17:00Z — same civil day in tz,
+    // instead of midnight UTC which reads as Aug 9, 7:00 PM locally.
+    const out = normalizeParsedTransactedAt('2026-08-10', tz, now)
+    expect(out).toBe('2026-08-10T17:00:00.000Z')
+    expect(localDay(out as string, tz)).toBe('2026-08-10')
+  })
+
+  it('midnight in a non-UTC offset is real time info and passes through', () => {
+    expect(normalizeParsedTransactedAt('2026-08-10T00:00:00-05:00', tz, now)).toBe('2026-08-10T00:00:00-05:00')
   })
 })

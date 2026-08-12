@@ -15,6 +15,13 @@ export interface ParseOptions {
    *  cache is effectively unscoped, which `clearParseCache` on sign-out
    *  still protects against for any single-session leak. */
   userId?: string
+  /** The caller's civil date (`YYYY-MM-DD`) in the *user's* timezone.
+   *  Without it the API route derives "today" from the server's UTC
+   *  clock, which after ~7 PM in the Americas is already tomorrow — so
+   *  "I spent $6 today" parsed to tomorrow's date (TestFlight build 8,
+   *  2026-08-11). Optional for backward compatibility: older clients
+   *  keep the UTC fallback. */
+  todayCivilDate?: string
 }
 
 // Simple in-memory LRU cache
@@ -39,9 +46,12 @@ function epochDayBucket(): number {
  *  A second user on the same device, a category added since the last
  *  parse, or the same phrase parsed a day later must never share a cache
  *  entry with the first. */
-function cacheKey(opts: Pick<ParseOptions, 'transcript' | 'locale' | 'currency' | 'categories' | 'userId'>): string {
+function cacheKey(opts: Pick<ParseOptions, 'transcript' | 'locale' | 'currency' | 'categories' | 'userId' | 'todayCivilDate'>): string {
   const sortedCategories = [...opts.categories].sort().join(',')
-  return `${opts.userId ?? ''}:${opts.locale}:${opts.currency}:${sortedCategories}:${epochDayBucket()}:${opts.transcript.toLowerCase().trim()}`
+  // The user's civil date participates too: when it's supplied it drives
+  // the prompt's "today", so two parses across the user's own midnight
+  // must not share an entry even inside one epoch-day bucket.
+  return `${opts.userId ?? ''}:${opts.locale}:${opts.currency}:${sortedCategories}:${epochDayBucket()}:${opts.todayCivilDate ?? ''}:${opts.transcript.toLowerCase().trim()}`
 }
 
 /** Sign-out teardown (fix-plan item 1.7 / audit 02-F24's second half): a
@@ -89,6 +99,7 @@ export async function parseExpense(opts: ParseOptions): Promise<ParsedExpense> {
       locale: opts.locale,
       currency: opts.currency,
       categories: opts.categories,
+      todayCivilDate: opts.todayCivilDate,
     }),
   })
 

@@ -188,12 +188,14 @@ export function VoiceCaptureOverlay({
       {/* Scrim over whatever screen the user was on */}
       <View style={styles.scrim} />
 
-      {/* Reactive screen-edge glow */}
+      {/* Reactive screen-edge glow — three stacked pulsing layers, wide
+          enough to read as a glow bleeding in from the screen edge, not a
+          hairline border (build 8 was too faint to register). */}
       {phase !== 'error' && (
         <>
-          <EdgeGlowLayer inset={-2} borderWidth={3} maxOpacity={1} minOpacity={0.55} durationMs={1700} />
-          <EdgeGlowLayer inset={-5} borderWidth={14} maxOpacity={0.28} minOpacity={0.12} durationMs={2300} />
-          <EdgeGlowLayer inset={-10} borderWidth={30} maxOpacity={0.14} minOpacity={0.05} durationMs={3100} />
+          <EdgeGlowLayer inset={-2} borderWidth={4} maxOpacity={1} minOpacity={0.5} durationMs={1400} />
+          <EdgeGlowLayer inset={-5} borderWidth={18} maxOpacity={0.4} minOpacity={0.16} durationMs={2100} />
+          <EdgeGlowLayer inset={-10} borderWidth={40} maxOpacity={0.22} minOpacity={0.08} durationMs={2900} />
         </>
       )}
 

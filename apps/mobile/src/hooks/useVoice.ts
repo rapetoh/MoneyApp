@@ -7,6 +7,7 @@ import {
 import { parseExpense } from '@voice-expense/ai'
 import { supabase } from '../lib/supabase'
 import { getApiUrl } from './useApiUrl'
+import { localDay } from '@voice-expense/shared'
 import type { ParsedExpense } from '@voice-expense/shared'
 
 export type VoiceState = 'idle' | 'listening' | 'processing' | 'done' | 'error'
@@ -35,6 +36,9 @@ export function useVoice(
   userCurrency: string,
   userCategories: string[],
   userLocale: string,
+  /** IANA zone (profiles.timezone) — anchors the parse prompt's "today"
+   *  to the user's civil date instead of the server's UTC clock. */
+  userTimezone: string = 'UTC',
 ): UseVoiceReturn {
   const [state, setState] = useState<VoiceState>('idle')
   const [transcript, setTranscript] = useState('')
@@ -61,9 +65,11 @@ export function useVoice(
   const categoriesRef = useRef(userCategories)
   const currencyRef = useRef(userCurrency)
   const localeRef = useRef(userLocale)
+  const timezoneRef = useRef(userTimezone)
   useEffect(() => { categoriesRef.current = userCategories }, [userCategories])
   useEffect(() => { currencyRef.current = userCurrency }, [userCurrency])
   useEffect(() => { localeRef.current = userLocale }, [userLocale])
+  useEffect(() => { timezoneRef.current = userTimezone }, [userTimezone])
 
   // Interim results (shown in real-time while speaking)
   useSpeechRecognitionEvent('result', (event) => {
@@ -153,6 +159,7 @@ export function useVoice(
           apiBaseUrl,
           authToken: token,
           userId,
+          todayCivilDate: localDay(new Date().toISOString(), timezoneRef.current),
         })
 
         // A newer session (inject / reset / fresh recording) superseded

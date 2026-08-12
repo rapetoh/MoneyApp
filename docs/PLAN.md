@@ -59,6 +59,21 @@ truth: `docs/voice redesign/` (screenshot + Claude Design HTML, artboards
   no date picker exists anywhere yet; follow-up), and the mockup's
   "nothing uploaded" copy (transcript does go to the parse API; the
   existing honest "Processed securely" line stays).
+- **Build 8 field defects → fixed same day for build 9** (owner's first
+  TestFlight session, Aug 11 evening — full write-up in
+  [voice redesign/IMPLEMENTATION.md](./voice%20redesign/IMPLEMENTATION.md)
+  §"Build 8 field defects"): (1) every save dead-lettered —
+  `sync_upsert_transaction`'s pinned search_path couldn't resolve
+  `uuid_generate_v4()`; migration 030 (`gen_random_uuid()`) applied to
+  production immediately, stuck items sync via Retry All; (2) "$6 today"
+  dated to yesterday evening — parse "today" now comes from the client's
+  civil date (new optional `todayCivilDate` on the parse API, backward
+  compatible) and date-only parses are normalized via the new shared
+  `normalizeParsedTransactedAt`; (3) duplicate rows after a rejected save
+  — result sheet is one-shot and closes after every save attempt;
+  (4) frozen listening animation — waveform no longer gated on volume
+  metering (continuous mockup-style loop, mic level as amplitude boost),
+  edge glow strengthened.
 - **Monetization**: mobile free forever; Murmur Plus $3.99/mo or $29.99/yr unlocks Ask Murmur + auto recurring + export + desktop. **Superseded Aug 9, 2026 (fix-plan 3.1)**: no purchase flow exists yet on any platform, so the price and the "Upgrade" CTA are gone from the product until IAP/Stripe ships — see the dated entry below. The feature bundle (Ask Murmur + auto recurring + export + desktop) is unchanged; only "there is a working checkout for it today" was false.
 - **Storage**: Supabase-first; no CloudKit rewrite. Privacy story via on-device voice + transcript-only sync + explicit controls.
 - **Auth**: all 3 providers preserved (Apple + Google + email); lazy identity — no sign-in wall at launch.

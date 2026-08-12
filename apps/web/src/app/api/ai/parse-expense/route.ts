@@ -39,14 +39,14 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  let body: { transcript?: string; locale?: string; currency?: string; categories?: string[] }
+  let body: { transcript?: string; locale?: string; currency?: string; categories?: string[]; todayCivilDate?: string }
   try {
     body = await req.json()
   } catch {
     return Response.json({ error: 'Invalid JSON body' }, { status: 400 })
   }
 
-  const { transcript, locale = 'en', currency = 'USD', categories = [] } = body
+  const { transcript, locale = 'en', currency = 'USD', categories = [], todayCivilDate } = body
   if (!transcript || typeof transcript !== 'string') {
     return Response.json({ error: 'transcript is required' }, { status: 400 })
   }
@@ -69,10 +69,21 @@ export async function POST(req: NextRequest) {
     return Response.json({ error: 'categories must be a string array' }, { status: 400 })
   }
 
+  // "Today" for the prompt comes from the *user's* civil date when the
+  // client supplies one — the server's UTC date is already tomorrow for
+  // any user west of UTC after their local ~7 PM, which dated "I spent $6
+  // today" to the wrong day (TestFlight build 8, 2026-08-11). The value
+  // is client-controlled, so it must parse as a plausible calendar date
+  // (same trust boundary as locale/currency above); anything else falls
+  // back to the UTC clock rather than reaching the prompt.
+  const civilDateOk =
+    typeof todayCivilDate === 'string' &&
+    /^\d{4}-\d{2}-\d{2}$/.test(todayCivilDate) &&
+    !isNaN(Date.parse(todayCivilDate))
   const systemPrompt = getPrompt({
     locale: locale as Locale,
     currency,
-    today: new Date().toISOString().split('T')[0],
+    today: civilDateOk ? todayCivilDate : new Date().toISOString().split('T')[0],
     categories,
   })
 
