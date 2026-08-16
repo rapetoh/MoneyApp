@@ -175,11 +175,15 @@ export async function POST(req: NextRequest) {
     const verdictTrimmed = result.response.verdict.text.trim()
     const verdictTooShort = !result.response.out_of_scope && verdictTrimmed.length < 8
     const dataMismatch = detectDataMismatch(result.response, overview, askReq.question)
+    const stall = detectStall(result.response)
+    const repeat = detectRepeat(result.response, askReq)
 
     if (
       validation.comparison_direction_violations.length === 0 &&
       !verdictTooShort &&
-      !dataMismatch
+      !dataMismatch &&
+      !stall &&
+      !repeat
     ) {
       console.log(
         `[ask-murmur] ok outcome=primary tool_calls=${result.calls.length} ms=${Date.now() - startedAt}`,
@@ -199,26 +203,29 @@ export async function POST(req: NextRequest) {
     if (dataMismatch) {
       reasons.push(dataMismatch)
     }
+    if (stall) reasons.push(stall)
+    if (repeat) reasons.push(repeat)
     // Retry reasons embed the verdict text and untraced amounts — log only
     // which triggers fired.
     console.warn(
-      `[ask-murmur] retrying once: direction_violations=${validation.comparison_direction_violations.length} empty_verdict=${verdictTooShort} data_mismatch=${dataMismatch !== null}`,
+      `[ask-murmur] retrying once: direction_violations=${validation.comparison_direction_violations.length} empty_verdict=${verdictTooShort} data_mismatch=${dataMismatch !== null} stall=${stall !== null} repeat=${repeat !== null}`,
     )
     if (DEBUG_TRACE) {
       console.warn('[ask-murmur] trace retry reasons:', reasons.join(' | '))
     }
     const retry = await runConversation(askReq, ctx, reasons, overview)
     const retryVerdict = retry.response.verdict.text.trim()
-    if (retryVerdict.length >= 8 || retry.response.out_of_scope) {
+    const retryStalled = detectStall(retry.response) !== null || detectRepeat(retry.response, askReq) !== null
+    if ((retryVerdict.length >= 8 && !retryStalled) || retry.response.out_of_scope) {
       console.log(
         `[ask-murmur] ok outcome=retry tool_calls=${retry.calls.length} ms=${Date.now() - startedAt}`,
       )
       return Response.json(retry.response)
     }
 
-    // Retry also produced an empty/broken verdict. Fall through to
-    // summarize-fallback.
-    console.error('[ask-murmur] retry also empty; using summarize fallback')
+    // Retry also produced an empty/stalled/repeated verdict. Fall through
+    // to summarize-fallback — a real data summary beats a second stall.
+    console.error('[ask-murmur] retry also empty/stalled; using summarize fallback')
     const summary = await runSummarizeFallback(askReq, ctx)
     console.log(`[ask-murmur] ok outcome=summarize_fallback ms=${Date.now() - startedAt}`)
     return Response.json(summary)
@@ -246,6 +253,54 @@ export async function POST(req: NextRequest) {
 interface ConversationResult {
   response: AskMurmurResponse
   calls: ToolCallRecord[]
+}
+
+// ─── Non-answer / stall / repeat detectors ──────────────────────────────────
+//
+// Two structural failures the empty-verdict check cannot see (owner report,
+// Aug 15 — "Can I afford a PS5 this month?" → "To determine if you can
+// afford a PS5 this month, we need to compare your spending and income for
+// August." three times in a row):
+//   1. A *stall*: fluent prose that narrates the work or asks permission
+//      instead of doing it — no numbers, no breakdown, no chart.
+//   2. A *verbatim repeat* of the previous turn's answer in response to a
+//      follow-up ("Ok", "Okay?????").
+// Both are retry triggers with a pointed instruction; if the retry does it
+// again, the deterministic summarize fallback answers instead.
+
+const STALL_RE =
+  /\b(to (?:determine|answer|assess|figure out|check|see|know|find out)|we need to|i need to|i(?:'|’)ll need|i (?:will|can|could|would) (?:check|look|analy[sz]e|calculate|compare|review|need)|let me|let(?:'|’)s (?:take a look|look|start|begin)|would you like me to|shall i|do you want me to|first,? (?:i|we)|i(?:'|’)d need|please (?:provide|share|tell)|could you (?:tell|clarify|specify|share)|can you (?:tell|clarify|specify|share))\b/i
+
+function normalizeVerdict(text: string): string {
+  return text.replace(/<\/?b>/g, '').replace(/\s+/g, ' ').trim().toLowerCase()
+}
+
+/** Non-null when the answer is a stall (narration/permission-seeking with
+ *  no data) — the retry reason to feed back. */
+function detectStall(response: AskMurmurResponse): string | null {
+  if (response.out_of_scope) return null
+  const verdict = response.verdict.text
+  const hasNumbers = /\d/.test(verdict)
+  const hasData = !!response.breakdown || !!response.chart
+  if (hasNumbers || hasData) return null
+  if (!STALL_RE.test(verdict)) return null
+  return (
+    `previous attempt described what it would do instead of doing it ("${verdict.slice(0, 140)}"). ` +
+    'This is not allowed. Do not narrate, do not ask permission, do not ask the user for numbers you can compute — ' +
+    'call the tools NOW and lead the verdict with the answer and the figures.'
+  )
+}
+
+/** Non-null when the answer repeats the last history answer verbatim. */
+function detectRepeat(response: AskMurmurResponse, req: AskMurmurRequest): string | null {
+  const last = req.history?.[req.history.length - 1]
+  if (!last) return null
+  if (normalizeVerdict(response.verdict.text) !== normalizeVerdict(last.answer)) return null
+  return (
+    `previous attempt repeated the prior answer word for word. The user sent a follow-up ("${req.question.slice(0, 80)}") — respond to THAT. ` +
+    'If the follow-up is an acknowledgement (ok, thanks, sure) and your prior reply promised an analysis, deliver that analysis now with real numbers; ' +
+    'otherwise answer in one or two fresh sentences and offer the most useful next thing.'
+  )
 }
 
 // ─── Data-mismatch sanity check ──────────────────────────────────────────────
