@@ -34,6 +34,14 @@ because the rules they sum unfold beneath them:
 - **Bills & transfers · $342/mo** → Charles Schwab $300/mo, Xtream $42/mo
 - **Expected income · $3,667/mo** → The20 $1,500/mo, 20 LLC $1,000/2 wk
 
+The word itself is retired everywhere a user can see it: the Budgets
+header on web and mobile said "$X spent · $Y committed · $Z cap" for the
+same idea (bills due this period that haven't posted yet) — it now says
+**"$Y still due"** in all four locales (`budgets.committed` → "still due" /
+"encore à payer" / "pendiente" / "ainda a pagar"), the phrase Ask Murmur
+already uses for that figure. `committed` survives only as an internal
+field name.
+
 Each rule leaf shows how it's billed in its own currency (`$100 every 2 wk`,
 `$1,500/yr`), FX-pending rules are listed but never folded into a total as
 0. The old arbitrary `.slice(0, 4)` cap on rules is gone (up to 25 per card,

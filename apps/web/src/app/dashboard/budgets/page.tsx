@@ -338,13 +338,15 @@ export default function BudgetsPage() {
                 // pre-logged future transaction) is real money that's
                 // going to leave, but it isn't gone yet, so it gets its
                 // own word instead of being folded invisibly into
-                // "spent".
+                // "spent". That word is "still due" (owner, Aug 16 2026 —
+                // "committed" read as jargon), the same phrase Ask Murmur
+                // uses for the same figure.
                 <>
                   <b style={{ color: colors.ink }}>{fmtShort(overallStatus?.spent ?? 0)}</b> spent
                   {(overallStatus?.committed ?? 0) > 0 && (
                     <>
                       {' '}
-                      · <b style={{ color: colors.ink }}>{fmtShort(overallStatus!.committed)}</b> committed
+                      · <b style={{ color: colors.ink }}>{fmtShort(overallStatus!.committed)}</b> still due
                     </>
                   )}
                   {' '}· <b style={{ color: colors.ink }}>{fmtShort(overall.amount)}</b> cap {periodSuffix(overall.period)}.
