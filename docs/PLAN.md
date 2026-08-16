@@ -61,6 +61,18 @@ truth: `docs/voice redesign/` (screenshot + Claude Design HTML, artboards
   no date picker exists anywhere yet; follow-up), and the mockup's
   "nothing uploaded" copy (transcript does go to the parse API; the
   existing honest "Processed securely" line stays).
+- **NEXT (owner directive, Aug 16): Ask Murmur is to be rebuilt as a
+  product, not patched further.** The Aug 15–16 work fixed reasoning and
+  grounding defects one by one; the owner's screenshots show the real
+  problem is architectural — a one-shot Q→A engine wearing a chat UI, no
+  conversation state, a fixed card+chart answer template, no persisted /
+  resumable thread on mobile, generic spinner. Target = Cash App's in-app
+  assistant: ranked proactive insights on entry (upcoming charges vs what's
+  left, spending anomalies, subscriptions to decide on), stateful
+  conversation, answer shape by question type, real actions (budget /
+  recurring / show transactions / log) and no fake money-moving. Full brief
+  in project memory (`project_ask_murmur_rebuild_handoff.md`). Keep the
+  deterministic tool layer; redesign the conversation/product layer.
 - **Ask Murmur rebuilt end to end → build 16** (Aug 15 night, owner
   ultimatum; details in
   [voice redesign/IMPLEMENTATION.md](./voice%20redesign/IMPLEMENTATION.md)
