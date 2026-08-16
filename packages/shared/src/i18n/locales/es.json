@@ -330,7 +330,6 @@
   "budgets.set_budget_cta": "Establecer presupuesto",
   "budgets.edit_budget": "Modificar presupuesto",
   "budgets.by_category": "Por categoría",
-  "budgets.by_category_coming_soon": "Los presupuestos por categoría llegan en la próxima versión.",
   "budgets.committed": "pendiente",
   "budgets.ring_used": "usado",
   "privacy.title": "Tu dinero, tuyo.",
@@ -602,5 +601,10 @@
   "recurring.income_per_month": "Ingresos recurrentes",
   "recurring.hero_footnote": "Cada frecuencia se muestra como importe mensual — un sueldo cada 2 semanas cuenta 26 ÷ 12 veces, una factura semanal 52 ÷ 12.",
   "recurring.expenses_section": "Gastos",
-  "recurring.income_section": "Ingresos"
+  "recurring.income_section": "Ingresos",
+  "budgets.applies_to": "Se aplica a",
+  "budgets.scope_overall": "Todo el gasto",
+  "budgets.by_category_empty": "Aún no hay presupuestos por categoría. Limita un área — supermercado, restaurantes, compras — y síguela aquí.",
+  "budgets.add_category_budget": "Añadir presupuesto por categoría",
+  "budgets.remove_confirm": "¿Eliminar este presupuesto?"
 }

@@ -116,6 +116,100 @@ export function useActiveBudget(userId: string | undefined) {
   return { budget, loading, error, setBudget: setBudget_, refetch: fetch }
 }
 
+const EMPTY_BUDGETS: Budget[] = []
+
+/**
+ * Every active *per-category* budget (`category_id` set) — the web
+ * Budgets page has created and rendered these for months; the phone
+ * loaded only the overall budget and showed "By category — coming soon"
+ * (owner report, Aug 16: a Food & Dining budget set on desktop never
+ * appeared on mobile). Same one-active-per-category rule as web:
+ * saving a category's budget deactivates that category's previous one;
+ * removing = deactivating.
+ */
+export function useCategoryBudgets(userId: string | undefined) {
+  const [budgets, setBudgets, hasCached] = useCachedState<Budget[]>(
+    userId ? `category_budgets:${userId}` : null,
+    EMPTY_BUDGETS,
+  )
+  const [loading, setLoading] = useState(!hasCached)
+  const [error, setError] = useState<string | null>(null)
+
+  const fetch = useCallback(async () => {
+    if (!userId) return
+    const { data, error: fetchError } = await supabase
+      .from('budgets')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('is_active', true)
+      .not('category_id', 'is', null)
+      .order('created_at', { ascending: false })
+    if (fetchError) {
+      setError(fetchError.message)
+    } else {
+      setBudgets((data as Budget[]) ?? [])
+      setError(null)
+    }
+    setLoading(false)
+  }, [userId, setBudgets])
+
+  useEffect(() => {
+    fetch()
+  }, [fetch])
+
+  useEffect(() => {
+    if (!userId) return
+    return DataEvents.onBudget(userId, fetch)
+  }, [userId, fetch])
+
+  async function saveCategoryBudget(
+    categoryId: string,
+    amount: number,
+    period: BudgetPeriod,
+    currency: string,
+    tz: string = deviceTimeZone(),
+  ): Promise<boolean> {
+    if (!userId) return false
+    await supabase
+      .from('budgets')
+      .update({ is_active: false })
+      .eq('user_id', userId)
+      .eq('is_active', true)
+      .eq('category_id', categoryId)
+    const { error: insertError } = await supabase.from('budgets').insert({
+      user_id: userId,
+      client_id: Crypto.randomUUID(),
+      amount,
+      period,
+      currency_code: currency,
+      category_id: categoryId,
+      is_active: true,
+      starts_at: localDay(new Date().toISOString(), tz),
+    })
+    if (!insertError) {
+      await fetch()
+      DataEvents.emitBudget(userId)
+    }
+    return !insertError
+  }
+
+  async function removeCategoryBudget(id: string): Promise<boolean> {
+    if (!userId) return false
+    const { error: updateError } = await supabase
+      .from('budgets')
+      .update({ is_active: false })
+      .eq('id', id)
+      .eq('user_id', userId)
+    if (!updateError) {
+      await fetch()
+      DataEvents.emitBudget(userId)
+    }
+    return !updateError
+  }
+
+  return { budgets, loading, error, saveCategoryBudget, removeCategoryBudget, refetch: fetch }
+}
+
 /**
  * The full budget-status breakdown — `{spent, committed, remaining,
  * pct}` — for a caller that has the user's recurring rules on hand

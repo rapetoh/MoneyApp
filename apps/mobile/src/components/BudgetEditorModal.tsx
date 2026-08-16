@@ -10,8 +10,8 @@ import {
   Alert,
 } from 'react-native'
 import { Colors, Typography, Radius, Hairline } from '../theme'
-import { t, currencySymbolFor, type Locale } from '@voice-expense/shared'
-import type { BudgetPeriod } from '@voice-expense/shared'
+import { t, currencySymbolFor, merchantColor, type Locale } from '@voice-expense/shared'
+import type { BudgetPeriod, Category } from '@voice-expense/shared'
 
 // All five `BudgetPeriod` values (fix-plan 2.5 — "Ship all five periods
 // in `BudgetEditorModal`"). Quarterly/yearly were missing here entirely,
@@ -36,15 +36,25 @@ interface Props {
   initialPeriod?: BudgetPeriod | null
   currency: string
   locale: Locale
-  /** Persist the edit. Return true on success. */
-  onSave: (amount: number, period: BudgetPeriod) => Promise<boolean>
+  /** Persist the edit. Return true on success. `categoryId` is null for
+   *  the overall budget, or the category this budget caps. */
+  onSave: (amount: number, period: BudgetPeriod, categoryId: string | null) => Promise<boolean>
   onClose: () => void
+  /** When provided, the sheet offers an "Applies to" picker — overall or one
+   *  of these categories (per-category budgets, same model as web). Omit
+   *  for an overall-only editor (Settings). */
+  categories?: Category[]
+  /** Pre-selected scope: null = overall. Only meaningful with `categories`. */
+  initialCategoryId?: string | null
+  /** Lock the scope (editing an existing budget) — the picker is shown but
+   *  not changeable, so an edit can't silently become a different budget. */
+  lockCategory?: boolean
 }
 
 /**
  * Shared budget editor modal — used by the Settings screen and the Budgets
- * tab. Lets the user set or modify a global (category-id-null) budget amount
- * and period in a single sheet.
+ * tab. Sets or modifies a budget's amount and period; with `categories`
+ * it also picks the scope (overall vs one category).
  */
 export function BudgetEditorModal({
   visible,
@@ -54,17 +64,22 @@ export function BudgetEditorModal({
   locale,
   onSave,
   onClose,
+  categories,
+  initialCategoryId = null,
+  lockCategory = false,
 }: Props) {
   const [amount, setAmount] = useState('')
   const [period, setPeriod] = useState<BudgetPeriod>('monthly')
+  const [categoryId, setCategoryId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     if (visible) {
       setAmount(initialAmount != null ? String(initialAmount) : '')
       setPeriod(initialPeriod ?? 'monthly')
+      setCategoryId(initialCategoryId ?? null)
     }
-  }, [visible, initialAmount, initialPeriod])
+  }, [visible, initialAmount, initialPeriod, initialCategoryId])
 
   async function handleSave() {
     const parsed = parseFloat(amount.replace(',', '.'))
@@ -73,7 +88,7 @@ export function BudgetEditorModal({
       return
     }
     setSaving(true)
-    const ok = await onSave(parsed, period)
+    const ok = await onSave(parsed, period, categoryId)
     setSaving(false)
     if (!ok) {
       Alert.alert(t('common.error', locale), t('settings.budget_save_error', locale))
@@ -81,6 +96,8 @@ export function BudgetEditorModal({
     }
     onClose()
   }
+
+  const scopePicker = !!categories
 
   return (
     <Modal
@@ -125,6 +142,53 @@ export function BudgetEditorModal({
             />
           </View>
 
+          {scopePicker && (
+            <>
+              <Text style={styles.sectionLabel}>{t('budgets.applies_to', locale)}</Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.scopeRow}
+                keyboardShouldPersistTaps="handled"
+              >
+                <Pressable
+                  onPress={() => !lockCategory && setCategoryId(null)}
+                  disabled={lockCategory}
+                  style={[styles.scopeChip, categoryId === null && styles.scopeChipActive, lockCategory && categoryId !== null && styles.scopeChipDim]}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: categoryId === null }}
+                >
+                  <Text style={[styles.scopeChipLabel, categoryId === null && styles.scopeChipLabelActive]}>
+                    {t('budgets.scope_overall', locale)}
+                  </Text>
+                </Pressable>
+                {categories!.map((c) => {
+                  const color = c.color ?? merchantColor(c.name)
+                  const selected = categoryId === c.id
+                  return (
+                    <Pressable
+                      key={c.id}
+                      onPress={() => !lockCategory && setCategoryId(c.id)}
+                      disabled={lockCategory}
+                      style={[
+                        styles.scopeChip,
+                        selected && { backgroundColor: color + '22', borderColor: color },
+                        lockCategory && !selected && styles.scopeChipDim,
+                      ]}
+                      accessibilityRole="radio"
+                      accessibilityState={{ selected }}
+                    >
+                      <View style={[styles.scopeDot, { backgroundColor: color }]} />
+                      <Text style={[styles.scopeChipLabel, selected && { color, fontFamily: Typography.fontFamily.sansSemiBold }]}>
+                        {c.name}
+                      </Text>
+                    </Pressable>
+                  )
+                })}
+              </ScrollView>
+            </>
+          )}
+
           <Text style={styles.sectionLabel}>{t('settings.budget_period', locale)}</Text>
           <View style={styles.periodList}>
             {BUDGET_PERIODS.map((p, i) => (
@@ -145,6 +209,27 @@ export function BudgetEditorModal({
 
 const styles = StyleSheet.create({
   modal: { flex: 1, backgroundColor: Colors.background },
+  scopeRow: { flexDirection: 'row', gap: 8, paddingVertical: 2, paddingRight: 8 },
+  scopeChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: Colors.surface ?? Colors.card,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  scopeChipActive: { backgroundColor: Colors.accentSoft ?? Colors.primaryLight, borderColor: Colors.accent ?? Colors.primary },
+  scopeChipDim: { opacity: 0.4 },
+  scopeDot: { width: 8, height: 8, borderRadius: 4 },
+  scopeChipLabel: {
+    fontFamily: Typography.fontFamily.sans,
+    fontSize: 13,
+    color: Colors.ink2 ?? Colors.text,
+  },
+  scopeChipLabelActive: { color: Colors.accent ?? Colors.primary, fontFamily: Typography.fontFamily.sansSemiBold },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',

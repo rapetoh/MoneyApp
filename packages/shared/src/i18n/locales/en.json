@@ -330,7 +330,6 @@
   "budgets.set_budget_cta": "Set a budget",
   "budgets.edit_budget": "Edit budget",
   "budgets.by_category": "By category",
-  "budgets.by_category_coming_soon": "Per-category budgets arrive in the next release.",
   "budgets.committed": "still due",
   "budgets.ring_used": "used",
   "privacy.title": "Your money, yours.",
@@ -602,5 +601,10 @@
   "recurring.income_per_month": "Recurring income",
   "recurring.hero_footnote": "Every schedule is shown as a per-month amount — a paycheck every 2 weeks counts 26 ÷ 12 times, a weekly bill 52 ÷ 12.",
   "recurring.expenses_section": "Expenses",
-  "recurring.income_section": "Income"
+  "recurring.income_section": "Income",
+  "budgets.applies_to": "Applies to",
+  "budgets.scope_overall": "All spending",
+  "budgets.by_category_empty": "No category budgets yet. Cap a single area — groceries, dining, shopping — and track it here.",
+  "budgets.add_category_budget": "Add a category budget",
+  "budgets.remove_confirm": "Remove this budget?"
 }

@@ -1,20 +1,21 @@
 import { useMemo, useState, useEffect } from 'react'
-import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl} from 'react-native'
+import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl, Alert } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useLocalSearchParams } from 'expo-router'
 import { useAuth } from '../../src/hooks/useAuth'
 import { useProfile } from '../../src/hooks/useProfile'
 import { useTransactions } from '../../src/hooks/useTransactions'
-import { useActiveBudget, budgetStatusFor } from '../../src/hooks/useBudget'
+import { useActiveBudget, useCategoryBudgets, budgetStatusFor } from '../../src/hooks/useBudget'
+import { useCategories } from '../../src/hooks/useCategories'
 import { useRecurringRules } from '../../src/hooks/useRecurringRules'
 import { useManualRefresh } from '../../src/hooks/useManualRefresh'
 import { Money } from '../../src/components/Money'
 import { BudgetRing } from '../../src/components/BudgetRing'
 import { BudgetEditorModal } from '../../src/components/BudgetEditorModal'
 import { Colors, Typography, useTabBarClearance } from '../../src/theme'
-import { t, localParts, daysBetween } from '@voice-expense/shared'
-import type { Locale } from '@voice-expense/shared'
+import { t, localParts, daysBetween, formatMoney, merchantColor, categoryPalette } from '@voice-expense/shared'
+import type { Locale, Budget, BudgetPeriod } from '@voice-expense/shared'
 
 /**
  * Budgets tab. Matches `S_Budgets` in
@@ -24,9 +25,13 @@ import type { Locale } from '@voice-expense/shared'
  *     (big sans-display) + "+" add-budget pill.
  *   - Hero card: BudgetRing + "MONTHLY BUDGET" label + serif "left" amount +
  *     "left of $X,XXX" line + "On pace" sage pill (or "Over budget" warning).
- *   - "By category" section: empty placeholder for now — the app has the DB
- *     columns for per-category budgets (budgets.category_id nullable) but no
- *     UI to manage them yet. That's its own feature, landing post-Phase D.
+ *   - "By category" section: every active per-category budget (same model
+ *     as the web Budgets page — one active budget per category), each with
+ *     spent-of-cap, a pace bar and an over/tight state; tap a row to edit
+ *     or remove it. The "+" pill opens the shared editor with an
+ *     "Applies to" picker (overall or a category). Added Aug 16, 2026 —
+ *     the owner set a Food & Dining budget on desktop and the phone
+ *     showed "coming soon".
  *
  * The ring's progress arc is a follow-up once react-native-svg is installed
  * (see BudgetRing component notes).
@@ -69,9 +74,16 @@ export default function BudgetsScreen() {
   // `null` either way), so the empty-state CTA below rendered for a
   // fetch failure as readily as for a genuinely unconfigured budget.
   const { budget, error: budgetError, setBudget, refetch: refetchBudget } = useActiveBudget(user?.id)
+  const { budgets: categoryBudgets, saveCategoryBudget, removeCategoryBudget, refetch: refetchCategoryBudgets } = useCategoryBudgets(user?.id)
+  const { categories, categoryMap } = useCategories(user?.id)
   const { rules: recurringRules, refetch: refetchRules } = useRecurringRules(user?.id)
-  const { refreshing, onRefresh } = useManualRefresh(user?.id, [refetchBudget, refetchRules])
+  const { refreshing, onRefresh } = useManualRefresh(user?.id, [refetchBudget, refetchCategoryBudgets, refetchRules])
   const [budgetModalVisible, setBudgetModalVisible] = useState(false)
+  // Which budget the editor is working on: null = new (scope pickable),
+  // otherwise an existing budget (scope locked to it).
+  const [editing, setEditing] = useState<Budget | null>(null)
+  const openNewBudget = () => { setEditing(null); setBudgetModalVisible(true) }
+  const openEditBudget = (b: Budget) => { setEditing(b); setBudgetModalVisible(true) }
   // `?edit=1` — Ask Murmur's "Adjust budget" / "Set budget" action lands
   // here with the editor already open (docs/ask-murmur/SPEC.md §1.4).
   const params = useLocalSearchParams<{ edit?: string }>()
@@ -105,6 +117,45 @@ export default function BudgetsScreen() {
     [status, tz],
   )
 
+  // Per-category statuses through the same shared computation as the hero
+  // (packages/shared/src/domain/budget.ts) — the web page does exactly this
+  // per row, so both surfaces show identical figures for a category budget.
+  const categoryRows = useMemo(
+    () =>
+      categoryBudgets
+        .map((b) => {
+          const st = budgetStatusFor(b, transactions, recurringRules, tz)
+          const cat = b.category_id ? categoryMap[b.category_id] : undefined
+          const used = (st?.spent ?? 0) + (st?.committed ?? 0)
+          return {
+            budget: b,
+            name: cat?.name ?? '—',
+            color: cat?.color ?? merchantColor(cat?.name ?? '?'),
+            used,
+            pct: b.amount > 0 ? used / b.amount : 0,
+          }
+        })
+        .sort((a, b) => b.pct - a.pct),
+    [categoryBudgets, transactions, recurringRules, tz, categoryMap],
+  )
+
+  function onCategoryRowPress(b: Budget, name: string) {
+    Alert.alert(name, formatMoney(b.amount, b.currency_code, locale) + ' · ' + periodLabel(b.period, locale), [
+      { text: t('detail.edit', locale), onPress: () => openEditBudget(b) },
+      {
+        text: t('detail.delete', locale),
+        style: 'destructive',
+        onPress: () => {
+          Alert.alert(t('budgets.remove_confirm', locale), name, [
+            { text: t('common.cancel', locale), style: 'cancel' },
+            { text: t('detail.delete', locale), style: 'destructive', onPress: () => removeCategoryBudget(b.id) },
+          ])
+        },
+      },
+      { text: t('common.cancel', locale), style: 'cancel' },
+    ])
+  }
+
   const spent = (status?.spent ?? 0) + (status?.committed ?? 0)
   const limit = budget?.amount ?? 0
   const remaining = Math.max(0, limit - spent)
@@ -132,7 +183,7 @@ export default function BudgetsScreen() {
           </View>
           <Pressable
             style={({ pressed }) => [styles.headerBtn, pressed && styles.headerBtnPressed]}
-            onPress={() => setBudgetModalVisible(true)}
+            onPress={openNewBudget}
             hitSlop={8}
             accessibilityLabel={t('budgets.edit_budget', locale)}
           >
@@ -228,30 +279,79 @@ export default function BudgetsScreen() {
             <Text style={styles.emptyHeroBody}>{t('budgets.no_budget_body', locale)}</Text>
             <Pressable
               style={({ pressed }) => [styles.ctaBtn, pressed && styles.ctaBtnPressed]}
-              onPress={() => setBudgetModalVisible(true)}
+              onPress={openNewBudget}
             >
               <Text style={styles.ctaBtnText}>{t('budgets.set_budget_cta', locale)}</Text>
             </Pressable>
           </View>
         )}
 
-        {/* By category */}
+        {/* By category — one row per active category budget */}
         <Text style={styles.sectionHead}>{t('budgets.by_category', locale)}</Text>
-        <View style={styles.emptyCategoryCard}>
-          <Text style={styles.emptyCategoryBody}>
-            {t('budgets.by_category_coming_soon', locale)}
-          </Text>
-        </View>
+        {categoryRows.length === 0 ? (
+          <Pressable style={({ pressed }) => [styles.emptyCategoryCard, pressed && { opacity: 0.7 }]} onPress={openNewBudget}>
+            <Text style={styles.emptyCategoryBody}>{t('budgets.by_category_empty', locale)}</Text>
+            <Text style={styles.emptyCategoryLink}>{t('budgets.add_category_budget', locale)}</Text>
+          </Pressable>
+        ) : (
+          <View style={styles.categoryCard}>
+            {categoryRows.map((row, i) => {
+              const over = row.pct > 1
+              const near = !over && row.pct > 0.9
+              const barColor = over ? Colors.destructive : near ? '#B8860B' : categoryPalette(row.color).fg
+              return (
+                <Pressable
+                  key={row.budget.id}
+                  onPress={() => onCategoryRowPress(row.budget, row.name)}
+                  style={({ pressed }) => [styles.categoryRow, i > 0 && styles.categoryRowDivider, pressed && styles.categoryRowPressed]}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${row.name}, ${formatMoney(row.used, row.budget.currency_code, locale)} of ${formatMoney(row.budget.amount, row.budget.currency_code, locale)}`}
+                >
+                  <View style={styles.categoryTop}>
+                    <View style={styles.categoryNameWrap}>
+                      <View style={[styles.categoryDot, { backgroundColor: row.color }]} />
+                      <Text style={styles.categoryName} numberOfLines={1}>{row.name}</Text>
+                      <Text style={styles.categoryPeriod}>{periodLabel(row.budget.period, locale)}</Text>
+                    </View>
+                    <View style={styles.categoryAmounts}>
+                      <Money value={row.used} size={15} serif={false} sansWeight="700" currencyCode={row.budget.currency_code} locale={locale} />
+                      <Text style={styles.categoryOf}>
+                        {`/ ${formatMoney(row.budget.amount, row.budget.currency_code, locale, { precision: 'compact' })}`}
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={styles.categoryTrack}>
+                    <View style={[styles.categoryFill, { width: `${Math.min(row.pct, 1) * 100}%`, backgroundColor: barColor }]} />
+                  </View>
+                  <Text style={[styles.categoryState, over && styles.categoryStateOver, near && styles.categoryStateNear]}>
+                    {over
+                      ? `${t('budgets.status_over', locale)} · ${formatMoney(row.used - row.budget.amount, row.budget.currency_code, locale, { precision: 'compact' })} ${t('budgets.over_by', locale)}`
+                      : near
+                        ? `${t('budgets.status_tight', locale)} · ${formatMoney(Math.max(0, row.budget.amount - row.used), row.budget.currency_code, locale, { precision: 'compact' })} ${t('budgets.left_of', locale)} ${formatMoney(row.budget.amount, row.budget.currency_code, locale, { precision: 'compact' })}`
+                        : `${t('budgets.status_on_pace', locale)} · ${formatMoney(Math.max(0, row.budget.amount - row.used), row.budget.currency_code, locale, { precision: 'compact' })} ${t('budgets.left_of', locale)} ${formatMoney(row.budget.amount, row.budget.currency_code, locale, { precision: 'compact' })}`}
+                  </Text>
+                </Pressable>
+              )
+            })}
+          </View>
+        )}
       </ScrollView>
 
       <BudgetEditorModal
         visible={budgetModalVisible}
-        initialAmount={budget?.amount ?? null}
-        initialPeriod={budget?.period ?? null}
+        initialAmount={editing ? editing.amount : null}
+        initialPeriod={editing ? editing.period : (budget?.period ?? null)}
+        initialCategoryId={editing ? editing.category_id : null}
+        lockCategory={editing !== null}
+        categories={categories}
         currency={currency}
         locale={locale}
-        onSave={async (amount, period) => setBudget(amount, period, currency, tz)}
-        onClose={() => setBudgetModalVisible(false)}
+        onSave={async (amount: number, period: BudgetPeriod, categoryId: string | null) =>
+          categoryId
+            ? saveCategoryBudget(categoryId, amount, period, currency, tz)
+            : setBudget(amount, period, currency, tz)
+        }
+        onClose={() => { setBudgetModalVisible(false); setEditing(null) }}
       />
     </SafeAreaView>
   )
@@ -420,4 +520,58 @@ const styles = StyleSheet.create({
     lineHeight: 19,
     textAlign: 'center',
   },
+  emptyCategoryLink: {
+    marginTop: 8,
+    fontFamily: Typography.fontFamily.sansSemiBold,
+    fontSize: 13,
+    fontWeight: '600',
+    color: Colors.accent ?? Colors.primary,
+    textAlign: 'center',
+  },
+  categoryCard: {
+    marginHorizontal: 16,
+    backgroundColor: Colors.surface ?? '#FFFFFF',
+    borderRadius: 22,
+    overflow: 'hidden',
+  },
+  categoryRow: { paddingHorizontal: 18, paddingVertical: 14 },
+  categoryRowDivider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: Colors.line },
+  categoryRowPressed: { backgroundColor: 'rgba(40,36,28,0.04)' },
+  categoryTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  categoryNameWrap: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1 },
+  categoryDot: { width: 8, height: 8, borderRadius: 4 },
+  categoryName: {
+    fontFamily: Typography.fontFamily.sansSemiBold,
+    fontSize: 14.5,
+    fontWeight: '600',
+    color: Colors.ink ?? Colors.text,
+    flexShrink: 1,
+  },
+  categoryPeriod: {
+    fontFamily: Typography.fontFamily.sans,
+    fontSize: 11,
+    color: Colors.ink4 ?? Colors.textMuted,
+  },
+  categoryAmounts: { flexDirection: 'row', alignItems: 'baseline', gap: 6 },
+  categoryOf: {
+    fontFamily: Typography.fontFamily.sansSemiBold,
+    fontSize: 12,
+    color: Colors.ink4 ?? Colors.textMuted,
+  },
+  categoryTrack: {
+    marginTop: 10,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: Colors.surface2 ?? '#F5F2EB',
+    overflow: 'hidden',
+  },
+  categoryFill: { height: '100%', borderRadius: 3 },
+  categoryState: {
+    marginTop: 6,
+    fontFamily: Typography.fontFamily.sans,
+    fontSize: 12,
+    color: Colors.ink3 ?? Colors.textSecondary,
+  },
+  categoryStateOver: { color: Colors.destructive, fontFamily: Typography.fontFamily.sansSemiBold },
+  categoryStateNear: { color: '#B8860B', fontFamily: Typography.fontFamily.sansSemiBold },
 })

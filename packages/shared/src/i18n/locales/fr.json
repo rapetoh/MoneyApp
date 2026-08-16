@@ -330,7 +330,6 @@
   "budgets.set_budget_cta": "Définir un budget",
   "budgets.edit_budget": "Modifier le budget",
   "budgets.by_category": "Par catégorie",
-  "budgets.by_category_coming_soon": "Les budgets par catégorie arrivent dans la prochaine version.",
   "budgets.committed": "encore à payer",
   "budgets.ring_used": "utilisé",
   "privacy.title": "Votre argent, à vous.",
@@ -602,5 +601,10 @@
   "recurring.income_per_month": "Revenus récurrents",
   "recurring.hero_footnote": "Chaque échéance est ramenée à un montant mensuel — une paie toutes les 2 semaines compte 26 ÷ 12 fois, une facture hebdomadaire 52 ÷ 12.",
   "recurring.expenses_section": "Dépenses",
-  "recurring.income_section": "Revenus"
+  "recurring.income_section": "Revenus",
+  "budgets.applies_to": "S’applique à",
+  "budgets.scope_overall": "Toutes les dépenses",
+  "budgets.by_category_empty": "Aucun budget par catégorie. Plafonnez un domaine — courses, restaurants, shopping — et suivez-le ici.",
+  "budgets.add_category_budget": "Ajouter un budget par catégorie",
+  "budgets.remove_confirm": "Supprimer ce budget ?"
 }
