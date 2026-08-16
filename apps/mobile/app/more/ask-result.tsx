@@ -184,15 +184,16 @@ export default function AskResultScreen() {
       .catch((err) => console.warn('[ask-result] persist failed:', err))
   }
 
+  const anyLoading = turns.some((t) => t.state.kind === 'loading')
+  const canSend = draft.trim().length > 0 && !anyLoading
+
   function onSend() {
     const trimmed = draft.trim()
-    if (!trimmed) return
+    // The keyboard's return key calls this too — same gate as the button.
+    if (!trimmed || anyLoading) return
     setDraft('')
     void ask(trimmed)
   }
-
-  const anyLoading = turns.some((t) => t.state.kind === 'loading')
-  const canSend = draft.trim().length > 0 && !anyLoading
 
   return (
     <>
@@ -253,7 +254,9 @@ export default function AskResultScreen() {
               onSubmitEditing={onSend}
               blurOnSubmit={false}
               multiline={false}
-              editable={!anyLoading}
+              // Stays editable while an answer streams in — toggling
+              // `editable` on a focused field dismisses the keyboard on iOS,
+              // which would make every follow-up a re-tap. Send is gated.
               accessibilityLabel={t('ask.follow_up_placeholder', locale)}
             />
             <Pressable
