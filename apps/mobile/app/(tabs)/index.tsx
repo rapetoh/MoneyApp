@@ -226,7 +226,22 @@ export default function TodayScreen() {
     () => budgetStatusFor(budget, transactions, recurringRules, tz),
     [budget, transactions, recurringRules, tz],
   )
-  const leftThisPeriod = budgetStatus ? Math.max(0, budgetStatus.remaining) : null
+  // Not clamped: an over-budget week reads "over by $237", never "$0 left"
+  // (owner screenshot Aug 16: a $700 weekly budget $237 over rendered as
+  // "$0 left this month · 16 days to go"). Caption and countdown follow the
+  // budget's own period/window, not the calendar month.
+  const leftThisPeriod = budgetStatus ? budgetStatus.remaining : null
+  const budgetPeriodKey = budget?.period === 'weekly'
+    ? 'home.left_this_week'
+    : budget?.period === 'monthly'
+      ? 'home.left_this_month'
+      : 'home.left_this_period'
+  const budgetDaysLeft = useMemo(() => {
+    if (!budgetStatus) return daysLeft
+    const now = localParts(nowInstant, tz)
+    const end = localParts(budgetStatus.window.endExclusive, tz)
+    return Math.max(1, daysBetween(now.y, now.m, now.d, end.y, end.m, end.d))
+  }, [budgetStatus, nowInstant, tz, daysLeft])
 
   // Day-1 coach surface: show until the user has logged anything, unless they
   // tap Skip this session. Persistence is intentionally not wired — if the
@@ -312,13 +327,16 @@ export default function TodayScreen() {
           leftThisPeriod != null && (
             <View style={styles.budgetLine}>
               <Text style={styles.budgetLeft}>
-                <Text style={styles.budgetLeftAccent}>
-                  {formatBudgetShort(leftThisPeriod, currency, locale)}
+                <Text style={[styles.budgetLeftAccent, leftThisPeriod < 0 && styles.budgetOverAccent]}>
+                  {formatBudgetShort(Math.abs(leftThisPeriod), currency, locale)}
                 </Text>
-                <Text style={styles.budgetLeftRest}> {t('home.left_this_month', locale)}</Text>
+                <Text style={styles.budgetLeftRest}>
+                  {' '}
+                  {leftThisPeriod < 0 ? t('home.over_budget', locale) : t(budgetPeriodKey, locale)}
+                </Text>
               </Text>
               <Text style={styles.budgetRight}>
-                {daysLeft} {t('home.days_to_go', locale)}
+                {budgetDaysLeft} {t(leftThisPeriod < 0 && budget?.period === 'weekly' ? 'home.days_left_week' : 'home.days_to_go', locale)}
               </Text>
             </View>
           )
@@ -472,6 +490,7 @@ const styles = StyleSheet.create({
     fontFamily: Typography.fontFamily.sans,
     fontWeight: '500',
   },
+  budgetOverAccent: { color: Colors.destructive },
   budgetRight: {
     fontSize: 13,
     fontFamily: Typography.fontFamily.sans,

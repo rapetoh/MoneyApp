@@ -517,13 +517,16 @@ export default function RecurringPage() {
     return m
   }, [charges])
 
-  // Total + heaviest day for the calendar footer.
-  const totalCharges = charges.reduce((s, c) => s + c.rule.amount, 0)
+  // Total + heaviest day for the calendar footer — bills (debits) only; a
+  // paycheck is not a "charge" and must never make a day "heaviest" (owner
+  // review Aug 16: two $2,500 deposits read as "$5,342 in charges").
+  const totalCharges = charges.reduce((s, c) => s + (c.rule.direction === 'debit' ? c.rule.amount : 0), 0)
+  const totalIncoming = charges.reduce((s, c) => s + (c.rule.direction === 'credit' ? c.rule.amount : 0), 0)
   const heaviestEntry = (() => {
     let bestDay = 0
     let bestSum = 0
     for (const [d, rs] of Object.entries(chargesByDay)) {
-      const sum = rs.reduce((s, r) => s + r.amount, 0)
+      const sum = rs.reduce((s, r) => s + (r.direction === 'debit' ? r.amount : 0), 0)
       if (sum > bestSum) {
         bestSum = sum
         bestDay = Number(d)
@@ -933,13 +936,17 @@ export default function RecurringPage() {
                     lineHeight: 1.5,
                   }}
                 >
-                  <b style={{ color: colors.ink }}>{fmtShort(totalCharges)}</b> in charges hit before{' '}
-                  {dayOffsetToLabel(31, tz, locale)}
-                  .
-                  {heaviestDate && (
+                  <b style={{ color: colors.ink }}>{fmtShort(totalCharges)}</b> in bills
+                  {totalIncoming > 0 && (
+                    <>
+                      {' '}and <b style={{ color: colors.ink }}>{fmtShort(totalIncoming)}</b> in expected income
+                    </>
+                  )}{' '}
+                  before {dayOffsetToLabel(31, tz, locale)}.
+                  {heaviestDate && heaviestEntry.sum > 0 && (
                     <>
                       {' '}
-                      Heaviest day: <b style={{ color: colors.ink }}>{heaviestDate}</b>.
+                      Heaviest bill day: <b style={{ color: colors.ink }}>{heaviestDate}</b>.
                     </>
                   )}
                 </div>

@@ -195,7 +195,8 @@ try {
 
   // 2. Greeting → overview → follow-up window.
   await runConversation('overview', [
-    { message: 'Hey', expect: (r) => { if (/\d/.test(r.text)) pass('overview: greeting cites a real figure'); else fail('overview: greeting has no figure') } },
+    { message: 'Heyy how are you doing?', expect: (r) => { const human = /\b(doing (well|good|great)|i'?m (good|well|great|doing)|thanks for asking|good, thanks|great, thanks)\b/i.test(r.text); if (human) pass('overview: "how are you" answered like a person'); else fail(`overview: small talk answered as a report: "${r.text.slice(0, 120)}"`) } },
+    { message: 'why did you tell me that? I just asked how you were doing', expect: (r) => { const meta = /\b(fair|sorry|you'?re right|apolog|my bad|good point|got it|understood|i (over|jumped)|didn'?t mean)\b/i.test(r.text) || !/\$\s?\d/.test(r.text); if (meta) pass('overview: meta question answered directly, no figure recital'); else fail(`overview: meta question deflected with figures: "${r.text.slice(0, 120)}"`) } },
     { message: 'How am I doing overall with my money?', expect: (r) => { if (/\d/.test(r.text)) pass('overview: answered with figures'); else fail('overview: no figures') } },
     { message: 'and last month?', expect: (r) => { if (/\d/.test(r.text) && (r.focus?.window?.name === 'lastMonth' || /last month/i.test(r.text))) pass('overview: "and last month?" resolved to lastMonth'); else fail(`overview: "and last month?" not resolved (window=${r.focus?.window?.name})`) } },
   ])
