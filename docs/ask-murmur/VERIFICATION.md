@@ -91,4 +91,4 @@ every windowed result carries `coverage` and the prompt forbids averaging over u
 Replay script `apps/web/scripts/ask-murmur-owner-replay.mjs` (the owner's exact turns on data shaped
 like their account). Local run with the new code: $5,000 next month with Sep 8/22 dates ✓; 20 LLC ↔
 The20 MSP by the link ✓; "monthly average salary" → "$5,416.67 on average, from your recurring income
-rules" (truthful; not $1,250). Production run pending the deploy of 8ff14d4.
+rules" (truthful; not $1,250). Production run after the deploy (~14:45 CDT): the owner replay `CHECKS: all passed` ($1,329 · $2,500 · $5,416.67 said as the recurring average · $5,000 next month with Sep 8/22 · 20 LLC = The20 MSP $1,000 by the link); the full harness `CHECKS: all passed` (24 checks). iOS build 23 submitted to TestFlight with the wire change.
