@@ -185,13 +185,17 @@ export async function POST(req: NextRequest) {
     const dataMismatch = detectDataMismatch(result.response, overview, askReq.question)
     const stall = detectStall(result.response)
     const repeat = detectRepeat(result.response, askReq)
+    const ungrounded = detectUngrounded(result.response, result.calls, validation.soft_issues)
+    const windowMismatch = detectWindowMismatch(askReq.question, result.response, result.calls)
 
     if (
       validation.comparison_direction_violations.length === 0 &&
       !verdictTooShort &&
       !dataMismatch &&
       !stall &&
-      !repeat
+      !repeat &&
+      !ungrounded &&
+      !windowMismatch
     ) {
       console.log(
         `[ask-murmur] ok outcome=primary tool_calls=${result.calls.length} ms=${Date.now() - startedAt}`,
@@ -213,17 +217,29 @@ export async function POST(req: NextRequest) {
     }
     if (stall) reasons.push(stall)
     if (repeat) reasons.push(repeat)
+    if (ungrounded) reasons.push(ungrounded)
+    if (windowMismatch) reasons.push(windowMismatch)
     // Retry reasons embed the verdict text and untraced amounts — log only
     // which triggers fired.
     console.warn(
-      `[ask-murmur] retrying once: direction_violations=${validation.comparison_direction_violations.length} empty_verdict=${verdictTooShort} data_mismatch=${dataMismatch !== null} stall=${stall !== null} repeat=${repeat !== null}`,
+      `[ask-murmur] retrying once: direction_violations=${validation.comparison_direction_violations.length} empty_verdict=${verdictTooShort} data_mismatch=${dataMismatch !== null} stall=${stall !== null} repeat=${repeat !== null} ungrounded=${ungrounded !== null} window_mismatch=${windowMismatch !== null}`,
     )
     if (DEBUG_TRACE) {
       console.warn('[ask-murmur] trace retry reasons:', reasons.join(' | '))
     }
     const retry = await runConversation(askReq, ctx, reasons, overview)
     const retryVerdict = retry.response.verdict.text.trim()
-    const retryStalled = detectStall(retry.response) !== null || detectRepeat(retry.response, askReq) !== null
+    const retryValidation = validateAskMurmurResponseAgainstCalls(
+      retry.response,
+      retry.calls,
+      askReq.question,
+      askReq.monthly_income,
+      askReq.budget ? [askReq.budget.amount, askReq.budget.spent, askReq.budget.committed, askReq.budget.remaining] : null,
+    )
+    const retryStalled =
+      detectStall(retry.response) !== null ||
+      detectRepeat(retry.response, askReq) !== null ||
+      detectUngrounded(retry.response, retry.calls, retryValidation.soft_issues) !== null
     if ((retryVerdict.length >= 8 && !retryStalled) || retry.response.out_of_scope) {
       console.log(
         `[ask-murmur] ok outcome=retry tool_calls=${retry.calls.length} ms=${Date.now() - startedAt}`,
@@ -327,6 +343,70 @@ function parseBudget(raw: unknown): AskMurmurBudget | null {
     period_start: b.period_start.slice(0, 40),
     period_end: b.period_end.slice(0, 40),
   }
+}
+
+// ─── Ungrounded-number / window-mismatch detectors ─────────────────────────
+//
+// Aug 15 trace: "and last month?" was answered with tool_calls=0 and an
+// invented "$91" — the numeric validator flagged it, but only as a *soft*
+// issue nothing acted on. Two structural triggers now:
+//   1. A numeric answer produced without a single successful tool call
+//      whose figures the validator couldn't trace → retry ("call the tools").
+//   2. The question names a period ("last month", "yesterday", "this
+//      week"…) and no tool call queried that window → retry.
+
+const PERIOD_PHRASES: Array<{ re: RegExp; windows: string[]; label: string }> = [
+  { re: /\blast\s+month\b|\bprevious\s+month\b|\bmois\s+dernier\b|\bmes\s+pasado\b|\bm[êe]s\s+passado\b/i, windows: ['lastMonth', 'custom'], label: 'last month' },
+  { re: /\bthis\s+month\b|\bce\s+mois/i, windows: ['thisMonth', 'custom'], label: 'this month' },
+  { re: /\byesterday\b|\bhier\b|\bayer\b|\bontem\b/i, windows: ['yesterday', 'custom'], label: 'yesterday' },
+  { re: /\blast\s+week\b|\bsemaine\s+derni[eè]re\b|\bsemana\s+pasada\b|\bsemana\s+passada\b/i, windows: ['lastWeek', 'last7Days', 'custom'], label: 'last week' },
+  { re: /\bthis\s+week\b|\bcette\s+semaine\b|\besta\s+semana\b/i, windows: ['thisWeek', 'last7Days', 'custom'], label: 'this week' },
+  { re: /\blast\s+year\b|\bann[ée]e\s+derni[eè]re\b|\ba[ñn]o\s+pasado\b|\bano\s+passado\b/i, windows: ['lastYear', 'last12Months', 'custom'], label: 'last year' },
+  { re: /\bthis\s+year\b|\bcette\s+ann[ée]e\b|\beste\s+a[ñn]o\b|\beste\s+ano\b/i, windows: ['thisYear', 'last12Months', 'custom'], label: 'this year' },
+  { re: /\btoday\b|\baujourd/i, windows: ['today', 'custom'], label: 'today' },
+]
+
+function windowsQueried(calls: ToolCallRecord[]): Set<string> {
+  const out = new Set<string>()
+  for (const c of calls) {
+    if (!c.ok || !c.args || typeof c.args !== 'object') continue
+    const w = (c.args as { window?: unknown }).window
+    if (typeof w === 'string') out.add(w)
+  }
+  return out
+}
+
+/** Non-null when the question names a period and no successful tool call
+ *  queried a window that could answer for it. Skips greetings/refusals
+ *  (no numbers) and answers that made no claim about that period. */
+function detectWindowMismatch(question: string, response: AskMurmurResponse, calls: ToolCallRecord[]): string | null {
+  if (response.out_of_scope) return null
+  if (!/\d/.test(response.verdict.text) && !response.breakdown && !response.chart) return null
+  const queried = windowsQueried(calls)
+  for (const p of PERIOD_PHRASES) {
+    if (!p.re.test(question)) continue
+    if (p.windows.some((w) => queried.has(w))) return null
+    return (
+      `the user asked about ${p.label} but no tool call queried that period (windows queried: ${queried.size ? Array.from(queried).join(', ') : 'none'}). ` +
+      `Call \`total\` (and any breakdown tool you need) with window "${p.windows[0]}" and answer from those results.`
+    )
+  }
+  return null
+}
+
+/** Non-null when a numeric answer was produced with no successful tool call
+ *  and the validator could not trace its figures. */
+function detectUngrounded(response: AskMurmurResponse, calls: ToolCallRecord[], softIssues: string[]): string | null {
+  if (response.out_of_scope) return null
+  const okCalls = calls.filter((c) => c.ok).length
+  const untraced = softIssues.filter((i) => /not traced to a tool call/.test(i))
+  if (okCalls === 0 && untraced.length > 0) {
+    return (
+      `previous attempt quoted figures without calling any tool (${untraced.slice(0, 3).join('; ')}). ` +
+      'Every number must come from a tool result, the data overview, the BUDGET block, or the user\'s own words — call the tools now.'
+    )
+  }
+  return null
 }
 
 // ─── Non-answer / stall / repeat detectors ──────────────────────────────────

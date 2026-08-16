@@ -206,6 +206,17 @@ function monthsAgoWindow(y: number, m: number, d: number, tz: string, n: number)
   return { start: toDate(bounds.start), end: dayWindow(y, m, d, tz).end }
 }
 
+/** Every argument each tool accepts — `resolveToolCall` rejects anything
+ *  else with a self-correcting error rather than dropping it. */
+const TOOL_ARG_NAMES: Record<string, Set<string>> = {
+  total: new Set(['window', 'start_date', 'end_date', 'direction', 'category_name', 'merchant_contains']),
+  sum_by_category: new Set(['window', 'start_date', 'end_date', 'direction', 'merchant_contains']),
+  top_merchants: new Set(['window', 'start_date', 'end_date', 'direction', 'category_name', 'merchant_contains', 'limit']),
+  series: new Set(['window', 'start_date', 'end_date', 'bucket', 'direction', 'category_name', 'merchant_contains']),
+  recurring_total: new Set(['direction']),
+  compare: new Set(['a', 'b']),
+}
+
 export const WINDOW_NAMES = [
   'today',
   'yesterday',
@@ -434,7 +445,7 @@ function totalTool(args: TotalArgs, ctx: ToolContext, windows: Record<WindowName
 
 // ─── sum_by_category ────────────────────────────────────────────────────
 
-interface SumByCategoryArgs extends Pick<RowFilter, 'window' | 'start_date' | 'end_date' | 'direction'> {}
+interface SumByCategoryArgs extends Pick<RowFilter, 'window' | 'start_date' | 'end_date' | 'direction' | 'merchant_contains'> {}
 
 function parseSumByCategoryArgs(args: Record<string, unknown>): SumByCategoryArgs {
   return {
@@ -442,6 +453,7 @@ function parseSumByCategoryArgs(args: Record<string, unknown>): SumByCategoryArg
     start_date: parseCivilDate(args.start_date, 'start_date'),
     end_date: parseCivilDate(args.end_date, 'end_date'),
     direction: parseDirection(args.direction),
+    merchant_contains: parseOptionalString(args.merchant_contains),
   }
 }
 
@@ -451,7 +463,7 @@ function sumByCategoryTool(
   windows: Record<WindowName, DateWindow>,
 ): unknown {
   const direction = args.direction ?? 'debit'
-  const { rows, pendingCount } = filterRows(ctx, windows, { window: args.window, start_date: args.start_date, end_date: args.end_date, direction })
+  const { rows, pendingCount } = filterRows(ctx, windows, { window: args.window, start_date: args.start_date, end_date: args.end_date, direction, merchant_contains: args.merchant_contains })
   const byCat = new Map<string, { total: number; count: number }>()
   for (const t of rows) {
     const key = t.category_name || 'Uncategorized'
@@ -474,6 +486,7 @@ interface TopMerchantsArgs {
   end_date?: RowFilter['end_date']
   direction?: 'debit' | 'credit'
   category_name?: string
+  merchant_contains?: string
   limit: number
 }
 
@@ -484,6 +497,7 @@ function parseTopMerchantsArgs(args: Record<string, unknown>): TopMerchantsArgs 
     end_date: parseCivilDate(args.end_date, 'end_date'),
     direction: parseDirection(args.direction),
     category_name: parseOptionalString(args.category_name),
+    merchant_contains: parseOptionalString(args.merchant_contains),
     limit: parseLimit(args.limit, 5, 20),
   }
 }
@@ -500,6 +514,7 @@ function topMerchantsTool(
     end_date: args.end_date,
     direction,
     category_name: args.category_name,
+    merchant_contains: args.merchant_contains,
   })
   const byMerchant = new Map<string, { total: number; count: number }>()
   for (const t of rows) {
@@ -521,7 +536,7 @@ function topMerchantsTool(
 const SERIES_BUCKETS = ['day', 'week', 'month', 'weekday'] as const
 type SeriesBucket = (typeof SERIES_BUCKETS)[number]
 
-interface SeriesArgs extends Pick<RowFilter, 'window' | 'start_date' | 'end_date' | 'direction'> {
+interface SeriesArgs extends Pick<RowFilter, 'window' | 'start_date' | 'end_date' | 'direction' | 'category_name' | 'merchant_contains'> {
   bucket: SeriesBucket
 }
 
@@ -536,13 +551,15 @@ function parseSeriesArgs(args: Record<string, unknown>): SeriesArgs {
     end_date: parseCivilDate(args.end_date, 'end_date'),
     bucket: bucket as SeriesBucket,
     direction: parseDirection(args.direction),
+    category_name: parseOptionalString(args.category_name),
+    merchant_contains: parseOptionalString(args.merchant_contains),
   }
 }
 
 function seriesTool(args: SeriesArgs, ctx: ToolContext, windows: Record<WindowName, DateWindow>): unknown {
   const direction = args.direction ?? 'debit'
   const tz = resolveTz(ctx.tz)
-  const { rows, pendingCount } = filterRows(ctx, windows, { window: args.window, start_date: args.start_date, end_date: args.end_date, direction })
+  const { rows, pendingCount } = filterRows(ctx, windows, { window: args.window, start_date: args.start_date, end_date: args.end_date, direction, category_name: args.category_name, merchant_contains: args.merchant_contains })
 
   const byBucket = new Map<string, { total: number; count: number; order: number }>()
   for (const t of rows) {
@@ -740,6 +757,10 @@ export const TOOLS = [
             enum: ['debit', 'credit'],
             description: 'Default "debit" (spend). Pass "credit" for an income breakdown.',
           },
+          merchant_contains: {
+            type: 'string',
+            description: 'Case-insensitive substring match on merchant name, e.g. "coffee", "uber".',
+          },
         },
         additionalProperties: false,
       },
@@ -761,6 +782,10 @@ export const TOOLS = [
           category_name: {
             type: 'string',
             description: 'Optional exact category name to narrow to, e.g. top merchants within "Food & Dining".',
+          },
+          merchant_contains: {
+            type: 'string',
+            description: 'Case-insensitive substring match on merchant name, e.g. "coffee", "uber".',
           },
           limit: { type: 'number', description: 'Max merchants to return, 1–20. Default 5.' },
         },
@@ -787,6 +812,14 @@ export const TOOLS = [
               'How to group points. "weekday" groups by Monday–Sunday regardless of date, for "which day do I spend most" questions.',
           },
           direction: { type: 'string', enum: ['debit', 'credit'], description: 'Default "debit".' },
+          category_name: {
+            type: 'string',
+            description: 'Optional exact category name to trend, e.g. "Food & Dining".',
+          },
+          merchant_contains: {
+            type: 'string',
+            description: 'Optional case-insensitive merchant substring to trend, e.g. "uber".',
+          },
         },
         additionalProperties: false,
       },
@@ -858,6 +891,24 @@ export function resolveToolCall(
   try {
     const safeArgs = args && typeof args === 'object' ? (args as Record<string, unknown>) : {}
     const windows = buildWindows(ctx.now_utc, ctx.tz)
+
+    // Reject arguments a tool doesn't understand instead of silently
+    // ignoring them. Aug 15: the model called top_merchants with
+    // merchant_contains "coffee" (a perfectly reasonable filter this tool
+    // didn't accept), the filter was dropped, and an unfiltered top-5
+    // (a handbag, a brokerage transfer) shipped under a "coffee" caption.
+    // A named error here lets the model fix its call; silence lets it
+    // mislabel.
+    const allowed = TOOL_ARG_NAMES[name]
+    if (allowed) {
+      const unknown = Object.keys(safeArgs).filter((k) => !allowed.has(k))
+      if (unknown.length > 0) {
+        return {
+          ok: false,
+          error: `${name}: unknown argument(s) ${unknown.map((k) => JSON.stringify(k)).join(', ')}. Allowed: ${Array.from(allowed).join(', ')}.`,
+        }
+      }
+    }
 
     let result: unknown
     switch (name) {
