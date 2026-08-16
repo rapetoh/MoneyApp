@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react'
-import { View, Text, StyleSheet } from 'react-native'
+import React, { useEffect, useRef, useState } from 'react'
+import { View, Text, StyleSheet, Animated } from 'react-native'
 import { Image } from 'expo-image'
 import { merchantColor, categoryPalette } from '@voice-expense/shared'
 import { merchantLogoUrl } from '../services/merchantLogo'
@@ -36,6 +36,12 @@ export function MerchantAvatar({
   categoryColor,
 }: Props) {
   const [logoFailed, setLogoFailed] = useState(false)
+  // 0 until the logo has actually decoded, then fades to 1 — the letter
+  // tile is the ONLY thing visible before that moment, and the logo (on
+  // its own opaque white ground) fully covers it after. Build 13 drew the
+  // logo directly over the coloured tile, so every favicon with a
+  // transparent background showed the letter and colour bleeding through.
+  const logoOpacity = useRef(new Animated.Value(0)).current
 
   // Reset the failed flag whenever the merchant or its domain changes. Without
   // this, a single transient error (e.g. first-paint race, flaky network on
@@ -43,7 +49,8 @@ export function MerchantAvatar({
   // even after the image would load fine on retry.
   useEffect(() => {
     setLogoFailed(false)
-  }, [merchant, merchantDomain])
+    logoOpacity.setValue(0)
+  }, [merchant, merchantDomain, logoOpacity])
 
   // Decide what to show in the fallback tile. Priority:
   //   1. The merchant's first letter if we have a merchant name.
@@ -74,11 +81,11 @@ export function MerchantAvatar({
 
   const borderRadius = radius ?? size / 2
 
-  // The letter tile is always drawn; the logo (expo-image, memory+disk
-  // cached, decoded off the JS thread) sits on top and crossfades in over
-  // it. No white placeholder square, no one-by-one pop-in on launch: a
-  // cached logo paints with the row, and a first-ever fetch fades in from
-  // the tile instead of from nothing (build 12 feedback).
+  // Letter tile first; the logo mounts invisible on an opaque white ground,
+  // and fades in only once expo-image reports it decoded (memory/disk
+  // cached logos report within a frame or two, so the tile is a beat, not
+  // a flash). A failed fetch leaves the tile — never a broken image, never
+  // a letter under a logo.
   return (
     <View
       style={[
@@ -88,15 +95,20 @@ export function MerchantAvatar({
     >
       <Text style={[styles.initial, { fontSize: size * 0.38 }]}>{initial}</Text>
       {logoUrl && (
-        <Image
-          source={{ uri: logoUrl }}
-          style={[StyleSheet.absoluteFill, { borderRadius }]}
-          contentFit="cover"
-          cachePolicy="memory-disk"
-          transition={140}
-          onError={() => setLogoFailed(true)}
-          accessibilityIgnoresInvertColors
-        />
+        <Animated.View style={[StyleSheet.absoluteFill, styles.logoGround, { borderRadius, opacity: logoOpacity }]}>
+          <Image
+            source={{ uri: logoUrl }}
+            style={[StyleSheet.absoluteFill, { borderRadius }]}
+            contentFit="cover"
+            cachePolicy="memory-disk"
+            transition={0}
+            onLoad={() => {
+              Animated.timing(logoOpacity, { toValue: 1, duration: 140, useNativeDriver: true }).start()
+            }}
+            onError={() => setLogoFailed(true)}
+            accessibilityIgnoresInvertColors
+          />
+        </Animated.View>
       )}
     </View>
   )
@@ -112,5 +124,9 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontFamily: Typography.fontFamily.sansBold,
     lineHeight: undefined,
+  },
+  // Opaque ground under the logo — favicons are frequently transparent.
+  logoGround: {
+    backgroundColor: '#FFFFFF',
   },
 })

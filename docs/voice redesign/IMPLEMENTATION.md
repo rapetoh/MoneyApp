@@ -207,11 +207,16 @@ The owner's first TestFlight session surfaced four real defects:
    factor showed $5,425 for a $2,500 biweekly paycheck; correct is
    $5,416.67), unit-tested; web dashboard/MindMap inherit the fix.
 4. **Merchant logos popping in one by one.** `MerchantAvatar` now uses
-   `expo-image` (memory + disk cache, off-thread decode) drawn *over* the
-   letter tile with a 140ms crossfade — no white placeholder, cached logos
-   paint with the row on every launch after the first — and
+   `expo-image` (memory + disk cache, off-thread decode) and
    `useTransactions` prefetches every logo the moment the list loads
-   (`src/services/merchantLogo.ts`).
+   (`src/services/merchantLogo.ts`). **Build 13 regression, fixed in
+   build 15:** the logo was drawn directly over the coloured letter tile,
+   so any favicon with a transparent background (Render, Ally, The20, LV…)
+   showed the letter and tile colour bleeding through. The logo now mounts
+   invisible on an opaque white ground and fades in only once expo-image
+   reports it decoded (`onLoad`); the tile is the only thing visible
+   before that and is fully covered after. Rule: a logo and its fallback
+   tile must never be visible at the same time.
 5. **Stale-then-current flash on every screen.** Root cause: every data
    hook instance started empty and refetched on mount (categories,
    profile, budget, rules from the *network*). New app-wide query cache
