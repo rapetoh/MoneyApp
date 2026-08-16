@@ -197,6 +197,49 @@ Nothing about the capture state machine, the save path, undo, the Shortcut
 
 ---
 
+## 6. Found during verification — cold start via the Shortcut deep link stranded the app on the launch screen. **Pre-existing; fixed.**
+
+While recording the walkthrough the owner tapped "Open" on a
+`voiceexpense://shortcut?amount=…` link with the app killed, and the app
+never left the launch mark (25 s, until swiped away). Reproduced at will
+with `xcrun simctl openurl`; a process sample showed main and JS threads
+idle; a diagnostic build showed the root layout **never rendered**.
+
+**Cause:** the Shortcut URL matched no route file. Expo Router resolves an
+unmatched cold-start URL to its internal `+not-found` screen, which is a
+*sibling* of the app's root layout in the internal root stack — so
+`app/_layout.tsx` (splash hide, auth gate, the shortcut hook) never
+mounted, `SplashScreen.hideAsync()` was never called, and the native
+splash stayed forever. This is independent of the Aug 16 launch work: the
+old code hid the splash from the same layout, so a cold Shortcut launch has
+always sat on the (then white) launch screen. A *warm* Shortcut worked,
+which is how it went unnoticed.
+
+**Fix (route-based, no URL parsing in the app):**
+- `app/shortcut.tsx` — a real route for the link. It validates the query
+  (`src/services/shortcutLink.ts`, the old `parseShortcutUrl` rules
+  verbatim, unit-tested) and `<Redirect>`s to the unchanged
+  `/(tabs)/record` bridge with the same `shortcut_*` params. Installed
+  Shortcuts keep working; the param contract did not change.
+- `app/+not-found.tsx` — a catch-all that renders inside the root layout
+  and redirects to Today, so **no unknown URL can ever strand the app on
+  the launch screen again**.
+- Both registered in the root Stack with `animation: 'none'` (transient,
+  render nothing).
+- `useShortcutHandler` deleted (and its call in `_layout.tsx`): with a real
+  route, Expo Router's own linking handles cold and warm URLs, and the hook
+  would have double-fired on warm links.
+- Second pre-existing defect found in the same test: a Shortcut arriving
+  while the result sheet was already up left the *first* amount on screen —
+  `VoiceResultSheet` seeds its editable fields from `parsed` on mount and
+  the instance was being reused. `useVoice` now exposes
+  `sessionGeneration` (the existing session counter) and the sheet is
+  keyed on it, so every new parse mounts a fresh sheet.
+
+Verified on the Release simulator build: cold Shortcut → launch mark →
+dissolve → Today with the $12.50 result sheet; two warm Shortcuts in a row
+→ second ($8 Uber) replaces the first; unknown URL cold start → Today.
+
 ## Verification
 
 - `tsc --noEmit` clean (mobile, web); `eslint` 0 errors (mobile: only the

@@ -26,10 +26,9 @@ import type { Locale } from '@voice-expense/shared'
  * Reached via the `voiceexpense://reset-password?code=…` link
  * `requestPasswordReset` (useAuth.ts) emails out. Expo Router resolves
  * that deep link to this screen with `code` as a search param — no
- * manual `Linking` parsing needed, which also sidesteps the
- * hostname-vs-path ambiguity fix-plan 3.4 fixes for `useShortcutHandler`
- * (Router's own URL-to-route resolver folds host and path together, so
- * it isn't affected by that bug).
+ * manual `Linking` parsing needed (Router's own URL-to-route resolver
+ * folds host and path together; the Shortcuts link moved onto the same
+ * mechanism on Aug 16 2026 — see app/shortcut.tsx).
  *
  * `exchangeCodeForSession` trades the one-time code for a real session
  * scoped to the account being recovered — the user is technically

@@ -75,9 +75,13 @@ truth: `docs/voice redesign/` (screenshot + Claude Design HTML, artboards
   the sheet slides (RN `Modal animationType="slide"` was sliding the
   backdrop too). Voice overlay and result sheet now enter/exit through
   `<Presence>` instead of popping. Root groups cross-fade on
-  `router.replace`. New `Motion` tokens (`src/theme/motion.ts`). **Requires
-  a new native build** — storyboard, icon and Android splash change at
-  prebuild.
+  `router.replace`. New `Motion` tokens (`src/theme/motion.ts`). Found and
+  fixed while verifying: a **cold start via the iOS Shortcut deep link had
+  always stranded the app on the launch screen** (unmatched URL → Expo
+  Router's not-found screen beside the root layout → splash never hidden);
+  now `app/shortcut.tsx` + `app/+not-found.tsx` routes, `useShortcutHandler`
+  deleted, result sheet keyed per capture session. **Requires a new native
+  build** — storyboard, icon and Android splash change at prebuild.
 - **Ask Murmur rebuilt as a product (Aug 16, 2026)** — spec, architecture
   and verification in [docs/ask-murmur/](./ask-murmur/SPEC.md): on-device
   entry insights (upcoming bill / budget pace / category surge / subscriptions

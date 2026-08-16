@@ -37,7 +37,7 @@ handler:
 |---|---|
 | Voice | tab-bar mic FAB → `openVoice()` (custom `tabBarButton`, no navigation) |
 | Receipt / paycheck scan | Quick entry screen → `presentParsed(expense, 'scan')` |
-| iOS Shortcut deep link | unchanged `useShortcutHandler` → `/(tabs)/record` bridge → `presentParsed(…, 'shortcut')` |
+| iOS Shortcut deep link | `app/shortcut.tsx` route (Aug 16 2026 — replaced `useShortcutHandler`, whose cold-start path never mounted; see docs/fixes-2026-08-16-launch-brand-motion.md §6) → `/(tabs)/record` bridge → `presentParsed(…, 'shortcut')` |
 | Android payment notification | `useNotificationListener` inside the provider → `presentParsed(…, 'notification_listener')` |
 
 This replaces the pre-redesign arrangement where `VoiceConfirmModal` was
@@ -58,7 +58,7 @@ be visible at once.
 `/(tabs)/record` survives only as a **bridge** (`app/(tabs)/record.tsx`):
 `shortcut_*` params → validated inject + result sheet; `?tab=manual` (old
 Day-1 "type instead" target) → Quick entry; bare visit → Today + voice
-overlay. `useShortcutHandler` is untouched so already-installed iOS Shortcuts
+overlay. The Shortcut param contract is untouched so already-installed iOS Shortcuts
 keep working.
 
 ## Judgment calls (mockup vs. reality)

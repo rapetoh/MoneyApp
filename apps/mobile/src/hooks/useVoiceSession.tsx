@@ -210,6 +210,11 @@ export function VoiceSessionProvider({ children }: { children: ReactNode }) {
       <Presence visible={sheetVisible && parsed !== null}>
         {sheetVisible && parsed ? (
           <VoiceResultSheet
+            // The sheet seeds its editable fields from `parsed` once, on
+            // mount. A new parse while it is up (a second Shortcut, an
+            // Android notification landing on an open sheet) must be a
+            // new sheet, not the old instance showing the old amount.
+            key={voice.sessionGeneration}
             parsed={parsed}
             transcript={voice.transcript}
             parseDurationMs={voice.parseDurationMs}

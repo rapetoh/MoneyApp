@@ -15,9 +15,11 @@ import type { PaymentMethod } from '@voice-expense/shared'
  * modal at /transaction/new. This route stays registered only so every
  * pre-redesign link keeps working:
  *
- *   - voiceexpense://shortcut?... — useShortcutHandler still pushes here
- *     with shortcut_* params (unchanged, so existing iOS Shortcuts keep
- *     working); the parsed expense goes to the shared result sheet.
+ *   - voiceexpense://shortcut?... — resolved by Expo Router to
+ *     app/shortcut.tsx, which redirects here with shortcut_* params
+ *     (validated in src/services/shortcutLink.ts; the param contract is
+ *     unchanged, so existing iOS Shortcuts keep working); the parsed
+ *     expense goes to the shared result sheet.
  *   - /(tabs)/record?tab=manual — the old "type instead" target →
  *     Quick entry.
  *   - /(tabs)/record bare — old FAB semantics → voice overlay over Today.

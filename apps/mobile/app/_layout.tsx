@@ -12,7 +12,6 @@ import { useCategories } from '../src/hooks/useCategories'
 import { useActiveBudget } from '../src/hooks/useBudget'
 import { useRecurringRules } from '../src/hooks/useRecurringRules'
 import { syncManager } from '../src/services/sync/SyncManager'
-import { useShortcutHandler } from '../src/hooks/useShortcutHandler'
 import { runRecurringCatchUp } from '../src/services/recurringCatchUp'
 import { runFxBackfill } from '../src/services/fxBackfill'
 import { registerDevice } from '../src/services/sync/deviceRegistry'
@@ -96,8 +95,9 @@ export default function RootLayout() {
   // paints its first frame) *under* the veil before it lifts.
   const [launchDone, setLaunchDone] = useState(false)
 
-  // Handles voiceexpense://shortcut?amount=XX&merchant=... deep links from iOS Shortcuts
-  useShortcutHandler()
+  // voiceexpense://shortcut?… (iOS Shortcuts) is a real route now —
+  // app/shortcut.tsx → /(tabs)/record bridge. No URL parsing here; see
+  // src/services/shortcutLink.ts for why the old root-level hook had to go.
 
   // Android payment-notification capture (fix-plan 3.4) now lives inside
   // VoiceSessionProvider — the same root-level result sheet serves voice,
@@ -226,6 +226,12 @@ export default function RootLayout() {
             <Stack.Screen name="(auth)" options={{ animation: 'fade' }} />
             <Stack.Screen name="(onboarding)" options={{ animation: 'fade' }} />
             <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
+            {/* Transient redirect routes (render nothing, replace
+                themselves on focus): the Shortcuts deep link and the
+                catch-all for unknown URLs. `none` so a warm deep link
+                doesn't slide an empty card in before the redirect. */}
+            <Stack.Screen name="shortcut" options={{ animation: 'none' }} />
+            <Stack.Screen name="+not-found" options={{ animation: 'none' }} />
             <Stack.Screen
               name="transaction/[id]"
               options={{

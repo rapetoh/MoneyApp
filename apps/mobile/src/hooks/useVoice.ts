@@ -30,6 +30,11 @@ export interface UseVoiceReturn {
   stopListening: () => void
   reset: () => void
   injectParsed: (parsed: ParsedExpense) => void
+  /** Bumps on every startListening / injectParsed / reset — identifies
+   *  one capture session. Key the result sheet on it so a new parse (e.g.
+   *  a second Shortcut arriving while the sheet is already up) mounts a
+   *  fresh sheet instead of reusing the previous one's internal state. */
+  sessionGeneration: number
 }
 
 export function useVoice(
@@ -260,5 +265,8 @@ export function useVoice(
     stopListening,
     reset,
     injectParsed,
+    // Read at render time — every path that changes it (start / inject /
+    // reset) also sets state, so consumers always re-render past it.
+    sessionGeneration: sessionGenRef.current,
   }
 }
