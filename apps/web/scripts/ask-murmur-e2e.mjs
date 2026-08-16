@@ -8,6 +8,8 @@
 //   node apps/web/scripts/ask-murmur-e2e.mjs
 //
 // Reads Supabase URL / anon key / service-role key from apps/web/.env.local.
+// Set API_BASE=http://localhost:3111 to hit a local `next dev` (run it with
+// AI_DEBUG_TRACE=1 to see tool calls and retry reasons in its log).
 // Costs one OpenAI call per turn. Added Aug 15, 2026 after the owner asked
 // for proof the feature was exercised end to end, not just typechecked —
 // run it before any release that touches Ask Murmur (packages/ai/src/
@@ -23,7 +25,7 @@ const env = Object.fromEntries(
 const URL = env.NEXT_PUBLIC_SUPABASE_URL || env.SUPABASE_URL
 const ANON = env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 const SERVICE = env.SUPABASE_SERVICE_ROLE_KEY
-const API = 'https://money-app-web-w6su.vercel.app'
+const API = process.env.API_BASE || 'https://money-app-web-w6su.vercel.app'
 
 const admin = createClient(URL, SERVICE, { auth: { persistSession: false } })
 const email = `ask-e2e-${Date.now()}@example.com`
@@ -46,6 +48,14 @@ try {
   const tx = (amount, merchant, category_name, d, direction = 'debit', is_recurring = false) =>
     ({ amount, amount_in_profile_currency: amount, direction, merchant, category_name, transacted_at: daysAgo(d), is_recurring })
   const transactions = [
+    tx(38, 'Render', 'Entertainment', 1),
+    tx(30, 'TikTok shop', 'Shopping', 3),
+    tx(150, 'Ally', 'Savings & Investing', 3),
+    tx(8, 'Lays', 'Food & Dining', 4),
+    tx(15, 'Walmart', 'Shopping', 4),
+    tx(36, 'Dollar Tree', 'Shopping', 4),
+    tx(1000, 'The20 MSP', 'Business & Work', 4, 'credit', true),
+    tx(1500, 'The20', 'Business & Work', 4, 'credit', true),
     tx(6, 'Snacks', 'Food & Dining', 0),
     tx(500, 'Louis Vuitton', 'Shopping', 0),
     tx(500, 'Kunkel & Associates', 'Business & Work', 1, 'credit'),
@@ -95,24 +105,41 @@ try {
     return { status: res.status, ms, json, text }
   }
 
-  // ---- Conversation, exactly as the mobile thread sends it ----
-  const history = []
-  const turns = [
-    'How much did I spend on food this month?',
-    'And how does that compare to last month?',
-    'Which merchant was the biggest part of it?',
-    'Can I afford a $400 pair of shoes right now?',
+  // ---- The owner's exact conversations (Aug 15 screenshots) + the ones
+  //      that exposed defects during the fix. Each is checked for a stall
+  //      (narration, no numbers), a verbatim repeat of the previous turn,
+  //      and — for subject questions — an unfiltered breakdown. Requests are
+  //      paced ~8s apart: the OpenAI org tier is 30k tokens/min for gpt-4o.
+  const convos = [
+    ['Hey', 'How am i doing overall with my money?', 'and last month?'],
+    ['Can I afford a PS5 this month?', 'Ok', 'Okay?????', 'What about a $1,200 laptop instead?'],
+    ['Where is my coffee budget going?', 'How much on Uber this month?', 'How much did I spend so far this month?'],
   ]
-  for (const q of turns) {
-    const r = await ask(q, history)
-    console.log(`\n=== Q: ${q}\n[${r.status} · ${r.ms}ms]`)
-    if (r.status !== 200 || !r.json) { console.log('RAW:', r.text.slice(0, 600)); continue }
-    console.log('VERDICT:', r.json.verdict?.text)
-    if (r.json.breakdown) console.log('BREAKDOWN:', r.json.breakdown.caption, JSON.stringify(r.json.breakdown.rows))
-    if (r.json.note) console.log('NOTE:', r.json.note.text)
-    console.log('ATTRIB:', JSON.stringify(r.json.attribution))
-    history.push({ question: q, answer: r.json.verdict.text })
+  let failures = 0
+  for (const convo of convos) {
+    console.log('\n──────── new conversation ────────')
+    const history = []
+    let lastAnswer = null
+    for (const q of convo) {
+      const r = await ask(q, history)
+      console.log(`\n=== Q: ${q}\n[${r.status} · ${r.ms}ms]`)
+      if (r.status !== 200 || !r.json) { console.log('RAW:', r.text.slice(0, 400)); failures++; continue }
+      const v = r.json.verdict?.text ?? ''
+      const stall = /\b(to determine|we need to|let me|would you like me to|i will (?:check|look))\b/i.test(v) && !/\d/.test(v)
+      const repeat = lastAnswer !== null && v.trim().toLowerCase() === lastAnswer.trim().toLowerCase()
+      const offSubject = /coffee/i.test(q) && r.json.breakdown && r.json.breakdown.rows.some((x) => /schwab|ally|vuitton/i.test(x.label))
+      console.log('VERDICT:', v)
+      if (r.json.breakdown) console.log('BREAKDOWN:', r.json.breakdown.caption, '·', r.json.breakdown.rows.map((x) => `${x.label}=${x.value}`).join(' | '))
+      if (r.json.chart) console.log('CHART:', r.json.chart.type, '·', r.json.chart.title, '·', r.json.chart.data.length, 'points')
+      if (r.json.note) console.log('NOTE:', r.json.note.text)
+      console.log(`CHECK: stall=${stall} repeat=${repeat} offSubject=${!!offSubject}`)
+      if (stall || repeat || offSubject) failures++
+      history.push({ question: q, answer: v })
+      lastAnswer = v
+      await new Promise((res) => setTimeout(res, 8000))
+    }
   }
+  console.log(`\nCONVERSATION CHECKS: ${failures === 0 ? 'ALL PASSED' : failures + ' FAILED'}`)
 
   // ---- Error paths the screen must handle ----
   const noAuth = await fetch(`${API}/api/ai/ask-murmur`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...base, question: 'hi' }) })

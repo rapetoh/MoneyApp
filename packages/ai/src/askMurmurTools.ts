@@ -857,6 +857,12 @@ export interface AskMurmurDataOverview {
   pending_conversion_count: number
   /** Pre-computed for the model so it doesn't have to discover empty
    *  windows by trial-and-error. */
+  /** Spend / income inside the CURRENT calendar month (user's tz) — the
+   *  figure to quote for "this month". `total_debit`/`total_credit` above
+   *  span everything loaded (~90 days) and must never be labelled as a
+   *  month. */
+  this_month_debit: number
+  this_month_credit: number
   has_transactions_this_year: boolean
   has_transactions_this_month: boolean
   has_transactions_last_month: boolean
@@ -890,6 +896,8 @@ export function buildDataOverview(ctx: ToolContext): AskMurmurDataOverview {
       credit_count: 0,
       total_debit: 0,
       total_credit: 0,
+      this_month_debit: 0,
+      this_month_credit: 0,
       pending_conversion_count: 0,
       has_transactions_this_year: false,
       has_transactions_this_month: false,
@@ -922,6 +930,16 @@ export function buildDataOverview(ctx: ToolContext): AskMurmurDataOverview {
   const summary = summarize(txns.map(toSummarizable))
 
   const w = buildWindows(ctx.now_utc, tz)
+  // Same aggregation as the `total` tool (every debit / credit row with a
+  // resolved amount, transfers included) — so a figure the model quotes
+  // from the overview and a figure it gets from `total` for the same
+  // window can never disagree. (`summarize` above excludes transfer-kind
+  // categories by design; mixing the two definitions inside one
+  // conversation produced "$881" and "$1,331" for the same month.)
+  const { rows: monthDebits } = filterRows(ctx, w, { window: 'thisMonth', direction: 'debit' })
+  const { rows: monthCredits } = filterRows(ctx, w, { window: 'thisMonth', direction: 'credit' })
+  const thisMonthDebit = roundCents(monthDebits.reduce((acc, t) => acc + amountOf(t), 0))
+  const thisMonthCredit = roundCents(monthCredits.reduce((acc, t) => acc + amountOf(t), 0))
   return {
     transaction_count: txns.length,
     earliest_transacted_at: earliest,
@@ -932,6 +950,8 @@ export function buildDataOverview(ctx: ToolContext): AskMurmurDataOverview {
     credit_count: creditCount,
     total_debit: summary.expense,
     total_credit: summary.income,
+    this_month_debit: thisMonthDebit,
+    this_month_credit: thisMonthCredit,
     pending_conversion_count: summary.pendingCount,
     has_transactions_this_year: inWindow(txns, w.thisYear).length > 0,
     has_transactions_this_month: inWindow(txns, w.thisMonth).length > 0,

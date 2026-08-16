@@ -232,7 +232,34 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     // Message + status only — the raw OpenAI SDK error object embeds the
     // request body, i.e. the user's question and transactions.
-    const e = err as { status?: number; message?: string }
+    const e = err as { status?: number; message?: string; headers?: Record<string, string> }
+
+    // Capacity, not a bad answer (owner-facing on Aug 15: an org-level
+    // 30k tokens/min gpt-4o limit tripped mid-conversation and the
+    // question-blind summarize fallback answered "what about a laptop?"
+    // with a 6-month category summary). The SDK already backed off twice
+    // inside the minute window; wait the rest of it out once more, then
+    // — if still limited — say so honestly with a Retry-After. An
+    // off-topic answer is worse than a "busy, try again" the client can
+    // retry with one tap.
+    if (e?.status === 429) {
+      const waitMs = retryAfterMs(e)
+      console.warn(`[ask-murmur] rate limited (429); waiting ${waitMs}ms and retrying once`)
+      await new Promise((r) => setTimeout(r, waitMs))
+      try {
+        const again = await runConversation(askReq, ctx, [], overview)
+        console.log(`[ask-murmur] ok outcome=after_429 tool_calls=${again.calls.length} ms=${Date.now() - startedAt}`)
+        return Response.json(again.response)
+      } catch (err2) {
+        const e2 = err2 as { status?: number; message?: string }
+        console.error(`[ask-murmur] still failing after 429 wait (status=${e2?.status ?? 'n/a'}): ${e2?.message ?? String(err2)}`)
+        return Response.json(
+          { error: 'busy', retry_after_seconds: 5 },
+          { status: 503, headers: { 'Retry-After': '5' } },
+        )
+      }
+    }
+
     console.error(
       `[ask-murmur] primary attempt threw (status=${e?.status ?? 'n/a'}): ${e?.message ?? String(err)}; using summarize fallback`,
     )
@@ -253,6 +280,20 @@ export async function POST(req: NextRequest) {
 interface ConversationResult {
   response: AskMurmurResponse
   calls: ToolCallRecord[]
+}
+
+/** How long to wait after a 429 before one more full attempt. Honors a
+ *  Retry-After header or the SDK message's "try again in Nms" hint; clamps
+ *  to 1.5–6s so a serverless invocation can't stall past its budget. */
+function retryAfterMs(e: { message?: string; headers?: Record<string, string> }): number {
+  const header = Number(e.headers?.['retry-after'])
+  if (Number.isFinite(header) && header > 0) return Math.min(Math.max(header * 1000, 1500), 6000)
+  const m = /try again in (\d+(?:\.\d+)?)\s*(ms|s)\b/i.exec(e.message ?? '')
+  if (m) {
+    const ms = m[2].toLowerCase() === 's' ? Number(m[1]) * 1000 : Number(m[1])
+    return Math.min(Math.max(ms + 400, 1500), 6000)
+  }
+  return 2500
 }
 
 // ─── Non-answer / stall / repeat detectors ──────────────────────────────────
@@ -529,7 +570,7 @@ async function runSummarizeFallback(
   // snapshot full of `null`s.
   const snapshot = buildSummarySnapshot(ctx)
 
-  const systemPrompt = `You are Murmur, a personal-finance reader. Summarize the user's spending in 2-3 sentences in ${ctx.locale} using the snapshot below. The numbers in the snapshot are deterministic — quote them verbatim. Always include a chart if the snapshot has data: a "donut" of top categories (data: name + total) or a "line" of monthly_series (data: label + spent). If the snapshot has no data, say so plainly and offer one concrete next step.
+  const systemPrompt = `You are Murmur, a personal-finance reader. Answer the user's question below as directly as the snapshot allows, in 2-3 sentences in ${ctx.locale}; if the snapshot cannot answer it, say exactly what you can see instead — never change the subject silently. The numbers in the snapshot are deterministic — quote them verbatim. Always include a chart if the snapshot has data: a "donut" of top categories (data: name + total) or a "line" of monthly_series (data: label + spent). If the snapshot has no data, say so plainly and offer one concrete next step.
 
 Output STRICT JSON only:
 {
