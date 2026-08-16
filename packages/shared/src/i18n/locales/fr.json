@@ -24,7 +24,7 @@
   "home.left_this_month": "restants ce mois-ci",
   "home.left_this_week": "restants cette semaine",
   "home.left_this_period": "restants sur cette période",
-  "home.over_budget": "au-dessus du budget",
+  "home.over_budget_suffix": "au-dessus du budget",
   "home.days_left_week": "jours restants cette semaine",
   "home.days_to_go": "jours restants",
   "home.first_expense": "Appuyez sur le micro pour enregistrer votre première dépense",

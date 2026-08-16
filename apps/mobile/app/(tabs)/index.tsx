@@ -332,7 +332,7 @@ export default function TodayScreen() {
                 </Text>
                 <Text style={styles.budgetLeftRest}>
                   {' '}
-                  {leftThisPeriod < 0 ? t('home.over_budget', locale) : t(budgetPeriodKey, locale)}
+                  {leftThisPeriod < 0 ? t('home.over_budget_suffix', locale) : t(budgetPeriodKey, locale)}
                 </Text>
               </Text>
               <Text style={styles.budgetRight}>
