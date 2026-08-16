@@ -252,8 +252,9 @@ describe('tool: recurring_total', () => {
     const r = resolveToolCall('recurring_total', {}, weeklyCtx)
     expect(r.ok).toBe(true)
     const result = r.ok ? (r.result as { monthly_total: number }) : null
-    // 60 * 4.33 = 259.8 — nowhere near the raw $60.
-    expect(result?.monthly_total).toBeCloseTo(259.8, 1)
+    // 60 * (52 / 12) = 260 — exact calendar ratio (was the 4.33 shortcut),
+    // nowhere near the raw $60.
+    expect(result?.monthly_total).toBeCloseTo(260, 1)
   })
 })
 
