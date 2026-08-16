@@ -174,6 +174,62 @@ The owner's first TestFlight session surfaced four real defects:
    Cosmetic fix in the same pass: no duplicated category chip on the
    merchant card when the parse has no merchant.
 
+**Build 12 → build 13 (owner's six-item review, Aug 11 late evening):**
+
+1. **Glow rendered as visible concentric rings** (vs. the Claude app's
+   smooth feathered glow). The stacked-stroke approximation is gone;
+   `VoiceEdgeGlow` now draws each of the mockup's three inset shadows as a
+   real Gaussian-blurred stroke (react-native-svg native `FeGaussianBlur`,
+   σ = blur/2, half the stroke clipped outside the viewport) plus the crisp
+   2.5px edge line — one continuous gradient per layer, mockup timings,
+   mic-driven inner flare. Rings are impossible by construction.
+2. **"Add manually" recurring sheet cut off at the bottom.** Two shared
+   `BottomSheet` defects for tall content, fixed for every sheet: (a) with
+   the keyboard up, the sheet's max height is now capped at
+   `keyboardTop − safeTop − 8` so it *shrinks* (header stays on screen)
+   instead of being lifted off the top; (b) `RecurringRuleEditor`'s Save
+   moved from the header to a pinned footer so the sheet has a visible
+   floor above the home indicator and the body scrolls above it. The
+   native page-sheet modals (category picker, budget editor, settings
+   pickers) were audited — they scroll natively; the two with text inputs
+   gained `automaticallyAdjustKeyboardInsets`.
+3. **Recurring screen made legible.** Eyebrow "Detected automatically" →
+   "Subscriptions, bills & income" (rules are user-created; nothing here
+   was auto-detected). Hero: two labelled figures — recurring *expenses*
+   per month (+ "That's $X a year." — no longer "in subscriptions", which
+   mislabelled a savings transfer) and recurring *income* per month —
+   plus a one-line footnote on how per-month figures are derived. List
+   split into **Expenses** and **Income** sections, each header carrying
+   its monthly subtotal (the same two numbers as the hero); rows show
+   signed/coloured amounts and "≈ $X/mo" whenever the cadence isn't plain
+   monthly, so every total is reproducible row by row. Shared math fixed
+   to exact calendar ratios (26/12, 52/12, 365.25/12 — the old 2.17
+   factor showed $5,425 for a $2,500 biweekly paycheck; correct is
+   $5,416.67), unit-tested; web dashboard/MindMap inherit the fix.
+4. **Merchant logos popping in one by one.** `MerchantAvatar` now uses
+   `expo-image` (memory + disk cache, off-thread decode) drawn *over* the
+   letter tile with a 140ms crossfade — no white placeholder, cached logos
+   paint with the row on every launch after the first — and
+   `useTransactions` prefetches every logo the moment the list loads
+   (`src/services/merchantLogo.ts`).
+5. **Stale-then-current flash on every screen.** Root cause: every data
+   hook instance started empty and refetched on mount (categories,
+   profile, budget, rules from the *network*). New app-wide query cache
+   (`src/services/queryCache.ts`, `useCachedState`): each hook reads the
+   last known value synchronously on first render, refreshes in the
+   background, and writes through — notifying every other instance, so
+   cross-screen updates are immediate. Root layout preloads
+   transactions/categories/budget/rules before the splash lifts (SQLite
+   always; network up to 2.5s so offline still boots). Cleared on
+   sign-out.
+6. **Ask Murmur was single-shot.** The API and the web thread already
+   support multi-turn `history`; mobile asked one question and had a dead
+   follow-up bar (removed earlier). `more/ask-result.tsx` is now a real
+   conversation: per-turn loading/answer/error (retry a turn alone),
+   follow-ups sent with the completed turns as context, every turn
+   appended to the same persisted conversation, always-present input bar
+   above the keyboard.
+
 **Build 11 follow-ups (same day):**
 
 - **Crash on focusing any field in the expanded edit sheet.** The sheet's

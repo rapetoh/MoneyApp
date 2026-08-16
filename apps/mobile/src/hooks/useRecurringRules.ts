@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { getCalendars } from 'expo-localization'
 import * as Crypto from 'expo-crypto'
 import { supabase } from '../lib/supabase'
+import { useCachedState } from '../services/queryCache'
 import { getCurrentProfileCurrency } from '../services/profileCurrency'
 import type { RecurringRule, RecurringFrequency } from '@voice-expense/shared'
 import {
@@ -88,9 +89,16 @@ export function isRuleOverdue(rule: RecurringRule, tz: string = deviceTimeZone()
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
+const EMPTY_RULES: RecurringRule[] = []
+
 export function useRecurringRules(userId: string | undefined) {
-  const [rules, setRules] = useState<RecurringRule[]>([])
-  const [loading, setLoading] = useState(true)
+  // Shared, process-lifetime value (src/services/queryCache.ts) — see
+  // useCategories for why every data hook reads through it.
+  const [rules, setRules, hasCached] = useCachedState<RecurringRule[]>(
+    userId ? `recurring_rules:${userId}` : null,
+    EMPTY_RULES,
+  )
+  const [loading, setLoading] = useState(!hasCached)
   // Read-error exposure (fix-plan 2.13 / audit 08-F21 family): this fetch
   // used to discard `error` entirely, so a failed read rendered exactly
   // like "no recurring rules yet" everywhere this hook is consumed. The

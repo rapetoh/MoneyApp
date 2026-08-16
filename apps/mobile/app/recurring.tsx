@@ -164,6 +164,13 @@ export default function RecurringScreen() {
   // style to tell them apart.
   const activeRules = useMemo(() => rules.filter((r) => r.is_active), [rules])
   const pausedRules = useMemo(() => rules.filter((r) => !r.is_active), [rules])
+  // Expenses and income as two labelled lists (build 12 feedback: one
+  // undifferentiated "Active" list of $1,000 / $1,500 / $42 / $300 rows gave
+  // the reader no way to tie the $342 hero to anything). Each section
+  // header carries its own monthly subtotal — the same two numbers the
+  // hero shows, so hero and list visibly agree.
+  const activeExpenses = useMemo(() => activeRules.filter((r) => r.direction === 'debit'), [activeRules])
+  const activeIncome = useMemo(() => activeRules.filter((r) => r.direction === 'credit'), [activeRules])
 
   function handleRowPress(rule: RecurringRule) {
     // Action sheet via Alert — preserves the shipped pause/resume + delete
@@ -243,7 +250,7 @@ export default function RecurringScreen() {
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           {/* Title block */}
           <View style={styles.intro}>
-            <Text style={styles.eyebrow}>{t('recurring.eyebrow_detected', locale)}</Text>
+            <Text style={styles.eyebrow}>{t('recurring.eyebrow', locale)}</Text>
             <Text style={styles.headline}>{t('recurring.heading', locale)}</Text>
           </View>
 
@@ -288,7 +295,11 @@ export default function RecurringScreen() {
                   labelled line below instead of being netted in silently. */}
               <View style={styles.heroWrap}>
                 <View style={styles.heroCard}>
-                  <Text style={styles.heroEyebrow}>{t('recurring.paid_monthly', locale)}</Text>
+                  {/* Two figures, each named for what it is. "Paid monthly …
+                      a year in subscriptions" mislabelled a savings
+                      transfer as a subscription and never said the figure
+                      excluded income (build 12 feedback). */}
+                  <Text style={styles.heroEyebrow}>{t('recurring.expenses_per_month', locale)}</Text>
                   <View style={styles.heroAmountRow}>
                     <Money value={monthlyTotal} size={46} currencyCode={currency} locale={locale} />
                     <Text style={styles.heroPer}>{t('recurring.per_month', locale)}</Text>
@@ -301,13 +312,21 @@ export default function RecurringScreen() {
                     {t('recurring.yearly_suffix', locale)}
                   </Text>
                   {inflowMonthly > 0 && (
-                    <Text style={styles.heroInflow}>
-                      {t('recurring.inflow_monthly', locale).replace(
-                        '{amount}',
-                        formatCurrency(inflowMonthly, currency, locale),
-                      )}
-                    </Text>
+                    <View style={styles.heroInflowRow}>
+                      <Text style={styles.heroInflowLabel}>{t('recurring.income_per_month', locale)}</Text>
+                      <View style={styles.heroInflowAmount}>
+                        <Money
+                          value={inflowMonthly}
+                          size={20}
+                          currencyCode={currency}
+                          locale={locale}
+                          color={Colors.income}
+                        />
+                        <Text style={styles.heroPerSmall}>{t('recurring.per_month', locale)}</Text>
+                      </View>
+                    </View>
                   )}
+                  <Text style={styles.heroFootnote}>{t('recurring.hero_footnote', locale)}</Text>
                 </View>
               </View>
 
@@ -315,15 +334,44 @@ export default function RecurringScreen() {
                   previously one flat list under an "Active subscriptions"
                   heading that included paused rules too, told apart only
                   by a dimmed row style. */}
-              {activeRules.length > 0 && (
+              {activeExpenses.length > 0 && (
                 <View style={styles.sectionWrap}>
-                  <Text style={styles.sectionLabel}>{t('recurring.active_section', locale)}</Text>
+                  <View style={styles.sectionHead}>
+                    <Text style={styles.sectionLabel}>{t('recurring.expenses_section', locale)}</Text>
+                    <Text style={styles.sectionTotal}>
+                      {formatCurrency(monthlyTotal, currency, locale)}{t('recurring.short_monthly', locale)}
+                    </Text>
+                  </View>
                   <View style={styles.listCard}>
-                    {activeRules.map((rule, i) => (
+                    {activeExpenses.map((rule, i) => (
                       <RuleRow
                         key={rule.id}
                         rule={rule}
-                        isLast={i === activeRules.length - 1}
+                        isLast={i === activeExpenses.length - 1}
+                        isToggling={toggling === rule.id}
+                        currency={currency}
+                        locale={locale}
+                        categoryById={categoryById}
+                        onPress={() => handleRowPress(rule)}
+                      />
+                    ))}
+                  </View>
+                </View>
+              )}
+              {activeIncome.length > 0 && (
+                <View style={styles.sectionWrap}>
+                  <View style={styles.sectionHead}>
+                    <Text style={styles.sectionLabel}>{t('recurring.income_section', locale)}</Text>
+                    <Text style={[styles.sectionTotal, { color: Colors.income }]}>
+                      {formatCurrency(inflowMonthly, currency, locale)}{t('recurring.short_monthly', locale)}
+                    </Text>
+                  </View>
+                  <View style={styles.listCard}>
+                    {activeIncome.map((rule, i) => (
+                      <RuleRow
+                        key={rule.id}
+                        rule={rule}
+                        isLast={i === activeIncome.length - 1}
                         isToggling={toggling === rule.id}
                         currency={currency}
                         locale={locale}
@@ -336,7 +384,9 @@ export default function RecurringScreen() {
               )}
               {pausedRules.length > 0 && (
                 <View style={styles.sectionWrap}>
-                  <Text style={styles.sectionLabel}>{t('recurring.paused_section', locale)}</Text>
+                  <View style={styles.sectionHead}>
+                    <Text style={styles.sectionLabel}>{t('recurring.paused_section', locale)}</Text>
+                  </View>
                   <View style={styles.listCard}>
                     {pausedRules.map((rule, i) => (
                       <RuleRow
@@ -396,6 +446,11 @@ function RuleRow({
 }) {
   const cat = rule.category_id ? categoryById.get(rule.category_id) : null
   const ruleLabel = rule.name ?? formatCurrency(rule.amount, rule.currency_code, locale)
+  const isCredit = rule.direction === 'credit'
+  // "≈ $2,166.67/mo" under any cadence that isn't plain monthly, so the
+  // section subtotal above the list is reproducible row by row.
+  const monthlyEq = monthlyEquivalentFx(rule)
+  const showMonthlyEq = !(rule.frequency === 'monthly' && (rule.interval || 1) === 1)
   const statusLabel = rule.is_active
     ? `${t('recurring.next_due', locale)} ${formatNextDue(rule, locale)}`
     : t('recurring.paused', locale)
@@ -437,14 +492,20 @@ function RuleRow({
         ) : (
           <>
             <Money
-              value={rule.amount}
+              value={isCredit ? rule.amount : -rule.amount}
               size={14}
               serif={false}
               sansWeight="700"
               currencyCode={rule.currency_code || currency}
               locale={locale}
+              color={isCredit ? Colors.income : undefined}
             />
             <Text style={styles.ruleFreqTag}>{t(FREQ_SHORT_KEY[rule.frequency], locale)}</Text>
+            {showMonthlyEq && (
+              <Text style={styles.ruleMonthlyEq} numberOfLines={1}>
+                {'≈ '}{formatCurrency(monthlyEq, currency, locale)}{t('recurring.short_monthly', locale)}
+              </Text>
+            )}
           </>
         )}
       </View>
@@ -561,23 +622,66 @@ const styles = StyleSheet.create({
     color: Colors.ink ?? Colors.text,
     fontWeight: '700',
   },
-  heroInflow: {
-    fontFamily: Typography.fontFamily.sansSemiBold,
-    fontSize: 12.5,
-    color: Colors.income ?? Colors.primary,
-    marginTop: 8,
+  heroInflowRow: {
+    marginTop: 14,
+    paddingTop: 12,
+    borderTopWidth: Hairline.width,
+    borderTopColor: 'rgba(40,36,28,0.12)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  heroInflowLabel: {
+    color: Colors.ink3 ?? Colors.textSecondary,
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+    fontFamily: Typography.fontFamily.sansBold,
+    flexShrink: 1,
+  },
+  heroInflowAmount: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 4,
+  },
+  heroPerSmall: {
+    color: Colors.ink3 ?? Colors.textSecondary,
+    fontSize: 12,
+    fontFamily: Typography.fontFamily.sans,
+  },
+  heroFootnote: {
+    marginTop: 12,
+    fontSize: 11.5,
+    lineHeight: 16,
+    color: Colors.ink4 ?? Colors.textMuted,
+    fontFamily: Typography.fontFamily.sans,
   },
 
   sectionWrap: { paddingHorizontal: 16, paddingTop: 24 },
-  sectionLabel: {
+  sectionHead: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
     paddingHorizontal: 8,
     paddingBottom: 8,
+    gap: 8,
+  },
+  sectionLabel: {
     color: Colors.ink3 ?? Colors.textSecondary,
     fontSize: 11,
     fontWeight: '700',
     letterSpacing: 0.6,
     textTransform: 'uppercase',
     fontFamily: Typography.fontFamily.sansBold,
+  },
+  sectionTotal: {
+    color: Colors.ink2 ?? Colors.textSecondary,
+    fontSize: 12,
+    fontWeight: '700',
+    fontFamily: Typography.fontFamily.sansBold,
+    fontVariant: ['tabular-nums'],
   },
   listCard: {
     backgroundColor: Colors.surface2 ?? Colors.card,
@@ -622,6 +726,13 @@ const styles = StyleSheet.create({
     letterSpacing: 0.4,
     marginTop: 1,
     fontFamily: Typography.fontFamily.sansSemiBold,
+  },
+  ruleMonthlyEq: {
+    fontSize: 10.5,
+    color: Colors.ink4 ?? Colors.textMuted,
+    fontFamily: Typography.fontFamily.sans,
+    marginTop: 2,
+    fontVariant: ['tabular-nums'],
   },
 
   emptyState: {

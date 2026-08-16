@@ -189,15 +189,26 @@ export function RecurringRuleEditor({
       onClose={onClose}
       title={title}
       cancelLabel={t('common.cancel', locale)}
-      headerRight={
-        <Pressable onPress={handleSave} hitSlop={10} disabled={saving}>
-          <Text style={[styles.navText, styles.saveText, saving && { opacity: 0.4 }]}>
-            {t('common.save', locale)}
+      contentContainerStyle={styles.body}
+      scrollViewProps={{ keyboardShouldPersistTaps: 'handled' }}
+      // Save lives in the pinned footer, not the header: this is the
+      // app's tallest sheet, and a header-only action left the scrolling
+      // body running straight off the bottom of the screen with nothing
+      // to mark its end (build 12 feedback: "stuck at the bottom, can't
+      // see it entirely"). A footer gives the sheet a visible floor above
+      // the home indicator, and the body scrolls above it.
+      footer={
+        <Pressable
+          onPress={handleSave}
+          disabled={saving}
+          style={({ pressed }) => [styles.saveButton, saving && styles.saveButtonDisabled, pressed && { opacity: 0.85 }]}
+          accessibilityRole="button"
+        >
+          <Text style={styles.saveButtonText}>
+            {mode === 'edit' ? t('voice.save_changes', locale) : t('recurring.add_rule_cta', locale)}
           </Text>
         </Pressable>
       }
-      contentContainerStyle={styles.body}
-      scrollViewProps={{ keyboardShouldPersistTaps: 'handled' }}
       testID="recurring-rule-editor-sheet"
     >
       {/* Direction — a two-way segmented control conveyed by colour alone,
@@ -367,13 +378,21 @@ export function RecurringRuleEditor({
 }
 
 const styles = StyleSheet.create({
-  navText: {
-    fontSize: 15,
-    color: Colors.ink2 ?? Colors.textSecondary,
+  saveButton: {
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: Colors.ink ?? '#1B1915',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  saveButtonDisabled: { opacity: 0.4 },
+  saveButtonText: {
     fontFamily: Typography.fontFamily.sansSemiBold,
     fontWeight: '600',
+    fontSize: 16,
+    color: '#FFFFFF',
+    letterSpacing: -0.2,
   },
-  saveText: { color: Colors.accent ?? Colors.primary, fontWeight: '700' },
 
   body: { paddingHorizontal: 20, paddingTop: 4, paddingBottom: 12, gap: 4 },
 

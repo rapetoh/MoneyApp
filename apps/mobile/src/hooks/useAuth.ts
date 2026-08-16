@@ -8,6 +8,7 @@ import { wipeLocalDatabase } from '../services/sync/localDb'
 import { setCurrentProfileCurrency } from '../services/profileCurrency'
 import { cancelDayTwo } from '../services/dayTwoDunning'
 import { clearParseCache } from '@voice-expense/ai'
+import { cacheClear } from '../services/queryCache'
 
 /**
  * Per-user SecureStore keys, mirrored from the modules that own them
@@ -39,6 +40,10 @@ export async function resetLocalState(): Promise<void> {
   syncManager.stop()
   await wipeLocalDatabase()
   setCurrentProfileCurrency('USD')
+  // The shared in-memory query cache (src/services/queryCache.ts) holds
+  // the last known transactions/categories/profile/budget/rules — the next
+  // account must never see the previous one's data for even one frame.
+  cacheClear()
   // The parse cache (packages/ai/src/parser.ts) is a module-level `Map`
   // keyed in part on user id (fix-plan 1.7 / audit 02-F24) — clearing it
   // here is belt-and-suspenders against any entry written before that key

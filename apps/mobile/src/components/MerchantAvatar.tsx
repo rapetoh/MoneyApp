@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react'
-import { View, Text, Image, StyleSheet, type ImageStyle } from 'react-native'
-import { merchantColor, guessDomain, categoryPalette } from '@voice-expense/shared'
+import { View, Text, StyleSheet } from 'react-native'
+import { Image } from 'expo-image'
+import { merchantColor, categoryPalette } from '@voice-expense/shared'
+import { merchantLogoUrl } from '../services/merchantLogo'
 import { Typography } from '../theme'
 
 interface Props {
@@ -68,35 +70,15 @@ export function MerchantAvatar({
   // Only attempt a favicon fetch when we actually have a merchant name. Using
   // the category as a domain guess (e.g. guessDomain("Rent") → "rent.com")
   // would point at unrelated websites and either 404 or show something wrong.
-  const domain = hasMerchant
-    ? (merchantDomain ?? guessDomain(merchant!))
-    : null
-  const logoUrl = domain && !logoFailed
-    ? `https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=http://${domain}&size=128`
-    : null
+  const logoUrl = hasMerchant && !logoFailed ? merchantLogoUrl(merchant, merchantDomain) : null
 
   const borderRadius = radius ?? size / 2
 
-  if (logoUrl) {
-    // `cover` (not `contain`) fills the full frame so the logo reads at small
-    // sizes; favicons are square so no cropping occurs in practice, and it
-    // prevents the "tiny logo floating in empty circle" look at 40px.
-    const imageStyle: ImageStyle = {
-      width: size,
-      height: size,
-      borderRadius,
-      backgroundColor: '#FFFFFF',
-    }
-    return (
-      <Image
-        source={{ uri: logoUrl }}
-        style={imageStyle}
-        onError={() => setLogoFailed(true)}
-        resizeMode="cover"
-      />
-    )
-  }
-
+  // The letter tile is always drawn; the logo (expo-image, memory+disk
+  // cached, decoded off the JS thread) sits on top and crossfades in over
+  // it. No white placeholder square, no one-by-one pop-in on launch: a
+  // cached logo paints with the row, and a first-ever fetch fades in from
+  // the tile instead of from nothing (build 12 feedback).
   return (
     <View
       style={[
@@ -105,6 +87,17 @@ export function MerchantAvatar({
       ]}
     >
       <Text style={[styles.initial, { fontSize: size * 0.38 }]}>{initial}</Text>
+      {logoUrl && (
+        <Image
+          source={{ uri: logoUrl }}
+          style={[StyleSheet.absoluteFill, { borderRadius }]}
+          contentFit="cover"
+          cachePolicy="memory-disk"
+          transition={140}
+          onError={() => setLogoFailed(true)}
+          accessibilityIgnoresInvertColors
+        />
+      )}
     </View>
   )
 }
@@ -113,6 +106,7 @@ const styles = StyleSheet.create({
   avatar: {
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
   initial: {
     color: '#FFFFFF',

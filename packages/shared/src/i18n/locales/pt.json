@@ -419,7 +419,7 @@
   "recurring.paid_monthly": "Pago por mês",
   "recurring.per_month": "/ mês",
   "recurring.yearly_prefix": "Isso é",
-  "recurring.yearly_suffix": "por ano em assinaturas.",
+  "recurring.yearly_suffix": "por ano.",
   "recurring.pause": "Pausar",
   "recurring.resume": "Retomar",
   "recurring.overdue": "Atrasado — geração pendente",
@@ -509,5 +509,14 @@
   "settings.sync_hide": "Ocultar",
   "nav.transaction": "Transação",
   "nav.add_expense": "Adicionar Despesa",
-  "nav.edit_transaction": "Editar Transação"
+  "nav.edit_transaction": "Editar Transação",
+  "recurring.add_rule_cta": "Adicionar regra",
+  "recurring.eyebrow": "Assinaturas, contas e rendimentos",
+  "recurring.expenses_per_month": "Despesas recorrentes · por mês",
+  "recurring.income_per_month": "Rendimentos recorrentes",
+  "recurring.hero_footnote": "Cada frequência aparece como valor mensal — um salário a cada 2 semanas conta 26 ÷ 12 vezes, uma conta semanal 52 ÷ 12.",
+  "recurring.expenses_section": "Despesas",
+  "recurring.income_section": "Rendimentos",
+  "ask.follow_up_placeholder": "Faça uma pergunta de seguimento…",
+  "ask.send": "Enviar"
 }

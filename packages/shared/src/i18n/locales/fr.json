@@ -419,7 +419,7 @@
   "recurring.paid_monthly": "Payé par mois",
   "recurring.per_month": "/ mois",
   "recurring.yearly_prefix": "C'est",
-  "recurring.yearly_suffix": "par an en abonnements.",
+  "recurring.yearly_suffix": "par an.",
   "recurring.pause": "Mettre en pause",
   "recurring.resume": "Reprendre",
   "recurring.overdue": "En retard — génération en attente",
@@ -509,5 +509,14 @@
   "settings.sync_hide": "Masquer",
   "nav.transaction": "Transaction",
   "nav.add_expense": "Ajouter une Dépense",
-  "nav.edit_transaction": "Modifier la Transaction"
+  "nav.edit_transaction": "Modifier la Transaction",
+  "recurring.add_rule_cta": "Ajouter la règle",
+  "recurring.eyebrow": "Abonnements, factures et revenus",
+  "recurring.expenses_per_month": "Dépenses récurrentes · par mois",
+  "recurring.income_per_month": "Revenus récurrents",
+  "recurring.hero_footnote": "Chaque échéance est ramenée à un montant mensuel — une paie toutes les 2 semaines compte 26 ÷ 12 fois, une facture hebdomadaire 52 ÷ 12.",
+  "recurring.expenses_section": "Dépenses",
+  "recurring.income_section": "Revenus",
+  "ask.follow_up_placeholder": "Poser une question de suivi…",
+  "ask.send": "Envoyer"
 }

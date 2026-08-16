@@ -264,6 +264,11 @@ describe('monthlyEquivalent / annualEquivalent (03-F23 — honour interval)', ()
   it('a yearly $120 rule equals a $10/mo equivalent', () => {
     expect(monthlyEquivalent({ frequency: 'yearly', interval: 1, amount: 120 })).toBe(10)
   })
+  it('uses exact calendar ratios for sub-monthly cadences (26/12, 52/12, 365.25/12)', () => {
+    expect(monthlyEquivalent({ frequency: 'biweekly', interval: 1, amount: 2500 })).toBeCloseTo(5416.67, 2)
+    expect(monthlyEquivalent({ frequency: 'weekly', interval: 1, amount: 100 })).toBeCloseTo(433.33, 2)
+    expect(monthlyEquivalent({ frequency: 'daily', interval: 1, amount: 1 })).toBeCloseTo(30.4375, 4)
+  })
 
   it('annualEquivalent is twelve times the monthly figure', () => {
     const rule = { frequency: 'quarterly' as const, interval: 1, amount: 300 }

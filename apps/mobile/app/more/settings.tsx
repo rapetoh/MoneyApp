@@ -844,7 +844,12 @@ export default function SettingsScreen() {
             <Text style={styles.modalTitle}>{t('settings.sync_issues', locale)}</Text>
             <View style={{ width: 60 }} />
           </View>
-          <ScrollView contentContainerStyle={styles.modalBody}>
+          <ScrollView
+            contentContainerStyle={styles.modalBody}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
+            automaticallyAdjustKeyboardInsets
+          >
             {deadEntries.length === 0 ? (
               <Text style={styles.modalHint}>{t('settings.sync_issues_empty', locale)}</Text>
             ) : (

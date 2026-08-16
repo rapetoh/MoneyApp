@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import {
   Animated,
   Keyboard,
+  LayoutAnimation,
   Modal,
   Platform,
   Pressable,
@@ -89,9 +90,18 @@ export function BottomSheet({
   const { height: windowHeight } = useWindowDimensions()
   const sheetRef = useRef<View>(null)
   const lift = useRef(new Animated.Value(0)).current
+  // Window-space top edge of the keyboard while it is showing, else null.
+  // Caps the sheet's height (below) so a tall sheet *shrinks* to fit above
+  // the keyboard instead of being translated until its header — Cancel /
+  // title / Save — leaves the screen. Lifting alone is only correct for a
+  // sheet shorter than the space above the keyboard.
+  const [keyboardTop, setKeyboardTop] = useState<number | null>(null)
 
   useEffect(() => {
-    if (!visible) return
+    if (!visible) {
+      setKeyboardTop(null)
+      return
+    }
 
     const liftToOverlap = (keyboardScreenY: number, duration: number) => {
       const node = sheetRef.current
@@ -125,12 +135,25 @@ export function BottomSheet({
 
     const showSub = Keyboard.addListener(showEventName as 'keyboardDidShow', (e: KeyboardEvent) => {
       if (e.endCoordinates.height <= 0) {
+        setKeyboardTop(null)
         resetLift(e.duration ?? 200)
         return
       }
+      LayoutAnimation.configureNext(LayoutAnimation.create(
+        Math.max(e.duration ?? 220, 1),
+        LayoutAnimation.Types.keyboard,
+        LayoutAnimation.Properties.opacity,
+      ))
+      setKeyboardTop(e.endCoordinates.screenY)
       liftToOverlap(e.endCoordinates.screenY, e.duration ?? 220)
     })
     const hideSub = Keyboard.addListener(hideEventName as 'keyboardDidHide', (e: KeyboardEvent) => {
+      LayoutAnimation.configureNext(LayoutAnimation.create(
+        Math.max(e?.duration ?? 200, 1),
+        LayoutAnimation.Types.keyboard,
+        LayoutAnimation.Properties.opacity,
+      ))
+      setKeyboardTop(null)
       resetLift(e?.duration ?? 200)
     })
 
@@ -139,6 +162,14 @@ export function BottomSheet({
       hideSub.remove()
     }
   }, [visible, lift])
+
+  // With the keyboard up, the sheet may be at most the space between the
+  // top safe area and the keyboard — it then lifts by exactly the keyboard
+  // height, landing its top at (or below) the safe area and its bottom on
+  // the keyboard's edge, header always visible, body still scrollable.
+  const maxHeight = keyboardTop == null
+    ? windowHeight * maxHeightPercent
+    : Math.min(windowHeight * maxHeightPercent, keyboardTop - insets.top - 8)
 
   return (
     <Modal
@@ -153,7 +184,7 @@ export function BottomSheet({
           ref={sheetRef}
           style={[
             styles.sheetWrap,
-            { maxHeight: windowHeight * maxHeightPercent },
+            { maxHeight },
             { transform: [{ translateY: Animated.multiply(lift, -1) }] },
           ]}
         >

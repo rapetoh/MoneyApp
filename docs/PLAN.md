@@ -61,6 +61,16 @@ truth: `docs/voice redesign/` (screenshot + Claude Design HTML, artboards
   no date picker exists anywhere yet; follow-up), and the mockup's
   "nothing uploaded" copy (transcript does go to the parse API; the
   existing honest "Processed securely" line stays).
+- **Build 12 review → build 13** (Aug 11 late evening; details in
+  [voice redesign/IMPLEMENTATION.md](./voice%20redesign/IMPLEMENTATION.md)
+  §"Build 12 → build 13"): smooth blurred edge glow (native
+  FeGaussianBlur, no rings); shared BottomSheet shrinks under the keyboard
+  and the recurring editor got a pinned Save footer; Recurring screen
+  restructured (honest eyebrow, expenses/income hero + sections with
+  subtotals, per-row monthly equivalents, exact 26/12 & 52/12 math);
+  expo-image disk-cached logos with prefetch; app-wide query cache +
+  splash preload eliminating the stale-then-current flash; Ask Murmur is
+  now multi-turn on mobile.
 - **Build 8 field defects → fixed same day for build 9** (owner's first
   TestFlight session, Aug 11 evening — full write-up in
   [voice redesign/IMPLEMENTATION.md](./voice%20redesign/IMPLEMENTATION.md)

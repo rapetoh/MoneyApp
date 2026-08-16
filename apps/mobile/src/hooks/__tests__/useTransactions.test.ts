@@ -66,6 +66,9 @@ vi.mock('expo-constants', () => ({ default: { deviceName: 'Test Device' } }))
 // `expo-modules-core`, which touches RN-only globals (`__DEV__`) at
 // import time outside a React Native runtime.
 vi.mock('expo-localization', () => ({ getCalendars: () => [{ timeZone: 'UTC' }] }))
+// `useTransactions` warms the merchant-logo cache (src/services/merchantLogo.ts)
+// after every local read; expo-image's native module isn't available here.
+vi.mock('expo-image', () => ({ Image: { prefetch: vi.fn(async () => true) } }))
 
 const { syncManager } = await import('../../services/sync/SyncManager')
 const { deleteTransactionAndEnqueue } = await import('../useTransactions')

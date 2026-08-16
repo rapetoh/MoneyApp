@@ -371,12 +371,15 @@ export function monthlyEquivalent(rule: {
 }): number {
   const interval = normalizedInterval(rule)
   switch (rule.frequency) {
+    // Exact calendar ratios, not the 30 / 4.33 / 2.17 shortcuts this used
+    // to ship: a $2,500 biweekly paycheck is $5,416.67/mo (26 ÷ 12), not
+    // the $5,425 the rounded factor produced on the Recurring hero.
     case 'daily':
-      return (rule.amount * 30) / interval
+      return (rule.amount * (365.25 / 12)) / interval
     case 'weekly':
-      return (rule.amount * 4.33) / interval
+      return (rule.amount * (52 / 12)) / interval
     case 'biweekly':
-      return (rule.amount * 2.17) / interval
+      return (rule.amount * (26 / 12)) / interval
     case 'monthly':
       return rule.amount / interval
     case 'quarterly':

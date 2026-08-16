@@ -1,10 +1,14 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Stack, useRouter, useSegments } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import * as SplashScreen from 'expo-splash-screen'
 import { useFonts } from 'expo-font'
 import { useAuth } from '../src/hooks/useAuth'
 import { useProfile } from '../src/hooks/useProfile'
+import { useTransactions } from '../src/hooks/useTransactions'
+import { useCategories } from '../src/hooks/useCategories'
+import { useActiveBudget } from '../src/hooks/useBudget'
+import { useRecurringRules } from '../src/hooks/useRecurringRules'
 import { syncManager } from '../src/services/sync/SyncManager'
 import { useShortcutHandler } from '../src/hooks/useShortcutHandler'
 import { runRecurringCatchUp } from '../src/services/recurringCatchUp'
@@ -18,6 +22,9 @@ import { t } from '@voice-expense/shared'
 import type { Locale } from '@voice-expense/shared'
 
 SplashScreen.preventAutoHideAsync()
+
+/** Longest the splash waits on the network half of the data preload. */
+const PRELOAD_NETWORK_BUDGET_MS = 2500
 
 // Registers every face named by `Typography.fontFamily` (src/theme/typography.ts).
 // Keys here ARE the `fontFamily` strings used app-wide — expo-font maps this
@@ -52,7 +59,31 @@ export default function RootLayout() {
   // still counts as resolved — better a system-font fallback than an
   // infinite splash if font loading ever fails on a device.
   const fontsReady = fontsLoaded || !!fontError
-  const ready = fontsReady && !loading && (!session || !profileLoading)
+
+  // Data preload (build 12 feedback: screens painted empty/default first,
+  // then re-rendered as each fetch landed). These hooks share the app-wide
+  // query cache (src/services/queryCache.ts), so mounting them here fills
+  // it before the splash lifts — the first frame of Today already has the
+  // transaction list, categories, budget and recurring rules. Transactions
+  // come from SQLite (fast, offline-safe) and are always waited for; the
+  // three network reads are waited for up to PRELOAD_NETWORK_BUDGET_MS so
+  // an offline launch still boots (they keep loading in the background).
+  const userId = session?.user?.id
+  const { loading: txLoading } = useTransactions(userId)
+  const { loading: catLoading } = useCategories(userId)
+  const { loading: budgetLoading } = useActiveBudget(userId)
+  const { loading: rulesLoading } = useRecurringRules(userId)
+  const [preloadTimedOut, setPreloadTimedOut] = useState(false)
+  useEffect(() => {
+    if (!userId) return
+    setPreloadTimedOut(false)
+    const timer = setTimeout(() => setPreloadTimedOut(true), PRELOAD_NETWORK_BUDGET_MS)
+    return () => clearTimeout(timer)
+  }, [userId])
+  const networkPreloaded = (!catLoading && !budgetLoading && !rulesLoading) || preloadTimedOut
+  const dataReady = !session || (!txLoading && networkPreloaded)
+
+  const ready = fontsReady && !loading && (!session || !profileLoading) && dataReady
 
   // Handles voiceexpense://shortcut?amount=XX&merchant=... deep links from iOS Shortcuts
   useShortcutHandler()

@@ -3,6 +3,7 @@ import * as Crypto from 'expo-crypto'
 import { getCalendars } from 'expo-localization'
 import { supabase } from '../lib/supabase'
 import { DataEvents } from '../events/dataEvents'
+import { useCachedState } from '../services/queryCache'
 import { budgetStatus, localDay } from '@voice-expense/shared'
 import type {
   Budget,
@@ -29,8 +30,13 @@ function deviceTimeZone(): string {
 }
 
 export function useActiveBudget(userId: string | undefined) {
-  const [budget, setBudget] = useState<Budget | null>(null)
-  const [loading, setLoading] = useState(true)
+  // Shared, process-lifetime value (src/services/queryCache.ts) — see
+  // useCategories for why every data hook reads through it.
+  const [budget, setBudget, hasCached] = useCachedState<Budget | null>(
+    userId ? `budget:${userId}` : null,
+    null,
+  )
+  const [loading, setLoading] = useState(!hasCached)
   // Read-error exposure (fix-plan 2.13 / audit 08-F21 family): this fetch
   // used to discard `error` entirely, so a failed read rendered exactly
   // like "no budget set" (the app's actual empty state) everywhere this

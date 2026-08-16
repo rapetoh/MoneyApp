@@ -3,6 +3,7 @@ import { getCalendars } from 'expo-localization'
 import { supabase } from '../lib/supabase'
 import { DataEvents } from '../events/dataEvents'
 import { setCurrentProfileCurrency } from '../services/profileCurrency'
+import { useCachedState } from '../services/queryCache'
 import type { Profile, ProfileUpdate } from '@voice-expense/shared'
 
 // On fresh sign-up, the profile row is created by a server-side trigger
@@ -52,8 +53,14 @@ function captureDeviceTimezone(userId: string, storedTimezone: string): void {
 }
 
 export function useProfile(userId: string | undefined) {
-  const [profile, setProfile] = useState<Profile | null>(null)
-  const [loading, setLoading] = useState(true)
+  // Shared, process-lifetime value (src/services/queryCache.ts) — before
+  // this, every screen's own instance started `null` and rendered one frame
+  // in the default currency/locale before its fetch returned.
+  const [profile, setProfile, hasCached] = useCachedState<Profile | null>(
+    userId ? `profile:${userId}` : null,
+    null,
+  )
+  const [loading, setLoading] = useState(!hasCached)
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const retryStartRef = useRef<number | null>(null)
 

@@ -102,7 +102,12 @@ export function BudgetEditorModal({
           </Pressable>
         </View>
 
-        <ScrollView contentContainerStyle={styles.modalBody}>
+        <ScrollView
+          contentContainerStyle={styles.modalBody}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          automaticallyAdjustKeyboardInsets
+        >
           <Text style={styles.modalHint}>{t('settings.budget_hint', locale)}</Text>
 
           <View style={styles.amountRow}>

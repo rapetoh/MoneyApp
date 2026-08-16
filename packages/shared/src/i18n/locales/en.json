@@ -419,7 +419,7 @@
   "recurring.paid_monthly": "Paid monthly",
   "recurring.per_month": "/ month",
   "recurring.yearly_prefix": "That's",
-  "recurring.yearly_suffix": "a year in subscriptions.",
+  "recurring.yearly_suffix": "a year.",
   "recurring.pause": "Pause",
   "recurring.resume": "Resume",
   "recurring.overdue": "Overdue — pending generation",
@@ -509,5 +509,14 @@
   "settings.sync_hide": "Hide",
   "nav.transaction": "Transaction",
   "nav.add_expense": "Add Expense",
-  "nav.edit_transaction": "Edit Transaction"
+  "nav.edit_transaction": "Edit Transaction",
+  "recurring.add_rule_cta": "Add rule",
+  "recurring.eyebrow": "Subscriptions, bills & income",
+  "recurring.expenses_per_month": "Recurring expenses · per month",
+  "recurring.income_per_month": "Recurring income",
+  "recurring.hero_footnote": "Every schedule is shown as a per-month amount — a paycheck every 2 weeks counts 26 ÷ 12 times, a weekly bill 52 ÷ 12.",
+  "recurring.expenses_section": "Expenses",
+  "recurring.income_section": "Income",
+  "ask.follow_up_placeholder": "Ask a follow-up…",
+  "ask.send": "Send"
 }

@@ -9,6 +9,8 @@ import { snapshotFx, localDay } from '@voice-expense/shared'
 import { validateTransactionWriteFields } from '@voice-expense/ai'
 import * as Crypto from 'expo-crypto'
 import { getCurrentProfileCurrency } from '../services/profileCurrency'
+import { useCachedState, cacheHas } from '../services/queryCache'
+import { prefetchMerchantLogos } from '../services/merchantLogo'
 
 /** IANA zone the device is currently in. Mirrors `useProfile.ts`'s own
  *  `getDeviceTimeZone` (fix-plan 1.3 part 1 — that hook keeps
@@ -74,9 +76,17 @@ export async function deleteTransactionAndEnqueue(userId: string, id: string): P
   return { id, status: outcome.status, error: outcome.error }
 }
 
+const EMPTY_TRANSACTIONS: Transaction[] = []
+
 export function useTransactions(userId: string | undefined) {
-  const [transactions, setTransactions] = useState<Transaction[]>([])
-  const [loading, setLoading] = useState(true)
+  // Shared across every mounted instance (src/services/queryCache.ts): the
+  // first render of any screen already has the last known list — no empty
+  // frame, no `$0.00` aggregate flashing before the SQLite read lands.
+  const [transactions, setTransactions, hasCached] = useCachedState<Transaction[]>(
+    userId ? `transactions:${userId}` : null,
+    EMPTY_TRANSACTIONS,
+  )
+  const [loading, setLoading] = useState(!hasCached)
   const [error, setError] = useState<string | null>(null)
 
   const loadLocal = useCallback(async () => {
@@ -84,7 +94,10 @@ export function useTransactions(userId: string | undefined) {
     const local = await getTransactions(userId)
     setTransactions(local)
     setLoading(false)
-  }, [userId])
+    // Warm the logo cache for every row before it mounts (no-op for URLs
+    // already requested this process).
+    prefetchMerchantLogos(local)
+  }, [userId, setTransactions])
 
   // Initial load: read SQLite immediately, then pull remote. `pullRemote`
   // and the realtime channel below are owned by SyncManager as a single
@@ -106,7 +119,7 @@ export function useTransactions(userId: string | undefined) {
   useEffect(() => {
     if (!userId) return
 
-    setLoading(true)
+    setLoading(!cacheHas(`transactions:${userId}`))
     setError(null)
     syncManager.startRealtime(userId)
     loadLocal().then(() => {

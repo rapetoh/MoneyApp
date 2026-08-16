@@ -6,8 +6,11 @@ import {
   ScrollView,
   Pressable,
   ActivityIndicator,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '../../src/hooks/useAuth'
@@ -29,7 +32,7 @@ import {
   buildAskMurmurRequest,
   postAskMurmur,
 } from '../../src/services/askMurmurClient'
-import type { AskMurmurResponse, AskMurmurStatRow } from '@voice-expense/shared'
+import type { AskMurmurResponse, AskMurmurStatRow, AskMurmurHistoryTurn } from '@voice-expense/shared'
 
 /**
  * Ask Murmur — result state.
@@ -42,8 +45,9 @@ import type { AskMurmurResponse, AskMurmurStatRow } from '@voice-expense/shared'
  * The screen owns its own back-pill chrome — the native Stack header is hidden
  * via `more/ask-result` options in app/_layout.tsx.
  *
- * Loading / error / refusal states all render inside the Murmur bubble so the
- * thread layout stays consistent.
+ * Multi-turn: every turn owns its loading / answer / error state, follow-ups
+ * are sent with the completed turns as `history` (the web thread's contract),
+ * and each turn is appended to the same persisted conversation.
  *
  * `response.actions` (create_goal / set_budget / show_category /
  * show_transactions suggestions from the reasoner) is intentionally not
@@ -52,6 +56,15 @@ import type { AskMurmurResponse, AskMurmurStatRow } from '@voice-expense/shared'
  * pressed state that does nothing is worse than no pill). Reintroduce
  * once those destinations exist.
  */
+interface Turn {
+  id: number
+  question: string
+  state:
+    | { kind: 'loading' }
+    | { kind: 'ok'; response: AskMurmurResponse }
+    | { kind: 'error' }
+}
+
 export default function AskResultScreen() {
   const { user } = useAuth()
   const { profile } = useProfile(user?.id)
@@ -59,92 +72,132 @@ export default function AskResultScreen() {
   const currency = profile?.currency_code ?? 'USD'
   const router = useRouter()
   const params = useLocalSearchParams<{ q?: string }>()
-  const question = (params.q ?? '').toString().trim()
+  const initialQuestion = (params.q ?? '').toString().trim()
 
   const { transactions } = useTransactions(user?.id)
   const { categories } = useCategories(user?.id)
   const { rules: recurringRules } = useRecurringRules(user?.id)
 
-  const [state, setState] = useState<
-    | { kind: 'idle' }
-    | { kind: 'loading' }
-    | { kind: 'ok'; response: AskMurmurResponse }
-    | { kind: 'error' }
-  >({ kind: 'idle' })
+  // The conversation. Every turn is a question + its own loading / answer /
+  // error state, so a failed follow-up retries alone and never disturbs the
+  // answers above it. Follow-ups carry the completed turns as `history`
+  // — the same multi-turn contract the web thread already uses — so "and
+  // last month?" is understood in context.
+  const [turns, setTurns] = useState<Turn[]>([])
+  // Mirror of `turns` for callbacks that need the current list without a
+  // stale closure.
+  const turnsRef = useRef<Turn[]>([])
+  turnsRef.current = turns
+  const [draft, setDraft] = useState('')
+  const nextIdRef = useRef(1)
+  const scrollRef = useRef<ScrollView>(null)
+  const insets = useSafeAreaInsets()
 
-  // useTransactions/useCategories/useRecurringRules load asynchronously. We
-  // wait for transactions to populate before firing the request — otherwise
-  // the model would get an empty data block and refuse for the wrong reason.
-  // Once we've fired once, the `firedRef` guard prevents re-fires from list
-  // refreshes (e.g. SyncManager landing a row mid-conversation).
+  // Latest data snapshot for requests fired from callbacks.
+  const dataRef = useRef({ transactions, categories, recurringRules, profile, locale, currency })
+  dataRef.current = { transactions, categories, recurringRules, profile, locale, currency }
+
+  // One persisted thread per screen visit (ask_conversations / ask_messages
+  // — the same tables the desktop history dropdown reads).
+  const conversationIdRef = useRef<string | null>(null)
+  const persistChainRef = useRef<Promise<void>>(Promise.resolve())
+
   const firedRef = useRef(false)
-  // One persisted thread per screen visit, even across error→retry cycles.
-  const persistedRef = useRef(false)
-
   useEffect(() => {
-    if (!question || !user?.id || firedRef.current) return
-    if (transactions.length === 0 && !categories.length) return
+    if (!initialQuestion || !user?.id || firedRef.current) return
+    // Data hooks read the app-wide cache (src/services/queryCache.ts), so
+    // in practice this is populated on the first render; the guard only
+    // matters for a brand-new account with nothing loaded yet.
+    if (transactions.length === 0 && categories.length === 0) return
     firedRef.current = true
-    void runAsk()
-    // We deliberately don't include the loaders in the dep array — the guard
-    // is the firedRef. Re-renders from data updates shouldn't re-fire.
+    void ask(initialQuestion)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [question, user?.id, transactions.length, categories.length])
+  }, [initialQuestion, user?.id, transactions.length, categories.length])
 
-  async function runAsk() {
-    setState({ kind: 'loading' })
+  function historyFor(turnList: Turn[]): AskMurmurHistoryTurn[] {
+    const history: AskMurmurHistoryTurn[] = []
+    for (const turn of turnList) {
+      if (turn.state.kind === 'ok') {
+        history.push({ question: turn.question, answer: turn.state.response.verdict.text })
+      }
+    }
+    return history
+  }
+
+  async function ask(question: string, retryId?: number) {
+    const id = retryId ?? nextIdRef.current++
+    setTurns((prev) => {
+      const existing = prev.find((t) => t.id === id)
+      if (existing) return prev.map((t) => (t.id === id ? { ...t, state: { kind: 'loading' } } : t))
+      return [...prev, { id, question, state: { kind: 'loading' } }]
+    })
+    requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true }))
+
     try {
       const apiBaseUrl = await getApiUrl()
       const { data: sessionData } = await supabase.auth.getSession()
       const authToken = sessionData.session?.access_token
-      if (!authToken) {
-        setState({ kind: 'error' })
-        return
-      }
+      if (!authToken) throw new Error('no session')
 
-      const request = buildAskMurmurRequest({
-        question,
-        locale,
-        currency,
-        monthly_income: profile?.monthly_income ?? null,
-        transactions,
-        recurringRules,
-        categories,
-      })
+      const d = dataRef.current
+      // Context = every completed turn *before* this one.
+      const priorTurns = turnsRef.current.filter((t) => t.id !== id)
+      const request = {
+        ...buildAskMurmurRequest({
+          question,
+          locale: d.locale,
+          currency: d.currency,
+          monthly_income: d.profile?.monthly_income ?? null,
+          transactions: d.transactions,
+          recurringRules: d.recurringRules,
+          categories: d.categories,
+          timeZone: d.profile?.timezone || undefined,
+        }),
+        history: historyFor(priorTurns),
+      }
       const response = await postAskMurmur({ apiBaseUrl, authToken, request })
-      setState({ kind: 'ok', response })
-      // Persist to the same ask_conversations / ask_messages tables the web
-      // thread uses, so this question shows up in the desktop history
-      // dropdown. Fire-and-forget — a persistence failure never blocks the
-      // rendered answer.
-      void persistAsk(response)
+      setTurns((prev) => prev.map((t) => (t.id === id ? { ...t, state: { kind: 'ok', response } } : t)))
+      requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true }))
+      persist(question, response)
     } catch (err) {
       console.warn('[ask-result] request failed:', err)
-      setState({ kind: 'error' })
+      setTurns((prev) => prev.map((t) => (t.id === id ? { ...t, state: { kind: 'error' } } : t)))
     }
   }
 
-  async function persistAsk(response: AskMurmurResponse) {
-    if (persistedRef.current || !user?.id) return
-    persistedRef.current = true
-    try {
-      const conversation = await createConversation(supabase, user.id, question)
-      if (!conversation) return
-      await appendUserMessage(supabase, conversation.id, user.id, question)
-      await appendAssistantMessage(supabase, conversation.id, user.id, response)
-    } catch (err) {
-      console.warn('[ask-result] persist failed:', err)
-    }
+  function persist(question: string, response: AskMurmurResponse) {
+    if (!user?.id) return
+    const userId = user.id
+    // Serialized so the conversation row exists before its first message
+    // and turns land in order. Fire-and-forget — persistence never blocks
+    // the rendered answer.
+    persistChainRef.current = persistChainRef.current
+      .then(async () => {
+        if (!conversationIdRef.current) {
+          const conversation = await createConversation(supabase, userId, question)
+          if (!conversation) return
+          conversationIdRef.current = conversation.id
+        }
+        await appendUserMessage(supabase, conversationIdRef.current, userId, question)
+        await appendAssistantMessage(supabase, conversationIdRef.current, userId, response)
+      })
+      .catch((err) => console.warn('[ask-result] persist failed:', err))
   }
 
-  function onRetry() {
-    void runAsk()
+  function onSend() {
+    const trimmed = draft.trim()
+    if (!trimmed) return
+    setDraft('')
+    void ask(trimmed)
   }
+
+  const anyLoading = turns.some((t) => t.state.kind === 'loading')
+  const canSend = draft.trim().length > 0 && !anyLoading
 
   return (
     <>
       <Stack.Screen options={{ headerShown: false }} />
-      <SafeAreaView style={styles.safe} edges={['top', 'bottom', 'left', 'right']}>
+      <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
         {/* Header — back pill + sparkle title (centered) + spacer */}
         <View style={styles.headerRow}>
           <Pressable
@@ -163,21 +216,57 @@ export default function AskResultScreen() {
           <View style={styles.iconPillSpacer} />
         </View>
 
-        <ScrollView
-          contentContainerStyle={styles.threadContent}
-          showsVerticalScrollIndicator={false}
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          // Screen-relative: this KAV is mounted at the window origin (no
+          // native header, top safe area is padding on the SafeAreaView),
+          // so its own frame math is correct here — the F37 offset problem
+          // only bites a KAV nested under a header/modal.
         >
-          <UserBubble text={question} />
-          <MurmurBubble state={state} locale={locale} onRetry={onRetry} />
-        </ScrollView>
+          <ScrollView
+            ref={scrollRef}
+            contentContainerStyle={styles.threadContent}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="interactive"
+            onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
+          >
+            {turns.map((turn) => (
+              <View key={turn.id}>
+                <UserBubble text={turn.question} />
+                <MurmurBubble state={turn.state} locale={locale} onRetry={() => ask(turn.question, turn.id)} />
+              </View>
+            ))}
+          </ScrollView>
 
-        {/* Follow-up bar was a dead placeholder — it looked like a chat
-            input but the mic button only called router.back(). Users tap
-            the mic expecting "submit my follow-up" and get the opposite.
-            Removed until the multi-turn flow on this screen actually
-            ships (web already supports follow-ups via the conversation
-            thread on /dashboard/ask). Reintroduce wired-up when that
-            mobile work lands. */}
+          {/* Follow-up bar — a real one this time: submits a follow-up in
+              context (the previous Q/A pairs travel as `history`). */}
+          <View style={[styles.inputBar, { paddingBottom: Math.max(insets.bottom, 10) }]}>
+            <TextInput
+              value={draft}
+              onChangeText={setDraft}
+              placeholder={t('ask.follow_up_placeholder', locale)}
+              placeholderTextColor={Colors.ink4}
+              style={styles.input}
+              returnKeyType="send"
+              onSubmitEditing={onSend}
+              blurOnSubmit={false}
+              multiline={false}
+              editable={!anyLoading}
+              accessibilityLabel={t('ask.follow_up_placeholder', locale)}
+            />
+            <Pressable
+              onPress={onSend}
+              disabled={!canSend}
+              style={({ pressed }) => [styles.sendBtn, !canSend && styles.sendBtnDisabled, pressed && styles.pressed]}
+              accessibilityRole="button"
+              accessibilityLabel={t('ask.send', locale)}
+            >
+              <Ionicons name="arrow-up" size={18} color="#FFFFFF" />
+            </Pressable>
+          </View>
+        </KeyboardAvoidingView>
       </SafeAreaView>
     </>
   )
@@ -198,11 +287,7 @@ function UserBubble({ text }: { text: string }) {
 }
 
 interface MurmurBubbleProps {
-  state:
-    | { kind: 'idle' }
-    | { kind: 'loading' }
-    | { kind: 'ok'; response: AskMurmurResponse }
-    | { kind: 'error' }
+  state: Turn['state']
   locale: Locale
   onRetry: () => void
 }
@@ -214,7 +299,7 @@ function MurmurBubble({ state, locale, onRetry }: MurmurBubbleProps) {
         <Ionicons name="sparkles" size={14} color={Colors.accent} />
       </View>
       <View style={styles.murmurCol}>
-        {state.kind === 'idle' || state.kind === 'loading' ? (
+        {state.kind === 'loading' ? (
           <View style={styles.bubbleCard}>
             <View style={styles.thinkingRow}>
               <ActivityIndicator size="small" color={Colors.accent} />
@@ -541,6 +626,39 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     fontFamily: Typography.fontFamily.sans,
   },
+
+  // Follow-up input bar
+  inputBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    borderTopWidth: Hairline.width,
+    borderTopColor: Hairline.color,
+    backgroundColor: Colors.background,
+  },
+  input: {
+    flex: 1,
+    height: 44,
+    borderRadius: 22,
+    paddingHorizontal: 16,
+    backgroundColor: Colors.surface,
+    borderWidth: Hairline.width,
+    borderColor: 'rgba(40,36,28,0.12)',
+    fontFamily: Typography.fontFamily.sans,
+    fontSize: 15,
+    color: Colors.ink,
+  },
+  sendBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: Colors.ink,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sendBtnDisabled: { opacity: 0.35 },
 
   // Attribution
   attributionRow: {
