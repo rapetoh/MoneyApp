@@ -6,6 +6,7 @@
   "home.expenses": "Expenses",
   "home.recent_activity": "Recent Activity",
   "home.view_all": "View All",
+  "home.see_all_transactions": "See all {count} transactions",
   "home.safe_to_spend": "Safe to Spend",
   "home.over_budget": "Over budget by",
   "home.set_budget": "Set a budget to track your spending",

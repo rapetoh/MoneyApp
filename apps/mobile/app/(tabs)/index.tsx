@@ -17,7 +17,7 @@ import { TransactionRow } from '../../src/components/TransactionRow'
 import { Money, MoneyLabel } from '../../src/components/Money'
 import { MiniBars } from '../../src/components/MiniBars'
 import { DayOneFirstLog } from '../../src/components/DayOneFirstLog'
-import { Colors, Typography, Spacing, useTabBarClearance } from '../../src/theme'
+import { Colors, Typography, Spacing, Hairline, useTabBarClearance } from '../../src/theme'
 import {
   t,
   aggAmount,
@@ -40,17 +40,26 @@ import type { Locale, Transaction } from '@voice-expense/shared'
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Groups today + yesterday + everything older, in `tz`. Mirrors the
- * mockup's "Today · Friday" / "Yesterday · Thursday" sectioning. Bucket
- * keys for "older" days are the transaction's own `YYYY-MM-DD` local day
- * (`localDay`), which sorts lexicographically the same as chronologically
- * — no `Date#getTime()` needed to order them.
+ * The Today feed = recent activity, bounded by time and never silently
+ * truncated (owner decision, Aug 16 2026): the last 7 civil days (in `tz`),
+ * grouped by day — Today · Yesterday · "Saturday, August 15" … — extended
+ * further back only when those 7 days hold fewer than `MIN_FEED_ROWS`
+ * transactions (a quiet week, a new user), and always followed by a
+ * "See all N transactions" row (rendered by the screen) so the full ledger
+ * is one tap away and the user always knows more exists. Replaces the
+ * April 19 rule (Today + Yesterday + two older days, cut without a hint),
+ * which was a mockup read too literally: on a real month it hid the
+ * biggest day (owner screenshot Aug 16: Aug 11 with both paychecks).
+ * Days with nothing logged are not rendered.
  */
 interface Section {
   key: string
   label: string
   data: Transaction[]
 }
+const FEED_DAYS = 7
+const MIN_FEED_ROWS = 8
+
 function groupForToday(txns: Transaction[], locale: Locale, nowIso: string, tz: string): Section[] {
   const today = localParts(nowIso, tz)
   const todayDayIso = localDay(nowIso, tz)
@@ -59,45 +68,35 @@ function groupForToday(txns: Transaction[], locale: Locale, nowIso: string, tz: 
   // land on the adjacent civil day across a DST transition.
   const yestInstant = civilDateTimeToInstant(yestCivil.y, yestCivil.m, yestCivil.d, 12, 0, 0, tz)
   const yestDayIso = localDay(yestInstant, tz)
+  const cutoffCivil = addDays(today.y, today.m, today.d, -(FEED_DAYS - 1))
+  const cutoffDayIso = localDay(civilDateTimeToInstant(cutoffCivil.y, cutoffCivil.m, cutoffCivil.d, 12, 0, 0, tz), tz)
 
+  // Newest first; bucket by civil day.
+  const live = txns.filter((t) => !t.is_deleted).slice().sort((a, b) => (a.transacted_at < b.transacted_at ? 1 : a.transacted_at > b.transacted_at ? -1 : 0))
   const buckets = new Map<string, { label: string; items: Transaction[] }>()
-
-  for (const txn of txns) {
-    if (txn.is_deleted) continue
+  let rowsInWindow = 0
+  for (const txn of live) {
     const dayIso = localDay(txn.transacted_at, tz)
+    const inWindow = dayIso >= cutoffDayIso
+    // Past the 7-day window: keep adding whole days only while the feed is
+    // still short of MIN_FEED_ROWS.
+    if (!inWindow && rowsInWindow >= MIN_FEED_ROWS && !buckets.has(dayIso)) break
     const d = new Date(txn.transacted_at)
-    let key: string
     let label: string
     if (dayIso === todayDayIso) {
-      key = 'today'
       label = `${t('transactions.today', locale)} · ${d.toLocaleDateString(locale, { weekday: 'long', timeZone: tz })}`
     } else if (dayIso === yestDayIso) {
-      key = 'yesterday'
       label = `${t('transactions.yesterday', locale)} · ${d.toLocaleDateString(locale, { weekday: 'long', timeZone: tz })}`
     } else {
-      key = dayIso
       label = d.toLocaleDateString(locale, { weekday: 'long', month: 'long', day: 'numeric', timeZone: tz })
     }
-    const bucket = buckets.get(key) ?? { label, items: [] }
+    const bucket = buckets.get(dayIso) ?? { label, items: [] }
     bucket.items.push(txn)
-    buckets.set(key, bucket)
+    buckets.set(dayIso, bucket)
+    rowsInWindow += 1
   }
-
-  const order = ['today', 'yesterday']
-  const sorted: Section[] = []
-  for (const k of order) {
-    const b = buckets.get(k)
-    if (b) {
-      sorted.push({ key: k, label: b.label, data: b.items })
-      buckets.delete(k)
-    }
-  }
-  // Older days — keep up to 2 more sections so Today stays scannable, with a
-  // clear path to More → History for the full list. Keys here are always
-  // `YYYY-MM-DD`, so a plain string comparison is chronological order too.
-  const older: Section[] = Array.from(buckets, ([k, v]) => ({ key: k, label: v.label, data: v.items }))
-  older.sort((a, b) => (a.key < b.key ? 1 : a.key > b.key ? -1 : 0))
-  return [...sorted, ...older.slice(0, 2)]
+  // Map insertion order is newest-day first already (input sorted desc).
+  return Array.from(buckets, ([key, v]) => ({ key, label: v.label, data: v.items }))
 }
 
 /** Last 7 days of spending indexed Mon..Sun, in `tz`. The rightmost bar is
@@ -200,6 +199,7 @@ export default function TodayScreen() {
     () => groupForToday(transactions, locale, nowInstant, tz),
     [transactions, locale, nowInstant, tz],
   )
+  const liveCount = useMemo(() => transactions.filter((x) => !x.is_deleted).length, [transactions])
   const weekly = useMemo(() => weeklySpendBars(transactions, nowInstant, tz), [transactions, nowInstant, tz])
   const todayDow = useMemo(() => localParts(nowInstant, tz).weekdayIndex, [nowInstant, tz])
   const daysLeft = useMemo(() => daysLeftInMonth(nowInstant, tz), [nowInstant, tz])
@@ -407,6 +407,18 @@ export default function TodayScreen() {
                 </View>
               </View>
             ))}
+            {/* Always: the bridge to the full ledger, with the real count —
+                the feed above is recent activity, never "everything". */}
+            <Pressable
+              onPress={() => router.push('/more/transactions')}
+              style={({ pressed }) => [styles.seeAllRow, pressed && styles.seeAllRowPressed]}
+              accessibilityRole="button"
+            >
+              <Text style={styles.seeAllText}>
+                {t('home.see_all_transactions', locale).replace('{count}', String(liveCount))}
+              </Text>
+              <Ionicons name="chevron-forward" size={15} color={Colors.ink3} />
+            </Pressable>
           </View>
         )}
       </ScrollView>
@@ -418,6 +430,26 @@ const styles = StyleSheet.create({
   safe: {
     flex: 1,
     backgroundColor: Colors.background,
+  },
+  seeAllRow: {
+    marginTop: 6,
+    marginHorizontal: 4,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 16,
+    backgroundColor: Colors.surface,
+    borderWidth: Hairline.width,
+    borderColor: Hairline.color,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  seeAllRowPressed: { opacity: 0.7 },
+  seeAllText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.ink2,
+    fontFamily: Typography.fontFamily.sansSemiBold,
   },
   // `paddingBottom` set per-instance above from `useTabBarClearance()`
   // (audit 01-F13, fix-plan 1.8/2.14).

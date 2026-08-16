@@ -82,6 +82,13 @@ truth: `docs/voice redesign/` (screenshot + Claude Design HTML, artboards
   now `app/shortcut.tsx` + `app/+not-found.tsx` routes, `useShortcutHandler`
   deleted, result sheet keyed per capture session. **Requires a new native
   build** — storyboard, icon and Android splash change at prebuild.
+- **Today feed rule (owner decision, Aug 16, 2026):** the home screen shows
+  the last 7 days of activity grouped by day (extended back only when those
+  days hold fewer than 8 transactions), then an always-present "See all N
+  transactions" row into the full ledger. Replaces the April 19 rule (Today
+  + Yesterday + two older days, cut with no hint) which hid the biggest day
+  of the owner's month. Home budget line now reads "over by" with the
+  budget's own period and countdown, never a clamped "$0 left this month".
 - **Ask Murmur rebuilt as a product (Aug 16, 2026)** — spec, architecture
   and verification in [docs/ask-murmur/](./ask-murmur/SPEC.md): on-device
   entry insights (upcoming bill / budget pace / category surge / subscriptions
