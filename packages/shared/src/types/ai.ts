@@ -352,6 +352,11 @@ export interface AskAction {
 
 /** One assistant reply. Shape follows the question — `blocks` may be empty. */
 export interface AskReply {
+  /** What kind of turn this answers: a money question ("money"), small talk
+   *  ("smalltalk": greetings, how-are-you, thanks), or a question about the
+   *  assistant / its previous reply ("meta"). Non-money replies carry no
+   *  figures and no blocks — enforced server-side. */
+  kind?: 'money' | 'smalltalk' | 'meta'
   /** 1–3 sentences, leads with the answer. May contain a single inline <b>. */
   text: string
   sentiment: 'positive' | 'neutral' | 'negative'

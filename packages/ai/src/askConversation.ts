@@ -97,10 +97,11 @@ ${JSON.stringify(input.seed_insight)}`
   return `You are Murmur — the in-app money assistant of a personal expense tracker. You already watch the user's money: you have their transactions (last 12 months), recurring rules, income and budget, and a set of deterministic tools that compute over them. You answer like a sharp, warm human advisor who has the numbers in front of them: direct, specific, in ${localeName}.
 
 THIS IS A CONVERSATION WITH A PERSON. Answer what they actually said, the way a sharp, warm human would:
-- Small talk gets a human answer, not a report. "Hey, how are you doing?" → "Doing well, thanks for asking! Ready when you are — what's on your mind?" (first person, one or two sentences, warm; a light offer of help is fine; NO figures unless they asked about their money). "Thanks" / "ok" → a short human acknowledgement that keeps the thread on its subject.
+- Every reply declares its \`kind\`: "money" (they asked about their money), "smalltalk" (greetings, how are you, thanks, chit-chat) or "meta" (about you, your previous reply, why you said something). A "smalltalk" or "meta" reply contains NO currency figures, NO percentages and NO blocks — the platform rejects it otherwise.
+- Small talk gets a human answer, not a report. "Hey, how are you doing?" → "Doing well, thanks for asking! Ready when you are — what's on your mind?" (first person, one or two sentences, warm; a light offer of help is fine). "Thanks" / "ok" → a short human acknowledgement that keeps the thread on its subject.
 - If they ask about you, your reply, or why you said something ("why are you telling me my income?", "you didn't answer my question", "why do you keep…"), answer THAT directly and honestly — acknowledge, explain in one sentence, adjust — and do not repeat the figures again.
 - Money questions get money answers with figures (see NUMBERS). Never mix the two: recite data only when data was asked for.
-- Prior turns are in this thread as real messages (the user's words, your answer, and COMPUTED — the exact figures your tools returned that turn). Read them. Short follow-ups refer to them: "what were those exactly?" → list the transactions behind the last figure (list_transactions with the same filters); "is it a good ratio out of how much I make?" → the last figure vs their income (arith percent_of); "and last month?" → same subject, window lastMonth; "what else can you help me with?" → 3–4 concrete things you can do from THEIR data, tied to the current focus. ${input.has_prior_turns ? 'The thread is already open: do NOT greet again, do NOT introduce yourself, do NOT restart.' : 'On the very first message, if it is only a greeting, greet back in one human sentence and offer 2–3 specific things you can look at for them (you may mention one real figure such as this_month_debit, lightly — it must not read as a report).'} Never repeat a previous answer word for word.
+- Prior turns are in this thread as real messages (the user's words, your answer, and COMPUTED — the exact figures your tools returned that turn). Read them. Short follow-ups refer to them: "what were those exactly?" → list the transactions behind the last figure (list_transactions with the same filters); "is it a good ratio out of how much I make?" → the last figure vs their income (arith percent_of); "and last month?" → same subject, window lastMonth; "what else can you help me with?" → 3–4 concrete things you can do from THEIR data, tied to the current focus. ${input.has_prior_turns ? 'The thread is already open: do NOT greet again, do NOT introduce yourself, do NOT restart.' : 'On the very first message, if it is only a greeting, greet back in one human sentence and offer 2–3 specific things you can look at for them — no figures.'} Never repeat a previous answer word for word.
 - The platform makes you call at least one tool on every turn. That first call is for you (e.g. a cheap \`total\` for this month) — you MUST NOT recite its result unless it answers what the user actually asked.
 
 NUMBERS — non-negotiable:
@@ -138,6 +139,7 @@ SCOPE. In: anything reasoned from the user's own data + universal personal-finan
 
 OUTPUT: strictly valid JSON, nothing else:
 {
+  "kind": "money" | "smalltalk" | "meta",
   "text": string,
   "sentiment": "positive" | "neutral" | "negative",
   "blocks": [ …as above… ],
@@ -318,18 +320,20 @@ export function validateFocus(raw: unknown): AskFocus | null {
 export function validateAskReply(raw: unknown, transactionCount: number): AskReply {
   const obj = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {}
   const out_of_scope = obj.out_of_scope === true
+  const kind: AskReply['kind'] = obj.kind === 'smalltalk' || obj.kind === 'meta' ? obj.kind : 'money'
   // Accept the legacy key too, in case the model echoes an old example.
   const verdictObj = obj.verdict && typeof obj.verdict === 'object' ? (obj.verdict as Record<string, unknown>) : null
   const text = (asStr(obj.text) || (verdictObj ? asStr(verdictObj.text) : '')).trim()
   const sentimentRaw = obj.sentiment ?? verdictObj?.sentiment
   const sentiment = sentimentRaw === 'positive' || sentimentRaw === 'negative' ? sentimentRaw : 'neutral'
-  const blocks = out_of_scope
+  const blocks = out_of_scope || kind !== 'money'
     ? []
     : (Array.isArray(obj.blocks) ? obj.blocks : []).map(validateBlock).filter((b): b is AskBlock => b !== null).slice(0, MAX_BLOCKS)
   const actions = out_of_scope
     ? []
     : (Array.isArray(obj.actions) ? obj.actions : []).map(validateAction).filter((a): a is AskAction => a !== null).slice(0, 3)
   return {
+    kind,
     text,
     sentiment,
     blocks,
@@ -347,6 +351,8 @@ export interface AskGrounding {
   untraced: string[]
   /** "more A than B" that contradicts a `compare` result. */
   direction_violation: string | null
+  /** A small-talk / meta reply that recites figures anyway. */
+  recital: string | null
 }
 
 function addTrusted(set: Set<number>, v: number) {
@@ -401,8 +407,15 @@ export function trustedFigures(input: {
 }
 
 export function groundAskReply(reply: AskReply, trusted: Set<number>, calls: ToolCallRecord[]): AskGrounding {
-  if (reply.out_of_scope) return { untraced: [], direction_violation: null }
+  if (reply.out_of_scope) return { untraced: [], direction_violation: null, recital: null }
   const untraced: string[] = []
+  // A small-talk or meta reply must not carry figures at all — the number
+  // is not "wrong", it is unasked for (owner screenshots Aug 16: "how are
+  // you doing?" answered with spending totals four times).
+  const recital =
+    reply.kind && reply.kind !== 'money' && (extractCurrencyValues(stripHtml(reply.text)).length > 0 || extractPercentValues(stripHtml(reply.text)).length > 0)
+      ? `you marked this reply "${reply.kind}" but it recites figures — the user did not ask about their money; answer as a person, with no amounts`
+      : null
   const check = (label: string, text: string) => {
     if (!text) return
     const cleaned = stripHtml(text)
@@ -436,7 +449,7 @@ export function groundAskReply(reply: AskReply, trusted: Set<number>, calls: Too
     }
   })
   const direction_violation = checkComparisonDirection(reply.text, comparisonsFromCalls(calls))
-  return { untraced, direction_violation }
+  return { untraced, direction_violation, recital }
 }
 
 // ─── Focus + computed records ───────────────────────────────────────────────

@@ -375,6 +375,7 @@ function issuesFor(
     issues.push(`ungrounded figures (${grounding.untraced.slice(0, 4).join('; ')}) — these numbers match no tool result; compute them with the tools (arith for ratios/differences) or drop them`)
   }
   if (grounding.direction_violation) issues.push(`comparison direction: ${grounding.direction_violation}`)
+  if (grounding.recital) issues.push(`unasked figures: ${grounding.recital}`)
   return issues
 }
 

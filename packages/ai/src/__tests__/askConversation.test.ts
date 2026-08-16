@@ -90,6 +90,18 @@ describe('grounding', () => {
     expect(g.untraced).toEqual(['text: 777', 'blocks[0].rows[0](a): 91'])
   })
 
+  it('rejects a small-talk / meta reply that recites figures, accepts a clean one', () => {
+    const calls = [call('total', { window: 'thisMonth', direction: 'debit' })]
+    const trusted = trustedFigures({ calls, priorTurns: [], focus: null, overview, budget: null, monthlyIncome: null, message: 'how are you doing?', seedInsight: null })
+    const recital = validateAskReply({ kind: 'smalltalk', text: "Doing well! You've spent $500 this month.", blocks: [{ type: 'figure', label: 'x', value: '$500' }] }, 4)
+    expect(recital.blocks).toEqual([]) // non-money replies never carry blocks
+    expect(groundAskReply(recital, trusted, calls).recital).toBeTruthy()
+    const clean = validateAskReply({ kind: 'smalltalk', text: 'Doing well, thanks for asking! What can I look at for you?' }, 4)
+    expect(groundAskReply(clean, trusted, calls).recital).toBeNull()
+    const money = validateAskReply({ kind: 'money', text: "You've spent $500 this month." }, 4)
+    expect(groundAskReply(money, trusted, calls).recital).toBeNull()
+  })
+
   it('flags a comparison whose direction contradicts compare', () => {
     const calls = [call('compare', { a: { label: 'Food', value: 50 }, b: { label: 'Investing', value: 450 } })]
     const trusted = trustedFigures({ calls, priorTurns: [], focus: null, overview, budget: null, monthlyIncome: null, message: '', seedInsight: null })
