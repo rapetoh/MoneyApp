@@ -67,3 +67,15 @@ Transcript highlights, read by a human:
 - Latency: three turns took 24–60 s — 429 backoff on the 30k TPM org tier, not logic. Owner to raise.
 - Error paths 401/400/404/402/no-data all correct; 8 messages persisted per 4-turn thread, focus and
   computed on the stored replies.
+
+**Aug 16 2026, ~15:30 UTC — owner review round 2 (desktop screenshots).** "hello how are you doing"
+was answered with spending figures four turns in a row — the model recited the mandatory first tool
+call's result. Fix is structural: every reply declares `kind` (money / smalltalk / meta); a non-money
+reply that carries any currency/percent figure is rejected by the validator and retried; non-money
+replies never carry blocks. Live check `node apps/web/scripts/ask-murmur-smalltalk.mjs` against
+production after commit 2652e36: "hello how are you doing" → "Doing well, thanks for asking! Ready when
+you are — what's on your mind?"; the meta question is answered directly; the next money question gets
+"$1,270" — `CHECKS: all passed`. Also verified against the owner's own data (Gadget Maison): August
+spending $1,329 = the Ask figure; the home line "$0 left this month" was a $700 **weekly** budget $237
+over, clamped to 0 and captioned "this month" — fixed on the home screen (build 22); the Recurring
+screen's dates/totals are correct, its calendar footer had counted two paychecks as "charges" — fixed.
