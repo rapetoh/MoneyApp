@@ -53,3 +53,5 @@ export * from './plus'
 
 // Ask Murmur conversation persistence (web thread + mobile result card)
 export * from './askStorage'
+// Ask Murmur entry insights — deterministic, runs on the client (docs/ask-murmur/SPEC.md §3.3).
+export * from './domain/askInsights'

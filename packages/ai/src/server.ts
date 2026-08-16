@@ -27,3 +27,17 @@ export type {
   ToolCallRecord,
   AskMurmurDataOverview,
 } from './askMurmurTools'
+
+// ─── Ask Murmur v2 conversation engine (docs/ask-murmur/SPEC.md) ───────────
+export {
+  buildAskSystemPrompt,
+  buildContextMessages,
+  validateAskReply,
+  validateFocus,
+  trustedFigures,
+  groundAskReply,
+  mergeFocus,
+  compactComputed,
+  MAX_CONTEXT_TURNS,
+} from './askConversation'
+export type { AskPriorTurn, AskPromptInput, AskGrounding } from './askConversation'

@@ -337,7 +337,10 @@ describe('TOOLS catalog', () => {
   it('exposes exactly the closed toolset — no run_query, no code execution', () => {
     const names = TOOLS.map((t) => t.function.name).sort()
     expect(names).toEqual([
+      'arith',
+      'can_afford',
       'compare',
+      'list_transactions',
       'recurring_total',
       'series',
       'sum_by_category',
@@ -345,6 +348,79 @@ describe('TOOLS catalog', () => {
       'total',
     ])
     expect(names).not.toContain('run_query')
+  })
+})
+
+describe('tool: list_transactions (rebuild — "what were those exactly?")', () => {
+  it('returns the rows behind a filtered figure, newest first, with count + total', () => {
+    const r = resolveToolCall('list_transactions', { window: 'thisYear', direction: 'debit', limit: 3 }, ctx)
+    expect(r.ok).toBe(true)
+    const res = (r as { ok: true; result: { transactions: Array<{ date: string; amount: number }>; count: number; total: number; truncated: boolean } }).result
+    expect(res.transactions).toHaveLength(3)
+    expect(res.count).toBeGreaterThan(3)
+    expect(res.truncated).toBe(true)
+    for (let i = 1; i < res.transactions.length; i++) {
+      expect(res.transactions[i - 1].date >= res.transactions[i].date).toBe(true)
+    }
+    expect(res.total).toBeGreaterThan(0)
+  })
+  it('min_amount filters and an unknown argument is rejected', () => {
+    const r = resolveToolCall('list_transactions', { window: 'thisYear', min_amount: 10000 }, ctx)
+    expect(r.ok).toBe(true)
+    expect((r as { ok: true; result: { count: number } }).result.count).toBe(1)
+    const bad = resolveToolCall('list_transactions', { window: 'thisYear', merchant: 'x' }, ctx)
+    expect(bad.ok).toBe(false)
+  })
+})
+
+describe('tool: arith (rebuild — ratios without model arithmetic)', () => {
+  it('percent_of, divide, subtract are exact and rounded to 2 dp', () => {
+    expect((resolveToolCall('arith', { op: 'percent_of', a: 450, b: 5416.67 }, ctx) as { result: { result: number } }).result.result).toBe(8.31)
+    expect((resolveToolCall('arith', { op: 'divide', a: 763, b: 16 }, ctx) as { result: { result: number } }).result.result).toBe(47.69)
+    expect((resolveToolCall('arith', { op: 'subtract', a: 1331, b: 881 }, ctx) as { result: { result: number } }).result.result).toBe(450)
+  })
+  it('rejects a bad op and division by zero with self-correcting errors', () => {
+    expect(resolveToolCall('arith', { op: 'pow', a: 1, b: 2 }, ctx).ok).toBe(false)
+    expect(resolveToolCall('arith', { op: 'divide', a: 1, b: 0 }, ctx).ok).toBe(false)
+  })
+})
+
+describe('tool: can_afford (rebuild — the yes/no is deterministic)', () => {
+  it('fits when available ≥ cost, else reports the shortfall', () => {
+    const yes = resolveToolCall('can_afford', { available: 1584, cost: 1200 }, ctx) as { result: { fits: boolean; left_after: number; verdict: string } }
+    expect(yes.result.fits).toBe(true)
+    expect(yes.result.left_after).toBe(384)
+    expect(yes.result.verdict).toBe('fits')
+    const no = resolveToolCall('can_afford', { available: 300, cost: 499 }, ctx) as { result: { fits: boolean; shortfall: number } }
+    expect(no.result.fits).toBe(false)
+    expect(no.result.shortfall).toBe(199)
+  })
+})
+
+describe('data overview vocabulary (rebuild)', () => {
+  it('lists the real category names with totals and frequent merchants', () => {
+    const o = buildDataOverview(ctx)
+    expect(o.categories.length).toBeGreaterThan(0)
+    expect(o.categories[0]).toHaveProperty('name')
+    expect(o.categories[0]).toHaveProperty('total')
+    expect(o.merchants.length).toBeGreaterThan(0)
+  })
+})
+
+describe('tool: recurring_total — upcoming occurrences (rebuild)', () => {
+  it('names the next occurrence within 30 days when rules carry recurrence fields', () => {
+    const withRules = {
+      ...ctx,
+      recurring_rules: [
+        { name: 'Netflix', amount: 14, direction: 'debit' as const, frequency: 'monthly', interval: 1, starts_at: '2026-01-22T12:00:00Z', ends_at: null },
+        { name: 'Gym', amount: 30, direction: 'debit' as const, frequency: 'monthly', interval: 1, starts_at: '2026-01-05T12:00:00Z', ends_at: null },
+        { name: 'Legacy', amount: 9, direction: 'debit' as const, frequency: 'monthly' },
+      ],
+    }
+    const r = resolveToolCall('recurring_total', {}, withRules) as { ok: true; result: { upcoming: Array<{ name: string; due_date: string }> } }
+    expect(r.ok).toBe(true)
+    // ctx now = 2026-05-03 Chicago → Gym May 5, Netflix May 22; the legacy rule has no dates.
+    expect(r.result.upcoming.map((u) => `${u.name} ${u.due_date}`)).toEqual(['Gym 2026-05-05', 'Netflix 2026-05-22'])
   })
 })
 

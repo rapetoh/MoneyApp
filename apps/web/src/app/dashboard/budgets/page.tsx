@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useMemo } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { createClient } from '../../../lib/supabase/client'
 import { colors, font, radius } from '../../../lib/theme'
 import { Toolbar } from '../../../components/Toolbar'
@@ -53,8 +54,11 @@ export default function BudgetsPage() {
     null,
   )
   const [loading, setLoading] = useState(true)
-  const [showForm, setShowForm] = useState(false)
-  const [amount, setAmount] = useState('')
+  // `?edit=1[&amount=][&category=]` — Ask Murmur's "Set/Adjust budget"
+  // action lands with the form open and prefilled (docs/ask-murmur/SPEC.md §1.4).
+  const searchParams = useSearchParams()
+  const [showForm, setShowForm] = useState(searchParams.get('edit') === '1')
+  const [amount, setAmount] = useState(searchParams.get('amount') ?? '')
   const [period, setPeriod] = useState<BudgetPeriod>('monthly')
   const [categoryId, setCategoryId] = useState<string>('')
   const [saving, setSaving] = useState(false)

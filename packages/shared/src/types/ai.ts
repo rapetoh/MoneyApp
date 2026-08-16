@@ -267,3 +267,148 @@ export interface AskMurmurResponse {
    *  are typically empty and the verdict explains the refusal politely. */
   out_of_scope: boolean
 }
+
+// ─── Ask Murmur v2 — conversation contract (rebuild, Aug 16 2026) ─────────
+//
+// Spec: docs/ask-murmur/SPEC.md. The assistant is a stateful conversation
+// engine served by POST /api/ai/ask-murmur/turn. The legacy one-shot shape
+// above (`AskMurmurRequest` / `AskMurmurResponse`) is kept only for the
+// deprecated /api/ai/ask-murmur route (TestFlight build 17) and for
+// rendering assistant messages persisted before the rebuild — see
+// `legacyResponseToReply` in packages/shared/src/askStorage.ts.
+
+/** Recurring rule on the wire — the reasoner's `recurring_total` tool and
+ *  the client-side insight engine both read it. The recurrence fields are
+ *  optional so an older client that sends only name/amount/direction/
+ *  frequency still works; when present the server can name the next
+ *  occurrence ("Netflix $14 due Aug 22"). */
+export interface AskMurmurRecurringRuleV2 extends AskMurmurRecurringRule {
+  id?: string
+  category_name?: string | null
+  interval?: number
+  starts_at?: string
+  ends_at?: string | null
+  anchor_day?: number | null
+  anchor_weekday?: number | null
+  anchor_time?: string | null
+}
+
+/** What the conversation is currently about. The focus of a thread IS the
+ *  focus of its last assistant reply (persisted with the message); it is
+ *  injected into every turn's system prompt and updated from the model's
+ *  own `focus` output each turn. */
+export interface AskFocus {
+  /** "coffee", "Savings & Investing", "budget", "subscriptions", null when unset. */
+  subject: string | null
+  /** The period the last answer covered — a tool window name, with civil
+   *  dates for "custom". */
+  window: { name: string; start_date?: string; end_date?: string } | null
+  /** Merchants / categories / items named so far in the thread (≤ 12). */
+  entities: string[]
+  /** Key figures of the last answer (≤ 8) — quotable next turn. */
+  figures: Array<{ label: string; value: number }>
+}
+
+/** Compact record of one tool call the assistant made in a turn — persisted
+ *  inside the stored reply (`AskReply.computed`) so later turns can see what
+ *  was computed. */
+export interface AskComputedRecord {
+  tool: string
+  args: Record<string, unknown>
+  /** Tool result, truncated server-side to keep a turn ≤ ~1.2 KB. */
+  result: unknown
+}
+
+export type AskBlock =
+  /** One hero number: "$312.40" with a label ("Coffee · this month"). */
+  | { type: 'figure'; label: string; value: string; sub?: string }
+  /** Label/value rows — a breakdown, a comparison, an affordability ledger. */
+  | { type: 'rows'; caption: string; rows: AskMurmurStatRow[] }
+  /** Individual transactions ("what were those exactly?"). */
+  | {
+      type: 'transactions'
+      caption: string
+      rows: Array<{ date: string; merchant: string; amount: string; category?: string }>
+    }
+  /** A chart — categories share, ranked merchants, a trend. */
+  | { type: 'chart'; chart: AskMurmurChart }
+  /** An ordered plan. */
+  | { type: 'steps'; caption: string; steps: string[] }
+
+export type AskActionIntent =
+  | 'show_transactions'
+  | 'set_budget'
+  | 'open_recurring'
+  | 'log_expense'
+  | 'create_rule'
+
+export interface AskAction {
+  label: string
+  intent: AskActionIntent
+  /** show_transactions: query? category_name? merchant? month? (YYYY-MM)
+   *  set_budget: category_name? amount?  open_recurring: name?  */
+  params?: Record<string, string>
+}
+
+/** One assistant reply. Shape follows the question — `blocks` may be empty. */
+export interface AskReply {
+  /** 1–3 sentences, leads with the answer. May contain a single inline <b>. */
+  text: string
+  sentiment: 'positive' | 'neutral' | 'negative'
+  blocks: AskBlock[]
+  actions: AskAction[]
+  focus: AskFocus | null
+  out_of_scope: boolean
+  /** Number of transactions the reasoner could see (for the attribution line). */
+  transaction_count: number
+  /** Server-only, present on persisted rows: the compact tool records of
+   *  the turn (what the next turn's context needs). Stripped from the
+   *  turn response; clients ignore it. */
+  computed?: AskComputedRecord[]
+}
+
+/** A proactive finding computed on the client before the user types.
+ *  `title`/`detail`/`question`/`action.label` are already localized. */
+export type AskInsightKind =
+  | 'upcoming_bill'
+  | 'budget_pace'
+  | 'category_surge'
+  | 'subscriptions'
+  | 'month_delta'
+  | 'net_flow'
+  | 'large_transaction'
+  | 'no_data'
+
+export interface AskInsight {
+  id: string
+  kind: AskInsightKind
+  score: number
+  tone: 'alert' | 'watch' | 'good' | 'neutral'
+  title: string
+  detail: string
+  /** The question sent as the first user turn when the card is tapped. */
+  question: string
+  action: AskAction | null
+}
+
+export interface AskTurnRequest {
+  /** Omit / null to start a new conversation. */
+  conversation_id?: string | null
+  message: string
+  /** Set when the message was produced by tapping an insight card. */
+  seed_insight?: { kind: AskInsightKind; title: string; detail: string } | null
+  locale: Locale
+  currency: string
+  now_utc: string
+  time_zone: string
+  monthly_income: number | null
+  transactions: AskMurmurTransaction[]
+  recurring_rules: AskMurmurRecurringRuleV2[]
+  budget?: AskMurmurBudget | null
+}
+
+export interface AskTurnResponse {
+  conversation_id: string
+  user_message_id: string | null
+  message: { id: string | null; reply: AskReply; created_at: string }
+}

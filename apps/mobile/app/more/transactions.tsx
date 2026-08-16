@@ -72,11 +72,14 @@ export default function TransactionsScreen() {
   const { transactions, loading, error } = useTransactions(user?.id)
   const { categories, categoryMap } = useCategories(user?.id)
   const { profile } = useProfile(user?.id)
-  const [search, setSearch] = useState('')
+  const router = useRouter()
+  // `?month=YYYY-MM` from the History calendar; `?q=` from Ask Murmur's
+  // "See transactions" action (docs/ask-murmur/SPEC.md §1.4) — seeds the
+  // same search box the user could type into.
+  const params = useLocalSearchParams<{ month?: string; q?: string }>()
+  const [search, setSearch] = useState(typeof params.q === 'string' ? params.q : '')
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null)
   const [view, setView] = useState<'expenses' | 'income'>('expenses')
-  const router = useRouter()
-  const params = useLocalSearchParams<{ month?: string }>()
 
   const locale = (profile?.locale ?? 'en') as Locale
   const currency = profile?.currency_code ?? 'USD'

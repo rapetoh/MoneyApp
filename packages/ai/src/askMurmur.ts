@@ -268,6 +268,12 @@ function validateAction(raw: unknown): AskMurmurAction | null {
   return action
 }
 
+/** Shape-validates a chart object (2–10 non-negative points, valid type).
+ *  Shared with the v2 conversation engine (askConversation.ts). */
+export function validateChartShape(raw: unknown): AskMurmurChart | undefined {
+  return validateChart(raw)
+}
+
 function validateChart(raw: unknown): AskMurmurChart | undefined {
   if (!raw || typeof raw !== 'object') return undefined
   const r = raw as Record<string, unknown>
@@ -397,7 +403,7 @@ export interface AskMurmurValidation {
 const HTML_TAG_RE = /<\/?[a-z][^>]*>/gi
 const NEAR_NUMBER_WINDOW = 80
 
-function stripHtml(s: string): string {
+export function stripHtml(s: string): string {
   return s.replace(HTML_TAG_RE, ' ')
 }
 
@@ -435,7 +441,7 @@ function parseLocaleNumber(raw: string): number {
  *  with optional currency marker, decimal, or grouping. Bare integers ≤ 4
  *  digits without any of those markers are skipped (year, count of days,
  *  etc.) so "90 days" doesn't get treated as $90. */
-function extractCurrencyValues(text: string): number[] {
+export function extractCurrencyValues(text: string): number[] {
   const out: number[] = []
   const re = /(?:[$€£¥₦]|\b(?:USD|EUR|GBP|JPY|CAD|XAF|NGN|GHS|CHF|AUD)\b)?\s*(-?\d{1,3}(?:[,.\s]\d{3})*(?:[.,]\d{1,2})?|-?\d+(?:[.,]\d{1,2})?)/gi
   let m: RegExpExecArray | null
@@ -455,7 +461,7 @@ function extractCurrencyValues(text: string): number[] {
   return out
 }
 
-function extractPercentValues(text: string): number[] {
+export function extractPercentValues(text: string): number[] {
   const out: number[] = []
   const re = /(-?\d{1,3}(?:[.,]\d{1,2})?)\s*(?:%|percent\b|per cent\b)/gi
   let m: RegExpExecArray | null
@@ -466,7 +472,7 @@ function extractPercentValues(text: string): number[] {
   return out
 }
 
-function isTrustedCurrency(value: number, trusted: Set<number>): boolean {
+export function isTrustedCurrency(value: number, trusted: Set<number>): boolean {
   const r = Math.round(value * 100) / 100
   if (trusted.has(r)) return true
   if (trusted.has(Math.round(value))) return true
@@ -480,7 +486,7 @@ function isTrustedCurrency(value: number, trusted: Set<number>): boolean {
   return false
 }
 
-function isTrustedPercent(value: number, trusted: Set<number>): boolean {
+export function isTrustedPercent(value: number, trusted: Set<number>): boolean {
   for (const t of trusted) {
     if (Math.abs(t - value) <= 1) return true
   }
@@ -490,7 +496,7 @@ function isTrustedPercent(value: number, trusted: Set<number>): boolean {
 /** Sniff for "X more/less than Y" patterns in the verdict and assert the
  *  direction agrees with a `compare` tool result whose labels appear nearby.
  *  This is the structural fix for the bug that started this whole rebuild. */
-function checkComparisonDirection(
+export function checkComparisonDirection(
   verdict: string,
   comparisons: ReturnType<typeof comparisonsFromCalls>,
 ): string | null {

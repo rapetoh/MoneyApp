@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useMemo, useState, useEffect } from 'react'
 import {
   View,
   Text,
@@ -9,7 +9,7 @@ import {
   ActivityIndicator,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Stack, useRouter, useFocusEffect } from 'expo-router'
+import { Stack, useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '../src/hooks/useAuth'
 import { useProfile } from '../src/hooks/useProfile'
@@ -98,6 +98,11 @@ export default function RecurringScreen() {
     setEditingRule(null)
     setEditorVisible(true)
   }
+  // `?new=1` — Ask Murmur's "Add a recurring rule" action (SPEC §1.4).
+  const params = useLocalSearchParams<{ new?: string }>()
+  useEffect(() => {
+    if (params.new === '1') openCreate()
+  }, [params.new])
 
   function openEdit(rule: RecurringRule) {
     setEditorMode('edit')

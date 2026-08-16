@@ -78,7 +78,22 @@ truth: `docs/voice redesign/` (screenshot + Claude Design HTML, artboards
   `router.replace`. New `Motion` tokens (`src/theme/motion.ts`). **Requires
   a new native build** — storyboard, icon and Android splash change at
   prebuild.
-- **NEXT (owner directive, Aug 16): Ask Murmur is to be rebuilt as a
+- **Ask Murmur rebuilt as a product (Aug 16, 2026)** — spec, architecture
+  and verification in [docs/ask-murmur/](./ask-murmur/SPEC.md): on-device
+  entry insights (upcoming bill / budget pace / category surge / subscriptions
+  / month delta / net flow / large transaction), a server-owned stateful
+  conversation (`POST /api/ai/ask-murmur/turn`, real prior messages + focus +
+  computed figures, first model round must call a tool, `list_transactions`
+  / `arith` / `can_afford` tools, category vocabulary in the overview),
+  answer shape by question (figure / rows / transactions / chart / steps),
+  real actions only (show transactions / set budget / open recurring / log /
+  create rule), persisted + resumable threads with History on mobile and web,
+  breathing Murmur mark while thinking, server-side Plus gate + rate limit.
+  Legacy one-shot route kept only for TestFlight build 17. Harness rewritten
+  around the owner's transcripts as threads — local runs and prod result in
+  [VERIFICATION.md](./ask-murmur/VERIFICATION.md). Open: OpenAI org tier is
+  30k TPM (two quick turns can hit "busy") — raise before launch.
+- **(superseded by the entry above) NEXT (owner directive, Aug 16): Ask Murmur is to be rebuilt as a
   product, not patched further.** The Aug 15–16 work fixed reasoning and
   grounding defects one by one; the owner's screenshots show the real
   problem is architectural — a one-shot Q→A engine wearing a chat UI, no

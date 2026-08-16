@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useMemo } from 'react'
+import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '../../../lib/supabase/client'
 import { colors, font, radius } from '../../../lib/theme'
@@ -345,6 +346,11 @@ export default function RecurringPage() {
     setEditingRule(null)
     setModalOpen(true)
   }
+  // `?new=1` — Ask Murmur's "Add a recurring rule" action (SPEC §1.4).
+  const searchParams = useSearchParams()
+  useEffect(() => {
+    if (searchParams.get('new') === '1') openCreateModal()
+  }, [searchParams])
 
   function openEditModal(rule: RecurringRule) {
     setModalMode('edit')

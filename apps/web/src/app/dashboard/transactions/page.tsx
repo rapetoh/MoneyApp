@@ -255,6 +255,11 @@ export default function TransactionsPage() {
     setShowForm(true)
   }
 
+  // `?new=1` — Ask Murmur's "Log an expense" action (docs/ask-murmur/SPEC.md §1.4).
+  useEffect(() => {
+    if (searchParams.get('new') === '1') openNewForm()
+  }, [searchParams])
+
   function closeForm() {
     setShowForm(false)
     setEditingId(null)

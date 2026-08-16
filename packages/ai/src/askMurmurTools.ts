@@ -21,13 +21,22 @@
 // `eval`, `Function`, or any VM API — there is no interpreter here to
 // escape.
 //
-// Six tools:
-//   total            — sum over a window, optionally filtered by
+// Nine tools (docs/ask-murmur/SPEC.md §3.1):
+//   total             — sum over a window, optionally filtered by
 //                       direction / category / merchant substring.
 //   sum_by_category   — per-category totals over a window, sorted.
 //   top_merchants     — ranked merchant totals over a window.
 //   series            — a time series bucketed by day/week/month/weekday.
-//   recurring_total   — normalized monthly/annual recurring commitment.
+//   list_transactions — the individual rows behind a figure ("what were
+//                       those exactly?"), newest first, capped.
+//   recurring_total   — normalized monthly/annual recurring commitment,
+//                       what is still due this month, and the next
+//                       occurrences (when rules carry recurrence fields).
+//   arith             — one arithmetic step (ratio, difference, share)
+//                       over figures already computed — the model never
+//                       does the math itself.
+//   can_afford        — the yes/no of "can I afford X" (fits / left /
+//                       shortfall) — the model never decides it itself.
 //   compare           — structural comparison of two values the model
 //                        computed via the tools above. Forces the
 //                        verdict's "more A than B" direction to be
@@ -44,6 +53,7 @@
 
 import type {
   AskMurmurRecurringRule,
+  AskMurmurRecurringRuleV2,
   AskMurmurTransaction,
   RecurringFrequency,
 } from '@voice-expense/shared'
@@ -51,6 +61,7 @@ import {
   addDays,
   addMonthsClamped,
   civilDateTimeToInstant,
+  firstOccurrenceOnOrAfter,
   isSpend,
   localDay,
   localParts,
@@ -213,7 +224,10 @@ const TOOL_ARG_NAMES: Record<string, Set<string>> = {
   sum_by_category: new Set(['window', 'start_date', 'end_date', 'direction', 'merchant_contains']),
   top_merchants: new Set(['window', 'start_date', 'end_date', 'direction', 'category_name', 'merchant_contains', 'limit']),
   series: new Set(['window', 'start_date', 'end_date', 'bucket', 'direction', 'category_name', 'merchant_contains']),
+  list_transactions: new Set(['window', 'start_date', 'end_date', 'direction', 'category_name', 'merchant_contains', 'min_amount', 'limit']),
   recurring_total: new Set(['direction']),
+  arith: new Set(['op', 'a', 'b']),
+  can_afford: new Set(['available', 'cost']),
   compare: new Set(['a', 'b']),
 }
 
@@ -599,6 +613,106 @@ function seriesTool(args: SeriesArgs, ctx: ToolContext, windows: Record<WindowNa
   return { points, pending_conversion_count: pendingCount }
 }
 
+// ─── list_transactions ──────────────────────────────────────────────────
+//
+// The rows behind a figure. "I invested $450 this week" → "what were those
+// exactly?" needs the individual transactions, which no aggregation tool
+// can give. Newest first, capped, dates as civil days in the user's zone.
+
+interface ListTransactionsArgs extends RowFilter {
+  min_amount?: number
+  limit: number
+}
+
+function parseListTransactionsArgs(args: Record<string, unknown>): ListTransactionsArgs {
+  const minRaw = args.min_amount
+  const min_amount = minRaw == null ? undefined : Number(minRaw)
+  if (min_amount !== undefined && !Number.isFinite(min_amount)) {
+    throw new Error(`"min_amount" must be a number; got ${JSON.stringify(minRaw)}`)
+  }
+  return {
+    window: parseWindowName(args.window),
+    start_date: parseCivilDate(args.start_date, 'start_date'),
+    end_date: parseCivilDate(args.end_date, 'end_date'),
+    direction: parseDirection(args.direction),
+    category_name: parseOptionalString(args.category_name),
+    merchant_contains: parseOptionalString(args.merchant_contains),
+    min_amount,
+    limit: parseLimit(args.limit, 12, 25),
+  }
+}
+
+function listTransactionsTool(
+  args: ListTransactionsArgs,
+  ctx: ToolContext,
+  windows: Record<WindowName, DateWindow>,
+): unknown {
+  const tz = resolveTz(ctx.tz)
+  const { rows, pendingCount } = filterRows(ctx, windows, args)
+  const matched = (args.min_amount !== undefined ? rows.filter((t) => amountOf(t) >= (args.min_amount as number)) : rows)
+    .slice()
+    .sort((a, b) => (a.transacted_at < b.transacted_at ? 1 : a.transacted_at > b.transacted_at ? -1 : 0))
+  const total = roundCents(matched.reduce((acc, t) => acc + amountOf(t), 0))
+  return {
+    transactions: matched.slice(0, args.limit).map((t) => ({
+      date: localDay(t.transacted_at, tz),
+      merchant: t.merchant?.trim() || 'Unknown',
+      amount: roundCents(amountOf(t)),
+      direction: t.direction,
+      category: t.category_name ?? null,
+      recurring: !!t.is_recurring,
+    })),
+    count: matched.length,
+    total,
+    truncated: matched.length > args.limit,
+    pending_conversion_count: pendingCount,
+  }
+}
+
+// ─── arith ──────────────────────────────────────────────────────────────
+//
+// One arithmetic step over figures the model already has (tool results,
+// the overview, the budget block, the user's own numbers). "Is $450 a good
+// ratio of what I make?" needs 450 ÷ 5416.67 — the model is not allowed to
+// compute that in its head, so it asks; the validator then finds the
+// result in the trusted set like any other tool figure.
+
+const ARITH_OPS = ['add', 'subtract', 'multiply', 'divide', 'percent_of'] as const
+type ArithOp = (typeof ARITH_OPS)[number]
+
+function arithTool(args: Record<string, unknown>): unknown {
+  const op = args.op
+  if (typeof op !== 'string' || !(ARITH_OPS as readonly string[]).includes(op)) {
+    throw new Error(`"op" must be one of ${ARITH_OPS.join(', ')}; got ${JSON.stringify(op)}`)
+  }
+  const a = Number(args.a)
+  const b = Number(args.b)
+  if (!Number.isFinite(a) || !Number.isFinite(b)) {
+    throw new Error('arith: "a" and "b" must both be numbers')
+  }
+  let result: number
+  switch (op as ArithOp) {
+    case 'add':
+      result = a + b
+      break
+    case 'subtract':
+      result = a - b
+      break
+    case 'multiply':
+      result = a * b
+      break
+    case 'divide':
+      if (b === 0) throw new Error('arith: cannot divide by zero')
+      result = a / b
+      break
+    case 'percent_of':
+      if (b === 0) throw new Error('arith: cannot take a percent of zero')
+      result = (a / b) * 100
+      break
+  }
+  return { op, a: round2(a), b: round2(b), result: round2(result) }
+}
+
 // ─── recurring_total ────────────────────────────────────────────────────
 
 const VALID_FREQUENCIES: ReadonlySet<string> = new Set([
@@ -656,6 +770,37 @@ function recurringTotalTool(args: RecurringTotalArgs, ctx: ToolContext): unknown
   const monthly_total = roundCents(normalized.reduce((acc, r) => acc + r.monthly_amount, 0))
   const still_due_this_month = normalized.filter((r) => !r.charged_this_month)
   const still_due_this_month_total = roundCents(still_due_this_month.reduce((acc, r) => acc + r.monthly_amount, 0))
+
+  // Next occurrence per rule within 30 days — only for rules that carry
+  // their recurrence fields (the rebuilt clients send them; an older client
+  // gets an empty list, never a guess). "Netflix $14 due Aug 22".
+  const horizonMs = Date.parse(ctx.now_utc) + 30 * 864e5
+  const upcoming: Array<{ name: string; amount: number; due_date: string }> = []
+  for (const r of rules) {
+    const v2 = r as AskMurmurRecurringRuleV2
+    if (!v2.starts_at) continue
+    try {
+      const occ = firstOccurrenceOnOrAfter(
+        {
+          frequency: v2.frequency as RecurringFrequency,
+          interval: v2.interval ?? 1,
+          starts_at: v2.starts_at,
+          ends_at: v2.ends_at ?? null,
+          anchor_day: v2.anchor_day ?? null,
+          anchor_weekday: v2.anchor_weekday ?? null,
+          anchor_time: v2.anchor_time ?? null,
+        },
+        ctx.now_utc,
+        tz,
+      )
+      if (!occ || Date.parse(occ.instant) > horizonMs) continue
+      upcoming.push({ name: r.name?.trim() || 'Unnamed', amount: roundCents(r.amount), due_date: occ.occurrenceDate })
+    } catch {
+      /* malformed rule — skip */
+    }
+  }
+  upcoming.sort((a, b) => (a.due_date < b.due_date ? -1 : a.due_date > b.due_date ? 1 : 0))
+
   return {
     rules: normalized,
     monthly_total,
@@ -664,6 +809,33 @@ function recurringTotalTool(args: RecurringTotalArgs, ctx: ToolContext): unknown
     // bills": only these are not yet in this month's spending total.
     still_due_this_month: still_due_this_month.map((r) => ({ name: r.name, monthly_amount: r.monthly_amount })),
     still_due_this_month_total,
+    // Next 30 days, soonest first (civil dates in the user's zone).
+    upcoming,
+  }
+}
+
+// ─── can_afford ─────────────────────────────────────────────────────────
+//
+// The yes/no of an affordability question, decided deterministically.
+// Aug 16 trace: with $1,584 left the model wrote "you wouldn't be able to
+// afford a $1,200 laptop … leaving you $384" — right numbers, wrong verdict.
+// The model passes what is available and what the item costs; the tool
+// says whether it fits and what is left (or short).
+
+function canAffordTool(args: Record<string, unknown>): unknown {
+  const available = Number(args.available)
+  const cost = Number(args.cost)
+  if (!Number.isFinite(available) || !Number.isFinite(cost)) {
+    throw new Error('can_afford: "available" and "cost" must both be numbers')
+  }
+  const left = round2(available - cost)
+  return {
+    available: round2(available),
+    cost: round2(cost),
+    fits: left >= 0,
+    left_after: left >= 0 ? left : 0,
+    shortfall: left < 0 ? round2(-left) : 0,
+    verdict: left >= 0 ? 'fits' : 'does_not_fit',
   }
 }
 
@@ -703,10 +875,10 @@ function compareTool(args: { a: ComparePayload; b: ComparePayload }) {
 // ─── Catalog (OpenAI function-calling format) ──────────────────────────
 
 const WINDOW_ENUM_DESCRIPTION =
-  'One of: "today", "yesterday", "thisWeek" / "lastWeek" (Monday–Sunday), "thisMonth", "lastMonth", "thisQuarter", "lastQuarter", "thisYear", "lastYear", "last7Days" (last 7 calendar days incl. today), "last30Days", "last90Days", "last6Months", "last12Months" (rolling), or "custom" with start_date + end_date (inclusive YYYY-MM-DD in the user\'s zone) for anything else — a named month ("June" → 2026-06-01..2026-06-30), "between the 1st and the 10th", a specific past quarter. Prefer a named window when one matches exactly.'
+  'Named window (see the system prompt for the list), or "custom" with start_date + end_date for anything else (a named month, "the first week of July"). Prefer a named window when one matches exactly.'
 const CUSTOM_DATE_PROPS = {
-  start_date: { type: 'string', description: 'Only with window "custom": first day, inclusive, YYYY-MM-DD in the user\'s time zone.' },
-  end_date: { type: 'string', description: 'Only with window "custom": last day, inclusive, YYYY-MM-DD in the user\'s time zone.' },
+  start_date: { type: 'string', description: 'With window "custom": first day, inclusive, YYYY-MM-DD (user zone).' },
+  end_date: { type: 'string', description: 'With window "custom": last day, inclusive, YYYY-MM-DD (user zone).' },
 }
 
 export const TOOLS = [
@@ -828,6 +1000,28 @@ export const TOOLS = [
   {
     type: 'function' as const,
     function: {
+      name: 'list_transactions',
+      description:
+        'The individual transactions behind a figure — newest first, capped (default 12, max 25) — with `count` and `total` for the whole match. Use when the user wants to see the actual items ("what were those exactly?", "show me the transactions", "which ones?", "list my Uber rides").',
+      parameters: {
+        type: 'object',
+        required: ['window'],
+        properties: {
+          window: { type: 'string', enum: WINDOW_NAMES, description: WINDOW_ENUM_DESCRIPTION },
+          ...CUSTOM_DATE_PROPS,
+          direction: { type: 'string', enum: ['debit', 'credit'], description: 'Omit for both. "debit" = spend, "credit" = income.' },
+          category_name: { type: 'string', description: 'Exact category name to filter to.' },
+          merchant_contains: { type: 'string', description: 'Case-insensitive substring match on merchant name.' },
+          min_amount: { type: 'number', description: 'Only rows at or above this amount (profile currency).' },
+          limit: { type: 'number', description: 'Max rows to return, 1–25. Default 12.' },
+        },
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
       name: 'recurring_total',
       description:
         'Normalized monthly + annual total of the user’s active recurring rules (each rule’s frequency converted to its monthly-equivalent cost), plus the per-rule breakdown with `charged_this_month`, and `still_due_this_month_total` (rules that have NOT yet produced a transaction this month). Use for "how much do my subscriptions cost" / "recurring bills" questions — never estimate this from raw rule amounts yourself. For end-of-month forecasts use `still_due_this_month_total`, never `monthly_total` (bills already charged are already inside this month’s spending).',
@@ -839,6 +1033,41 @@ export const TOOLS = [
             enum: ['debit', 'credit'],
             description: 'Default "debit" (bills). Pass "credit" for recurring income like salary.',
           },
+        },
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'arith',
+      description:
+        'One arithmetic step over two numbers you already have (from a tool result, the data overview, the BUDGET block, or the user\'s message). You never do arithmetic yourself: a ratio ("is that a good share of what I make?" → percent_of), a difference ("how much more than last month?" → subtract), a per-day pace (divide), a projection (multiply) all go through this tool, and you quote the returned `result`.',
+      parameters: {
+        type: 'object',
+        required: ['op', 'a', 'b'],
+        properties: {
+          op: { type: 'string', enum: ARITH_OPS, description: 'percent_of = a ÷ b × 100 ("a is what percent of b").' },
+          a: { type: 'number' },
+          b: { type: 'number' },
+        },
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'can_afford',
+      description:
+        'Decides an affordability question. Pass what the user has available (e.g. income this month − spending this month − still_due_this_month_total, computed with the tools) and what the item costs; returns fits (true/false), left_after, shortfall and a verdict. Your yes/no MUST follow `verdict` — never decide affordability yourself.',
+      parameters: {
+        type: 'object',
+        required: ['available', 'cost'],
+        properties: {
+          available: { type: 'number', description: 'Money available for the purchase, in the profile currency.' },
+          cost: { type: 'number', description: 'Price of the item (the user\'s figure or your stated typical price).' },
         },
         additionalProperties: false,
       },
@@ -924,8 +1153,17 @@ export function resolveToolCall(
       case 'series':
         result = seriesTool(parseSeriesArgs(safeArgs), ctx, windows)
         break
+      case 'list_transactions':
+        result = listTransactionsTool(parseListTransactionsArgs(safeArgs), ctx, windows)
+        break
       case 'recurring_total':
         result = recurringTotalTool(parseRecurringTotalArgs(safeArgs), ctx)
+        break
+      case 'arith':
+        result = arithTool(safeArgs)
+        break
+      case 'can_afford':
+        result = canAffordTool(safeArgs)
         break
       case 'compare':
         result = compareTool(safeArgs as unknown as { a: ComparePayload; b: ComparePayload })
@@ -1038,6 +1276,13 @@ export interface AskMurmurDataOverview {
   /** Distinct years in the data set, sorted ascending. Capped at 5 so
    *  the prompt stays compact. */
   years_present: number[]
+  /** The user's own vocabulary — every category name in the data with its
+   *  debit total, biggest first (≤ 30). Without this the model has to guess
+   *  category names ("investments" vs the real "Savings & Investing") and
+   *  answers "no transactions" from nothing (Aug 16 trace). */
+  categories: Array<{ name: string; total: number; count: number }>
+  /** Most frequent merchants (≤ 20) — same purpose, for merchant filters. */
+  merchants: string[]
 }
 
 function toSummarizable(t: AskMurmurTransaction): SummarizableTransaction {
@@ -1072,6 +1317,8 @@ export function buildDataOverview(ctx: ToolContext): AskMurmurDataOverview {
       has_transactions_last_30_days: false,
       has_transactions_last_90_days: false,
       years_present: [],
+      categories: [],
+      merchants: [],
     }
   }
 
@@ -1107,6 +1354,28 @@ export function buildDataOverview(ctx: ToolContext): AskMurmurDataOverview {
   const { rows: monthCredits } = filterRows(ctx, w, { window: 'thisMonth', direction: 'credit' })
   const thisMonthDebit = roundCents(monthDebits.reduce((acc, t) => acc + amountOf(t), 0))
   const thisMonthCredit = roundCents(monthCredits.reduce((acc, t) => acc + amountOf(t), 0))
+
+  const catAgg = new Map<string, { total: number; count: number }>()
+  const merchantAgg = new Map<string, number>()
+  for (const t of txns) {
+    if (t.direction === 'debit') {
+      const key = t.category_name || 'Uncategorized'
+      const b = catAgg.get(key) ?? { total: 0, count: 0 }
+      if (t.amount_in_profile_currency != null) b.total += t.amount_in_profile_currency
+      b.count += 1
+      catAgg.set(key, b)
+    }
+    const m = t.merchant?.trim()
+    if (m) merchantAgg.set(m, (merchantAgg.get(m) ?? 0) + 1)
+  }
+  const categories = Array.from(catAgg.entries())
+    .map(([name, v]) => ({ name, total: roundCents(v.total), count: v.count }))
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 30)
+  const merchants = Array.from(merchantAgg.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 20)
+    .map(([name]) => name)
   return {
     transaction_count: txns.length,
     earliest_transacted_at: earliest,
@@ -1126,6 +1395,8 @@ export function buildDataOverview(ctx: ToolContext): AskMurmurDataOverview {
     has_transactions_last_30_days: inWindow(txns, w.last30Days).length > 0,
     has_transactions_last_90_days: inWindow(txns, w.last90Days).length > 0,
     years_present: Array.from(years).sort((a, b) => a - b).slice(0, 5),
+    categories,
+    merchants,
   }
 }
 

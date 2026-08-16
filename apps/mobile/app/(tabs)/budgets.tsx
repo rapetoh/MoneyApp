@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
+import { useLocalSearchParams } from 'expo-router'
 import { useAuth } from '../../src/hooks/useAuth'
 import { useProfile } from '../../src/hooks/useProfile'
 import { useTransactions } from '../../src/hooks/useTransactions'
@@ -69,6 +70,12 @@ export default function BudgetsScreen() {
   const { budget, error: budgetError, setBudget, refetch: refetchBudget } = useActiveBudget(user?.id)
   const { rules: recurringRules } = useRecurringRules(user?.id)
   const [budgetModalVisible, setBudgetModalVisible] = useState(false)
+  // `?edit=1` — Ask Murmur's "Adjust budget" / "Set budget" action lands
+  // here with the editor already open (docs/ask-murmur/SPEC.md §1.4).
+  const params = useLocalSearchParams<{ edit?: string }>()
+  useEffect(() => {
+    if (params.edit === '1') setBudgetModalVisible(true)
+  }, [params.edit])
 
   const locale = (profile?.locale ?? 'en') as Locale
   const currency = profile?.currency_code ?? 'USD'
