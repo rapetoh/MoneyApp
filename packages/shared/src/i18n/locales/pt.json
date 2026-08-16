@@ -516,7 +516,5 @@
   "recurring.income_per_month": "Rendimentos recorrentes",
   "recurring.hero_footnote": "Cada frequência aparece como valor mensal — um salário a cada 2 semanas conta 26 ÷ 12 vezes, uma conta semanal 52 ÷ 12.",
   "recurring.expenses_section": "Despesas",
-  "recurring.income_section": "Rendimentos",
-  "ask.follow_up_placeholder": "Faça uma pergunta de seguimento…",
-  "ask.send": "Enviar"
+  "recurring.income_section": "Rendimentos"
 }

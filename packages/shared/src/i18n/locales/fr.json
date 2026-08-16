@@ -516,7 +516,5 @@
   "recurring.income_per_month": "Revenus récurrents",
   "recurring.hero_footnote": "Chaque échéance est ramenée à un montant mensuel — une paie toutes les 2 semaines compte 26 ÷ 12 fois, une facture hebdomadaire 52 ÷ 12.",
   "recurring.expenses_section": "Dépenses",
-  "recurring.income_section": "Revenus",
-  "ask.follow_up_placeholder": "Poser une question de suivi…",
-  "ask.send": "Envoyer"
+  "recurring.income_section": "Revenus"
 }

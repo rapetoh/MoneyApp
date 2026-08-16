@@ -516,7 +516,5 @@
   "recurring.income_per_month": "Ingresos recurrentes",
   "recurring.hero_footnote": "Cada frecuencia se muestra como importe mensual — un sueldo cada 2 semanas cuenta 26 ÷ 12 veces, una factura semanal 52 ÷ 12.",
   "recurring.expenses_section": "Gastos",
-  "recurring.income_section": "Ingresos",
-  "ask.follow_up_placeholder": "Haz una pregunta de seguimiento…",
-  "ask.send": "Enviar"
+  "recurring.income_section": "Ingresos"
 }

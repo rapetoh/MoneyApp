@@ -516,7 +516,5 @@
   "recurring.income_per_month": "Recurring income",
   "recurring.hero_footnote": "Every schedule is shown as a per-month amount — a paycheck every 2 weeks counts 26 ÷ 12 times, a weekly bill 52 ÷ 12.",
   "recurring.expenses_section": "Expenses",
-  "recurring.income_section": "Income",
-  "ask.follow_up_placeholder": "Ask a follow-up…",
-  "ask.send": "Send"
+  "recurring.income_section": "Income"
 }
