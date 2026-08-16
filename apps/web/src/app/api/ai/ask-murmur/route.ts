@@ -170,7 +170,7 @@ export async function POST(req: NextRequest) {
       result.calls,
       askReq.question,
       askReq.monthly_income,
-      askReq.budget ? [askReq.budget.amount, askReq.budget.spent, askReq.budget.committed, askReq.budget.remaining] : null,
+      trustedFigures(askReq, overview),
     )
     if (validation.soft_issues.length > 0) {
       // Soft-issue strings quote the untraced amounts themselves — count only.
@@ -234,7 +234,7 @@ export async function POST(req: NextRequest) {
       retry.calls,
       askReq.question,
       askReq.monthly_income,
-      askReq.budget ? [askReq.budget.amount, askReq.budget.spent, askReq.budget.committed, askReq.budget.remaining] : null,
+      trustedFigures(askReq, overview),
     )
     const retryStalled =
       detectStall(retry.response) !== null ||
@@ -343,6 +343,20 @@ function parseBudget(raw: unknown): AskMurmurBudget | null {
     period_start: b.period_start.slice(0, 40),
     period_end: b.period_end.slice(0, 40),
   }
+}
+
+/** Figures the model may quote without a tool call: the BUDGET block (the
+ *  app's own numbers) and the data overview's totals — a greeting citing
+ *  `this_month_debit` is grounded, not hallucinated. */
+function trustedFigures(req: AskMurmurRequest, overview: AskMurmurDataOverview): number[] {
+  const out: number[] = [
+    overview.this_month_debit,
+    overview.this_month_credit,
+    overview.total_debit,
+    overview.total_credit,
+  ]
+  if (req.budget) out.push(req.budget.amount, req.budget.spent, req.budget.committed, req.budget.remaining)
+  return out
 }
 
 // ─── Ungrounded-number / window-mismatch detectors ─────────────────────────

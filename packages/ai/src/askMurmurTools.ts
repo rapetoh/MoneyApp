@@ -1150,8 +1150,12 @@ export interface AskMurmurSummarySnapshot {
 export function buildSummarySnapshot(ctx: ToolContext): AskMurmurSummarySnapshot {
   const tz = resolveTz(ctx.tz)
   const windows = buildWindows(ctx.now_utc, tz)
+  // Same definition of "spent" as the `total` tool and every app screen
+  // (every debit with a resolved amount — transfers included): a fallback
+  // answer must never disagree with the tool-grounded answers around it
+  // (Aug 15: "$881" here vs "$1,331" from `total` for the same month).
   const recent = inWindow(ctx.transactions, windows.last6Months).filter(
-    (t) => t.amount_in_profile_currency != null && isSpend(t, resolveCategoryKind(t.category_name, null)),
+    (t) => t.amount_in_profile_currency != null && t.direction === 'debit',
   )
 
   const byCat = new Map<string, number>()
