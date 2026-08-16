@@ -159,9 +159,9 @@ export interface LensProps {
   monthLabel: string
 }
 
-export type LensKey = 'mindmap' | 'flow' | 'calendar' | 'treemap' | 'cashflow' | 'matrix'
+export type LensKey = 'mindmap' | 'calendar' | 'treemap' | 'cashflow' | 'matrix'
 
-export const LENS_KEYS: LensKey[] = ['mindmap', 'flow', 'calendar', 'treemap', 'cashflow', 'matrix']
+export const LENS_KEYS: LensKey[] = ['mindmap', 'calendar', 'treemap', 'cashflow', 'matrix']
 
 export function isLensKey(v: unknown): v is LensKey {
   return typeof v === 'string' && (LENS_KEYS as string[]).includes(v)

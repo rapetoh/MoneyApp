@@ -168,6 +168,32 @@ export const Icon = {
     </svg>
   ),
   // Small downward chevron used in toolbar filter chips.
+  pencil: ({ color = 'currentColor', size = 16 }: Props) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <path
+        d="M4 20h4l10.5-10.5a2.1 2.1 0 0 0-3-3L5 17v3z"
+        stroke={color}
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path d="M13.5 6.5l3 3" stroke={color} strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  ),
+  trash: ({ color = 'currentColor', size = 16 }: Props) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <path d="M4 7h16" stroke={color} strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" stroke={color} strokeWidth="1.8" strokeLinecap="round" />
+      <path
+        d="M6 7l1 12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-12"
+        stroke={color}
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path d="M10 11v5M14 11v5" stroke={color} strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  ),
   chev: ({ color = 'currentColor', size = 12 }: Props) => (
     <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
       <path

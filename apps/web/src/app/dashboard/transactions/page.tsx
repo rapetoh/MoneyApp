@@ -11,6 +11,7 @@ import { MerchantLogo } from '../../../components/MerchantLogo'
 import { Chip } from '../../../components/Chip'
 import { Money } from '../../../components/Money'
 import { Icon } from '../../../components/Icons'
+import { RowActions } from '../../../components/RowActions'
 import { MonthPicker } from '../../../components/MonthPicker'
 import { ErrorState } from '../../../components/ErrorState'
 import { currentMonthIso } from '../../../lib/monthIso'
@@ -397,16 +398,21 @@ export default function TransactionsPage() {
     await load()
   }
 
-  async function handleDelete() {
-    if (!editingId) return
+  // Soft delete (30-day recovery window). Reached from the row's own
+  // Delete control and from the edit form's Delete button — the row is
+  // no longer click-to-edit, so deleting no longer requires opening the
+  // form first (owner, Aug 16 2026).
+  const [rowError, setRowError] = useState<string | null>(null)
+  async function handleDelete(id: string) {
     if (!window.confirm('Delete this transaction? It can be recovered for 30 days.')) return
     setSaving(true)
+    setRowError(null)
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
       setSaving(false)
       return
     }
-    const row = transactions.find((t) => t.id === editingId)
+    const row = transactions.find((t) => t.id === id)
     const { error } = await supabase
       .from('transactions')
       .update({
@@ -414,14 +420,15 @@ export default function TransactionsPage() {
         deleted_at: new Date().toISOString(),
         version: (row?.version ?? 1) + 1,
       })
-      .eq('id', editingId)
+      .eq('id', id)
       .eq('user_id', user.id)
     setSaving(false)
     if (error) {
-      setFormError(error.message)
+      if (editingId === id) setFormError(error.message)
+      else setRowError(error.message)
       return
     }
-    closeForm()
+    if (editingId === id) closeForm()
     await load()
   }
 
@@ -699,7 +706,7 @@ export default function TransactionsPage() {
             <div style={{ display: 'flex', gap: 8, justifyContent: 'space-between' }}>
               <div>
                 {editingId && (
-                  <button type="button" onClick={handleDelete} disabled={saving} style={styles.deleteBtn}>
+                  <button type="button" onClick={() => handleDelete(editingId)} disabled={saving} style={styles.deleteBtn}>
                     Delete
                   </button>
                 )}
@@ -725,7 +732,9 @@ export default function TransactionsPage() {
             <div>Source</div>
             <div>Account</div>
             <div style={{ textAlign: 'right' }}>Amount</div>
+            <div aria-hidden="true" />
           </div>
+          {rowError && <div style={styles.rowError}>{rowError}</div>}
           <div style={styles.tableBody}>
             {loading ? (
               <div style={styles.empty}>Loading…</div>
@@ -747,14 +756,11 @@ export default function TransactionsPage() {
                   .replace(' ', '')
                   .toLowerCase()
                 return (
-                  <button
+                  <div
                     key={t.id}
-                    type="button"
-                    onClick={() => openEditForm(t)}
-                    title="Click to edit"
+                    className="row-hover"
                     style={{
                       ...styles.tableRow,
-                      cursor: 'pointer',
                       borderBottom: i === filtered.length - 1 ? 'none' : `0.5px solid ${colors.line}`,
                     }}
                   >
@@ -808,7 +814,13 @@ export default function TransactionsPage() {
                         color={isIncome ? colors.accent : undefined}
                       />
                     </div>
-                  </button>
+                    <RowActions
+                      onEdit={() => openEditForm(t)}
+                      onDelete={() => handleDelete(t.id)}
+                      editLabel={`Edit ${t.merchant ?? 'transaction'}`}
+                      deleteLabel={`Delete ${t.merchant ?? 'transaction'}`}
+                    />
+                  </div>
                 )
               })
             )}
@@ -999,7 +1011,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   tableHead: {
     display: 'grid',
-    gridTemplateColumns: '140px 1.6fr 1fr 0.9fr 1fr 0.7fr',
+    gridTemplateColumns: '140px 1.6fr 1fr 0.9fr 1fr 0.7fr 72px',
     padding: '12px 16px',
     fontSize: 10,
     fontWeight: 700,
@@ -1010,24 +1022,26 @@ const styles: Record<string, React.CSSProperties> = {
     borderBottom: `0.5px solid ${colors.line}`,
   },
   tableBody: { maxHeight: '70vh', overflow: 'auto' },
+  // A row is inert (owner, Aug 16 2026): the last column carries the
+  // explicit Edit / Delete controls (`RowActions`), which are real
+  // buttons and therefore keyboard-reachable — fix-plan 4.1's concern
+  // (01-F24/08-F49) is met by the controls, not by making the row one.
   tableRow: {
     display: 'grid',
-    gridTemplateColumns: '140px 1.6fr 1fr 0.9fr 1fr 0.7fr',
-    padding: '12px 16px',
+    gridTemplateColumns: '140px 1.6fr 1fr 0.9fr 1fr 0.7fr 72px',
+    padding: '10px 16px',
     fontSize: 13,
     alignItems: 'center',
     gap: 8,
-    // Reset: this row renders as a real <button> (fix-plan 4.1, audit
-    // 01-F24/08-F49) so the edit form is reachable by keyboard, not a
-    // <div onClick> the browser's UA stylesheet never targets as
-    // interactive. Undo the button defaults the grid layout above doesn't
-    // want: border, background, inherited font, left-aligned text.
-    width: '100%',
-    border: 'none',
-    background: 'transparent',
-    font: 'inherit',
-    textAlign: 'left',
-    color: 'inherit',
+    transition: 'background 0.12s ease',
+  },
+  rowError: {
+    padding: '10px 16px',
+    fontFamily: font.sans,
+    fontSize: 12,
+    color: '#A94646',
+    background: '#F7E9E9',
+    borderBottom: `0.5px solid ${colors.line}`,
   },
   dateCell: {
     color: colors.ink3,

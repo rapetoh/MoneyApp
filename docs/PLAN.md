@@ -1921,12 +1921,12 @@ the Insights page. Export preserved (in Data group).
 \u2014 replaces "Today" with the multi-lens Overview. Server component
 loads transactions + categories + recurring once, computes the KPI summary
 line ("$X in \u00b7 $Y out \u00b7 $Z saved \u00b7 N transactions"), and routes
-the body through `?lens=` URL state to one of six visualizations:
+the body through `?lens=` URL state to one of five visualizations (the Sankey "Flow" lens was removed by owner decision on Aug 16 2026 — see [fixes-2026-08-16-web-overview.md](./fixes-2026-08-16-web-overview.md)):
 - [MindMap.tsx](../apps/web/src/components/lenses/MindMap.tsx) \u2014 default;
   XMind-style radial with Income / Expenses / Saved / Plan branches and
-  top-merchant leaves under each expense category.
-- [Flow.tsx](../apps/web/src/components/lenses/Flow.tsx) \u2014 Sankey-style
-  ribbons from income sources to expense categories to top merchants.
+  top-merchant leaves under each expense category. Rebuilt Aug 16 2026
+  (real tree layout, logo on every leaf, self-explanatory Plan cards,
+  select-free pan, fit-to-content) — same fixes doc.
 - [Calendar.tsx](../apps/web/src/components/lenses/Calendar.tsx) \u2014 daily
   heatmap grid + day-detail panel (click any cell to see that day's
   transactions).

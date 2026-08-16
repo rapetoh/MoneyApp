@@ -5,7 +5,6 @@ import type { LensKey } from './lenses/types'
 
 const LENSES: Array<{ k: LensKey; label: string }> = [
   { k: 'mindmap', label: 'Mind map' },
-  { k: 'flow', label: 'Flow' },
   { k: 'calendar', label: 'Calendar' },
   { k: 'treemap', label: 'Treemap' },
   { k: 'cashflow', label: 'Cashflow' },
@@ -66,19 +65,6 @@ function Glyph({ kind, on }: { kind: LensKey; on: boolean }) {
         <circle cx="12" cy="3" r="1" fill={c} />
         <circle cx="2" cy="11" r="1" fill={c} />
         <circle cx="12" cy="11" r="1" fill={c} />
-      </svg>
-    )
-  }
-  if (kind === 'flow') {
-    return (
-      <svg width={w} height={h} viewBox="0 0 14 14">
-        <path
-          d="M1,3 C 5,3 5,5 9,5 L13,5 M1,7 C 5,7 5,7 9,7 L13,7 M1,11 C 5,11 5,9 9,9 L13,9"
-          stroke={c}
-          strokeWidth="1.4"
-          fill="none"
-          strokeLinecap="round"
-        />
       </svg>
     )
   }

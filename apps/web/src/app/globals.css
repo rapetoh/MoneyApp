@@ -53,3 +53,15 @@ input, textarea, select { font-family: inherit; }
 .murmur-pulse-dot  { animation: murmur-pulse-dot  2.6s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
 .murmur-pulse-arc1 { animation: murmur-pulse-arc1 2.6s ease-in-out infinite; }
 .murmur-pulse-arc2 { animation: murmur-pulse-arc2 2.6s ease-in-out infinite 0.2s; }
+
+/* Row actions (Edit / Delete) on list rows — transactions, recurring.
+   Rows are no longer click-to-edit (owner, Aug 16 2026): a row is a row;
+   editing and deleting each have their own explicit control. The pair
+   sits quiet at rest and comes forward on hover / keyboard focus, the
+   convention of Linear / Notion / Stripe tables. */
+.row-hover:hover { background: rgba(28, 24, 17, 0.025); }
+.row-actions { display: flex; align-items: center; justify-content: flex-end; gap: 4px; opacity: 0.55; transition: opacity 0.15s ease; }
+.row-hover:hover .row-actions, .row-hover:focus-within .row-actions { opacity: 1; }
+.row-action-btn { width: 30px; height: 30px; border-radius: 8px; border: 0; background: transparent; color: #6C675E; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; transition: background 0.12s ease, color 0.12s ease; }
+.row-action-btn:hover, .row-action-btn:focus-visible { background: rgba(28, 24, 17, 0.07); color: #1B1915; outline: none; }
+.row-action-btn.danger:hover, .row-action-btn.danger:focus-visible { background: rgba(169, 70, 70, 0.10); color: #A94646; }

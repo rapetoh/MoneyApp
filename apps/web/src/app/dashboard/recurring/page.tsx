@@ -7,6 +7,7 @@ import { colors, font, radius } from '../../../lib/theme'
 import { Toolbar } from '../../../components/Toolbar'
 import { Money } from '../../../components/Money'
 import { MerchantLogo } from '../../../components/MerchantLogo'
+import { RowActions } from '../../../components/RowActions'
 import { Icon } from '../../../components/Icons'
 import { ErrorState } from '../../../components/ErrorState'
 import {
@@ -682,6 +683,7 @@ export default function RecurringPage() {
               <div>Frequency</div>
               <div>Next charge</div>
               <div style={{ textAlign: 'right' }}>Status</div>
+              <div aria-hidden="true" />
             </div>
             <div style={{ flex: 1, overflow: 'auto' }}>
               {loading ? (
@@ -788,6 +790,12 @@ export default function RecurringPage() {
                             Pause
                           </button>
                         </div>
+                        <RowActions
+                          onEdit={() => openEditModal(r)}
+                          onDelete={() => handleDeleteRule(r)}
+                          editLabel={`Edit ${r.name ?? 'recurring rule'}`}
+                          deleteLabel={`Cancel ${r.name ?? 'recurring rule'}`}
+                        />
                       </div>
                     )
                   })}
@@ -796,20 +804,10 @@ export default function RecurringPage() {
                     return (
                       <div
                         key={r.id}
-                        onClick={() => openEditModal(r)}
-                        role="button"
-                        tabIndex={0}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault()
-                            openEditModal(r)
-                          }
-                        }}
-                        aria-label={`Edit ${r.name ?? 'recurring rule'}`}
+                        className="row-hover"
                         style={{
                           ...styles.tableRow,
                           opacity: 0.6,
-                          cursor: 'pointer',
                           borderBottom:
                             i === inactive.length - 1 ? 'none' : `0.5px solid ${colors.line}`,
                         }}
@@ -852,6 +850,12 @@ export default function RecurringPage() {
                             Resume
                           </button>
                         </div>
+                        <RowActions
+                          onEdit={() => openEditModal(r)}
+                          onDelete={() => handleDeleteRule(r)}
+                          editLabel={`Edit ${r.name ?? 'recurring rule'}`}
+                          deleteLabel={`Cancel ${r.name ?? 'recurring rule'}`}
+                        />
                       </div>
                     )
                   })}
@@ -1117,7 +1121,7 @@ const styles: Record<string, React.CSSProperties> = {
   tableHead: {
     padding: '12px 16px',
     display: 'grid',
-    gridTemplateColumns: '1.6fr 0.9fr 0.9fr 1fr 90px',
+    gridTemplateColumns: '1.6fr 0.9fr 0.9fr 1fr 90px 64px',
     fontSize: 10,
     fontWeight: 700,
     color: colors.ink3,
@@ -1128,7 +1132,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   tableRow: {
     display: 'grid',
-    gridTemplateColumns: '1.6fr 0.9fr 0.9fr 1fr 90px',
+    gridTemplateColumns: '1.6fr 0.9fr 0.9fr 1fr 90px 64px',
     padding: '12px 16px',
     fontSize: 13,
     alignItems: 'center',

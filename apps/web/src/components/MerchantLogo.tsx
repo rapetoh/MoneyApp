@@ -63,6 +63,9 @@ export function MerchantLogo({
         src={logoUrl}
         alt={name ?? 'Merchant logo'}
         onError={() => setLogoFailed(true)}
+        // Never a native image drag — on the mind-map canvas a drag that
+        // starts on a logo is a pan, and in a list it's nothing.
+        draggable={false}
         style={{
           width: size,
           height: size,

@@ -7,7 +7,6 @@ import { LensPills } from '../../components/LensPills'
 import { MonthPicker } from '../../components/MonthPicker'
 import { currentMonthIso, parseMonthIso } from '../../lib/monthIso'
 import { MindMapLens } from '../../components/lenses/MindMap'
-import { FlowLens } from '../../components/lenses/Flow'
 import { CalendarLens } from '../../components/lenses/Calendar'
 import { TreemapLens } from '../../components/lenses/Treemap'
 import { CashflowLens } from '../../components/lenses/Cashflow'
@@ -229,7 +228,6 @@ export default async function OverviewPage({
 
         <div style={styles.lensBody}>
           {lens === 'mindmap' && <MindMapLens props={lensProps} displayName={displayName} />}
-          {lens === 'flow' && <FlowLens props={lensProps} />}
           {lens === 'calendar' && <CalendarLens props={lensProps} />}
           {lens === 'treemap' && <TreemapLens props={lensProps} />}
           {lens === 'cashflow' && <CashflowLens props={lensProps} />}
