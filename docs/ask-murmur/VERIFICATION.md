@@ -48,4 +48,22 @@ PS5 subject. Both are prompt-quality, not grounding, issues — watch them in th
 
 ## Production run
 Record the date, the CHECKS line and anything a human would flag below every time the harness is
-run against production. See PLAN.md's dated entry for the latest.
+run against production.
+
+**Aug 16 2026, 13:50 UTC — commit 1c4bbad — `CHECKS: all passed` (17 model turns).**
+Transcript highlights, read by a human:
+- invest: "$450 this week" → "Charles Schwab $300 and Ally $150" (transactions block) → "8.31 % of your
+  monthly income" → concrete "what else" (budget not set / $1,416 of $3,000 / bills $356) with
+  set_budget · open_recurring · show_transactions chips; resumed later, "how much was that last month?"
+  → "$300" (pronoun → focus.subject works).
+- Hey → cites $1,416; overall → income $3,000 / spent $1,416 / $1,584 available, bills all charged;
+  "and last month?" → $7,500 / $770.50 / $6,729.50.
+- PS5 → yes, $499, $1,085 left (ledger rows incl. still-due bills $0); "$1,200 laptop" → yes, $384 left.
+- coffee → **$62.40 = Starbucks $50 + Blue Bottle $12.40** (fixed vs local run 3) — but it also listed
+  "Dunkin' = $0.00", a merchant the user doesn't have (prompt example leaked in; prompt tightened after
+  this run: only merchants present in the overview list).
+- "Ok" after PS5 → moved to last month's spending instead of staying on the purchase (prompt tightened:
+  acknowledgements stay on the subject).
+- Latency: three turns took 24–60 s — 429 backoff on the 30k TPM org tier, not logic. Owner to raise.
+- Error paths 401/400/404/402/no-data all correct; 8 messages persisted per 4-turn thread, focus and
+  computed on the stored replies.
