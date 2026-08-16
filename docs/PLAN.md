@@ -82,6 +82,14 @@ truth: `docs/voice redesign/` (screenshot + Claude Design HTML, artboards
   now `app/shortcut.tsx` + `app/+not-found.tsx` routes, `useShortcutHandler`
   deleted, result sheet keyed per capture session. **Requires a new native
   build** — storyboard, icon and Android splash change at prebuild.
+- **Refresh + first-tap flicker (owner review, Aug 16, 2026):** there was no
+  pull-to-refresh anywhere on mobile (pulling did nothing; data relied on
+  realtime + the foreground/network pull). Every list screen (Today,
+  Insights, Budgets, History, Recurring) now has a real one
+  (`useManualRefresh`: drain the outbox → pull from the server → every hook
+  re-reads; the spinner resolves only when the data is current). Tabs mount
+  eagerly at launch (`lazy: false`) so the first tap on a tab no longer
+  pays a whole-screen mount — the ~100 ms flash on first visit is gone.
 - **Today feed rule (owner decision, Aug 16, 2026):** the home screen shows
   the last 7 days of activity grouped by day (extended back only when those
   days hold fewer than 8 transactions), then an always-present "See all N

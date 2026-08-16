@@ -8,6 +8,7 @@ import {
   SectionList,
   ScrollView,
   Pressable,
+  RefreshControl,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Stack, useRouter, useLocalSearchParams } from 'expo-router'
@@ -16,6 +17,7 @@ import { useAuth } from '../../src/hooks/useAuth'
 import { useTransactions } from '../../src/hooks/useTransactions'
 import { useCategories } from '../../src/hooks/useCategories'
 import { useProfile } from '../../src/hooks/useProfile'
+import { useManualRefresh } from '../../src/hooks/useManualRefresh'
 import { syncManager } from '../../src/services/sync/SyncManager'
 import { TransactionRow } from '../../src/components/TransactionRow'
 import { Colors, Typography, Spacing, Radius, Hairline } from '../../src/theme'
@@ -72,6 +74,7 @@ export default function TransactionsScreen() {
   const { transactions, loading, error } = useTransactions(user?.id)
   const { categories, categoryMap } = useCategories(user?.id)
   const { profile } = useProfile(user?.id)
+  const { refreshing, onRefresh } = useManualRefresh(user?.id)
   const router = useRouter()
   // `?month=YYYY-MM` from the History calendar; `?q=` from Ask Murmur's
   // "See transactions" action (docs/ask-murmur/SPEC.md §1.4) — seeds the
@@ -276,6 +279,7 @@ export default function TransactionsScreen() {
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContent}
           stickySectionHeadersEnabled={false}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.ink3} />}
           renderSectionHeader={({ section: { title } }) => (
             <Text style={styles.dateHeader}>{title}</Text>
           )}

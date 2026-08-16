@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from 'react'
-import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native'
+import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl} from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useLocalSearchParams } from 'expo-router'
@@ -8,6 +8,7 @@ import { useProfile } from '../../src/hooks/useProfile'
 import { useTransactions } from '../../src/hooks/useTransactions'
 import { useActiveBudget, budgetStatusFor } from '../../src/hooks/useBudget'
 import { useRecurringRules } from '../../src/hooks/useRecurringRules'
+import { useManualRefresh } from '../../src/hooks/useManualRefresh'
 import { Money } from '../../src/components/Money'
 import { BudgetRing } from '../../src/components/BudgetRing'
 import { BudgetEditorModal } from '../../src/components/BudgetEditorModal'
@@ -68,7 +69,8 @@ export default function BudgetsScreen() {
   // `null` either way), so the empty-state CTA below rendered for a
   // fetch failure as readily as for a genuinely unconfigured budget.
   const { budget, error: budgetError, setBudget, refetch: refetchBudget } = useActiveBudget(user?.id)
-  const { rules: recurringRules } = useRecurringRules(user?.id)
+  const { rules: recurringRules, refetch: refetchRules } = useRecurringRules(user?.id)
+  const { refreshing, onRefresh } = useManualRefresh(user?.id, [refetchBudget, refetchRules])
   const [budgetModalVisible, setBudgetModalVisible] = useState(false)
   // `?edit=1` — Ask Murmur's "Adjust budget" / "Set budget" action lands
   // here with the editor already open (docs/ask-murmur/SPEC.md §1.4).
@@ -111,7 +113,11 @@ export default function BudgetsScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
-      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: tabBarClearance }]} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={[styles.content, { paddingBottom: tabBarClearance }]}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.ink3} />}
+      >
         {/* Header row. The "+" pill opens the shared BudgetEditorModal so the
             user can set or modify the global monthly budget from this tab
             directly (user feedback — previously it jumped to Settings, which

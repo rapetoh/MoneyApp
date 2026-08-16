@@ -76,6 +76,13 @@ export default function TabsLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
+        // Every tab mounts at launch, under the launch veil, instead of on
+        // its first tap. With lazy mounting the first visit to Budgets /
+        // Insights / More paid a whole-screen mount + layout on the tap —
+        // a visible ~100 ms flash before the content settled (owner review,
+        // Aug 16). Data is already preloaded at the root (query cache), so
+        // the eager mount is cheap and the first tap is instant.
+        lazy: false,
         // Bar's bottom edge floats `TAB_BAR_BOTTOM_OFFSET` above the safe
         // area, not a fixed 14pt off the physical screen edge — on a
         // Home-button device (insets.bottom === 0) that's 8pt; on a Face ID

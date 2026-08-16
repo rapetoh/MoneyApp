@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { ScrollView, View, Text, StyleSheet, ActivityIndicator, Pressable } from 'react-native'
+import { ScrollView, View, Text, StyleSheet, ActivityIndicator, Pressable, RefreshControl} from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
@@ -9,6 +9,7 @@ import { useCategories } from '../../src/hooks/useCategories'
 import { useProfile } from '../../src/hooks/useProfile'
 import { useActiveBudget, budgetStatusFor } from '../../src/hooks/useBudget'
 import { useRecurringRules } from '../../src/hooks/useRecurringRules'
+import { useManualRefresh } from '../../src/hooks/useManualRefresh'
 import { RecurringPatternBanner } from '../../src/components/RecurringPatternBanner'
 import type { RecurringPatternCandidate } from '../../src/services/recurringPatternDetector'
 import { usePlusStatus } from '../../src/hooks/usePlusStatus'
@@ -157,6 +158,7 @@ export default function TodayScreen() {
   const { profile } = useProfile(user?.id)
   const { budget, error: budgetError, refetch: refetchBudget } = useActiveBudget(user?.id)
   const { rules: recurringRules, createRule } = useRecurringRules(user?.id)
+  const { refreshing, onRefresh } = useManualRefresh(user?.id, [refetchBudget])
   const router = useRouter()
 
   // Auto-recurring detection is a Plus feature (PRD §11 / DESIGN.md §10).
@@ -270,6 +272,7 @@ export default function TodayScreen() {
       <ScrollView
         contentContainerStyle={[styles.content, { paddingBottom: tabBarClearance }]}
         showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.ink3} />}
       >
         {/* Header — APRIL / Today + manual entry + Ask Murmur + History.
             The + pill (voice redesign) is the old manual flow's new home:

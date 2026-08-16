@@ -7,12 +7,14 @@ import {
   Pressable,
   Alert,
   ActivityIndicator,
+  RefreshControl,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Stack, useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '../src/hooks/useAuth'
 import { useProfile } from '../src/hooks/useProfile'
+import { useManualRefresh } from '../src/hooks/useManualRefresh'
 import { useCategories } from '../src/hooks/useCategories'
 import { useRecurringRules, computeNextOccurrence, isRuleOverdue } from '../src/hooks/useRecurringRules'
 import { MerchantAvatar } from '../src/components/MerchantAvatar'
@@ -83,6 +85,7 @@ export default function RecurringScreen() {
   // (`rules` stays `[]` either way).
   const { rules, loading, error, createRule, toggleRule, deleteRule, updateRule, refetch } =
     useRecurringRules(user?.id)
+  const { refreshing, onRefresh } = useManualRefresh(user?.id, [refetch])
 
   // Create/edit sheet (fix-plan 3.3 — "Add manually" + tapping a rule to
   // edit it, the two lifecycle actions this screen never had). One sheet,
@@ -252,7 +255,11 @@ export default function RecurringScreen() {
             <Text style={styles.addPillText}>{t('recurring.add_manually', locale)}</Text>
           </Pressable>
         </View>
-        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.ink3} />}
+        >
           {/* Title block */}
           <View style={styles.intro}>
             <Text style={styles.eyebrow}>{t('recurring.eyebrow', locale)}</Text>

@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native'
+import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl} from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import Svg, { Path, Defs, LinearGradient, Stop } from 'react-native-svg'
@@ -8,6 +8,7 @@ import { useProfile } from '../../src/hooks/useProfile'
 import { useTransactions } from '../../src/hooks/useTransactions'
 import { useCategories } from '../../src/hooks/useCategories'
 import { useRecurringRules } from '../../src/hooks/useRecurringRules'
+import { useManualRefresh } from '../../src/hooks/useManualRefresh'
 import { useInsightsUnlock } from '../../src/hooks/useInsightsUnlock'
 import { syncManager } from '../../src/services/sync/SyncManager'
 import { Money } from '../../src/components/Money'
@@ -195,7 +196,8 @@ export default function InsightsScreen() {
   // categories card below (`transactions` stays `[]` either way).
   const { transactions, error: transactionsError } = useTransactions(user?.id)
   const { categoryMap } = useCategories(user?.id)
-  const { rules } = useRecurringRules(user?.id)
+  const { rules, refetch: refetchRules } = useRecurringRules(user?.id)
+  const { refreshing, onRefresh } = useManualRefresh(user?.id, [refetchRules])
 
   const locale = (profile?.locale ?? 'en') as Locale
   const currency = profile?.currency_code ?? 'USD'
@@ -414,7 +416,11 @@ export default function InsightsScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: tabBarClearance }]} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={[styles.content, { paddingBottom: tabBarClearance }]}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.ink3} />}
+      >
         {/* Title block — eyebrow + serif headline. Month picker is a subtle
             button in the eyebrow row so the overall page header stays calm. */}
         <View style={styles.header}>
