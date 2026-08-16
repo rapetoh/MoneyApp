@@ -6,6 +6,7 @@ import { Toolbar } from '../../../components/Toolbar'
 import { Card } from '../../../components/Card'
 import { Money } from '../../../components/Money'
 import { Icon } from '../../../components/Icons'
+import { ForecastChart } from '../../../components/ForecastChart'
 import { InsightsToolbarRight } from './InsightsToolbarRight'
 import {
   addDays,
@@ -60,109 +61,6 @@ function monthKey(y: number, m: number): string {
 function monthLabel(y: number, m: number, tz: string, locale: string, opts: Intl.DateTimeFormatOptions): string {
   const instant = civilDateTimeToInstant(y, m, 15, 12, 0, 0, tz)
   return new Date(instant).toLocaleDateString(locale, { ...opts, timeZone: tz })
-}
-
-function ForecastChart({
-  history,
-  forecast,
-  budget,
-  labels,
-  currency,
-  locale,
-}: {
-  history: number[]
-  forecast: Array<number | null>
-  budget: number | null
-  labels: string[]
-  currency: string
-  locale: string
-}) {
-  const fmt = (v: number) =>
-    new Intl.NumberFormat(locale, { style: 'currency', currency, maximumFractionDigits: 0 }).format(v)
-  const w = 1120
-  const h = 260
-  const pad = 36
-  const all = [...history, ...forecast.filter((x): x is number => x != null), budget ?? 0]
-  const max = Math.max(...all, 1) * 1.1
-  const x = (i: number) => pad + (i / Math.max(labels.length - 1, 1)) * (w - pad * 2)
-  const y = (v: number) => h - pad - (v / max) * (h - pad * 2)
-
-  const histPts = history.map((v, i) => [x(i), y(v)] as const)
-  const histLine = histPts.length
-    ? `M ${histPts[0][0]},${histPts[0][1]} ` +
-      histPts.slice(1).map((p) => `L ${p[0]},${p[1]}`).join(' ')
-    : ''
-  const histArea = histPts.length
-    ? `${histLine} L ${histPts[histPts.length - 1][0]},${h - pad} L ${histPts[0][0]},${h - pad} Z`
-    : ''
-
-  const forecastPts = forecast
-    .map((v, i) => (v == null ? null : ([x(i), y(v)] as const)))
-    .filter((p): p is readonly [number, number] => p != null)
-  const forecastLine = forecastPts.length
-    ? `M ${forecastPts[0][0]},${forecastPts[0][1]} ` +
-      forecastPts.slice(1).map((p) => `L ${p[0]},${p[1]}`).join(' ')
-    : ''
-
-  return (
-    <svg viewBox={`0 0 ${w} ${h + 24}`} style={{ width: '100%', height: 280 }}>
-      <defs>
-        <linearGradient id="gActual" x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0%" stopColor={colors.accent} stopOpacity="0.22" />
-          <stop offset="100%" stopColor={colors.accent} stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      {[0, 1, 2, 3, 4].map((i) => {
-        const gy = pad + i * ((h - pad * 2) / 4)
-        const val = max - (i * max) / 4
-        return (
-          <g key={i}>
-            <line x1={pad} x2={w - pad} y1={gy} y2={gy} stroke={colors.line} strokeDasharray="2 3" />
-            <text x={8} y={gy + 4} fontSize="10" fill={colors.ink4} fontWeight="600">
-              {fmt(val)}
-            </text>
-          </g>
-        )
-      })}
-      {budget != null && (
-        <>
-          <line
-            x1={pad}
-            x2={w - pad}
-            y1={y(budget)}
-            y2={y(budget)}
-            stroke={colors.ink4}
-            strokeWidth="1.5"
-            strokeDasharray="6 4"
-          />
-          <text x={w - pad - 6} y={y(budget) - 6} fontSize="10" fill={colors.ink3} textAnchor="end" fontWeight="700">
-            Budget {fmt(budget)}
-          </text>
-        </>
-      )}
-      {histArea && <path d={histArea} fill="url(#gActual)" />}
-      {histLine && <path d={histLine} fill="none" stroke={colors.accent} strokeWidth="2.5" />}
-      {forecastLine && (
-        <path d={forecastLine} fill="none" stroke="#7A5A1C" strokeWidth="2.5" strokeDasharray="5 4" opacity="0.7" />
-      )}
-      {histPts.map(([px, py], i) => (
-        <circle key={i} cx={px} cy={py} r="4" fill="#fff" stroke={colors.accent} strokeWidth="2" />
-      ))}
-      {labels.map((d, i) => (
-        <text
-          key={i}
-          x={x(i)}
-          y={h + 14}
-          fontSize="10"
-          fill={i < history.length ? colors.ink3 : colors.ink4}
-          textAnchor="middle"
-          fontWeight={i === history.length - 1 ? '700' : '600'}
-        >
-          {d}
-        </text>
-      ))}
-    </svg>
-  )
 }
 
 /** Weekday × hour, all 24 hours (fix-plan 2.11 / 04-F16 — the old
@@ -421,7 +319,6 @@ export default async function InsightsPage() {
             borderRadius: radius.xl,
             padding: '18px 20px',
             border: `0.5px solid ${colors.line}`,
-            height: 360,
           }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>

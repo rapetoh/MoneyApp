@@ -9,6 +9,7 @@ import { Icon } from '../../../components/Icons'
 import { PaywallGate } from '../../../components/PaywallGate'
 import { ErrorState } from '../../../components/ErrorState'
 import { usePlus } from '../../../lib/plus'
+import { buildTransactionsPdf, loadPdfFonts } from '../../../lib/pdf/transactionsPdf'
 import {
   buildExport,
   exportSummaryJSON,
@@ -69,6 +70,9 @@ export default function ExportPage() {
   const [loadError, setLoadError] = useState<string | null>(null)
   const { isPlus } = usePlus()
   const [busy, setBusy] = useState<Format | null>(null)
+  // A failed export (font fetch, jsPDF throw) used to vanish into the
+  // console with the button silently going back to idle.
+  const [exportError, setExportError] = useState<string | null>(null)
 
   const [dateFrom, setDateFrom] = useState(() => defaultDateRange().from)
   const [dateTo, setDateTo] = useState(() => defaultDateRange().to)
@@ -236,133 +240,34 @@ export default function ExportPage() {
 
   async function exportPDF() {
     setBusy('pdf')
+    setExportError(null)
     try {
-      // Dynamic import so jsPDF (~120KB) only loads when the user
-      // actually exports — keeps the initial bundle the same shape as
-      // before for users on free who never see this surface.
-      const [{ jsPDF }, autoTableModule] = await Promise.all([
+      // Dynamic imports so jsPDF (~120KB) and the embedded font files
+      // (~250KB) only load when the user actually exports — the initial
+      // bundle keeps the same shape for users who never see this surface.
+      // The document itself is rendered by lib/pdf/transactionsPdf.ts;
+      // see that file for why (Aug 16, 2026 owner review).
+      const [{ jsPDF }, autoTableModule, fonts] = await Promise.all([
         import('jspdf'),
         import('jspdf-autotable'),
+        loadPdfFonts(),
       ])
-      const autoTable = autoTableModule.default
-
       const doc = new jsPDF({ unit: 'pt', format: 'letter' })
-      const pageW = doc.internal.pageSize.getWidth()
-
-      const fmt = (v: number) =>
-        new Intl.NumberFormat(locale, { style: 'currency', currency }).format(v)
-
-      // Header band — eyebrow + serif title + totals row, matching the
-      // brand style of the previous HTML template (the visual we lost
-      // is hand-crafted typography, which jsPDF doesn't have built-in;
-      // we get a close enough match with the right sizes + colours).
-      doc.setTextColor('#6C675E')
-      doc.setFontSize(9)
-      doc.setFont('helvetica', 'bold')
-      doc.text(`MURMUR · ${dateFrom} → ${dateTo}`, 40, 56)
-
-      doc.setTextColor('#1B1915')
-      doc.setFontSize(26)
-      doc.setFont('times', 'normal')
-      doc.text('Transactions', 40, 92)
-
-      // Totals strip
-      const totalsY = 124
-      doc.setDrawColor(220, 216, 206)
-      doc.setLineWidth(0.5)
-      doc.roundedRect(40, totalsY - 18, pageW - 80, 64, 8, 8)
-
-      doc.setFont('helvetica', 'bold')
-      doc.setFontSize(8)
-      doc.setTextColor('#6C675E')
-      doc.text('TOTAL EXPENSES', 56, totalsY)
-      doc.text('TOTAL INCOME', 56 + (pageW - 80) / 3, totalsY)
-      doc.text('TRANSACTIONS', 56 + ((pageW - 80) / 3) * 2, totalsY)
-
-      doc.setFont('times', 'normal')
-      doc.setFontSize(16)
-      doc.setTextColor('#1B1915')
-      doc.text(fmt(totalExpenses), 56, totalsY + 22)
-      doc.setTextColor('#3F5A3E')
-      doc.text(
-        `+${fmt(totalIncome).replace(/^[+\-]/, '')}`,
-        56 + (pageW - 80) / 3,
-        totalsY + 22,
-      )
-      doc.setTextColor('#1B1915')
-      doc.text(
-        String(filtered.length),
-        56 + ((pageW - 80) / 3) * 2,
-        totalsY + 22,
-      )
-
-      // Transaction table. autoTable paginates automatically and re-
-      // emits the header on every page, so the user gets a clean
-      // multi-page document for long ranges. Both the original-currency
-      // amount and the profile-currency amount print (fix-plan 2.15) so
-      // the printed total above reconciles with a reader manually adding
-      // the right-hand column, not the left.
-      autoTable(doc, {
-        startY: totalsY + 60,
-        head: [['Date', 'Merchant', 'Category', 'Amount', `Amount (${currency})`]],
-        body: filtered.map((r) => {
-          const sign = r.direction === 'credit' ? '+' : '−'
-          // The native column keeps the transaction's own currency — a
-          // €45 dinner must not print as $45 (same rule as the
-          // transactions table).
-          const native =
-            r.currency === currency
-              ? fmt(r.amount).replace(/^[+−\-]/, '')
-              : new Intl.NumberFormat(locale, { style: 'currency', currency: r.currency }).format(r.amount)
-          const converted = r.amountInProfileCurrency != null ? fmt(r.amountInProfileCurrency).replace(/^[+−\-]/, '') : '—'
-          return [r.date, r.merchant, r.category, `${sign}${native}`, `${sign}${converted}`]
-        }),
-        styles: { fontSize: 9, cellPadding: 6, lineColor: [225, 222, 213], lineWidth: 0.5 },
-        headStyles: {
-          fillColor: false,
-          textColor: [108, 103, 94],
-          fontStyle: 'bold',
-          fontSize: 8,
-          cellPadding: { top: 8, right: 6, bottom: 8, left: 6 },
-        },
-        columnStyles: {
-          0: { cellWidth: 62 },
-          3: { halign: 'right', cellWidth: 76, fontStyle: 'bold' },
-          4: { halign: 'right', cellWidth: 76 },
-        },
-        didParseCell: (data) => {
-          // Sage-tinted credits to match the brand colour for income.
-          if (data.section === 'body' && (data.column.index === 3 || data.column.index === 4)) {
-            const cell = data.cell.raw as string
-            if (typeof cell === 'string' && cell.startsWith('+')) {
-              data.cell.styles.textColor = [63, 90, 62]
-            }
-          }
-        },
-        theme: 'plain',
-        margin: { left: 40, right: 40 },
+      buildTransactionsPdf(doc, autoTableModule.default, {
+        rows: filtered,
+        currency,
+        locale,
+        timezone: tz,
+        dateFrom,
+        dateTo,
+        totalExpenses,
+        totalIncome,
+        pendingCount,
+        fonts,
       })
-
-      // Footer on every page — the receipt for a total that would
-      // otherwise look short when some rows are still awaiting FX
-      // conversion (fix-plan 1.4).
-      const pageCount = doc.getNumberOfPages()
-      doc.setFont('helvetica', 'normal')
-      doc.setFontSize(8)
-      doc.setTextColor('#9C9589')
-      const pendingNote = pendingCount > 0 ? ` · ${pendingCount} awaiting currency conversion, excluded above` : ''
-      for (let i = 1; i <= pageCount; i++) {
-        doc.setPage(i)
-        const h = doc.internal.pageSize.getHeight()
-        doc.text(
-          `Exported by Murmur · ${new Date().toLocaleString(locale)} · ${filtered.length} transactions${pendingNote}`,
-          40,
-          h - 28,
-        )
-        doc.text(`Page ${i} / ${pageCount}`, pageW - 40, h - 28, { align: 'right' })
-      }
-
       doc.save(`${fileBase()}.pdf`)
+    } catch (e) {
+      setExportError(e instanceof Error ? e.message : 'The PDF could not be generated.')
     } finally {
       setBusy(null)
     }
@@ -453,6 +358,10 @@ export default function ExportPage() {
             </>
           )}
         </Card>
+
+        {exportError && (
+          <ErrorState compact message="The export could not be generated." detail={exportError} />
+        )}
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
           <FormatCard

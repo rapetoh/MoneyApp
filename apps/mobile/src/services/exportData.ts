@@ -199,8 +199,37 @@ function escapeHTML(s: string): string {
     .replace(/"/g, '&quot;')
 }
 
+/** Coin & Wave on a sage tile — the same geometry as
+ *  components/MurmurMark.tsx (160-unit grid, coin r=62 scaled onto the
+ *  75% keyline, waves at y=80/96). Inline so the printed page carries the
+ *  brand mark with no asset lookup (Aug 16, 2026 owner review: the
+ *  export PDF had no logo). */
+const MURMUR_MARK_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" width="26" height="26" aria-hidden="true">
+<rect width="160" height="160" rx="35" fill="#3F5A3E"/>
+<g transform="translate(80 80) scale(0.9677) translate(-80 -80)">
+<circle cx="80" cy="80" r="62" fill="#FBFAF7"/>
+<path d="M40 80 Q 55 64, 70 80 T 100 80 T 130 80" stroke="#3F5A3E" stroke-width="5" fill="none" stroke-linecap="round" opacity="0.95"/>
+<path d="M40 96 Q 55 86, 70 96 T 100 96 T 120 96" stroke="#3F5A3E" stroke-width="3" fill="none" stroke-linecap="round" opacity="0.45"/>
+</g></svg>`
+
+/** What the Category column prints — same rule as the web PDF
+ *  (apps/web/src/lib/pdf/transactionsPdf.ts `categoryLabel`): the data
+ *  layer keeps '' for "no category" so CSV/JSON stay honest, but the
+ *  printed page reads "Income" for an uncategorised credit and an em
+ *  dash for an uncategorised debit rather than a blank cell. */
+function pdfCategoryLabel(r: Pick<ExportRow, 'category' | 'direction'>, locale: Locale): string {
+  if (r.category) return r.category
+  return r.direction === 'credit' ? t('voice.income_label', locale) : '—'
+}
+
 function pdfHTML(input: ExportInput, locale: Locale): string {
   const result = assembleExport(input)
+  // The native-currency column only earns its place when at least one
+  // row is in a currency other than the profile's — otherwise it is a
+  // verbatim duplicate of the converted column (same rule as the web
+  // PDF), and a single Amount column *is* the profile currency, so the
+  // printed total still reconciles with a reader summing it.
+  const multiCurrency = result.rows.some((r) => r.currency !== input.currency)
   const rows = [...result.rows]
     .reverse()
     .map((r: ExportRow) => {
@@ -219,13 +248,14 @@ function pdfHTML(input: ExportInput, locale: Locale): string {
         r.amountInProfileCurrency != null
           ? `${r.direction === 'credit' ? '+' : ''}${input.currency} ${r.amountInProfileCurrency.toFixed(2)}`
           : '—'
+      const numClass = `num ${r.direction === 'credit' ? 'credit' : ''}`
       return `
         <tr>
           <td>${escapeHTML(date)}</td>
-          <td>${escapeHTML(r.merchant || '—')}</td>
-          <td>${escapeHTML(r.category)}</td>
-          <td class="num ${r.direction === 'credit' ? 'credit' : ''}">${escapeHTML(native)}</td>
-          <td class="num ${r.direction === 'credit' ? 'credit' : ''}">${escapeHTML(converted)}</td>
+          <td class="merchant">${escapeHTML(r.merchant || '—')}</td>
+          <td>${escapeHTML(pdfCategoryLabel(r, locale))}</td>
+          ${multiCurrency ? `<td class="${numClass}">${escapeHTML(native)}</td>` : ''}
+          <td class="${numClass}">${escapeHTML(converted)}</td>
         </tr>
       `
     })
@@ -258,6 +288,10 @@ function pdfHTML(input: ExportInput, locale: Locale): string {
     color: #1B1915; -webkit-text-size-adjust: 100%; }
   body { margin: 0; }
   .page { padding: 0; }
+  .brand { display: flex; align-items: center; gap: 8pt; padding-bottom: 12pt;
+    margin-bottom: 18pt; border-bottom: 0.5pt solid rgba(40,36,28,0.16); }
+  .brand svg { width: 26pt; height: 26pt; display: block; }
+  .brand .word { font-size: 13pt; font-weight: 700; letter-spacing: -0.2pt; color: #1B1915; }
   .eyebrow { font-size: 10pt; font-weight: 700; letter-spacing: 1.4pt;
     text-transform: uppercase; color: #6C675E; }
   h1 { font-family: "New York", "Iowan Old Style", Georgia, serif;
@@ -278,6 +312,7 @@ function pdfHTML(input: ExportInput, locale: Locale): string {
     padding: 6pt 4pt; border-bottom: 0.5pt solid rgba(40,36,28,0.16); }
   td { padding: 6pt 4pt; border-bottom: 0.5pt solid rgba(40,36,28,0.06);
     color: #1B1915; }
+  td.merchant { font-weight: 600; }
   td.num { font-family: "New York", Georgia, serif; font-feature-settings: "tnum" 1;
     font-weight: 500; text-align: right; }
   td.num.credit { color: #3F5A3E; }
@@ -285,6 +320,7 @@ function pdfHTML(input: ExportInput, locale: Locale): string {
 </style>
 </head>
 <body><div class="page">
+  <div class="brand">${MURMUR_MARK_SVG}<span class="word">Murmur</span></div>
   <div class="eyebrow">${escapeHTML(t('export.pdf_eyebrow', locale))}</div>
   <h1>${escapeHTML(t('export.pdf_title', locale))}</h1>
   <div class="meta">${escapeHTML(exported_at)}</div>
@@ -303,7 +339,7 @@ function pdfHTML(input: ExportInput, locale: Locale): string {
       <th>${escapeHTML(t('export.col_date', locale))}</th>
       <th>${escapeHTML(t('export.col_merchant', locale))}</th>
       <th>${escapeHTML(t('export.col_category', locale))}</th>
-      <th style="text-align:right">${escapeHTML(t('export.col_amount', locale))}</th>
+      ${multiCurrency ? `<th style="text-align:right">${escapeHTML(t('export.col_amount', locale))}</th>` : ''}
       <th style="text-align:right">${escapeHTML(`${t('export.col_amount', locale)} (${input.currency})`)}</th>
     </tr></thead>
     <tbody>${rows}</tbody>

@@ -597,7 +597,7 @@ Intelligence lives in `packages/ai/src/parser.ts` as a post-parse step.
 - [ ] Create $200/month Food budget → add $150 food → progress bar at 75%
 - [ ] Exceed budget → over-budget visual state
 - [ ] CSV export: all transactions present, correct UTF-8 with BOM encoding
-- [ ] PDF export: French/Spanish/Portuguese characters render correctly
+- [x] PDF export: French/Spanish/Portuguese characters render correctly (embedded Unicode font since Aug 16 2026; fr-FR + EUR covered by `transactionsPdf.test.ts`)
 - [ ] Analytics charts render at 1 week, 1 month, 6 months — no crashes
 - [ ] New user (0 transactions): graceful empty state
 - [ ] Safe to Spend panel: spent + upcoming + free sum correctly
@@ -1523,7 +1523,7 @@ All three of these are native modules and require **`npx expo prebuild
 expo-notifications add — one rebuild covers both).
 
 **Implementation:**
-- [apps/mobile/src/services/exportData.ts](../apps/mobile/src/services/exportData.ts) — pure formatters + the share-flow IO. `buildCSV`, `buildJSON`, `pdfHTML`, and `exportAndShare(format, input)`. CSV intentionally uses dot-decimal + comma-separator (the universal Excel/Numbers/Sheets contract) regardless of UI locale; JSON is structured with `app: 'Murmur'` + `version: 1` so future Murmur instances can re-import it cleanly. The PDF template uses serif money + sage credit highlighting + the brand-sheet color tokens. Files are named `murmur-YYYY-MM-DD.{csv,json,pdf}`.
+- [apps/mobile/src/services/exportData.ts](../apps/mobile/src/services/exportData.ts) — pure formatters + the share-flow IO. `buildCSV`, `buildJSON`, `pdfHTML`, and `exportAndShare(format, input)`. CSV intentionally uses dot-decimal + comma-separator (the universal Excel/Numbers/Sheets contract) regardless of UI locale; JSON is structured with `app: 'Murmur'` + `version: 1` so future Murmur instances can re-import it cleanly. The PDF template uses serif money + sage credit highlighting + the brand-sheet color tokens; since Aug 16 2026 it also carries the inline Coin & Wave brand mark, prints the localised "Income" for an uncategorised credit, and shows the native-currency column only for multi-currency exports (same rules as the web PDF). Files are named `murmur-YYYY-MM-DD.{csv,json,pdf}`.
 - [apps/mobile/app/more/settings.tsx](../apps/mobile/app/more/settings.tsx) — new "Data" group with an "Export your data" row. Free users tapping the row hit the paywall; Plus users get a three-button format-picker modal (CSV / JSON / PDF) with a tooltip line on each option. Tapping a format runs the export and hands the file to the share sheet; failures surface as an Alert.
 
 **i18n** — 22 new keys per locale (en/fr/es/pt) for the Settings entries,
@@ -1644,10 +1644,11 @@ Production paths stay walled until RevenueCat lands.
   Export (Plus).** Client component. Date range + transaction summary,
   three format cards: CSV (BOM + dot decimal so Excel / Numbers /
   Sheets all open clean), JSON (`{ app: 'Murmur', version: 1, ... }` so
-  a future Murmur instance can re-import), PDF (opens a new window
-  with brand-styled HTML and triggers `window.print()` so the user can
-  Save as PDF from the system print dialog — no JS PDF library, no
-  bundle bloat).
+  a future Murmur instance can re-import), PDF (a real downloadable
+  document rendered by
+  [lib/pdf/transactionsPdf.ts](../apps/web/src/lib/pdf/transactionsPdf.ts)
+  with jsPDF + autoTable and an embedded Unicode brand font — see
+  [fixes-2026-08-16-pdf-export-insights-recurring.md](fixes-2026-08-16-pdf-export-insights-recurring.md)).
 
 **Login** at [apps/web/src/app/login/page.tsx](../apps/web/src/app/login/page.tsx)
 — refreshed with the real MurmurMark and the brand tagline ("Speak it.
@@ -3283,6 +3284,18 @@ the engineering side rather than punted.
   credit colour) within jsPDF's primitive draw API. The previous
   `pdfHTML` helper and `escape` utility were removed — they were
   exclusively used by the popup path.
+- **Aug 16 2026 (owner review):** the inline jsPDF drawing used the
+  built-in WinAnsi-only fonts, so the typographic minus, arrow and
+  narrow spaces printed as garbage glyphs with broken widths on every
+  amount. Rebuilt as
+  [lib/pdf/transactionsPdf.ts](../apps/web/src/lib/pdf/transactionsPdf.ts):
+  embedded Plus Jakarta Sans (derived tabular-figure build in
+  `apps/web/public/fonts/`, built by `scripts/build-pdf-fonts.py`),
+  vector Coin & Wave brand mark, "Income" for uncategorised credits,
+  single Amount column for single-currency exports, hairline table,
+  Net in the totals strip, tested against the real fonts in node. Full
+  write-up:
+  [fixes-2026-08-16-pdf-export-insights-recurring.md](fixes-2026-08-16-pdf-export-insights-recurring.md).
 
 **Budgets page realtime + period-aware Overall + scope-edit sheet (DESKTOP §4.4, §4.5, §4.6, LOGIC §3.3).**
 - [budgets/page.tsx](../apps/web/src/app/dashboard/budgets/page.tsx)
