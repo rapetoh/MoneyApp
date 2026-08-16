@@ -79,3 +79,16 @@ you are — what's on your mind?"; the meta question is answered directly; the n
 spending $1,329 = the Ask figure; the home line "$0 left this month" was a $700 **weekly** budget $237
 over, clamped to 0 and captioned "this month" — fixed on the home screen (build 22); the Recurring
 screen's dates/totals are correct, its calendar footer had counted two paychecks as "charges" — fixed.
+
+**Aug 16 2026, ~14:15 CDT — owner verification of a desktop thread (their real account).** Human check
+against the database: $1,329 spent ✓, $2,500 earned ✓, "$1,250 monthly average over 12 months" ✗ (data
+starts Aug 8), "≈$5,416.67 next month" ⚠ (that is the biweekly average; September has two paydays →
+$5,000), "no transactions for 20 LLC" ✗ (the $1,000 "The20 MSP" deposit is linked to the 20 LLC rule).
+Structural fixes (commit 8ff14d4): transactions carry `recurring_rule_id` on the wire; `rule_name`
+filter with link-first matching on total/list_transactions and in recurring_total's charged-this-month;
+every windowed result carries `coverage` and the prompt forbids averaging over uncovered periods;
+`recurring_in_window` gives the calendar projection (`nextMonth`, `next30Days` windows).
+Replay script `apps/web/scripts/ask-murmur-owner-replay.mjs` (the owner's exact turns on data shaped
+like their account). Local run with the new code: $5,000 next month with Sep 8/22 dates ✓; 20 LLC ↔
+The20 MSP by the link ✓; "monthly average salary" → "$5,416.67 on average, from your recurring income
+rules" (truthful; not $1,250). Production run pending the deploy of 8ff14d4.
