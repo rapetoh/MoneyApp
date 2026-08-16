@@ -217,6 +217,61 @@ charts on mobile. Traced locally (`AI_DEBUG_TRACE=1` + the harness with
   off-subject checks): ALL PASSED + 401/400/no-data paths. Run before any
   release touching Ask.
 
+**Ask Murmur 360 — beyond the screenshots (Aug 15–16 night, build 16 → 17):**
+
+The owner asked whether the fix was a real 360 or a screenshot patch. It
+was the latter, so this pass hunted for what a real user would hit next
+and fixed each at its source; every item was verified with the tracing
+harness (`AI_DEBUG_TRACE=1` local + `API_BASE`) and then in production.
+
+- **Time windows.** The fixed list could not compute "last week",
+  "yesterday", "in June", "between the 1st and the 10th" (one of the app's
+  own starter prompts asks about last week). Added `yesterday`,
+  `thisWeek`/`lastWeek` (Mon–Sun), `thisQuarter`/`lastQuarter`, and
+  `custom` (`start_date`/`end_date`, inclusive civil dates in the user's
+  zone) through the one shared row filter — every tool gets them. Unit
+  tests: April 11–15, named month == lastMonth, bad/reversed dates.
+- **Data reach.** Clients sent 90 days / 500 rows, so "this year" was a
+  90-day number labelled as a year. Now 12 months / 2,000 rows on mobile,
+  web and server (rows never reach the model — no token cost).
+- **Budget awareness.** New `AskMurmurBudget` on the wire, filled from the
+  app's own `budgetStatus` (mobile `budgetStatusFor`, web same shared fn —
+  identical numbers to the Budgets tab), validated server-side, presented
+  in a BUDGET block; "how am I doing against my budget?" → remaining +
+  per-day pace; "no budget set" handled honestly. Budget figures are
+  trusted by the numeric validator.
+- **Still-due bills, deterministically.** `recurring_total` now reports
+  `charged_this_month` per rule and `still_due_this_month_total` (name /
+  recurring-amount match against this month's rows). The end-of-month
+  forecast had counted bills charged on the 12th as upcoming.
+- **Grounding, structurally.** Trace of "and last month?": the model
+  answered with *zero* tool calls and an invented $91; the validator had
+  flagged it only as a soft issue. New hard retry triggers:
+  `detectUngrounded` (numeric answer, no successful tool call, untraced
+  figures) and `detectWindowMismatch` (question names a period in
+  en/fr/es/pt but no tool queried it). Overview totals and BUDGET figures
+  are trusted so a grounded greeting isn't retried.
+- **Tool contract.** Trace of "coffee": the model correctly called
+  `top_merchants` with `merchant_contains`, which that tool didn't accept —
+  the filter was silently dropped and unfiltered merchants shipped under
+  a coffee caption. Every tool now rejects unknown arguments with a
+  self-correcting error; `top_merchants` / `sum_by_category` / `series`
+  accept `merchant_contains` (`series` also `category_name`).
+- **Fallback consistency.** The summarize fallback's snapshot excluded
+  transfers ($881 for a month every tool reported as $1,331); it now uses
+  the same "spent" definition as the tools and every app screen. A
+  fallback answer can no longer disagree with the grounded ones.
+- **Verified.** 14-question battery (last week, yesterday, July, Uber this
+  year, budget / no budget, subscriptions, biggest expense, weekday chart,
+  Tesla refusal, French, gibberish, forecast, starter prompt) hand-checked
+  against planted data — all exact; the standing harness (owner's three
+  conversations + error paths) **ALL PASSED in production** after each
+  deploy.
+- **Ops:** EAS free-plan iOS build quota ran out for the month during this
+  pass (resets Sep 1); build 17 (12-month reach + budget context on
+  mobile) was produced with `eas build --local` on the owner's Mac and
+  submitted with `eas submit`. Server changes need no build.
+
 **Build 12 → build 13 (owner's six-item review, Aug 11 late evening):**
 
 1. **Glow rendered as visible concentric rings** (vs. the Claude app's
