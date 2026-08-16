@@ -174,6 +174,49 @@ The owner's first TestFlight session surfaced four real defects:
    Cosmetic fix in the same pass: no duplicated category chip on the
    merchant card when the parse has no merchant.
 
+**Ask Murmur — build 14 → build 16 (owner's ultimatum, Aug 15 night):**
+
+Owner screenshots: (1) sending a question navigated to a second screen
+("a new chat every time"); (2) "Can I afford a PS5 this month?" →
+"To determine…we need to compare…" — a fluent stall with no numbers;
+(3) "Ok" / "Okay?????" → the identical stall repeated verbatim; (4) no
+charts on mobile. Traced locally (`AI_DEBUG_TRACE=1` + the harness with
+`API_BASE=http://localhost:3111`) and fixed at each source:
+
+- **One screen.** `app/more/ask.tsx` is the whole feature — hero + starter
+  prompts while empty, the thread once a question is sent, one always-
+  present input bar; sending never navigates. `ask-result` route deleted.
+  New `AskChart` (bar / line / horizontal_bar / donut, single-hue sage,
+  ink labels) renders the reasoner's chart the web already drew.
+  Attribution shows only under answers that used data.
+- **Stall + repeat detectors** in the route (narration/permission-seeking
+  with no digits/breakdown/chart; verdict == last history answer) → retry
+  with a pointed instruction → summarize fallback if still broken.
+- **Conversation rules** in the reasoner prompt: lead with the answer and
+  its number; named item without a price → typical retail price as a
+  stated assumption (the design's own "PS5 (you searched) · $499");
+  contentless follow-ups never repeat; greetings = one warm line + 2–3
+  grounded offers; charts for 3+ buckets / time series; **subject
+  filtering** (a "coffee" breakdown must come from a coffee/category-
+  filtered tool call — never unfiltered top merchants under a subject
+  caption); one definition of income per conversation; never add
+  `recurring_total` on top of a period's spending.
+- **429 handling.** The off-topic answers in production were the
+  question-blind summarize fallback firing on OpenAI rate limits — **the
+  OpenAI org is on a 30k tokens/min gpt-4o tier**. Now: honor Retry-After
+  (1.5–6s), one more full attempt, then a real 503 `{error:'busy'}` the
+  client retries with one tap. The fallback itself is now question-aware.
+  **Ops action for the owner:** raise the OpenAI usage tier before public
+  release — under real load 30k TPM will trip.
+- **One number for "this month".** Overview gained `this_month_debit` /
+  `this_month_credit` computed exactly like the `total` tool; the
+  greeting had quoted the 90-day `total_debit` as "this month" and the
+  same month showed $881 vs $1,331 across turns.
+- **Verified live in production** with `apps/web/scripts/ask-murmur-e2e.mjs`
+  (now the owner's exact three conversations, paced, with stall / repeat /
+  off-subject checks): ALL PASSED + 401/400/no-data paths. Run before any
+  release touching Ask.
+
 **Build 12 → build 13 (owner's six-item review, Aug 11 late evening):**
 
 1. **Glow rendered as visible concentric rings** (vs. the Claude app's

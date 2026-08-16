@@ -61,6 +61,14 @@ truth: `docs/voice redesign/` (screenshot + Claude Design HTML, artboards
   no date picker exists anywhere yet; follow-up), and the mockup's
   "nothing uploaded" copy (transcript does go to the parse API; the
   existing honest "Processed securely" line stays).
+- **Ask Murmur rebuilt end to end → build 16** (Aug 15 night, owner
+  ultimatum; details in
+  [voice redesign/IMPLEMENTATION.md](./voice%20redesign/IMPLEMENTATION.md)
+  §"Ask Murmur — build 14 → build 16"): one conversation screen on mobile
+  with charts; stall/repeat detectors + conversation rules in the reasoner;
+  honest 429 handling (org is on a **30k TPM gpt-4o tier — raise it before
+  public release**); one consistent month figure; production harness with
+  the owner's exact conversations — ALL PASSED.
 - **Build 12 review → build 13** (Aug 11 late evening; details in
   [voice redesign/IMPLEMENTATION.md](./voice%20redesign/IMPLEMENTATION.md)
   §"Build 12 → build 13"): smooth blurred edge glow (native
