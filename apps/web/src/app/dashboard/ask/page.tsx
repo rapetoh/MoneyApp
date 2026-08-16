@@ -231,6 +231,7 @@ export default function AskMurmurPage() {
         category_name: x.category_id ? (catById.get(x.category_id) ?? null) : null,
         transacted_at: x.transacted_at,
         is_recurring: !!x.is_recurring,
+        recurring_rule_id: x.recurring_rule_id ?? null,
       }))
     const wireRules: Array<AskMurmurRecurringRuleV2 & { amount_in_profile_currency?: number | null; is_active?: boolean }> = rules
       .filter((r) => r.is_active && !r.is_deleted)

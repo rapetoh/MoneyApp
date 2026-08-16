@@ -140,6 +140,7 @@ export async function POST(req: NextRequest) {
       category_name: typeof t.category_name === 'string' ? t.category_name : null,
       transacted_at: typeof t.transacted_at === 'string' ? t.transacted_at : '',
       is_recurring: !!t.is_recurring,
+      recurring_rule_id: typeof t.recurring_rule_id === 'string' ? t.recurring_rule_id : null,
     }))
     .filter((t) => t.transacted_at)
   const recurring_rules: AskMurmurRecurringRuleV2[] = (Array.isArray(body.recurring_rules) ? body.recurring_rules : [])

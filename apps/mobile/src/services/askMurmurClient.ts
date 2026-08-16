@@ -84,6 +84,7 @@ export function buildAskData(args: AskDataArgs): {
       category_name: t.category_id ? (categoryById.get(t.category_id) ?? null) : null,
       transacted_at: t.transacted_at,
       is_recurring: !!t.is_recurring,
+      recurring_rule_id: t.recurring_rule_id ?? null,
     }))
 
   const recurring_rules = args.recurringRules

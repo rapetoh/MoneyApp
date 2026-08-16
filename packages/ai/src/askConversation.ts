@@ -106,7 +106,10 @@ THIS IS A CONVERSATION WITH A PERSON. Answer what they actually said, the way a 
 
 NUMBERS — non-negotiable:
 - Every figure you write (money, percent, count, per-day pace, ratio, difference) must come from: a tool result in THIS turn, a COMPUTED figure from an earlier turn, the DATA OVERVIEW, the BUDGET block, the tapped insight, or the user's own message. You are not a calculator: any new arithmetic goes through the \`arith\` tool (percent_of for ratios/shares, subtract for differences, divide for per-day pace, multiply for projections). Quote tool results verbatim (they are already in the profile currency, 2 decimals). Format money the way ${localeName} writes it (fr "1 331 $", es/pt "1.331 $", en "$1,331").
-- Windows: today, yesterday, thisWeek, lastWeek (Mon–Sun), thisMonth, lastMonth, thisQuarter, lastQuarter, thisYear, lastYear, last7Days, last30Days, last90Days, last6Months, last12Months, or custom with start_date/end_date (YYYY-MM-DD in the user's zone) for anything else ("in June", "the first week of July"). Match the user's words exactly; when the phrasing is loose, say the range you used. If a window starts before earliest_transacted_at, say the data begins on that date.
+- Windows: today, yesterday, thisWeek, lastWeek (Mon–Sun), thisMonth, lastMonth, thisQuarter, lastQuarter, thisYear, lastYear, last7Days, last30Days, last90Days, last6Months, last12Months, nextMonth, next30Days, or custom with start_date/end_date (YYYY-MM-DD in the user's zone) for anything else ("in June", "the first week of July"). Match the user's words exactly; when the phrasing is loose, say the range you used.
+- DATA COVERAGE is a hard rule: every windowed tool result carries \`coverage\` (data_starts, days_with_data, months_covered, window_fully_covered). You may only state an average, a rate or a trend "over N months/weeks" when months_covered ≥ N. If the data covers less than the window asked (e.g. "past 12 months" but data starts 8 days ago), SAY SO ("your data starts Aug 8, so I only have August so far: $2,500 — no 12-month average exists yet") and give the figure for the covered part only. Never divide by a period the data doesn't cover.
+- Recurring rules ↔ transactions: use \`rule_name\` on total / list_transactions to get the payments that belong to a rule — the stored link, not the merchant name (a "The20 MSP" deposit can belong to the "20 LLC" rule). Never attribute a transaction to a rule by name resemblance.
+- "How much will I earn / pay next month (this month, next 30 days, in September)": call \`recurring_in_window\` — the calendar occurrences and their totals. \`recurring_total.monthly_total\` is the long-run monthly AVERAGE (biweekly × 26/12) — say "on average" if you quote it, and never present it as a specific month's amount.
 - Income = \`total\` with direction "credit" for the window (money actually received). Use monthly_income only when the window has no income transactions — and say so. One definition per thread.
 - A period's spending already contains the recurring bills charged inside it. For "what's left" / "can I afford X" / "will I make it": left = income this period − spending this period − recurring_total.still_due_this_month_total (bills not yet charged; name them). Never subtract monthly_total on top of spending. Never estimate subscriptions from raw rule amounts — recurring_total normalizes weekly/yearly to monthly.
 - Named item without a price ("a PS5", "an iPhone"): use its typical retail price as an explicit assumption and answer ("A PS5 runs about $499 …"); an item whose price varies too much (a car, a trip) → give the threshold you can cover.
@@ -527,8 +530,17 @@ export function compactComputed(calls: ToolCallRecord[]): AskComputedRecord[] {
         rules: Array.isArray(r.rules) ? (r.rules as Array<Record<string, unknown>>).slice(0, 12).map((x) => ({ name: x.name, monthly_amount: x.monthly_amount, charged_this_month: x.charged_this_month })) : [],
       }
     } else if (c.name === 'series' && result && typeof result === 'object') {
-      const r = result as { points?: unknown[] }
-      result = { points: (r.points ?? []).slice(0, 14) }
+      const r = result as { points?: unknown[]; coverage?: unknown }
+      result = { points: (r.points ?? []).slice(0, 14), coverage: r.coverage }
+    } else if (c.name === 'recurring_in_window' && result && typeof result === 'object') {
+      const r = result as Record<string, unknown>
+      result = {
+        window_start: r.window_start,
+        window_end_exclusive: r.window_end_exclusive,
+        expected_income_total: r.expected_income_total,
+        expected_bills_total: r.expected_bills_total,
+        rules: Array.isArray(r.rules) ? (r.rules as Array<Record<string, unknown>>).slice(0, 12).map((x) => ({ name: x.name, direction: x.direction, occurrences: x.occurrences, dates: Array.isArray(x.dates) ? (x.dates as unknown[]).slice(0, 6) : [], total: x.total })) : [],
+      }
     } else if ((c.name === 'top_merchants' || c.name === 'sum_by_category') && result && typeof result === 'object') {
       const r = result as Record<string, unknown[]>
       const key = c.name === 'top_merchants' ? 'merchants' : 'categories'

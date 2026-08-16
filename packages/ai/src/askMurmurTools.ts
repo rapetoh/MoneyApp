@@ -62,6 +62,7 @@ import {
   addMonthsClamped,
   civilDateTimeToInstant,
   firstOccurrenceOnOrAfter,
+  occurrencesInWindow,
   isSpend,
   localDay,
   localParts,
@@ -98,7 +99,7 @@ export interface ToolContext {
   monthly_income: number | null
   locale: string
   transactions: AskMurmurTransaction[]
-  recurring_rules: AskMurmurRecurringRule[]
+  recurring_rules: AskMurmurRecurringRuleV2[]
 }
 
 export interface ToolCallRecord {
@@ -220,12 +221,13 @@ function monthsAgoWindow(y: number, m: number, d: number, tz: string, n: number)
 /** Every argument each tool accepts — `resolveToolCall` rejects anything
  *  else with a self-correcting error rather than dropping it. */
 const TOOL_ARG_NAMES: Record<string, Set<string>> = {
-  total: new Set(['window', 'start_date', 'end_date', 'direction', 'category_name', 'merchant_contains']),
+  total: new Set(['window', 'start_date', 'end_date', 'direction', 'category_name', 'merchant_contains', 'rule_name']),
   sum_by_category: new Set(['window', 'start_date', 'end_date', 'direction', 'merchant_contains']),
   top_merchants: new Set(['window', 'start_date', 'end_date', 'direction', 'category_name', 'merchant_contains', 'limit']),
   series: new Set(['window', 'start_date', 'end_date', 'bucket', 'direction', 'category_name', 'merchant_contains']),
-  list_transactions: new Set(['window', 'start_date', 'end_date', 'direction', 'category_name', 'merchant_contains', 'min_amount', 'limit']),
+  list_transactions: new Set(['window', 'start_date', 'end_date', 'direction', 'category_name', 'merchant_contains', 'rule_name', 'min_amount', 'limit']),
   recurring_total: new Set(['direction']),
+  recurring_in_window: new Set(['window', 'start_date', 'end_date', 'direction']),
   arith: new Set(['op', 'a', 'b']),
   can_afford: new Set(['available', 'cost']),
   compare: new Set(['a', 'b']),
@@ -247,6 +249,8 @@ export const WINDOW_NAMES = [
   'last90Days',
   'last6Months',
   'last12Months',
+  'nextMonth',
+  'next30Days',
   // Any other range — a named month ("June"), "between the 1st and the
   // 10th", a specific quarter of last year — via start_date / end_date
   // (inclusive civil dates in the user's zone). Owner report Aug 15: the
@@ -289,6 +293,8 @@ export function buildWindows(nowUtcStr: string, tz: string): Record<WindowName, 
     last90Days: trailingDaysWindow(y, m, d, resolvedTz, 90),
     last6Months: monthsAgoWindow(y, m, d, resolvedTz, 5),
     last12Months: monthsAgoWindow(y, m, d, resolvedTz, 11),
+    nextMonth: (() => { const nm = addMonthsClamped(y, m, 1, 1); return monthWindow(nm.y, nm.m, resolvedTz) })(),
+    next30Days: (() => { const start = dayWindow(y, m, d, resolvedTz).start; const e = addDays(y, m, d, 30); return { start, end: toDate(civilDateTimeToInstant(e.y, e.m, e.d, 0, 0, 0, resolvedTz)) } })(),
     // Placeholder — a 'custom' filter is resolved from its own dates by
     // `resolveWindow`; this entry only keeps the record shape total.
     custom: { start: new Date(0), end: new Date(0) },
@@ -388,6 +394,29 @@ interface RowFilter {
   direction?: 'debit' | 'credit'
   category_name?: string
   merchant_contains?: string
+  /** Rows that belong to this recurring rule (by the real link, then by
+   *  name) — "which payments were 20 LLC?" (rule name, case-insensitive). */
+  rule_name?: string
+}
+
+/** Rules whose name matches `needle` (case-insensitive, either contains). */
+function rulesNamed(ctx: ToolContext, needle: string): AskMurmurRecurringRuleV2[] {
+  const n = needle.trim().toLowerCase()
+  return (ctx.recurring_rules as AskMurmurRecurringRuleV2[]).filter((r) => {
+    const rn = (r.name ?? '').trim().toLowerCase()
+    return !!rn && (rn === n || rn.includes(n) || n.includes(rn))
+  })
+}
+
+/** Does `t` belong to `rule`? The persisted link wins; a name match only
+ *  applies when the transaction carries no link at all. */
+function txBelongsToRule(t: AskMurmurTransaction, rule: AskMurmurRecurringRuleV2): boolean {
+  if (t.recurring_rule_id && rule.id) return t.recurring_rule_id === rule.id
+  if (t.recurring_rule_id && !rule.id) return false
+  const rn = (rule.name ?? '').trim().toLowerCase()
+  const mn = (t.merchant ?? '').trim().toLowerCase()
+  if (rn && mn && (mn.includes(rn) || rn.includes(mn))) return true
+  return !!t.is_recurring && t.direction === rule.direction && Math.abs((t.amount_in_profile_currency ?? NaN) - rule.amount) < 0.005
 }
 
 interface FilteredRows {
@@ -415,6 +444,10 @@ function filterRows(
   if (filter.merchant_contains) {
     const needle = filter.merchant_contains.toLowerCase()
     rows = rows.filter((t) => (t.merchant ?? '').toLowerCase().includes(needle))
+  }
+  if (filter.rule_name) {
+    const rules = rulesNamed(ctx, filter.rule_name)
+    rows = rules.length === 0 ? [] : rows.filter((t) => rules.some((r) => txBelongsToRule(t, r)))
   }
   let pendingCount = 0
   const resolved: AskMurmurTransaction[] = []
@@ -444,6 +477,34 @@ function parseTotalArgs(args: Record<string, unknown>): TotalArgs {
     direction: parseDirection(args.direction),
     category_name: parseOptionalString(args.category_name),
     merchant_contains: parseOptionalString(args.merchant_contains),
+    rule_name: parseOptionalString(args.rule_name),
+  }
+}
+
+/** How much of a requested window the data actually covers — so a
+ *  "12-month average" over 8 days of history is impossible to state without
+ *  seeing it (Aug 16: "$1,250 monthly average over the past 12 months" from
+ *  one month of data). `days_with_data` counts civil days from the earliest
+ *  transaction (or the window start, whichever is later) to the window end
+ *  (or now); `months_covered` is that in months, rounded to one decimal. */
+function coverageFor(ctx: ToolContext, w: DateWindow): { window_start: string; window_end: string; data_starts: string | null; days_with_data: number; months_covered: number; window_fully_covered: boolean } {
+  const tz = resolveTz(ctx.tz)
+  let earliest: number | null = null
+  for (const t of ctx.transactions ?? []) {
+    const ms = Date.parse(t.transacted_at)
+    if (Number.isFinite(ms) && (earliest === null || ms < earliest)) earliest = ms
+  }
+  const nowMs = Date.parse(ctx.now_utc)
+  const endMs = Math.min(w.end.getTime(), Number.isFinite(nowMs) ? nowMs : w.end.getTime())
+  const startMs = earliest === null ? w.start.getTime() : Math.max(w.start.getTime(), earliest)
+  const days = Math.max(0, Math.round((endMs - startMs) / 864e5))
+  return {
+    window_start: localDay(w.start.toISOString(), tz),
+    window_end: localDay(new Date(Math.max(w.start.getTime(), endMs)).toISOString(), tz),
+    data_starts: earliest === null ? null : localDay(new Date(earliest).toISOString(), tz),
+    days_with_data: earliest === null ? 0 : days,
+    months_covered: earliest === null ? 0 : Math.round((days / 30.44) * 10) / 10,
+    window_fully_covered: earliest !== null && earliest <= w.start.getTime(),
   }
 }
 
@@ -454,6 +515,7 @@ function totalTool(args: TotalArgs, ctx: ToolContext, windows: Record<WindowName
     total: roundCents(total),
     count: rows.length,
     pending_conversion_count: pendingCount,
+    coverage: coverageFor(ctx, resolveWindow(args, windows, ctx)),
   }
 }
 
@@ -610,7 +672,7 @@ function seriesTool(args: SeriesArgs, ctx: ToolContext, windows: Record<WindowNa
     .sort((a, b) => a.order - b.order)
     .map(({ order: _order, ...rest }) => rest)
 
-  return { points, pending_conversion_count: pendingCount }
+  return { points, pending_conversion_count: pendingCount, coverage: coverageFor(ctx, resolveWindow(args, windows, ctx)) }
 }
 
 // ─── list_transactions ──────────────────────────────────────────────────
@@ -637,6 +699,7 @@ function parseListTransactionsArgs(args: Record<string, unknown>): ListTransacti
     direction: parseDirection(args.direction),
     category_name: parseOptionalString(args.category_name),
     merchant_contains: parseOptionalString(args.merchant_contains),
+    rule_name: parseOptionalString(args.rule_name),
     min_amount,
     limit: parseLimit(args.limit, 12, 25),
   }
@@ -666,6 +729,68 @@ function listTransactionsTool(
     total,
     truncated: matched.length > args.limit,
     pending_conversion_count: pendingCount,
+  }
+}
+
+// ─── recurring_in_window ────────────────────────────────────────────────
+//
+// The calendar answer to "how much will I earn / pay next month": every
+// occurrence of every active rule inside the window, from the recurrence
+// engine (same math as the Recurring screen and the Budgets tab). Aug 16:
+// "next month ≈ $5,416.67" was the biweekly monthly-equivalent average;
+// September actually has two paydays → $5,000.
+
+function recurringInWindowTool(args: Record<string, unknown>, ctx: ToolContext, windows: Record<WindowName, DateWindow>): unknown {
+  const filter: RowFilter = {
+    window: parseWindowName(args.window),
+    start_date: parseCivilDate(args.start_date, 'start_date'),
+    end_date: parseCivilDate(args.end_date, 'end_date'),
+  }
+  const direction = parseDirection(args.direction)
+  const w = resolveWindow(filter, windows, ctx)
+  const tz = resolveTz(ctx.tz)
+  const rules = (ctx.recurring_rules as AskMurmurRecurringRuleV2[]).filter(
+    (r) => (!direction || r.direction === direction) && VALID_FREQUENCIES.has(r.frequency),
+  )
+  const perRule: Array<{ name: string; direction: string; amount: number; occurrences: number; dates: string[]; total: number; has_schedule: boolean }> = []
+  let missingSchedule = 0
+  for (const r of rules) {
+    const name = r.name?.trim() || 'Unnamed'
+    if (!r.starts_at) {
+      missingSchedule += 1
+      perRule.push({ name, direction: r.direction, amount: roundCents(r.amount), occurrences: 0, dates: [], total: 0, has_schedule: false })
+      continue
+    }
+    try {
+      const occ = occurrencesInWindow(
+        {
+          frequency: r.frequency as RecurringFrequency,
+          interval: r.interval ?? 1,
+          starts_at: r.starts_at,
+          ends_at: r.ends_at ?? null,
+          anchor_day: r.anchor_day ?? null,
+          anchor_weekday: r.anchor_weekday ?? null,
+          anchor_time: r.anchor_time ?? null,
+        },
+        w.start.toISOString(),
+        w.end.toISOString(),
+        tz,
+        { limit: 400 },
+      )
+      perRule.push({ name, direction: r.direction, amount: roundCents(r.amount), occurrences: occ.length, dates: occ.map((o) => o.occurrenceDate), total: roundCents(occ.length * r.amount), has_schedule: true })
+    } catch {
+      missingSchedule += 1
+      perRule.push({ name, direction: r.direction, amount: roundCents(r.amount), occurrences: 0, dates: [], total: 0, has_schedule: false })
+    }
+  }
+  const sum = (d: 'debit' | 'credit') => roundCents(perRule.filter((p) => p.direction === d).reduce((a, p) => a + p.total, 0))
+  return {
+    window_start: localDay(w.start.toISOString(), tz),
+    window_end_exclusive: localDay(w.end.toISOString(), tz),
+    rules: perRule,
+    expected_income_total: sum('credit'),
+    expected_bills_total: sum('debit'),
+    rules_without_schedule: missingSchedule,
   }
 }
 
@@ -747,12 +872,8 @@ function recurringTotalTool(args: RecurringTotalArgs, ctx: ToolContext): unknown
   const tz = resolveTz(ctx.tz)
   const windows = buildWindows(ctx.now_utc, tz)
   const thisMonthRows = filterRows(ctx, windows, { window: 'thisMonth', direction }).rows
-  const matchesRule = (rule: AskMurmurRecurringRule, t: AskMurmurTransaction): boolean => {
-    const rn = (rule.name ?? '').trim().toLowerCase()
-    const mn = (t.merchant ?? '').trim().toLowerCase()
-    if (rn && mn && (mn.includes(rn) || rn.includes(mn))) return true
-    return !!t.is_recurring && Math.abs(amountOf(t) - rule.amount) < 0.005
-  }
+  const matchesRule = (rule: AskMurmurRecurringRule, t: AskMurmurTransaction): boolean =>
+    txBelongsToRule(t, rule as AskMurmurRecurringRuleV2)
   const normalized = rules
     .map((r) => {
       const paid = thisMonthRows.some((t) => matchesRule(r, t))
@@ -907,6 +1028,7 @@ export const TOOLS = [
             type: 'string',
             description: 'Case-insensitive substring match on merchant name, e.g. "starbucks".',
           },
+          rule_name: { type: 'string', description: 'Only rows that belong to this recurring rule (by the stored link, then by name), e.g. "20 LLC". Use for "how much did <rule> pay me / cost me".' },
         },
         additionalProperties: false,
       },
@@ -1012,6 +1134,7 @@ export const TOOLS = [
           direction: { type: 'string', enum: ['debit', 'credit'], description: 'Omit for both. "debit" = spend, "credit" = income.' },
           category_name: { type: 'string', description: 'Exact category name to filter to.' },
           merchant_contains: { type: 'string', description: 'Case-insensitive substring match on merchant name.' },
+          rule_name: { type: 'string', description: 'Only rows that belong to this recurring rule (stored link first, then name), e.g. "20 LLC" — the right way to list the payments behind a rule.' },
           min_amount: { type: 'number', description: 'Only rows at or above this amount (profile currency).' },
           limit: { type: 'number', description: 'Max rows to return, 1–25. Default 12.' },
         },
@@ -1033,6 +1156,24 @@ export const TOOLS = [
             enum: ['debit', 'credit'],
             description: 'Default "debit" (bills). Pass "credit" for recurring income like salary.',
           },
+        },
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'recurring_in_window',
+      description:
+        'The CALENDAR projection of recurring rules inside a window: every occurrence (dates) of each active rule, expected_income_total and expected_bills_total. Use for "how much will I earn / pay next month (or this month, next 30 days, in September)" — this is the real answer; recurring_total.monthly_total is only the long-run monthly average.',
+      parameters: {
+        type: 'object',
+        required: ['window'],
+        properties: {
+          window: { type: 'string', enum: WINDOW_NAMES, description: WINDOW_ENUM_DESCRIPTION },
+          ...CUSTOM_DATE_PROPS,
+          direction: { type: 'string', enum: ['debit', 'credit'], description: 'Omit for both.' },
         },
         additionalProperties: false,
       },
@@ -1158,6 +1299,9 @@ export function resolveToolCall(
         break
       case 'recurring_total':
         result = recurringTotalTool(parseRecurringTotalArgs(safeArgs), ctx)
+        break
+      case 'recurring_in_window':
+        result = recurringInWindowTool(safeArgs, ctx, windows)
         break
       case 'arith':
         result = arithTool(safeArgs)

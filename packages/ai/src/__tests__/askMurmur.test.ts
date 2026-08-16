@@ -341,6 +341,7 @@ describe('TOOLS catalog', () => {
       'can_afford',
       'compare',
       'list_transactions',
+      'recurring_in_window',
       'recurring_total',
       'series',
       'sum_by_category',
@@ -404,6 +405,44 @@ describe('data overview vocabulary (rebuild)', () => {
     expect(o.categories[0]).toHaveProperty('name')
     expect(o.categories[0]).toHaveProperty('total')
     expect(o.merchants.length).toBeGreaterThan(0)
+  })
+})
+
+describe('rule ↔ transaction link, coverage, calendar projection (owner verification Aug 16)', () => {
+  const now = '2026-08-16T18:00:00Z'
+  const linked: ToolContext = {
+    ...ctx,
+    now_utc: now,
+    transactions: [
+      { amount: 1500, amount_in_profile_currency: 1500, direction: 'credit', merchant: 'The20', category_name: 'Business & Work', transacted_at: '2026-08-12T01:07:00Z', is_recurring: true, recurring_rule_id: 'rule-the20' },
+      { amount: 1000, amount_in_profile_currency: 1000, direction: 'credit', merchant: 'The20 MSP', category_name: 'Business & Work', transacted_at: '2026-08-12T01:15:00Z', is_recurring: true, recurring_rule_id: 'rule-20llc' },
+      { amount: 160, amount_in_profile_currency: 160, direction: 'debit', merchant: 'Best Buy', category_name: 'Shopping', transacted_at: '2026-08-16T01:04:00Z', is_recurring: false },
+    ],
+    recurring_rules: [
+      { id: 'rule-the20', name: 'The20', amount: 1500, direction: 'credit', frequency: 'biweekly', interval: 1, starts_at: '2026-08-12T01:07:00Z', ends_at: null },
+      { id: 'rule-20llc', name: '20 LLC', amount: 1000, direction: 'credit', frequency: 'biweekly', interval: 1, starts_at: '2026-08-12T01:15:00Z', ends_at: null },
+    ],
+  }
+  it('rule_name resolves by the stored link — "20 LLC" is the The20 MSP deposit, not nothing', () => {
+    const r = resolveToolCall('list_transactions', { window: 'thisMonth', rule_name: '20 LLC' }, linked) as { ok: true; result: { transactions: Array<{ merchant: string }>; total: number } }
+    expect(r.result.transactions.map((t) => t.merchant)).toEqual(['The20 MSP'])
+    expect(r.result.total).toBe(1000)
+    const t20 = resolveToolCall('total', { window: 'thisMonth', rule_name: 'The20' }, linked) as { ok: true; result: { total: number; count: number } }
+    expect(t20.result).toMatchObject({ total: 1500, count: 1 })
+  })
+  it('coverage exposes that "last12Months" is only ~5 days of data', () => {
+    const r = resolveToolCall('total', { window: 'last12Months', direction: 'credit' }, linked) as { ok: true; result: { total: number; coverage: { data_starts: string; months_covered: number; window_fully_covered: boolean } } }
+    expect(r.result.total).toBe(2500)
+    expect(r.result.coverage.data_starts).toBe('2026-08-11')
+    expect(r.result.coverage.window_fully_covered).toBe(false)
+    expect(r.result.coverage.months_covered).toBeLessThan(1)
+  })
+  it('recurring_in_window gives the calendar answer for next month (two biweekly paydays → $5,000)', () => {
+    const r = resolveToolCall('recurring_in_window', { window: 'nextMonth', direction: 'credit' }, linked) as { ok: true; result: { expected_income_total: number; rules: Array<{ name: string; occurrences: number; dates: string[] }> } }
+    expect(r.result.expected_income_total).toBe(5000)
+    const the20 = r.result.rules.find((x) => x.name === 'The20')!
+    expect(the20.occurrences).toBe(2)
+    expect(the20.dates).toEqual(['2026-09-08', '2026-09-22'])
   })
 })
 
