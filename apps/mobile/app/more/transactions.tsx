@@ -21,24 +21,25 @@ import { useManualRefresh } from '../../src/hooks/useManualRefresh'
 import { syncManager } from '../../src/services/sync/SyncManager'
 import { TransactionRow } from '../../src/components/TransactionRow'
 import { Colors, Typography, Spacing, Radius, Hairline } from '../../src/theme'
-import { t, type Locale } from '@voice-expense/shared'
+import { BottomSheet } from '../../src/components/BottomSheet'
+import { t, monthBounds, monthIso, formatMoney, type Locale } from '@voice-expense/shared'
 import type { Transaction } from '@voice-expense/shared'
 
-// "2026-04" → ISO bounds for month-scoped filtering. Returned `label` is the
-// first of the month, used to print "April 2026" in the heading.
-function parseMonthParam(raw: string | string[] | undefined):
-  | { start: string; end: string; label: Date }
-  | null {
+/** "2026-04" from the History calendar / Ask Murmur — validated to a month
+ *  key; bounds are resolved in the user's zone with `monthBounds`. */
+function parseMonthKey(raw: string | string[] | undefined): string | null {
   const v = Array.isArray(raw) ? raw[0] : raw
   if (!v) return null
   const match = /^(\d{4})-(\d{1,2})$/.exec(v)
   if (!match) return null
-  const y = parseInt(match[1], 10)
-  const m = parseInt(match[2], 10) - 1
-  if (m < 0 || m > 11) return null
-  const start = new Date(y, m, 1)
-  const end = new Date(y, m + 1, 1)
-  return { start: start.toISOString(), end: end.toISOString(), label: start }
+  const m = parseInt(match[2], 10)
+  if (m < 1 || m > 12) return null
+  return `${match[1]}-${String(m).padStart(2, '0')}`
+}
+
+function monthKeyLabel(key: string, locale: string, opts: Intl.DateTimeFormatOptions = { month: 'long', year: 'numeric' }): string {
+  const [y, m] = key.split('-').map(Number)
+  return new Intl.DateTimeFormat(locale, { ...opts, timeZone: 'UTC' }).format(new Date(Date.UTC(y, m - 1, 15)))
 }
 
 function groupByDate(transactions: Transaction[], locale: Locale) {
@@ -81,16 +82,28 @@ export default function TransactionsScreen() {
   // same search box the user could type into.
   const params = useLocalSearchParams<{ month?: string; q?: string }>()
   const [search, setSearch] = useState(typeof params.q === 'string' ? params.q : '')
+  // Month scope — null = all time. Seeded by `?month=` (History calendar,
+  // Ask Murmur actions); changed from the month chip in the header.
+  const [selectedMonth, setSelectedMonth] = useState<string | null>(() => parseMonthKey(params.month))
+  const [monthSheetOpen, setMonthSheetOpen] = useState(false)
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null)
   const [view, setView] = useState<'expenses' | 'income'>('expenses')
 
   const locale = (profile?.locale ?? 'en') as Locale
   const currency = profile?.currency_code ?? 'USD'
+  const tz = profile?.timezone || 'UTC'
 
-  // Optional ?month=YYYY-MM param from the History calendar: when set, the
-  // list is scoped to that month and the page title reads "April 2026"
-  // instead of the toggle-driven copy. Invalid values are ignored.
-  const monthFilter = useMemo(() => parseMonthParam(params.month), [params.month])
+  // Months that actually have data (newest first) — the month sheet's rows.
+  const monthOptions = useMemo(() => {
+    const keys = new Set<string>()
+    for (const tx of transactions) if (!tx.is_deleted) keys.add(monthIso(tx.transacted_at, tz))
+    return Array.from(keys).sort((a, b) => (a < b ? 1 : a > b ? -1 : 0))
+  }, [transactions, tz])
+  const monthFilter = useMemo(() => {
+    if (!selectedMonth) return null
+    const b = monthBounds(selectedMonth, tz)
+    return { start: b.start, end: b.endExclusive }
+  }, [selectedMonth, tz])
 
   // Only show categories that have at least one transaction
   const usedCategories = useMemo(() => {
@@ -132,20 +145,20 @@ export default function TransactionsScreen() {
   }, [transactions, search, selectedCategoryId, categoryMap, view, monthFilter])
 
   const sections = useMemo(() => groupByDate(filtered, locale), [filtered, locale])
+  // Summary for the current scope — count + total, so the number the user
+  // is looking at is stated, not implied.
+  const summary = useMemo(() => {
+    let total = 0
+    for (const tx of filtered) if (tx.amount_in_profile_currency != null) total += tx.amount_in_profile_currency
+    return { count: filtered.length, total }
+  }, [filtered])
 
   function toggleCategory(id: string) {
     setSelectedCategoryId((prev) => (prev === id ? null : id))
   }
 
-  // Page title — "April 2026" when the list is scoped to a month, otherwise
-  // the unfiltered "Transactions" label. Matches the H1 rhythm of the other
-  // Phase D screens.
-  const pageTitle = monthFilter
-    ? monthFilter.label.toLocaleDateString(locale, {
-        month: 'long',
-        year: 'numeric',
-      })
-    : t('more.transactions', locale)
+  const pageTitle = t('more.transactions', locale)
+  const monthChipLabel = selectedMonth ? monthKeyLabel(selectedMonth, locale, { month: 'short', year: 'numeric' }) : t('transactions.all_time', locale)
 
   return (
     <>
@@ -169,29 +182,50 @@ export default function TransactionsScreen() {
           <Text style={styles.pageTitle} numberOfLines={1}>
             {pageTitle}
           </Text>
-          <View style={styles.topRightSpacer} />
+          {/* Month scope — "All time" or "Aug 2026"; opens the month sheet. */}
+          <Pressable
+            onPress={() => setMonthSheetOpen(true)}
+            style={({ pressed }) => [styles.monthChip, selectedMonth && styles.monthChipActive, pressed && styles.backPillPressed]}
+            hitSlop={6}
+            accessibilityRole="button"
+            accessibilityLabel={t('transactions.pick_month', locale)}
+          >
+            <Ionicons name="calendar-outline" size={14} color={selectedMonth ? Colors.white : Colors.ink2} />
+            <Text style={[styles.monthChipText, selectedMonth && styles.monthChipTextActive]} numberOfLines={1}>
+              {monthChipLabel}
+            </Text>
+            <Ionicons name="chevron-down" size={12} color={selectedMonth ? Colors.white : Colors.ink3} />
+          </Pressable>
         </View>
 
       <View style={styles.header}>
-        {/* Expenses / Income toggle (styled like the Voice / Manual toggle) */}
+        {/* Expenses / Income — a full-width segmented control (iOS style:
+            quiet track, raised active pill). */}
         <View style={styles.segment}>
-          <Pressable
-            style={[styles.segmentTab, view === 'expenses' && styles.segmentTabActive]}
-            onPress={() => { setView('expenses'); setSelectedCategoryId(null) }}
-          >
-            <Text style={[styles.segmentLabel, view === 'expenses' && styles.segmentLabelActive]}>
-              {t('home.expenses', locale)}
-            </Text>
-          </Pressable>
-          <Pressable
-            style={[styles.segmentTab, view === 'income' && styles.segmentTabActive]}
-            onPress={() => { setView('income'); setSelectedCategoryId(null) }}
-          >
-            <Text style={[styles.segmentLabel, view === 'income' && styles.segmentLabelActive]}>
-              {t('home.income', locale)}
-            </Text>
-          </Pressable>
+          {(['expenses', 'income'] as const).map((key) => {
+            const active = view === key
+            return (
+              <Pressable
+                key={key}
+                style={[styles.segmentTab, active && styles.segmentTabActive]}
+                onPress={() => { setView(key); setSelectedCategoryId(null) }}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
+              >
+                <Text style={[styles.segmentLabel, active && styles.segmentLabelActive]}>
+                  {t(key === 'expenses' ? 'home.expenses' : 'home.income', locale)}
+                </Text>
+              </Pressable>
+            )
+          })}
         </View>
+        <Text style={styles.summaryLine}>
+          {selectedMonth ? monthKeyLabel(selectedMonth, locale) : t('transactions.all_time', locale)}
+          {' · '}
+          {t(summary.count === 1 ? 'transactions.count_one' : 'transactions.count_many', locale).replace('{count}', String(summary.count))}
+          {' · '}
+          {formatMoney(summary.total, currency, locale)}
+        </Text>
 
         <TextInput
           style={styles.search}
@@ -311,6 +345,34 @@ export default function TransactionsScreen() {
         />
       )}
       </SafeAreaView>
+
+      <BottomSheet
+        visible={monthSheetOpen}
+        onClose={() => setMonthSheetOpen(false)}
+        title={t('transactions.pick_month', locale)}
+        cancelLabel={t('common.cancel', locale)}
+      >
+        <View style={styles.monthList}>
+          {[null, ...monthOptions].map((key) => {
+            const active = key === selectedMonth
+            return (
+              <Pressable
+                key={key ?? 'all'}
+                style={[styles.monthOption, active && styles.monthOptionActive]}
+                onPress={() => {
+                  setSelectedMonth(key)
+                  setMonthSheetOpen(false)
+                }}
+              >
+                <Text style={[styles.monthOptionText, active && styles.monthOptionTextActive]}>
+                  {key ? monthKeyLabel(key, locale) : t('transactions.all_time', locale)}
+                </Text>
+                {active && <Ionicons name="checkmark" size={18} color={Colors.accent} />}
+              </Pressable>
+            )
+          })}
+        </View>
+      </BottomSheet>
     </>
   )
 }
@@ -346,34 +408,69 @@ const styles = StyleSheet.create({
     color: Colors.ink ?? Colors.text,
     letterSpacing: -0.2,
   },
-  // Matches the back-pill footprint so the centered title stays optically centered.
-  topRightSpacer: { width: 36, height: 36 },
-  header: { padding: Spacing.base, gap: Spacing.md },
+  monthChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    height: 36,
+    paddingHorizontal: 12,
+    borderRadius: 18,
+    backgroundColor: Colors.surface ?? '#FFFFFF',
+    borderWidth: Hairline.width,
+    borderColor: Hairline.color,
+    maxWidth: 150,
+  },
+  monthChipActive: { backgroundColor: Colors.ink, borderColor: Colors.ink },
+  monthChipText: { fontSize: 13, fontWeight: '600', color: Colors.ink2, fontFamily: Typography.fontFamily.sansSemiBold },
+  monthChipTextActive: { color: Colors.white },
+  header: { paddingHorizontal: Spacing.base, paddingTop: Spacing.sm, paddingBottom: Spacing.md, gap: Spacing.md },
   segment: {
     flexDirection: 'row',
-    backgroundColor: Colors.card,
-    borderRadius: Radius.full ?? 999,
-    padding: 4,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    alignSelf: 'flex-start',
+    backgroundColor: Colors.surface2,
+    borderRadius: 14,
+    padding: 3,
   },
   segmentTab: {
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: 8,
-    borderRadius: Radius.full ?? 999,
+    flex: 1,
+    paddingVertical: 9,
+    borderRadius: 11,
+    alignItems: 'center',
   },
   segmentTabActive: {
-    backgroundColor: Colors.primary,
+    backgroundColor: Colors.surface,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
+    elevation: 2,
   },
   segmentLabel: {
     fontFamily: Typography.fontFamily.sansSemiBold,
-    fontSize: Typography.size.sm,
-    color: Colors.textSecondary,
+    fontSize: 14,
+    color: Colors.ink3,
   },
   segmentLabelActive: {
-    color: Colors.white,
+    color: Colors.ink,
   },
+  summaryLine: {
+    fontSize: 12.5,
+    color: Colors.ink3,
+    fontFamily: Typography.fontFamily.sans,
+    marginTop: -4,
+    paddingHorizontal: 2,
+  },
+  monthList: { paddingHorizontal: 4, paddingBottom: 12 },
+  monthOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+  },
+  monthOptionActive: { backgroundColor: Colors.accentSoft },
+  monthOptionText: { fontSize: 15.5, color: Colors.ink, fontFamily: Typography.fontFamily.sans },
+  monthOptionTextActive: { color: Colors.accent, fontFamily: Typography.fontFamily.sansSemiBold, fontWeight: '600' },
   search: {
     backgroundColor: Colors.card,
     borderRadius: Radius.full ?? 999,

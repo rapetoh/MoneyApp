@@ -9,7 +9,7 @@ import { useTransactions } from '../../src/hooks/useTransactions'
 import { useInsightsUnlock } from '../../src/hooks/useInsightsUnlock'
 import { useDayTwoDunning } from '../../src/hooks/useDayTwoDunning'
 import { useVoiceSession } from '../../src/hooks/useVoiceSession'
-import { Colors, Typography, TAB_BAR_HEIGHT, TAB_BAR_BOTTOM_OFFSET } from '../../src/theme'
+import { Colors, Typography, TAB_BAR_HEIGHT, TAB_BAR_BOTTOM_OFFSET, reportTabBarHeight } from '../../src/theme'
 import { t, type Locale } from '@voice-expense/shared'
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name']
@@ -98,6 +98,9 @@ export default function TabsLayout() {
             intensity={80}
             tint="light"
             style={styles.tabBarBlur}
+            // The background fills the pill, so its height IS the bar's real
+            // height — reported to `useTabBarClearance()` (theme/chrome.ts).
+            onLayout={(e) => reportTabBarHeight(e.nativeEvent.layout.height)}
           />
         ),
         // Ink-on-quiet active state per the voice-redesign tab bar

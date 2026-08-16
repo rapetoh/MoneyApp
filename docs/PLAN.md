@@ -82,6 +82,15 @@ truth: `docs/voice redesign/` (screenshot + Claude Design HTML, artboards
   now `app/shortcut.tsx` + `app/+not-found.tsx` routes, `useShortcutHandler`
   deleted, result sheet keyed per capture session. **Requires a new native
   build** — storyboard, icon and Android splash change at prebuild.
+- **History screen + tab-bar clearance (owner review, Aug 16, 2026):** the
+  History list has a month scope — a "All time / Aug 2026" chip in the
+  header opens a sheet listing every month that has data (tz-correct
+  `monthBounds`); the Expenses/Income toggle is a full-width segmented
+  control; a summary line states the scope, count and total. Tab screens
+  now clear the *measured* tab bar (`reportTabBarHeight` from the bar
+  background's onLayout) plus the FAB overhang — the pill is ~80pt at
+  default type, not the 68pt constant, which is why "See all 13
+  transactions" sat behind the bar.
 - **Refresh + first-tap flicker (owner review, Aug 16, 2026):** there was no
   pull-to-refresh anywhere on mobile (pulling did nothing; data relied on
   realtime + the foreground/network pull). Every list screen (Today,

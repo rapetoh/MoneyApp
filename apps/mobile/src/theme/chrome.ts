@@ -12,6 +12,7 @@
 // meant to consume instead of a literal. Sweeping the 14 existing literal
 // call sites onto `useTabBarClearance()` is Stage 2 adoption work — this
 // module just has to exist and be correct first.
+import { useSyncExternalStore } from 'react'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 /** Height of the pill itself. Unrelated to the safe area — this is the
@@ -32,7 +33,34 @@ export const TAB_BAR_BOTTOM_OFFSET = 8
  * per F13's fix they use `insets.bottom + 24` instead, since there is no
  * bar height or bar offset to add.
  */
+/** How far the record FAB rises above the pill's top edge (its
+ *  `marginTop: -10` in the tabs layout) — content must clear that too. */
+export const TAB_BAR_FAB_OVERHANG = 10
+/** Breathing room between the last row and the bar / FAB. */
+export const TAB_BAR_CLEARANCE_GAP = 12
+
+// The pill uses `minHeight: TAB_BAR_HEIGHT` and grows with its icon +
+// label + padding (≈ 80pt at default type, more at large Dynamic Type), so
+// the constant under-reported it and the last row of every tab list sat
+// behind the bar (owner screenshot Aug 16: "See all 13 transactions" half
+// hidden). The tabs layout reports the bar's real measured height here
+// (from the bar background's onLayout); screens subscribe to it.
+let measuredTabBarHeight = 0
+const listeners = new Set<() => void>()
+export function reportTabBarHeight(h: number): void {
+  if (!Number.isFinite(h) || h <= 0 || Math.abs(h - measuredTabBarHeight) < 0.5) return
+  measuredTabBarHeight = h
+  for (const l of listeners) l()
+}
+function subscribe(l: () => void): () => void {
+  listeners.add(l)
+  return () => listeners.delete(l)
+}
+const getSnapshot = () => measuredTabBarHeight
+
 export function useTabBarClearance(): number {
   const insets = useSafeAreaInsets()
-  return TAB_BAR_HEIGHT + TAB_BAR_BOTTOM_OFFSET + insets.bottom
+  const measured = useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
+  const barHeight = Math.max(TAB_BAR_HEIGHT, measured)
+  return barHeight + TAB_BAR_BOTTOM_OFFSET + insets.bottom + TAB_BAR_FAB_OVERHANG + TAB_BAR_CLEARANCE_GAP
 }
