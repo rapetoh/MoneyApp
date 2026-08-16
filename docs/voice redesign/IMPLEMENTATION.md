@@ -119,6 +119,17 @@ keep working.
   parse, and (b) cancelling mid-recording actually stops the mic — before
   this, cancel left the recognizer running and the confirm sheet could pop
   open seconds after the user cancelled (pre-existing bug, fixed here).
+- **Both layers mount through `<Presence>`** (`src/components/Presence.tsx`,
+  Aug 16 2026) rather than `{visible && …}`. Presence keeps the layer
+  mounted through its exit, freezes the last element it was given while
+  visible (so the transcript / parsed result don't blank when
+  `voice.reset()` clears state mid-fade), disables touches, and hands the
+  layer a native-driven 0→1 `presence` value from `usePresence()`. The
+  overlay fades its scrim and rises its content 22 pt; the result sheet
+  fades its dim and rises 60 pt — both on `Motion` (`src/theme/motion.ts`).
+  The overlay's exit and the sheet's entrance overlap when a parse lands.
+  The single-driver rule above still holds: presence is native-driven and
+  is the only animation on the sheet node.
 
 ## Deleted
 

@@ -377,6 +377,36 @@ splash spec, do/don'ts. The implementation lives in
 regenerated from `apps/mobile/assets/brand/*.svg` via
 `node apps/mobile/assets/brand/generate-icons.mjs`.
 
+**Mark size on tiles (2026-08-16).** Wherever the coin sits on a tile — App
+Store icon, macOS/Windows icon, favicon, the in-app tile on sign-in and the
+web sidebar — its diameter is **75% of the tile**, Apple's app-icon keyline
+circle (`COIN_TILE_RATIO` in both `MurmurMark` components; the SVG sources
+carry the same transform). Android's adaptive foreground uses Material's
+52/108 keyline, the same visual weight under the launcher mask. Before this
+the coin was 48–51%, which read as a small badge next to every other icon.
+
+### Motion — how Murmur presents its own surfaces (2026-08-16)
+
+Native navigator transitions (push, sheet, tab) are the platform's and are
+left alone. Everything Murmur presents *itself* — bottom sheets, the voice
+capture overlay, the result sheet, the launch veil — follows one vocabulary
+in `apps/mobile/src/theme/motion.ts`:
+
+- **Dim fades, content moves.** A backdrop is never translated with the
+  thing it sits behind. Enter: content decelerates in (400 ms,
+  `cubic-bezier(.22,1,.36,1)`), dim fades over 280 ms. Exit: content
+  accelerates out (260 ms, `cubic-bezier(.4,0,1,1)`), dim fades over 240 ms,
+  and the layer stays mounted until both land (`Presence`, `BottomSheet`).
+- **Launch.** Native static mark (storyboard) → identical JS frame → 2.6 s
+  breath while loading → 800 ms minimum dwell → mark lifts and the veil
+  dissolves into the first screen (360 ms). Values in
+  `apps/mobile/assets/brand/launch.js`. Reduce Motion → fades only.
+- **Group swaps** (auth ↔ app ↔ onboarding) cross-fade; everything else is
+  the native push/sheet.
+
+Rationale and before/after in
+[fixes-2026-08-16-launch-brand-motion.md](./fixes-2026-08-16-launch-brand-motion.md).
+
 ### Phase F design override — frictionless sign-in (2026-04-25)
 
 The original "lazy identity / no sign-in wall" design intent was overridden

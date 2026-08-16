@@ -52,16 +52,30 @@ vi.mock('react-native', () => {
 
   return {
     Animated: {
-      // Only `new Animated.Value(0)` and `Animated.timing(...).start()` /
-      // `Animated.multiply` are exercised by BottomSheet's mount — no
-      // keyboard event fires in this test, so these never need to
-      // produce a real animated value, only avoid throwing.
+      // BottomSheet's mount exercises `new Animated.Value`, `.setValue`,
+      // `Animated.timing` / `Animated.parallel` (`.start`, `.stop`),
+      // `Animated.add` and `Animated.multiply` — no keyboard event fires
+      // in this test, so these never need to produce a real animated
+      // value, only avoid throwing. `parallel(...).start(cb)` completes
+      // synchronously with `finished: true`, which is what lets the exit
+      // choreography (sheet slides down, dim fades, *then* the Modal
+      // unmounts) collapse to "onClose ⇒ Modal.visible === false" here.
       Value: class MockAnimatedValue {
         constructor(public _value: number) {}
+        setValue(v: number) {
+          this._value = v
+        }
       },
-      timing: () => ({ start: (cb?: () => void) => cb?.() }),
+      timing: () => ({ start: (cb?: (r: { finished: boolean }) => void) => cb?.({ finished: true }), stop: () => {} }),
+      parallel: () => ({ start: (cb?: (r: { finished: boolean }) => void) => cb?.({ finished: true }), stop: () => {} }),
+      add: (a: unknown) => a,
       multiply: (a: unknown) => a,
       View: passthrough('Animated.View'),
+    },
+    Easing: {
+      bezier: () => (t: number) => t,
+      inOut: (f: (t: number) => number) => f,
+      cubic: (t: number) => t,
     },
     Keyboard: {
       addListener: () => ({ remove: () => {} }),

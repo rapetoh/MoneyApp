@@ -1,8 +1,18 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
   <!--
-    Splash icon — Coin & Wave (Aug 7, 2026). Expo's splash plugin centers
-    this on the cream (#FBFAF7) splash background, so the canvas stays
-    transparent; mark drawn at the same presence as the previous splash.
+    Splash / launch-screen mark — Coin & Wave (Aug 7, 2026; re-cropped
+    Aug 16, 2026). Transparent canvas: the cream background is painted by
+    the OS launch screen (expo-splash-screen plugin, app.config.js) and by
+    the JS handoff overlay (src/components/LaunchScreen.tsx) — both read
+    assets/brand/launch.js.
+
+    The coin is cropped tight (983 px of 1024, 2% margin for the anti-
+    aliased edge) so `imageWidth` in launch.js is, to within a couple of
+    points, the on-screen diameter of the coin. Before Aug 16 the coin was
+    298 px on a 1024 canvas, so the plugin's imageWidth would have shown a
+    ~35 pt coin — but the plugin wasn't given the image at all (see the
+    NOTE in app.config.js), so nothing showed. scale = 983/124;
+    translate = (1024 - 160*scale)/2.
   -->
   <defs>
     <radialGradient id="coin" cx="0.35" cy="0.3" r="0.9">
@@ -10,7 +20,7 @@
       <stop offset="100%" stop-color="#2D4530"/>
     </radialGradient>
   </defs>
-  <g transform="translate(320 320) scale(2.4)">
+  <g transform="translate(-122.2 -122.2) scale(7.927)">
     <circle cx="80" cy="80" r="62" fill="url(#coin)"/>
     <circle cx="80" cy="80" r="62" fill="none" stroke="#FBFAF7" stroke-width="1" opacity="0.18"/>
     <circle cx="80" cy="80" r="50" fill="none" stroke="#FBFAF7" stroke-width="1" opacity="0.18"/>

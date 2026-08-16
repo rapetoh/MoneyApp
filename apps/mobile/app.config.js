@@ -1,3 +1,5 @@
+const launch = require('./assets/brand/launch')
+
 module.exports = {
   expo: {
     name: 'Murmur',
@@ -8,11 +10,16 @@ module.exports = {
     icon: './assets/icon.png',
     userInterfaceStyle: 'light',
     newArchEnabled: true,
-    splash: {
-      image: './assets/splash-icon.png',
-      resizeMode: 'contain',
-      backgroundColor: '#FBFAF7',
-    },
+    // NOTE: there is intentionally NO top-level `splash` object. Since
+    // SDK 52 the native launch screen is configured through the
+    // `expo-splash-screen` plugin below, and the moment that plugin
+    // receives any props the legacy `expo.splash` object is ignored on
+    // both platforms (see @expo/prebuild-config getIosSplashConfig /
+    // getAndroidSplashConfig). Builds up to Aug 16 2026 had a top-level
+    // `splash.image` AND a plugin entry carrying only `backgroundColor` —
+    // so the storyboard was generated with no image and the template's
+    // white background: the "blank white screen for a second, then Home"
+    // every cold start showed.
     ios: {
       supportsTablet: false,
       bundleIdentifier: 'com.voiceexpense.app',
@@ -41,7 +48,22 @@ module.exports = {
       './plugins/withoutRemotePush.js',
       'expo-router',
       'expo-secure-store',
-      ['expo-splash-screen', { backgroundColor: '#FBFAF7' }],
+      // Native launch screen: the Coin & Wave mark, `SPLASH_IMAGE_WIDTH`
+      // pt wide, centered on the cream canvas — iOS storyboard and the
+      // Android 12+ system splash alike. `src/components/LaunchScreen.tsx`
+      // paints the identical frame in JS the moment the bundle is up and
+      // only then hides this native layer, so the mark can breathe while
+      // data loads and dissolve into the first screen. Values live in
+      // assets/brand/launch.js so the two sides can't drift.
+      [
+        'expo-splash-screen',
+        {
+          image: launch.SPLASH_IMAGE,
+          imageWidth: launch.SPLASH_IMAGE_WIDTH,
+          resizeMode: 'contain',
+          backgroundColor: launch.SPLASH_BACKGROUND,
+        },
+      ],
       'expo-localization',
       'expo-apple-authentication',
       'expo-web-browser',

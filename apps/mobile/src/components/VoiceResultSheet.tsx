@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Animated,
-  Easing,
   Keyboard,
   LayoutAnimation,
   Pressable,
@@ -20,6 +19,8 @@ import { MerchantAvatar } from './MerchantAvatar'
 import { AmountAdjustChips } from './AmountAdjustChips'
 import { RecurringToggle } from './RecurringToggle'
 import { NumericAccessory, NUMERIC_ACCESSORY_ID } from './NumericAccessory'
+import { usePresence } from './Presence'
+import { useReduceMotion } from '../hooks/useReduceMotion'
 import { Colors, Typography, Spacing, Radius } from '../theme'
 import {
   merchantColor,
@@ -130,15 +131,16 @@ export function VoiceResultSheet({
     if (resolved) setCategoryId((cur) => cur ?? resolved.category.id)
   }, [parsed.category_suggestion, categories])
 
-  // ── Entrance + edit-expansion ──────────────────────────────────────────
-  const slideIn = useRef(new Animated.Value(60)).current
-  const fadeIn = useRef(new Animated.Value(0)).current
-  useEffect(() => {
-    Animated.parallel([
-      Animated.timing(slideIn, { toValue: 0, duration: 420, easing: Easing.bezier(0.22, 1, 0.36, 1), useNativeDriver: true }),
-      Animated.timing(fadeIn, { toValue: 1, duration: 260, useNativeDriver: true }),
-    ]).start()
-  }, [slideIn, fadeIn])
+  // ── Entrance / exit + edit-expansion ──────────────────────────────────
+  // Presence comes from the enclosing <Presence> (VoiceSessionProvider):
+  // the sheet rises 60pt into place and its dim fades up as presence goes
+  // 0→1; on dismiss / save the same values run back down and the layer
+  // unmounts only once they land — the sheet is never yanked off-screen.
+  const presence = usePresence()
+  const reduceMotion = useReduceMotion()
+  const rise = reduceMotion
+    ? 0
+    : presence.interpolate({ inputRange: [0, 1], outputRange: [60, 0] })
 
   const editHeight = windowHeight - insets.top - 44
 
@@ -247,20 +249,22 @@ export function VoiceResultSheet({
 
   return (
     <View style={StyleSheet.absoluteFill}>
-      {/* Backdrop — tap dismisses. */}
-      <Pressable
-        style={[styles.backdrop, mode === 'edit' && styles.backdropEdit]}
-        onPress={onDismiss}
-        accessibilityLabel={t('common.cancel', locale)}
-      />
+      {/* Backdrop — tap dismisses. Fades with presence; the sheet slides. */}
+      <Animated.View style={[StyleSheet.absoluteFill, { opacity: presence }]}>
+        <Pressable
+          style={[styles.backdrop, mode === 'edit' && styles.backdropEdit]}
+          onPress={onDismiss}
+          accessibilityLabel={t('common.cancel', locale)}
+        />
+      </Animated.View>
 
       <Animated.View
         style={[
           styles.sheet,
           mode === 'edit' && { height: editHeight },
           {
-            opacity: fadeIn,
-            transform: [{ translateY: slideIn }],
+            opacity: presence,
+            transform: [{ translateY: rise }],
           },
         ]}
       >

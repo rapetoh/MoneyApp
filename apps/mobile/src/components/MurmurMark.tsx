@@ -63,6 +63,18 @@ const TOKENS = {
   tintedFg: '#A2B2A1',
 } as const
 
+/**
+ * Coin diameter as a fraction of the tile it sits on — Apple's app-icon
+ * keyline circle (768/1024). The App Store icon, the desktop .icns, the
+ * favicon (assets/brand/*.svg) and this in-app tile all use it, so the
+ * mark on the sign-in screen is the mark on the home screen. Until Aug 16
+ * 2026 the tile inset the mark 19% per side, leaving a 48% coin — the
+ * "logo looks zoomed out" the owner flagged across every surface.
+ */
+export const COIN_TILE_RATIO = 0.75
+/** Coin diameter on the mark's own 160-unit grid (r=62). */
+const COIN_GRID_RATIO = 124 / 160
+
 function resolveVariant(variant: MurmurVariant): PaletteResolved {
   switch (variant) {
     case 'cream':
@@ -93,11 +105,9 @@ export function MurmurMark({
 }: MurmurMarkProps) {
   const palette = resolveVariant(variant)
 
-  // ≈19% inset when on a colored tile (matches the previous mark's tile
-  // proportions so nothing shifts at call sites).
-  const padding = palette.bg ? 0.19 : 0
-  const inset = size * padding
-  const markSize = size - inset * 2
+  // On a tile, scale the 160-grid so the coin lands on the icon keyline
+  // (COIN_TILE_RATIO of the tile). Bare marks (mono-*) fill `size`.
+  const markSize = palette.bg ? size * (COIN_TILE_RATIO / COIN_GRID_RATIO) : size
 
   const gradient = palette.coin === 'gradient'
   const coinFill = gradient ? 'url(#murmurCoin)' : palette.coin

@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
+import { StyleSheet, View } from 'react-native'
 import { Stack, useRouter, useSegments } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import * as SplashScreen from 'expo-splash-screen'
 import { useFonts } from 'expo-font'
+import { LaunchScreen } from '../src/components/LaunchScreen'
 import { useAuth } from '../src/hooks/useAuth'
 import { useProfile } from '../src/hooks/useProfile'
 import { useTransactions } from '../src/hooks/useTransactions'
@@ -21,6 +23,10 @@ import { SyncFailureBanner } from '../src/components/SyncFailureBanner'
 import { t } from '@voice-expense/shared'
 import type { Locale } from '@voice-expense/shared'
 
+// The native launch screen (storyboard / Android 12 splash — configured in
+// app.config.js) stays up until <LaunchScreen> has painted the identical
+// frame in JS; that component owns `hideAsync()`, breathes the mark while
+// the gates below resolve, then dissolves into the first screen.
 SplashScreen.preventAutoHideAsync()
 
 /** Longest the splash waits on the network half of the data preload. */
@@ -85,6 +91,11 @@ export default function RootLayout() {
 
   const ready = fontsReady && !loading && (!session || !profileLoading) && dataReady
 
+  // True once <LaunchScreen> has finished dissolving into the app; the
+  // veil unmounts then. Separate from `ready` so the navigator mounts (and
+  // paints its first frame) *under* the veil before it lifts.
+  const [launchDone, setLaunchDone] = useState(false)
+
   // Handles voiceexpense://shortcut?amount=XX&merchant=... deep links from iOS Shortcuts
   useShortcutHandler()
 
@@ -110,8 +121,6 @@ export default function RootLayout() {
 
   useEffect(() => {
     if (!ready) return
-
-    SplashScreen.hideAsync()
 
     const segmentGroup = segments[0]
     const prevSegmentGroup = prevSegmentRef.current
@@ -199,109 +208,126 @@ export default function RootLayout() {
     runOncePerSession(`registerDevice:${userId}`, () => registerDevice(userId))
   }, [session?.user?.id])
 
-  if (!ready) return null
-
+  // Both children keep a stable key so React preserves the <LaunchScreen>
+  // instance when `ready` flips and the navigator appears beside it — a
+  // remount would restart the breath and re-decode the mark (a flicker).
   return (
-    <UndoProvider>
-      <VoiceSessionProvider>
-      <StatusBar style="dark" backgroundColor="#FBFAF7" />
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="(auth)" />
-        <Stack.Screen name="(onboarding)" />
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen
-          name="transaction/[id]"
-          options={{
-            headerShown: true,
-            headerTitle: t('nav.transaction', locale),
-            headerBackTitle: t('common.back', locale),
-            presentation: 'card',
-          }}
-        />
-        <Stack.Screen
-          name="transaction/new"
-          options={{
-            // Quick entry draws its own Cancel · title · mic header
-            // (artboard 11, docs/voice redesign), so the native modal
-            // header is suppressed.
-            headerShown: false,
-            presentation: 'modal',
-          }}
-        />
-        <Stack.Screen
-          name="transaction/edit"
-          options={{
-            headerShown: true,
-            headerTitle: t('nav.edit_transaction', locale),
-            headerBackTitle: t('common.back', locale),
-            presentation: 'modal',
-          }}
-        />
-        <Stack.Screen
-          name="recurring"
-          options={{
-            headerShown: true,
-            headerTitle: t('recurring.title', locale),
-            headerBackTitle: t('common.back', locale),
-            presentation: 'card',
-          }}
-        />
-        <Stack.Screen
-          name="more/transactions"
-          options={{
-            headerShown: false,
-            presentation: 'card',
-          }}
-        />
-        <Stack.Screen
-          name="more/settings"
-          options={{
-            headerShown: true,
-            headerTitle: t('settings.title', locale),
-            headerBackTitle: t('common.back', locale),
-            presentation: 'card',
-          }}
-        />
-        <Stack.Screen
-          name="more/privacy"
-          options={{
-            headerShown: true,
-            headerTitle: t('more.privacy', locale),
-            headerBackTitle: t('common.back', locale),
-            presentation: 'card',
-          }}
-        />
-        <Stack.Screen
-          name="more/ask"
-          options={{
-            headerShown: true,
-            headerTitle: t('more.ask', locale),
-            headerBackTitle: t('common.back', locale),
-            presentation: 'card',
-          }}
-        />
-        <Stack.Screen
-          name="more/help"
-          options={{
-            headerShown: true,
-            headerTitle: t('more.help', locale),
-            headerBackTitle: t('common.back', locale),
-            presentation: 'card',
-          }}
-        />
-        <Stack.Screen
-          name="more/paywall"
-          options={{
-            // Paywall owns its own dark chrome (close button lives in the screen).
-            headerShown: false,
-            presentation: 'modal',
-          }}
-        />
-      </Stack>
-      {/* App-wide failure surface for the sync outbox (fix-plan 1.6 point
-          4) — renders nothing unless something is dead-lettered. */}
-      <SyncFailureBanner locale={locale} />
-      </VoiceSessionProvider>
-    </UndoProvider>
+    <View style={styles.root}>
+      {ready && (
+        <UndoProvider key="app">
+          <VoiceSessionProvider>
+          <StatusBar style="dark" backgroundColor="#FBFAF7" />
+          <Stack screenOptions={{ headerShown: false }}>
+            {/* Top-level groups swap on auth / onboarding boundaries via
+                `router.replace` — a cross-fade there, not a horizontal push:
+                signing in or finishing onboarding is a change of world, not a
+                step deeper into the same one. Every other screen keeps the
+                native push (card) / sheet (modal) transition. */}
+            <Stack.Screen name="(auth)" options={{ animation: 'fade' }} />
+            <Stack.Screen name="(onboarding)" options={{ animation: 'fade' }} />
+            <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
+            <Stack.Screen
+              name="transaction/[id]"
+              options={{
+                headerShown: true,
+                headerTitle: t('nav.transaction', locale),
+                headerBackTitle: t('common.back', locale),
+                presentation: 'card',
+              }}
+            />
+            <Stack.Screen
+              name="transaction/new"
+              options={{
+                // Quick entry draws its own Cancel · title · mic header
+                // (artboard 11, docs/voice redesign), so the native modal
+                // header is suppressed.
+                headerShown: false,
+                presentation: 'modal',
+              }}
+            />
+            <Stack.Screen
+              name="transaction/edit"
+              options={{
+                headerShown: true,
+                headerTitle: t('nav.edit_transaction', locale),
+                headerBackTitle: t('common.back', locale),
+                presentation: 'modal',
+              }}
+            />
+            <Stack.Screen
+              name="recurring"
+              options={{
+                headerShown: true,
+                headerTitle: t('recurring.title', locale),
+                headerBackTitle: t('common.back', locale),
+                presentation: 'card',
+              }}
+            />
+            <Stack.Screen
+              name="more/transactions"
+              options={{
+                headerShown: false,
+                presentation: 'card',
+              }}
+            />
+            <Stack.Screen
+              name="more/settings"
+              options={{
+                headerShown: true,
+                headerTitle: t('settings.title', locale),
+                headerBackTitle: t('common.back', locale),
+                presentation: 'card',
+              }}
+            />
+            <Stack.Screen
+              name="more/privacy"
+              options={{
+                headerShown: true,
+                headerTitle: t('more.privacy', locale),
+                headerBackTitle: t('common.back', locale),
+                presentation: 'card',
+              }}
+            />
+            <Stack.Screen
+              name="more/ask"
+              options={{
+                headerShown: true,
+                headerTitle: t('more.ask', locale),
+                headerBackTitle: t('common.back', locale),
+                presentation: 'card',
+              }}
+            />
+            <Stack.Screen
+              name="more/help"
+              options={{
+                headerShown: true,
+                headerTitle: t('more.help', locale),
+                headerBackTitle: t('common.back', locale),
+                presentation: 'card',
+              }}
+            />
+            <Stack.Screen
+              name="more/paywall"
+              options={{
+                // Paywall owns its own dark chrome (close button lives in the screen).
+                headerShown: false,
+                presentation: 'modal',
+              }}
+            />
+          </Stack>
+          {/* App-wide failure surface for the sync outbox (fix-plan 1.6 point
+              4) — renders nothing unless something is dead-lettered. */}
+          <SyncFailureBanner locale={locale} />
+          </VoiceSessionProvider>
+        </UndoProvider>
+      )}
+      {!launchDone && (
+        <LaunchScreen key="launch" ready={ready} onDone={() => setLaunchDone(true)} />
+      )}
+    </View>
   )
 }
+
+const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: '#FBFAF7' },
+})

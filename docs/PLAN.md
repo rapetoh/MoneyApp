@@ -61,6 +61,23 @@ truth: `docs/voice redesign/` (screenshot + Claude Design HTML, artboards
   no date picker exists anywhere yet; follow-up), and the mockup's
   "nothing uploaded" copy (transcript does go to the parse API; the
   existing honest "Processed securely" line stays).
+- **Launch, brand-mark size and presentation motion → build 17** (Aug 16,
+  owner review of the TestFlight build; full write-up in
+  [fixes-2026-08-16-launch-brand-motion.md](./fixes-2026-08-16-launch-brand-motion.md)):
+  the native launch screen had **no image and a white background** (the
+  `expo-splash-screen` plugin entry carried only `backgroundColor`, which
+  makes prebuild ignore the legacy `expo.splash` object) — fixed at the
+  source and joined by a JS handoff veil (`src/components/LaunchScreen.tsx`)
+  that breathes the mark and dissolves into the first screen (Brand Sheet
+  §06, deferred since Aug 7). App icon coin raised from 51% to Apple's 75%
+  keyline on every surface (iOS, Android, favicon, web, desktop
+  `.icns/.ico`, in-app tiles). `BottomSheet` rebuilt so the dim fades while
+  the sheet slides (RN `Modal animationType="slide"` was sliding the
+  backdrop too). Voice overlay and result sheet now enter/exit through
+  `<Presence>` instead of popping. Root groups cross-fade on
+  `router.replace`. New `Motion` tokens (`src/theme/motion.ts`). **Requires
+  a new native build** — storyboard, icon and Android splash change at
+  prebuild.
 - **NEXT (owner directive, Aug 16): Ask Murmur is to be rebuilt as a
   product, not patched further.** The Aug 15–16 work fixed reasoning and
   grounding defects one by one; the owner's screenshots show the real
@@ -1370,20 +1387,21 @@ The Murmur brand sheet ([docs/money-app/project/Murmur Brand Sheet.html](./money
 - **Category tints** (low-saturation pastels). Mobile theme synced to the brand sheet's exact hex values: peach `#F3E7DC`, butter `#F2E8D5`, lavender `#EEE6F0`, rose `#F4DDDD` ([apps/mobile/src/theme/colors.ts](../apps/mobile/src/theme/colors.ts)).
 - **Type stack.** `New York` serif for display + money + headlines; `SF Pro Text` for sans body; `SF Mono` for codey numerics. Already in place via the existing `Typography` tokens — no changes.
 - **Wordmark.** New York Medium, −2.5 letterspacing. Final "r" can pulse sage in motion contexts.
-- **Splash.** 800ms hold on first paint, 320ms fade. Tagline ("Speak it. Spend clearly.") shows on cold start only, not on resume — current Expo splash plugin already handles the timing; the new icon delivers the visual.
+- **Splash.** 800ms hold on first paint, 320ms fade. Tagline ("Speak it. Spend clearly.") shows on cold start only, not on resume — current Expo splash plugin already handles the timing; the new icon delivers the visual. **Superseded Aug 16, 2026:** the plugin was in fact showing nothing (see [fixes-2026-08-16-launch-brand-motion.md](./fixes-2026-08-16-launch-brand-motion.md) §1); the launch is now native mark → JS veil with the 2.6s breath, 800ms minimum dwell, 360ms dissolve. Mark only — the tagline was deliberately not added (fonts are a loading gate; reference apps are mark-only).
 
 **Shipped:**
 - [apps/mobile/src/components/MurmurMark.tsx](../apps/mobile/src/components/MurmurMark.tsx) — reusable React Native SVG component implementing nine variants: `cream` (default), `sage` (brand), `ink` (dark mode), `tinted` (iOS 18 home-screen tinted), `cream-accent`, `stone`, `outline`, `mono-ink`, `mono-cream`. Variants compose a self-contained tile (background + 22% rounded corner + centered droplet) so callers don't need wrapper styles.
 - **Auth screens use the real mark.** [apps/mobile/app/(auth)/sign-in.tsx](../apps/mobile/app/(auth)/sign-in.tsx) and [apps/mobile/app/(auth)/sign-up.tsx](../apps/mobile/app/(auth)/sign-up.tsx) replaced the placeholder `<Text>M</Text>` sage tile with `<MurmurMark size={64} variant="sage" />`. The brand mark is the user's first visual contact with Murmur.
-- **App icon + adaptive icon + splash icon + favicon regenerated** from brand SVGs. New SVG sources live at [apps/mobile/assets/brand/](../apps/mobile/assets/brand/):
-  - `murmur-mark-cream.svg` — 1024 cream-bg + ink droplet → `assets/icon.png` (App Store / launcher)
-  - `murmur-mark-adaptive-foreground.svg` — 1024 transparent-bg with mark in 66% safe zone → `assets/adaptive-icon.png` (Android adaptive foreground)
-  - `murmur-mark-splash.svg` — 1024 transparent-bg, larger mark → `assets/splash-icon.png` (Expo splash plugin centers on cream bg)
-  - `murmur-mark-favicon.svg` — 192 silhouette + dot only (per brand sheet "≤24px drops the inner pulse") → `assets/favicon.png` (web)
+- **App icon + adaptive icon + splash icon + favicon regenerated** from brand SVGs. New SVG sources live at [apps/mobile/assets/brand/](../apps/mobile/assets/brand/) (sizes updated Aug 16, 2026 — coin on the 75% keyline everywhere, see [fixes-2026-08-16-launch-brand-motion.md](./fixes-2026-08-16-launch-brand-motion.md) §2):
+  - `murmur-mark-cream.svg` — 1024 cream-bg, coin on Apple's 768/1024 keyline → `assets/icon.png` (App Store / launcher) — also the source for the desktop `.icns/.ico` (`npm run icns -w @voice-expense/desktop`)
+  - `murmur-mark-adaptive-foreground.svg` — 1024 transparent-bg, coin on Material's 52/108 keyline → `assets/adaptive-icon.png` (Android adaptive foreground)
+  - `murmur-mark-splash.svg` — 1024 transparent-bg, coin cropped tight → `assets/splash-icon.png` (drawn at `SPLASH_IMAGE_WIDTH` from `assets/brand/launch.js` by both the native launch screen and `LaunchScreen.tsx`)
+  - `murmur-mark-favicon.svg` — 192 coin + primary wave only (per brand sheet "≤24px drops the inner pulse"), 75% coin → `assets/favicon.png` and `apps/web/src/app/icon.png`
+  - `launch.js` — the launch-screen constants shared by `app.config.js` and `LaunchScreen.tsx`
   - `generate-icons.mjs` — Node + sharp regeneration script. Re-run any time the SVGs change: `node apps/mobile/assets/brand/generate-icons.mjs`.
 
 **Not shipped this commit (tracked for follow-up):**
-- 2.6s breathing pulse animation. Brand sheet §06 specifies it for the splash and §01 mentions it for active listening + save events. The Listening view already has a strong identity (amount-as-hero + waveform), and a breathing splash needs a custom splash-to-app transition surface — both deserve their own focused pass. The static brand mark covers the mark-on-surfaces work.
+- 2.6s breathing pulse animation. Brand sheet §06 specifies it for the splash and §01 mentions it for active listening + save events. The Listening view already has a strong identity (amount-as-hero + waveform), and a breathing splash needs a custom splash-to-app transition surface — both deserve their own focused pass. The static brand mark covers the mark-on-surfaces work. **Splash half shipped Aug 16, 2026** (`src/components/LaunchScreen.tsx`).
 - Apple Sign In with the wordmark in dark contexts (e.g. paywall hero, dark splash variant).
 - Profile-card avatar replacement on Settings (currently a peach tile with the user's initial — the brand sheet doesn't override this, but a sage MurmurMark with the user's initial overlaid would tighten the brand presence).
 

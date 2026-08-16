@@ -10,6 +10,7 @@ import { useUndo } from './useUndo'
 import { useNotificationListener } from './useNotificationListener'
 import { VoiceCaptureOverlay } from '../components/VoiceCaptureOverlay'
 import { VoiceResultSheet, type ConfirmedExpense } from '../components/VoiceResultSheet'
+import { Presence } from '../components/Presence'
 import { t, formatMoney } from '@voice-expense/shared'
 import type { Locale, ParsedExpense, TransactionSource } from '@voice-expense/shared'
 
@@ -181,38 +182,48 @@ export function VoiceSessionProvider({ children }: { children: ReactNode }) {
 
   const api = useMemo<VoiceSessionApi>(() => ({ openVoice, presentParsed }), [openVoice, presentParsed])
 
+  // Both layers sit inside <Presence> so they glide in over the current
+  // screen and glide out on cancel / save — and stay mounted (frozen on
+  // their last props) through the exit, instead of vanishing on the frame
+  // `voice.reset()` clears the state. The overlay's exit and the sheet's
+  // entrance overlap when a parse lands, which is the cross-fade from
+  // "listening" to "here's what I heard".
   return (
     <VoiceSessionContext.Provider value={api}>
       {children}
-      {overlayVisible && (
-        <VoiceCaptureOverlay
-          phase={voice.state === 'listening' ? 'listening' : voice.state === 'processing' ? 'processing' : 'error'}
-          transcript={voice.interimTranscript || voice.transcript}
-          errorMessage={voice.errorMessage}
-          volumeLevel={voice.volumeLevel}
-          currencyCode={currency}
-          locale={locale}
-          onCancel={dismissAll}
-          onStop={voice.stopListening}
-          onKeyboard={handleKeyboard}
-          onRetry={() => voice.startListening(speechLocale)}
-        />
-      )}
-      {sheetVisible && parsed && (
-        <VoiceResultSheet
-          parsed={parsed}
-          transcript={voice.transcript}
-          parseDurationMs={voice.parseDurationMs}
-          categories={categories}
-          onCreateCategory={createCategory}
-          onSave={handleSave}
-          onDismiss={dismissAll}
-          onRedo={source === 'voice' ? handleRedo : undefined}
-          saving={saving}
-          locale={locale}
-          timezone={timezone}
-        />
-      )}
+      <Presence visible={overlayVisible}>
+        {overlayVisible ? (
+          <VoiceCaptureOverlay
+            phase={voice.state === 'listening' ? 'listening' : voice.state === 'processing' ? 'processing' : 'error'}
+            transcript={voice.interimTranscript || voice.transcript}
+            errorMessage={voice.errorMessage}
+            volumeLevel={voice.volumeLevel}
+            currencyCode={currency}
+            locale={locale}
+            onCancel={dismissAll}
+            onStop={voice.stopListening}
+            onKeyboard={handleKeyboard}
+            onRetry={() => voice.startListening(speechLocale)}
+          />
+        ) : null}
+      </Presence>
+      <Presence visible={sheetVisible && parsed !== null}>
+        {sheetVisible && parsed ? (
+          <VoiceResultSheet
+            parsed={parsed}
+            transcript={voice.transcript}
+            parseDurationMs={voice.parseDurationMs}
+            categories={categories}
+            onCreateCategory={createCategory}
+            onSave={handleSave}
+            onDismiss={dismissAll}
+            onRedo={source === 'voice' ? handleRedo : undefined}
+            saving={saving}
+            locale={locale}
+            timezone={timezone}
+          />
+        ) : null}
+      </Presence>
     </VoiceSessionContext.Provider>
   )
 }

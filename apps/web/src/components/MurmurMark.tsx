@@ -4,6 +4,14 @@
 // docs/money-app/project/Murmur Logos.html direction 04: a coin with a
 // soft wave engraved across it, on a 160-unit grid (coin r=62 at 80,80;
 // primary wave at y=80, faint secondary at y=96).
+//
+// On a tile the coin sits on Apple's app-icon keyline — 75% of the tile —
+// the same ratio as the App Store icon, the desktop .icns, the favicon and
+// the mobile in-app tile (see COIN_TILE_RATIO in the mobile component).
+// One number everywhere so the mark in the sidebar is the mark on the dock.
+const COIN_TILE_RATIO = 0.75
+const COIN_GRID_RATIO = 124 / 160
+const TILE_SCALE = COIN_TILE_RATIO / COIN_GRID_RATIO
 
 type Variant = 'cream' | 'sage' | 'ink' | 'mono-ink' | 'mono-cream'
 
@@ -54,6 +62,7 @@ export function MurmurMark({
       {p.bg && (
         <rect width="160" height="160" rx={radius * (160 / size)} fill={p.bg} />
       )}
+      <g transform={p.bg ? `translate(80 80) scale(${TILE_SCALE}) translate(-80 -80)` : undefined}>
       <circle cx="80" cy="80" r="62" fill={coinFill} />
       {p.coin === 'gradient' && (
         <>
@@ -79,6 +88,7 @@ export function MurmurMark({
         opacity="0.45"
         className={animating ? 'murmur-pulse-arc2' : undefined}
       />
+      </g>
     </svg>
   )
 }

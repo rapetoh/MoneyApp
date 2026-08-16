@@ -12,6 +12,8 @@ import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { LiveWaveform } from './LiveWaveform'
 import { VoiceEdgeGlow } from './VoiceEdgeGlow'
+import { usePresence } from './Presence'
+import { useReduceMotion } from '../hooks/useReduceMotion'
 import { Colors, Typography } from '../theme'
 import { t, formatMoney, type Locale } from '@voice-expense/shared'
 
@@ -107,6 +109,12 @@ function AmountChip({ label }: { label: string }) {
  * 14a — voice capture in place. Rendered by VoiceSessionProvider as a
  * root-level layer above the navigator (no RN Modal, no navigation), so
  * tapping the mic FAB never leaves the screen the user was on.
+ *
+ * Entrance / exit come from the enclosing <Presence>: the cream scrim
+ * fades up over the screen while the content rises a few points into
+ * place; on cancel or when the parse lands, the reverse — so the mic tap
+ * reads as the current screen receding under a listening surface, not as
+ * a new screen thrown on top of it.
  */
 export function VoiceCaptureOverlay({
   phase,
@@ -121,8 +129,13 @@ export function VoiceCaptureOverlay({
   onRetry,
 }: Props) {
   const insets = useSafeAreaInsets()
+  const presence = usePresence()
+  const reduceMotion = useReduceMotion()
   const [elapsed, setElapsed] = useState(0)
   const listening = phase === 'listening'
+  const rise = reduceMotion
+    ? 0
+    : presence.interpolate({ inputRange: [0, 1], outputRange: [22, 0] })
 
   useEffect(() => {
     if (!listening) return
@@ -142,17 +155,25 @@ export function VoiceCaptureOverlay({
   return (
     <View style={styles.root}>
       {/* Scrim over whatever screen the user was on */}
-      <View style={styles.scrim} />
+      <Animated.View style={[styles.scrim, { opacity: presence }]} />
 
       {/* Reactive screen-edge glow — the mockup's three inset-shadow
           layers rendered as feathered SVG falloff (solid borders read as
           a picture frame — build 9's mistake). Inner halo flares with
           the mic level. */}
       {phase !== 'error' && (
-        <VoiceEdgeGlow level={volumeLevel} active={phase === 'listening'} />
+        <Animated.View style={[StyleSheet.absoluteFill, { opacity: presence }]} pointerEvents="none">
+          <VoiceEdgeGlow level={volumeLevel} active={phase === 'listening'} />
+        </Animated.View>
       )}
 
-      <View style={[styles.content, { paddingTop: insets.top + 14, paddingBottom: insets.bottom + 18 }]}>
+      <Animated.View
+        style={[
+          styles.content,
+          { paddingTop: insets.top + 14, paddingBottom: insets.bottom + 18 },
+          { opacity: presence, transform: [{ translateY: rise }] },
+        ]}
+      >
         {/* Status pill */}
         <View style={styles.statusRow}>
           <View style={styles.statusPill}>
@@ -262,7 +283,7 @@ export function VoiceCaptureOverlay({
           <Ionicons name="lock-closed" size={11} color={Colors.ink3} />
           <Text style={styles.footerText}>{t('listening.processed_on_device', locale)}</Text>
         </View>
-      </View>
+      </Animated.View>
     </View>
   )
 }

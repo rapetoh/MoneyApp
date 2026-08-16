@@ -5,9 +5,16 @@
     Source of truth: docs/money-app/project/Murmur Logos.html direction
     04 "Coin & Wave" — a coin with a soft wave engraved across it. The
     hero mark is on a 160-unit grid (coin r=62 at 80,80; waves at y=80
-    and y=96). Same 1024-canvas wrapper as the previous mark so
-    rasterized sizing stays consistent. iOS rounds its own corners —
-    the 22% mask is NOT pre-applied.
+    and y=96). iOS rounds its own corners — the 22% mask is NOT
+    pre-applied.
+
+    Coin size (Aug 16, 2026): the coin sits on Apple's app-icon keyline
+    circle — 768 px of the 1024 canvas (75%). Until then it was 527 px
+    (51%), which read as a small badge floating in cream next to every
+    other icon on the home screen. scale = 768/124, translate centers
+    the 160 grid: (1024 - 160*scale)/2. The same 75% ratio drives the
+    favicon, the desktop .icns/.ico (built from this file) and the
+    in-app <MurmurMark> tile — see MurmurMark.tsx COIN_TILE_RATIO.
   -->
   <defs>
     <radialGradient id="coin" cx="0.35" cy="0.3" r="0.9">
@@ -16,7 +23,7 @@
     </radialGradient>
   </defs>
   <rect width="1024" height="1024" fill="#FBFAF7"/>
-  <g transform="translate(192 192) scale(4.25)">
+  <g transform="translate(16.52 16.52) scale(6.1935)">
     <circle cx="80" cy="80" r="62" fill="url(#coin)"/>
     <circle cx="80" cy="80" r="62" fill="none" stroke="#FBFAF7" stroke-width="1" opacity="0.18"/>
     <circle cx="80" cy="80" r="50" fill="none" stroke="#FBFAF7" stroke-width="1" opacity="0.18"/>
