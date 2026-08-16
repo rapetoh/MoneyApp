@@ -229,6 +229,17 @@ The owner's first TestFlight session surfaced four real defects:
    follow-ups sent with the completed turns as context, every turn
    appended to the same persisted conversation, always-present input bar
    above the keyboard.
+   **Verified live against production** (`apps/web/scripts/ask-murmur-e2e.mjs`,
+   Aug 15): a 4-turn conversation on data shaped like the owner's — food
+   this month ($107.20 ✓ hand-checked), "compare to last month" as a bare
+   follow-up understood in context ($84.50 ✓), biggest merchant ✓,
+   affordability; plus 401 / 400 / no-data paths. The affordability turn
+   exposed a reasoning defect — the model added `recurring_total` on top
+   of the month's spending, which already contained the bills paid that
+   month — fixed in the prompt (`packages/ai/src/askMurmur.ts`, "never
+   add recurring_total to a period's spending") and re-verified live:
+   income received $3,000 − spent $1,054 = $1,946 left, consistent
+   across both the affordability verdict and the "what's left" follow-up.
 
 **Build 11 follow-ups (same day):**
 

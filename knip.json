@@ -4,6 +4,7 @@
     "apps/desktop/build/afterPack.cjs",
     "apps/desktop/src/preload.ts",
     "apps/mobile/assets/brand/generate-icons.mjs",
+    "apps/web/scripts/ask-murmur-e2e.mjs",
     "apps/mobile/modules/notification-listener/**",
     "apps/mobile/plugins/**",
     "docs/money-app/project/**",
