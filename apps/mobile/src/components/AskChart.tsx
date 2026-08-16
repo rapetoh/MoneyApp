@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { View, Text, StyleSheet, type LayoutChangeEvent } from 'react-native'
 import Svg, { Rect, Path, Circle, Line as SvgLine } from 'react-native-svg'
-import { formatMoney } from '@voice-expense/shared'
+import { formatMoney, categoryPalette } from '@voice-expense/shared'
 import type { AskMurmurChart, AskMurmurChartPoint } from '@voice-expense/shared'
 import { Colors, Typography, Hairline } from '../theme'
 
@@ -11,11 +11,16 @@ interface Props {
   locale: string
 }
 
-// One hue for magnitude (sage, light→dark), ink for text — never a series
-// colour on a label. Identity in the donut comes from the direct labels
-// beside each slice, not from a rainbow (see the dataviz method: single-hue
-// marks, text wears text tokens, legend/labels never colour-alone).
-const SAGE_STEPS = ['#3F5A3E', '#5E7A5C', '#7E9A7B', '#9EB69B', '#BFD0BC', '#DCE6DA']
+// Categorical marks (donut slices, ranked bars, per-bucket bars) cycle
+// through the same hue-spread rotation the desktop chart uses
+// (apps/web/src/components/AskChart.tsx), each stop run through
+// `categoryPalette` for the 4.5:1 contrast floor — so a category is
+// distinguishable at a glance instead of six shades of sage (owner review,
+// Aug 16). A single measure over time (the line) stays one colour, the
+// brand accent, because there is nothing to tell apart.
+const PALETTE_SEED_HUES = ['#E85D04', '#2D6A4F', '#457B9D', '#9B59B6', '#C77A2E', '#2A9D8F', '#8E424C', '#5A5F34']
+const PALETTE: string[] = PALETTE_SEED_HUES.map((hex) => categoryPalette(hex).fg)
+const colorFor = (idx: number) => PALETTE[idx % PALETTE.length]
 const MAX_POINTS = 10
 
 /**
@@ -66,7 +71,7 @@ function Bars({ data, width, fmt }: { data: AskMurmurChartPoint[]; width: number
           const h = Math.max(2, (d.value / max) * plotH)
           const x = i * (barW + gap)
           const y = valueH + plotH - h
-          return <Rect key={i} x={x} y={y} width={barW} height={h} rx={3} fill={i === maxIdx ? SAGE_STEPS[0] : SAGE_STEPS[2]} />
+          return <Rect key={i} x={x} y={y} width={barW} height={h} rx={3} fill={colorFor(i)} />
         })}
       </Svg>
       {/* Selective direct label: only the peak, in ink. */}
@@ -101,9 +106,9 @@ function LineChart({ data, width, fmt }: { data: AskMurmurChartPoint[]; width: n
     <View>
       <Svg width={width} height={H}>
         <SvgLine x1={0} y1={pad + plotH} x2={width} y2={pad + plotH} stroke={Hairline.color} strokeWidth={1} />
-        <Path d={path} stroke={SAGE_STEPS[0]} strokeWidth={2} fill="none" strokeLinejoin="round" strokeLinecap="round" />
+        <Path d={path} stroke={Colors.accent} strokeWidth={2.5} fill="none" strokeLinejoin="round" strokeLinecap="round" />
         {pts.map((p, i) => (
-          <Circle key={i} cx={p.x} cy={p.y} r={i === pts.length - 1 ? 4.5 : 3} fill={SAGE_STEPS[0]} stroke="#FFFFFF" strokeWidth={2} />
+          <Circle key={i} cx={p.x} cy={p.y} r={i === pts.length - 1 ? 4.5 : 3} fill="#FFFFFF" stroke={Colors.accent} strokeWidth={2} />
         ))}
       </Svg>
       <View style={[styles.peakLabelWrap, { left: Math.min(Math.max(last.x - 30, 0), width - 60), width: 60, top: Math.max(last.y - 24, 0) }]} pointerEvents="none">
@@ -130,7 +135,7 @@ function HBars({ data, width, fmt }: { data: AskMurmurChartPoint[]; width: numbe
         <View key={i} style={styles.hRow}>
           <Text style={[styles.hLabel, { width: labelW }]} numberOfLines={1}>{d.label}</Text>
           <View style={{ width: barMax }}>
-            <View style={[styles.hBar, { width: Math.max(4, (d.value / max) * barMax), backgroundColor: i === 0 ? SAGE_STEPS[0] : SAGE_STEPS[2] }]} />
+            <View style={[styles.hBar, { width: Math.max(4, (d.value / max) * barMax), backgroundColor: colorFor(i) }]} />
           </View>
           <Text style={[styles.hValue, { width: valueW }]} numberOfLines={1}>{fmt(d.value)}</Text>
         </View>
@@ -140,41 +145,61 @@ function HBars({ data, width, fmt }: { data: AskMurmurChartPoint[]; width: numbe
 }
 
 // ── Donut — share of total, ≤ 6 slices ───────────────────────────────────────
+//
+// Geometry: the ring's outer edge is radius + stroke/2, so the radius must
+// leave room for the stroke inside the canvas. The previous version used
+// `size/2 − 4` with a 16px stroke, so 4px of ring on every side fell
+// outside the SVG and was clipped — the "circle with angles" in the owner's
+// screenshots. A neutral track ring behind the slices and the total in the
+// centre mirror the desktop chart.
 function Donut({ data, width, fmt }: { data: AskMurmurChartPoint[]; width: number; fmt: (v: number) => string }) {
   const slices = data.slice(0, 6)
-  const total = slices.reduce((s, d) => s + Math.max(d.value, 0), 0) || 1
-  const size = Math.min(132, width * 0.42)
-  const r = size / 2 - 4
+  const total = slices.reduce((s, d) => s + Math.max(d.value, 0), 0)
+  if (total <= 0) return null
+  const size = Math.min(148, Math.max(120, Math.round(width * 0.44)))
+  const stroke = 18
+  const r = (size - stroke) / 2 - 1
   const cx = size / 2
   const cy = size / 2
-  const stroke = 16
-  let angle = -Math.PI / 2
-  const arcs = slices.map((d, i) => {
-    const frac = Math.max(d.value, 0) / total
-    const start = angle
-    const end = angle + frac * Math.PI * 2 - 0.035 // 2px-ish surface gap between slices
-    angle += frac * Math.PI * 2
-    return { i, start, end: Math.max(end, start), frac }
-  })
-  const arcPath = (start: number, end: number) => {
-    const x1 = cx + r * Math.cos(start), y1 = cy + r * Math.sin(start)
-    const x2 = cx + r * Math.cos(end), y2 = cy + r * Math.sin(end)
-    const large = end - start > Math.PI ? 1 : 0
-    return `M${x1},${y1} A${r},${r} 0 ${large} 1 ${x2},${y2}`
-  }
+  const C = 2 * Math.PI * r
+  const gap = slices.length > 1 ? 2 : 0
+  let offset = 0
   return (
     <View style={styles.donutRow}>
-      <Svg width={size} height={size}>
-        {arcs.map((a) => (
-          <Path key={a.i} d={arcPath(a.start, a.end)} stroke={SAGE_STEPS[a.i]} strokeWidth={stroke} fill="none" strokeLinecap="butt" />
-        ))}
-      </Svg>
+      <View style={{ width: size, height: size }}>
+        <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+          <Circle cx={cx} cy={cy} r={r} stroke={Colors.surface2} strokeWidth={stroke} fill="none" />
+          {slices.map((d, i) => {
+            const len = Math.max(0, (Math.max(d.value, 0) / total) * C - gap)
+            const el = (
+              <Circle
+                key={i}
+                cx={cx}
+                cy={cy}
+                r={r}
+                stroke={colorFor(i)}
+                strokeWidth={stroke}
+                fill="none"
+                strokeDasharray={`${len} ${Math.max(0, C - len)}`}
+                strokeDashoffset={-offset}
+                rotation={-90}
+                origin={`${cx}, ${cy}`}
+              />
+            )
+            offset += len + gap
+            return el
+          })}
+        </Svg>
+        <View style={styles.donutCenter} pointerEvents="none">
+          <Text style={styles.donutCenterLabel}>{fmt(total)}</Text>
+        </View>
+      </View>
       <View style={styles.legend}>
         {slices.map((d, i) => (
           <View key={i} style={styles.legendRow}>
-            <View style={[styles.legendDot, { backgroundColor: SAGE_STEPS[i] }]} />
+            <View style={[styles.legendDot, { backgroundColor: colorFor(i) }]} />
             <Text style={styles.legendLabel} numberOfLines={1}>{d.label}</Text>
-            <Text style={styles.legendValue} numberOfLines={1}>{fmt(d.value)}</Text>
+            <Text style={styles.legendValue} numberOfLines={1}>{Math.round((Math.max(d.value, 0) / total) * 100)}%</Text>
           </View>
         ))}
       </View>
@@ -235,6 +260,14 @@ const styles = StyleSheet.create({
     fontVariant: ['tabular-nums'],
   },
   donutRow: { flexDirection: 'row', alignItems: 'center', gap: 16 },
+  donutCenter: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
+  donutCenterLabel: {
+    fontFamily: Typography.fontFamily.serif,
+    fontSize: 15,
+    fontWeight: '700',
+    color: Colors.ink,
+    letterSpacing: -0.3,
+  },
   legend: { flex: 1, gap: 8 },
   legendRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   legendDot: { width: 8, height: 8, borderRadius: 4 },

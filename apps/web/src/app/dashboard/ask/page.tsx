@@ -32,6 +32,7 @@ import {
 import type {
   AskAction,
   AskInsight,
+  AskInsightKind,
   AskMurmurBudget,
   AskMurmurRecurringRuleV2,
   AskMurmurTransaction,
@@ -55,8 +56,10 @@ import type {
  * opens with Murmur speaking first — ranked insights computed here from the
  * user's own data — then intent chips. The server owns the conversation
  * (POST /api/ai/ask-murmur/turn); this page reads threads back through
- * Supabase and resumes the most recent one if it is < 12 h old. Mirrors
- * apps/mobile/app/more/ask.tsx.
+ * Supabase. Ask always opens on the entry — never auto-jumps into an old
+ * thread (owner review, Aug 16); a thread < 12 h old is offered as a
+ * "pick up where you left off" card, and every thread is one click away in
+ * the rail. Mirrors apps/mobile/app/more/ask.tsx.
  */
 
 type LocalMessage =
@@ -120,6 +123,7 @@ export default function AskMurmurPage() {
 
   const [conversationId, setConversationId] = useState<string | null>(null)
   const [conversations, setConversations] = useState<AskConversationRow[]>([])
+  const [continueCandidate, setContinueCandidate] = useState<AskConversationRow | null>(null)
   const [messages, setMessages] = useState<LocalMessage[]>([])
   const [draft, setDraft] = useState('')
   const threadEndRef = useRef<HTMLDivElement | null>(null)
@@ -154,12 +158,9 @@ export default function AskMurmurPage() {
     if (!c.error) setCategories((c.data ?? []) as Category[])
     if (!b.error) setBudgets((b.data ?? []) as Budget[])
     try {
-      const [convs, resume] = await Promise.all([listConversations(supabase, user.id, 30), resumeCandidate(supabase, user.id)])
+      const [convs, recent] = await Promise.all([listConversations(supabase, user.id, 30), resumeCandidate(supabase, user.id)])
       setConversations(convs)
-      if (resume) {
-        setConversationId(resume.conversation.id)
-        setMessages(messagesFromRows(resume.messages))
-      }
+      setContinueCandidate(recent?.conversation ?? null)
     } catch (err) {
       console.warn('[ask] history load failed:', err)
     }
@@ -359,12 +360,12 @@ export default function AskMurmurPage() {
         }),
       )
       if (isNew && data.conversation_id) {
-        setConversations((prev) => [
-          { id: data.conversation_id, user_id: userId, title: trimmed.slice(0, 60), started_at: data.message.created_at, last_message_at: data.message.created_at, is_deleted: false, created_at: data.message.created_at, updated_at: data.message.created_at },
-          ...prev,
-        ])
+        const row: AskConversationRow = { id: data.conversation_id, user_id: userId, title: trimmed.slice(0, 60), started_at: data.message.created_at, last_message_at: data.message.created_at, is_deleted: false, created_at: data.message.created_at, updated_at: data.message.created_at }
+        setConversations((prev) => [row, ...prev])
+        setContinueCandidate(row)
       } else if (data.conversation_id) {
         setConversations((prev) => prev.map((c) => (c.id === data.conversation_id ? { ...c, last_message_at: data.message.created_at } : c)))
+        setContinueCandidate((prev) => (prev && prev.id === data.conversation_id ? { ...prev, last_message_at: data.message.created_at } : prev))
       }
     } catch (e) {
       console.error('[ask] turn failed:', e)
@@ -394,6 +395,7 @@ export default function AskMurmurPage() {
     try {
       await softDeleteConversation(supabase, id)
       setConversations((prev) => prev.filter((c) => c.id !== id))
+      setContinueCandidate((prev) => (prev?.id === id ? null : prev))
       if (id === conversationId) startNew()
     } catch (err) {
       console.warn('[ask] delete failed:', err)
@@ -492,7 +494,7 @@ export default function AskMurmurPage() {
           )}
           <div style={styles.thread}>
             {showEntry ? (
-              <EntryState locale={locale} insights={insights} intents={intents} onAskInsight={(i) => send(i.question, i)} onInsightAction={performAction} onIntent={(q) => send(q)} />
+              <EntryState locale={locale} insights={insights} intents={intents} continueCandidate={continueCandidate} onContinue={(id) => openConversation(id)} onAskInsight={(i) => send(i.question, i)} onInsightAction={performAction} onIntent={(q) => send(q)} />
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 18, maxWidth: 760 }}>
                 {messages.map((m) => {
@@ -582,6 +584,8 @@ function EntryState({
   locale,
   insights,
   intents,
+  continueCandidate,
+  onContinue,
   onAskInsight,
   onInsightAction,
   onIntent,
@@ -589,6 +593,8 @@ function EntryState({
   locale: Locale
   insights: AskInsight[]
   intents: Array<{ id: string; label: string; question: string }>
+  continueCandidate: AskConversationRow | null
+  onContinue: (id: string) => void
   onAskInsight: (i: AskInsight) => void
   onInsightAction: (a: AskAction) => void
   onIntent: (q: string) => void
@@ -599,6 +605,19 @@ function EntryState({
         <MurmurMark size={40} variant="cream" rounded />
         <div style={{ fontFamily: font.serif, fontSize: 22, color: colors.ink, fontWeight: 500, letterSpacing: -0.4, lineHeight: 1.3 }}>{t('ask.entry_lead', locale)}</div>
       </div>
+      {continueCandidate && (
+        <button type="button" onClick={() => onContinue(continueCandidate.id)} style={styles.continueCard}>
+          <span style={styles.continueIcon}>
+            <Icon.sparkle color={colors.accent} size={14} />
+          </span>
+          <span style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
+            <span style={styles.kindEyebrow}>{t('ask.continue_eyebrow', locale)}</span>
+            <span style={{ display: 'block', fontSize: 14, fontWeight: 600, color: colors.ink, marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{continueCandidate.title ?? '…'}</span>
+            <span style={{ display: 'block', fontSize: 12, color: colors.ink4, marginTop: 1 }}>{formatWhen(continueCandidate.last_message_at, locale)}</span>
+          </span>
+          <Icon.chev color={colors.ink4} size={12} />
+        </button>
+      )}
       <div style={styles.eyebrow}>{t('ask.today_eyebrow', locale)}</div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {insights.map((ins) => (
@@ -617,26 +636,63 @@ function EntryState({
   )
 }
 
+function KindIcon({ kind, color }: { kind: AskInsightKind; color: string }) {
+  switch (kind) {
+    case 'upcoming_bill':
+      return <Icon.calendar color={color} size={17} />
+    case 'budget_pace':
+      return <Icon.chart color={color} size={17} />
+    case 'category_surge':
+      return <Icon.trend color={color} size={17} />
+    case 'subscriptions':
+      return <Icon.recurring color={color} size={15} />
+    case 'month_delta':
+      return <Icon.swap color={color} size={17} />
+    case 'net_flow':
+      return <Icon.wallet color={color} size={17} />
+    case 'large_transaction':
+      return <Icon.alert color={color} size={17} />
+    case 'no_data':
+      return <Icon.mic color={color} size={17} />
+  }
+}
+
+/** An insight = a finding + one decision. Restrained: an icon tile and a
+ *  kind eyebrow carry the tone — no coloured stripes (owner review). */
 function InsightCard({ insight, locale, onAsk, onAction }: { insight: AskInsight; locale: Locale; onAsk: () => void; onAction: (a: AskAction) => void }) {
-  const stripe = insight.tone === 'alert' ? '#C8685E' : insight.tone === 'watch' ? '#C89B3C' : insight.tone === 'good' ? colors.accent : colors.ink4
+  const tone =
+    insight.tone === 'alert'
+      ? { fg: '#B44A3F', bg: '#F3DAD4' }
+      : insight.tone === 'watch'
+        ? { fg: '#9A6A15', bg: '#F5EBD6' }
+        : insight.tone === 'good'
+          ? { fg: colors.accent, bg: colors.accentSoft }
+          : { fg: colors.ink2, bg: colors.surface2 }
   return (
     <div style={styles.insightCard}>
-      <div style={{ width: 4, background: stripe, flexShrink: 0 }} />
       <button type="button" onClick={onAsk} style={styles.insightMain}>
-        <div style={{ fontFamily: font.serif, fontSize: 17, color: colors.ink, letterSpacing: -0.2, lineHeight: 1.3 }}>{insight.title}</div>
-        <div style={{ fontSize: 13.5, color: colors.ink3, marginTop: 4, lineHeight: 1.4 }}>{insight.detail}</div>
-        <div style={{ fontSize: 12.5, color: colors.ink3, marginTop: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-          <Icon.sparkle color={colors.ink4} size={11} />
-          {insight.question}
+        <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+          <span style={{ ...styles.insightIcon, background: tone.bg }}>
+            <KindIcon kind={insight.kind} color={tone.fg} />
+          </span>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <div style={{ ...styles.kindEyebrow, color: tone.fg }}>{t(`ask.kind_${insight.kind}`, locale)}</div>
+            <div style={{ fontFamily: font.serif, fontSize: 17, color: colors.ink, letterSpacing: -0.2, lineHeight: 1.3, marginTop: 3 }}>{insight.title}</div>
+            <div style={{ fontSize: 13.5, color: colors.ink3, marginTop: 4, lineHeight: 1.4 }}>{insight.detail}</div>
+          </div>
         </div>
       </button>
-      {insight.action && (
-        <div style={{ display: 'flex', alignItems: 'center', paddingRight: 14 }}>
+      <div style={styles.insightFooter}>
+        <button type="button" onClick={onAsk} style={styles.insightAskBtn}>
+          <MurmurMark size={14} variant="sage" rounded />
+          <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{insight.question}</span>
+        </button>
+        {insight.action && (
           <button type="button" onClick={() => onAction(insight.action as AskAction)} style={styles.insightAction}>
             {askActionLabel(insight.action, locale)}
           </button>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   )
 }
@@ -665,9 +721,15 @@ const styles: Record<string, CSSProperties> = {
   main: { display: 'flex', flexDirection: 'column', minHeight: 0, minWidth: 0 },
   thread: { flex: 1, overflowY: 'auto', padding: '20px 24px' },
   eyebrow: { fontSize: 11, fontWeight: 700, color: colors.ink3, letterSpacing: 0.6, textTransform: 'uppercase', fontFamily: font.sans, marginBottom: 10 },
-  insightCard: { display: 'flex', background: colors.card, border: `0.5px solid ${colors.line}`, borderRadius: radius.xl, overflow: 'hidden' },
-  insightMain: { flex: 1, minWidth: 0, textAlign: 'left', padding: '12px 14px', border: 'none', background: 'transparent', cursor: 'pointer', fontFamily: font.sans },
+  insightCard: { display: 'flex', flexDirection: 'column', background: colors.card, border: `0.5px solid ${colors.line}`, borderRadius: radius.xl, overflow: 'hidden' },
+  insightMain: { width: '100%', minWidth: 0, textAlign: 'left', padding: '14px 14px 10px', border: 'none', background: 'transparent', cursor: 'pointer', fontFamily: font.sans },
+  insightIcon: { width: 36, height: 36, borderRadius: 11, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  kindEyebrow: { display: 'block', fontSize: 10.5, fontWeight: 700, letterSpacing: 0.7, textTransform: 'uppercase', color: colors.ink3, fontFamily: font.sans },
+  insightFooter: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '10px 14px 12px', borderTop: `0.5px solid ${colors.line}` },
+  insightAskBtn: { display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, flex: 1, border: 'none', background: 'transparent', padding: 0, cursor: 'pointer', fontSize: 12.5, color: colors.ink3, fontFamily: font.sans, textAlign: 'left' },
   insightAction: { padding: '6px 10px', borderRadius: 999, border: 'none', background: colors.accentSoft, color: colors.accent, fontSize: 12, fontWeight: 700, fontFamily: font.sans, cursor: 'pointer', whiteSpace: 'nowrap' },
+  continueCard: { display: 'flex', alignItems: 'center', gap: 12, width: '100%', background: colors.card, border: `0.5px solid ${colors.line}`, borderRadius: radius.xl, padding: '12px 14px', marginBottom: 18, cursor: 'pointer', fontFamily: font.sans },
+  continueIcon: { width: 32, height: 32, borderRadius: 10, background: colors.accentSoft, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   intentChip: { padding: '9px 14px', borderRadius: 999, border: `0.5px solid rgba(40,36,28,0.16)`, background: colors.card, color: colors.ink, fontSize: 13.5, fontFamily: font.sans, cursor: 'pointer' },
   userBubble: { alignSelf: 'flex-end', maxWidth: '78%', background: colors.ink, color: '#fff', padding: '10px 14px', borderRadius: 18, borderBottomRightRadius: 6, fontSize: 14.5, lineHeight: 1.45, fontFamily: font.sans },
   assistantWrap: { display: 'flex', gap: 12, alignItems: 'flex-start' },

@@ -29,7 +29,8 @@ list of *insights* computed from the user's own data on the device, instantly, w
 Rules: at most 4 insights, ranked by urgency/severity (see §3.3); each is a *finding + one decision*;
 every number in an insight is computed deterministically (no LLM). Tapping an insight asks Murmur
 about it (the insight becomes the first user turn, with the finding passed as context). The action
-chip performs the real action (§4).
+chip performs the real action (§4). Card treatment (owner review, Aug 16): a tonal icon tile + a
+kind eyebrow ("Upcoming bill", "Running high", …) carry the tone — no coloured left stripes.
 
 Below the insights: an intent row ("I want to… check my budget · cut a subscription · see where my
 money went · plan a purchase") and the composer ("Ask anything about your money").
@@ -40,10 +41,12 @@ money went · plan a purchase") and the composer ("Ask anything about your money
   computed *and* a "focus" object: subject, period, entities). "What were those exactly?", "is it a
   good ratio out of how much I make?", "and last month?", "what else can you help me with?" resolve
   against that state. Murmur never re-greets mid-thread and never repeats an answer verbatim.
-- **Persisted + resumable.** Every turn is stored server-side (`ask_conversations` /
-  `ask_messages`). Re-opening Ask within 12 hours resumes the last conversation exactly where it
-  was — mobile back-swipe, app relaunch, or switching between phone and desktop. Older threads live
-  in History (list, open, delete). "New" starts a fresh thread and shows fresh insights.
+- **Persisted + resumable — but entry-first.** Every turn is stored server-side
+  (`ask_conversations` / `ask_messages`), so nothing is ever lost, and it is the same thread on
+  phone and desktop. Ask always **opens on the entry** (Murmur speaks first); it never jumps into an
+  old thread by itself (owner review, Aug 16). A thread from the last 12 hours is offered as a
+  "Pick up where you left off" card at the top of the entry; every thread is one tap away in History
+  (list, open, delete). "New" starts a fresh thread and shows fresh insights.
 - **Thinking state** is the Murmur mark breathing ("Reading your transactions…"), never a generic
   spinner.
 
@@ -181,9 +184,10 @@ to move, send, add or invest money through Murmur.
 ## 5. Surfaces
 
 ### 5.1 Mobile (`apps/mobile/app/more/ask.tsx`)
-Header: close · Murmur mark + "Ask Murmur" · History · New. Body: entry (insights → intents →
-composer) or thread (user bubbles right; Murmur turns left with mark, text, blocks, action chips).
-Resume rule §1.2. History = bottom sheet listing conversations (title, relative time, delete).
+Header: close · Murmur mark + "Ask Murmur" · History · New. Body: entry (continue card → insights →
+intents → composer) or thread (user bubbles right; Murmur turns left with mark, text, blocks, action
+chips). Entry-first rule §1.2. Charts: categorical marks (donut slices, ranked/bucket bars) use the
+same hue-spread palette as desktop; a single measure over time stays one colour. History = bottom sheet listing conversations (title, relative time, delete).
 Plus gate unchanged (free → paywall on send). Text input only (voice inside Ask is not built).
 
 ### 5.2 Web / desktop (`apps/web/src/app/dashboard/ask/page.tsx`)

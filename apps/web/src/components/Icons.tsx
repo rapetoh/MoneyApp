@@ -97,6 +97,36 @@ export const Icon = {
       />
     </svg>
   ),
+  // Ask Murmur insight kinds (docs/ask-murmur/SPEC.md §1.1).
+  calendar: ({ color = 'currentColor', size = 16 }: Props) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <rect x="4" y="5" width="16" height="15" rx="2.5" stroke={color} strokeWidth="1.8" />
+      <path d="M4 10h16M8 3v4M16 3v4" stroke={color} strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  ),
+  trend: ({ color = 'currentColor', size = 16 }: Props) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <path d="M4 17l5-5 4 4 7-8" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M15 8h5v5" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  ),
+  wallet: ({ color = 'currentColor', size = 16 }: Props) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <rect x="3" y="7" width="18" height="12" rx="2.5" stroke={color} strokeWidth="1.8" />
+      <path d="M3 10h18M16 14.5h2" stroke={color} strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  ),
+  alert: ({ color = 'currentColor', size = 16 }: Props) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <circle cx="12" cy="12" r="8.5" stroke={color} strokeWidth="1.8" />
+      <path d="M12 8v5M12 16.2v.3" stroke={color} strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  ),
+  swap: ({ color = 'currentColor', size = 16 }: Props) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <path d="M8 4v16M8 4L5 7M8 4l3 3M16 20V4M16 20l-3-3M16 20l3-3" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  ),
   // Tight refresh-loop glyph used to mark recurring transactions inline.
   recurring: ({ color = 'currentColor', size = 12 }: Props) => (
     <svg width={size} height={size} viewBox="0 0 16 16" fill="none">

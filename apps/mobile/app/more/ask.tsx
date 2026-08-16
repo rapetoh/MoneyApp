@@ -41,7 +41,7 @@ import {
   type AskMessageRow,
   type Locale,
 } from '@voice-expense/shared'
-import type { AskAction, AskInsight, AskReply } from '@voice-expense/shared'
+import type { AskAction, AskInsight, AskInsightKind, AskReply } from '@voice-expense/shared'
 import { AskTurnError, buildAskData, buildAskTurnRequest, postAskTurn } from '../../src/services/askMurmurClient'
 
 /**
@@ -57,9 +57,11 @@ import { AskTurnError, buildAskData, buildAskTurnRequest, postAskTurn } from '..
  *
  * The server owns the conversation (POST /api/ai/ask-murmur/turn persists
  * every turn + focus with the user's own JWT); this screen reads threads
- * back through Supabase and re-opens the most recent one if it is less
- * than 12 hours old, so a back-swipe or relaunch never loses the thread.
- * Sending never navigates. Plus gate: free users → paywall on send.
+ * back through Supabase. Ask ALWAYS opens on the entry (Murmur speaks
+ * first) — it never jumps into an old thread by itself (owner review, Aug
+ * 16). A recent thread (< 12 h) is offered as a "pick up where you left
+ * off" card at the top of the entry; older ones live in History. Sending
+ * never navigates. Plus gate: free users → paywall on send.
  */
 
 type LocalMessage =
@@ -138,7 +140,8 @@ export default function AskMurmurScreen() {
   // Conversation state.
   const [conversationId, setConversationId] = useState<string | null>(null)
   const [messages, setMessages] = useState<LocalMessage[]>([])
-  const [resumeChecked, setResumeChecked] = useState(false)
+  // The most recent thread, offered (never auto-opened) on the entry.
+  const [continueCandidate, setContinueCandidate] = useState<AskConversationRow | null>(null)
   const [draft, setDraft] = useState('')
   const [historyOpen, setHistoryOpen] = useState(false)
   const [history, setHistory] = useState<AskConversationRow[] | null>(null)
@@ -150,27 +153,22 @@ export default function AskMurmurScreen() {
     requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true }))
   }, [])
 
-  // Resume the most recent thread if it is fresh (§1.2).
+  // Offer (don't open) the most recent thread if it is fresh (§1.2).
   useEffect(() => {
-    if (!user?.id || resumeChecked) return
+    if (!user?.id) return
     let cancelled = false
     ;(async () => {
       try {
         const thread = await resumeCandidate(supabase, user.id)
-        if (cancelled || !thread) return
-        setConversationId(thread.conversation.id)
-        setMessages(messagesFromRows(thread.messages))
-        scrollToEnd()
+        if (!cancelled) setContinueCandidate(thread?.conversation ?? null)
       } catch (err) {
-        console.warn('[ask] resume failed:', err)
-      } finally {
-        if (!cancelled) setResumeChecked(true)
+        console.warn('[ask] continue candidate failed:', err)
       }
     })()
     return () => {
       cancelled = true
     }
-  }, [user?.id, resumeChecked, scrollToEnd])
+  }, [user?.id])
 
   const anyPending = messages.some((m) => m.role === 'pending')
 
@@ -211,6 +209,18 @@ export default function AskMurmurScreen() {
         }),
       )
       setHistory(null) // stale — refetch on next open
+      if (res.conversation_id) {
+        setContinueCandidate((prev) => ({
+          id: res.conversation_id,
+          user_id: user?.id ?? prev?.user_id ?? '',
+          title: prev?.id === res.conversation_id ? prev.title : trimmed.slice(0, 60),
+          started_at: prev?.id === res.conversation_id ? prev.started_at : res.message.created_at,
+          last_message_at: res.message.created_at,
+          is_deleted: false,
+          created_at: prev?.created_at ?? res.message.created_at,
+          updated_at: res.message.created_at,
+        }))
+      }
       scrollToEnd()
     } catch (err) {
       const e = err instanceof AskTurnError ? err : new AskTurnError('failed', 0)
@@ -272,6 +282,7 @@ export default function AskMurmurScreen() {
     try {
       await softDeleteConversation(supabase, id)
       setHistory((prev) => (prev ? prev.filter((c) => c.id !== id) : prev))
+      setContinueCandidate((prev) => (prev?.id === id ? null : prev))
       if (id === conversationId) startNew()
     } catch (err) {
       console.warn('[ask] delete failed:', err)
@@ -362,6 +373,8 @@ export default function AskMurmurScreen() {
                 locale={locale}
                 insights={insights}
                 intents={intents}
+                continueCandidate={continueCandidate}
+                onContinue={(id) => openConversation(id)}
                 onAskInsight={(ins) => send(ins.question, ins)}
                 onInsightAction={performAction}
                 onIntent={(q) => send(q)}
@@ -503,6 +516,8 @@ function EntryState({
   locale,
   insights,
   intents,
+  continueCandidate,
+  onContinue,
   onAskInsight,
   onInsightAction,
   onIntent,
@@ -510,6 +525,8 @@ function EntryState({
   locale: Locale
   insights: AskInsight[]
   intents: Array<{ id: string; label: string; question: string }>
+  continueCandidate: AskConversationRow | null
+  onContinue: (id: string) => void
   onAskInsight: (i: AskInsight) => void
   onInsightAction: (a: AskAction) => void
   onIntent: (q: string) => void
@@ -520,6 +537,25 @@ function EntryState({
         <MurmurMark size={44} variant="cream" />
         <Text style={styles.entryLead}>{t('ask.entry_lead', locale)}</Text>
       </View>
+      {continueCandidate && (
+        <Pressable
+          onPress={() => onContinue(continueCandidate.id)}
+          style={({ pressed }) => [styles.continueCard, pressed && styles.pressed]}
+          accessibilityRole="button"
+        >
+          <View style={styles.continueIcon}>
+            <Ionicons name="chatbubble-ellipses-outline" size={16} color={Colors.accent} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.continueEyebrow}>{t('ask.continue_eyebrow', locale)}</Text>
+            <Text style={styles.continueTitle} numberOfLines={1}>
+              {continueCandidate.title ?? '…'}
+            </Text>
+            <Text style={styles.continueMeta}>{formatWhen(continueCandidate.last_message_at, locale)}</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color={Colors.ink4} />
+        </Pressable>
+      )}
       <Text style={styles.sectionEyebrow}>{t('ask.today_eyebrow', locale)}</Text>
       <View style={styles.insightList}>
         {insights.map((ins) => (
@@ -538,6 +574,19 @@ function EntryState({
   )
 }
 
+const KIND_ICON: Record<AskInsightKind, keyof typeof Ionicons.glyphMap> = {
+  upcoming_bill: 'calendar-outline',
+  budget_pace: 'pie-chart-outline',
+  category_surge: 'trending-up-outline',
+  subscriptions: 'repeat-outline',
+  month_delta: 'swap-vertical-outline',
+  net_flow: 'wallet-outline',
+  large_transaction: 'flash-outline',
+  no_data: 'mic-outline',
+}
+
+/** An insight = a finding + one decision. Restrained card: an icon tile
+ *  and a kind eyebrow carry the tone; no coloured stripes (owner review). */
 function InsightCard({
   insight,
   locale,
@@ -549,27 +598,38 @@ function InsightCard({
   onAsk: () => void
   onAction: (a: AskAction) => void
 }) {
-  const stripe =
-    insight.tone === 'alert' ? Colors.unclear : insight.tone === 'watch' ? '#C89B3C' : insight.tone === 'good' ? Colors.accent : Colors.ink4
+  const tone =
+    insight.tone === 'alert'
+      ? { fg: Colors.unclear, bg: Colors.unclearSoft }
+      : insight.tone === 'watch'
+        ? { fg: '#9A6A15', bg: '#F5EBD6' }
+        : insight.tone === 'good'
+          ? { fg: Colors.accent, bg: Colors.accentSoft }
+          : { fg: Colors.ink2, bg: Colors.surface2 }
   return (
     <Pressable onPress={onAsk} style={({ pressed }) => [styles.insightCard, pressed && styles.insightPressed]} accessibilityRole="button">
-      <View style={[styles.insightStripe, { backgroundColor: stripe }]} />
-      <View style={styles.insightBody}>
-        <Text style={styles.insightTitle}>{insight.title}</Text>
-        <Text style={styles.insightDetail}>{insight.detail}</Text>
-        <View style={styles.insightFooter}>
-          <View style={styles.insightAskRow}>
-            <Ionicons name="chatbubble-ellipses-outline" size={13} color={Colors.ink3} />
-            <Text style={styles.insightAsk} numberOfLines={1}>
-              {insight.question}
-            </Text>
-          </View>
-          {insight.action && (
-            <Pressable onPress={() => onAction(insight.action as AskAction)} hitSlop={6} style={({ pressed }) => [styles.insightActionChip, pressed && styles.pressed]}>
-              <Text style={styles.insightActionText}>{askActionLabel(insight.action, locale)}</Text>
-            </Pressable>
-          )}
+      <View style={styles.insightTop}>
+        <View style={[styles.insightIcon, { backgroundColor: tone.bg }]}>
+          <Ionicons name={KIND_ICON[insight.kind]} size={17} color={tone.fg} />
         </View>
+        <View style={styles.insightBody}>
+          <Text style={[styles.insightKind, { color: tone.fg }]}>{t(`ask.kind_${insight.kind}`, locale)}</Text>
+          <Text style={styles.insightTitle}>{insight.title}</Text>
+          <Text style={styles.insightDetail}>{insight.detail}</Text>
+        </View>
+      </View>
+      <View style={styles.insightFooter}>
+        <View style={styles.insightAskRow}>
+          <MurmurMark size={14} variant="sage" />
+          <Text style={styles.insightAsk} numberOfLines={1}>
+            {insight.question}
+          </Text>
+        </View>
+        {insight.action && (
+          <Pressable onPress={() => onAction(insight.action as AskAction)} hitSlop={6} style={({ pressed }) => [styles.insightActionChip, pressed && styles.pressed]}>
+            <Text style={styles.insightActionText}>{askActionLabel(insight.action, locale)}</Text>
+          </Pressable>
+        )}
       </View>
     </Pressable>
   )
@@ -707,23 +767,57 @@ const styles = StyleSheet.create({
   },
   insightList: { gap: 10 },
   insightCard: {
-    flexDirection: 'row',
     backgroundColor: Colors.surface,
     borderRadius: 18,
     borderWidth: Hairline.width,
     borderColor: Hairline.color,
-    overflow: 'hidden',
+    paddingHorizontal: 14,
+    paddingTop: 14,
+    paddingBottom: 12,
+    gap: 10,
   },
-  insightPressed: { opacity: 0.8 },
-  insightStripe: { width: 4 },
-  insightBody: { flex: 1, paddingHorizontal: 14, paddingVertical: 13, gap: 4 },
+  insightPressed: { opacity: 0.85 },
+  insightTop: { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
+  insightIcon: { width: 36, height: 36, borderRadius: 11, alignItems: 'center', justifyContent: 'center', marginTop: 1 },
+  insightBody: { flex: 1, gap: 3 },
+  insightKind: {
+    fontSize: 10.5,
+    fontWeight: '700',
+    letterSpacing: 0.7,
+    textTransform: 'uppercase',
+    fontFamily: Typography.fontFamily.sansBold,
+  },
   insightTitle: { fontFamily: Typography.fontFamily.serif, fontSize: 17, lineHeight: 22, letterSpacing: -0.2, color: Colors.ink },
   insightDetail: { fontSize: 13.5, lineHeight: 19, color: Colors.ink3, fontFamily: Typography.fontFamily.sans },
-  insightFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 6 },
-  insightAskRow: { flexDirection: 'row', alignItems: 'center', gap: 5, flex: 1 },
+  insightFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    paddingTop: 10,
+    borderTopWidth: Hairline.width,
+    borderTopColor: Hairline.color,
+  },
+  insightAskRow: { flexDirection: 'row', alignItems: 'center', gap: 7, flex: 1 },
   insightAsk: { fontSize: 12.5, color: Colors.ink3, fontFamily: Typography.fontFamily.sans, flex: 1 },
   insightActionChip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, backgroundColor: Colors.accentSoft },
   insightActionText: { fontSize: 12, fontWeight: '700', color: Colors.accent, fontFamily: Typography.fontFamily.sansBold },
+  continueCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    borderWidth: Hairline.width,
+    borderColor: Hairline.color,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 18,
+  },
+  continueIcon: { width: 32, height: 32, borderRadius: 10, backgroundColor: Colors.accentSoft, alignItems: 'center', justifyContent: 'center' },
+  continueEyebrow: { fontSize: 10.5, fontWeight: '700', letterSpacing: 0.7, textTransform: 'uppercase', color: Colors.ink3, fontFamily: Typography.fontFamily.sansBold },
+  continueTitle: { fontSize: 14.5, color: Colors.ink, fontWeight: '600', marginTop: 2, fontFamily: Typography.fontFamily.sansSemiBold },
+  continueMeta: { fontSize: 12, color: Colors.ink4, marginTop: 1, fontFamily: Typography.fontFamily.sans },
   intentRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   intentChip: {
     paddingHorizontal: 14,
