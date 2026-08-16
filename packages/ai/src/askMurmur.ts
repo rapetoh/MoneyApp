@@ -53,6 +53,17 @@ to interpret the new question — never repeat or summarize the prior answer:
 ${JSON.stringify(trimmedHistory)}`
     : ''
 
+  const b = req.budget
+  const budgetBlock = b
+    ? `
+
+BUDGET (deterministic — the app's own Budgets screen computes exactly these numbers; quote them, never re-derive them):
+${JSON.stringify(b)}
+For any question about the budget ("how am I doing against my budget", "am I over budget", "how much can I still spend"), answer from this block: remaining = amount − spent − committed for the CURRENT period (period_start…period_end, days_left days to go); a negative remaining means over budget. Say the period ("your ${b.period} budget") and, when helpful, the pace (remaining ÷ days_left per day). If category_name is set, the budget caps only that category — say so.`
+    : `
+
+BUDGET: none set. If the user asks about "my budget", say plainly that no budget is set in Murmur yet and offer what you can: this month's spending vs income, or a suggested cap based on their average.`
+
   const overviewBlock = overview
     ? `
 
@@ -77,11 +88,13 @@ CRITICAL — how to compute numbers:
 - Call tools as many times as you need. Each call computes one specific aggregate; complex answers chain multiple calls (e.g. \`sum_by_category\` for a breakdown, then \`total\` for the grand total).
 - Every tool result is already in the user's profile currency and already rounded to 2 decimals — quote the returned figure verbatim, don't re-round it differently.
 
-CRITICAL — picking a window. Every tool that takes a \`window\` argument only accepts one of these exact strings — never invent a window, never compute a date range yourself:
-    "today", "thisMonth", "lastMonth", "thisYear", "lastYear",
-    "last7Days" (week), "last30Days", "last90Days" (quarter),
-    "last6Months", "last12Months" (rolling year)
-- Map the user's phrasing onto the closest window above — "this quarter" → \`last90Days\`, "this week" → \`last7Days\`. There is no tool for an arbitrary date range (e.g. "April 11–15") — pick the closest window that contains it, answer from that, and say in the verdict which window you actually used.
+CRITICAL — picking a window. Every tool that takes a \`window\` argument accepts exactly one of:
+    "today", "yesterday", "thisWeek", "lastWeek" (Monday–Sunday), "thisMonth", "lastMonth",
+    "thisQuarter", "lastQuarter", "thisYear", "lastYear",
+    "last7Days", "last30Days", "last90Days", "last6Months", "last12Months" (rolling),
+    "custom" — with \`start_date\` and \`end_date\` (inclusive YYYY-MM-DD in the user's zone).
+- Use the named window that matches the user's words exactly ("last week" → \`lastWeek\`, "yesterday" → \`yesterday\`, "this quarter" → \`thisQuarter\`). For anything else — a named month ("in June" → custom 2026-06-01..2026-06-30, using Today's date below to know the year), "between the 1st and the 10th", "the first week of July", "Q2 last year" — use \`custom\` and compute the two civil dates yourself. Say the range you used in the verdict when the user's phrasing was loose.
+- If a window reaches before \`earliest_transacted_at\` in the data overview, the answer covers only the part you have — say so ("since your records begin on <date>").
 
 Which tool to call:
 - A single number ("how much did I spend on X", "how much this month") → \`total\`, with \`direction\`/\`category_name\`/\`merchant_contains\` as needed.
@@ -107,7 +120,8 @@ CRITICAL — this is a conversation, and every reply must be a finished answer:
 
 CRITICAL — affordability / "what's left" / planning math:
 - A period's spending total (\`total\` with direction "debit") ALREADY CONTAINS every recurring bill that was paid inside that period (those charges are transactions too). NEVER add \`recurring_total\` on top of a period's spending — that double-counts the bills. Money left this month = income this month − spending this month; if a recurring bill has NOT yet been charged this month (no matching transaction in the window), you may mention it separately as still-to-come, but say so explicitly.
-- Use \`recurring_total\` on its own for questions about the cost of subscriptions/bills, and for forecasting a *future* period — not as an add-on to a period that already happened.
+- Use \`recurring_total\` on its own for questions about the cost of subscriptions/bills. For "will I run out of money / make it to the end of the month / what's left after bills": remaining = income this month − spending this month − \`recurring_total\`'s \`still_due_this_month_total\` (only the bills that have NOT yet been charged this month; name them). Never subtract \`monthly_total\` there — the bills already charged are inside this month's spending.
+- Format money the way the user's locale writes it (fr: "1 331 $", es: "1.331 $", pt: "1.331 $", en: "$1,331").
 
 CRITICAL — comparisons:
 - Whenever the verdict makes a numeric comparison ("more A than B", "higher than", "less than", etc.), call the \`compare\` tool with both values from prior tool calls. Use the tool's direction in the verdict; do NOT decide direction yourself.
@@ -182,7 +196,7 @@ User locale: ${req.locale}
 User currency: ${req.currency}
 Monthly income: ${req.monthly_income ?? 'unknown'}
 Transactions in data block: ${req.transactions.length}
-Recurring rules in data block: ${req.recurring_rules.length}${overviewBlock}${historyBlock}`
+Recurring rules in data block: ${req.recurring_rules.length}${budgetBlock}${overviewBlock}${historyBlock}`
 }
 
 // ─── Shape validator ─────────────────────────────────────────────────────────
@@ -528,6 +542,9 @@ export function validateAskMurmurResponseAgainstCalls(
   calls: ToolCallRecord[],
   question: string,
   monthlyIncome: number | null = null,
+  /** Figures from the request's BUDGET block (amount, spent, committed,
+   *  remaining) — deterministic app numbers the model may quote directly. */
+  budgetFigures: number[] | null = null,
 ): AskMurmurValidation {
   if (response.out_of_scope) {
     return { ok: true, comparison_direction_violations: [], soft_issues: [] }
@@ -545,6 +562,15 @@ export function validateAskMurmurResponseAgainstCalls(
   if (monthlyIncome != null && Number.isFinite(monthlyIncome)) {
     trusted.add(Math.round(monthlyIncome * 100) / 100)
     trusted.add(Math.round(monthlyIncome))
+  }
+  // Budget block figures are deterministic app numbers (the Budgets tab's
+  // own status), quotable without a tool call the same way monthly_income is.
+  for (const v of budgetFigures ?? []) {
+    if (Number.isFinite(v)) {
+      trusted.add(Math.round(v * 100) / 100)
+      trusted.add(Math.round(v))
+      trusted.add(Math.round(Math.abs(v) * 100) / 100)
+    }
   }
 
   const soft: string[] = []

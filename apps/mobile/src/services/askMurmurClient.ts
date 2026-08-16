@@ -1,10 +1,13 @@
 import { getCalendars } from 'expo-localization'
-import { addDays, civilDateTimeToInstant, localParts } from '@voice-expense/shared'
+import { addDays, civilDateTimeToInstant, localParts, daysBetween } from '@voice-expense/shared'
 import type {
   AskMurmurRequest,
   AskMurmurResponse,
   AskMurmurTransaction,
   AskMurmurRecurringRule,
+  AskMurmurBudget,
+  Budget,
+  BudgetStatus,
   Locale,
 } from '@voice-expense/shared'
 import type { Transaction } from '@voice-expense/shared'
@@ -12,8 +15,12 @@ import type { RecurringRule } from '@voice-expense/shared'
 import type { Category } from '@voice-expense/shared'
 
 // Server-side caps. Mirror these client-side so the request stays predictable.
-const MAX_TRANSACTIONS = 500
-const WINDOW_DAYS = 90
+// 12 months / 2,000 rows (was 90 days / 500): "how much on Uber this year?"
+// answered from 90 days of data was a wrong number with the right label
+// (owner review, Aug 15). Rows are aggregated by deterministic tools on
+// the server and never reach the model, so this costs no tokens.
+const MAX_TRANSACTIONS = 2000
+const WINDOW_DAYS = 366
 
 /** IANA zone the device is currently in — same lookup `useProfile.ts`
  *  uses to capture `profiles.timezone`. Falls back to `'UTC'` on a
@@ -39,11 +46,16 @@ interface BuildArgs {
    *  it loaded. Falls back to the device's current zone otherwise, never
    *  to the reading process's zone (fix-plan 2.10). */
   timeZone?: string
+  /** The active budget + the status the Budgets tab already computed for
+   *  it (`budgetStatusFor`) — forwarded as-is so the assistant quotes the
+   *  same remaining/spent the screen shows. Omit when no budget is set. */
+  budget?: Budget | null
+  budgetStatus?: BudgetStatus | null
 }
 
-/** Trim local stores into the wire shape the reasoner expects. Keep only the
- *  last 90 days of non-deleted transactions, drop oldest first if we still
- *  exceed the 500-row cap. */
+/** Trim local stores into the wire shape the reasoner expects. Keep the
+ *  last 12 months of non-deleted transactions, drop oldest first if we
+ *  still exceed the row cap. */
 export function buildAskMurmurRequest(args: BuildArgs): AskMurmurRequest {
   const tz = args.timeZone || deviceTimeZone()
   const nowIso = new Date().toISOString()
@@ -59,6 +71,14 @@ export function buildAskMurmurRequest(args: BuildArgs): AskMurmurRequest {
 
   const categoryById = new Map<string, string>()
   for (const c of args.categories) categoryById.set(c.id, c.name)
+
+  const budget = toAskBudget(
+    args.budget,
+    args.budgetStatus,
+    args.budget?.category_id ? (categoryById.get(args.budget.category_id) ?? null) : null,
+    nowIso,
+    tz,
+  )
 
   const filtered = args.transactions
     .filter((t) => !t.is_deleted && t.transacted_at >= cutoffIso)
@@ -103,6 +123,33 @@ export function buildAskMurmurRequest(args: BuildArgs): AskMurmurRequest {
     monthly_income: args.monthly_income,
     transactions,
     recurring_rules,
+    ...(budget ? { budget } : {}),
+  }
+}
+
+/** The wire shape of the app's own budget status — same numbers as the
+ *  Budgets tab, never re-derived by the model. */
+function toAskBudget(
+  budget: Budget | null | undefined,
+  status: BudgetStatus | null | undefined,
+  categoryName: string | null,
+  nowIso: string,
+  tz: string,
+): AskMurmurBudget | null {
+  if (!budget || !status) return null
+  const now = localParts(nowIso, tz)
+  const end = localParts(status.window.endExclusive, tz)
+  return {
+    amount: budget.amount,
+    currency: budget.currency_code,
+    period: budget.period as AskMurmurBudget['period'],
+    category_name: categoryName,
+    period_start: status.window.start,
+    period_end: status.window.endExclusive,
+    spent: status.spent,
+    committed: status.committed,
+    remaining: status.remaining,
+    days_left: Math.max(1, daysBetween(now.y, now.m, now.d, end.y, end.m, end.d)),
   }
 }
 

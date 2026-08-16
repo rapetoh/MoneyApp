@@ -137,13 +137,36 @@ export interface AskMurmurRequest {
    *  otherwise). */
   time_zone: string
   monthly_income: number | null
-  /** Cap: last 90 days, max 500 entries (oldest dropped client-side). */
+  /** Cap: last 12 months, max 2,000 entries (oldest dropped client-side). */
   transactions: AskMurmurTransaction[]
   recurring_rules: AskMurmurRecurringRule[]
-  /** Optional. Prior turns in the same desktop conversation (oldest first).
-   *  Capped server-side to the last 6 turns. Mobile sends none — the result
-   *  card is one-shot. */
+  /** Optional. The user's active budget *as the app already computes it*
+   *  (`budgetStatus` in packages/shared/src/domain/budget.ts — the same
+   *  numbers the Budgets tab shows), so "how am I doing against my
+   *  budget?" is answered from the app's own status, never re-derived.
+   *  Omitted when no budget is set. */
+  budget?: AskMurmurBudget | null
+  /** Optional. Prior turns in the same conversation (oldest first). Capped
+   *  server-side to the last 6 turns. Both the web thread and the mobile
+   *  thread send it. */
   history?: AskMurmurHistoryTurn[]
+}
+
+export interface AskMurmurBudget {
+  amount: number
+  currency: string
+  period: 'weekly' | 'biweekly' | 'monthly' | 'quarterly' | 'yearly'
+  /** Null = whole-spend budget; otherwise the category it caps. */
+  category_name: string | null
+  /** Current period, half-open ISO instants, in the user's zone. */
+  period_start: string
+  period_end: string
+  spent: number
+  /** Known-but-not-yet-posted outflow inside the period (due recurring). */
+  committed: number
+  /** `amount − spent − committed`, may be negative (over budget). */
+  remaining: number
+  days_left: number
 }
 
 /** Visualization the model can attach to a verdict to make a numeric story

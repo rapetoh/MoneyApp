@@ -13,7 +13,7 @@ import {
   type ToolContext,
 } from '@voice-expense/ai/server'
 import { localDay } from '@voice-expense/shared'
-import type { AskMurmurRequest, AskMurmurResponse, AskMurmurTransaction } from '@voice-expense/shared'
+import type { AskMurmurRequest, AskMurmurResponse, AskMurmurTransaction, AskMurmurBudget } from '@voice-expense/shared'
 import type { NextRequest } from 'next/server'
 import { getOpenAIEnv } from '../../../../lib/env'
 import { resolveNowUtc, resolveTimeZone } from './timeZone'
@@ -28,7 +28,11 @@ const MODEL = process.env.AI_ASK_MODEL?.trim() || 'gpt-4o'
 const DEBUG_TRACE = process.env.AI_DEBUG_TRACE === '1'
 
 // Defensive caps. The mobile client already trims, but we don't trust it.
-const MAX_TRANSACTIONS = 500
+// 12 months of history at up to 2,000 rows (was 90 days / 500 — which made
+// "this year" a 90-day number labelled as a year, owner report Aug 15).
+// Rows never reach the model — the deterministic tools aggregate them —
+// so a bigger dataset costs no tokens.
+const MAX_TRANSACTIONS = 2000
 const MAX_RECURRING = 50
 const MAX_QUESTION_LEN = 600
 const MAX_HISTORY_TURNS = 6
@@ -112,6 +116,8 @@ export async function POST(req: NextRequest) {
         .filter((h): h is { question: string; answer: string } => h !== null)
     : []
 
+  const budget = parseBudget(body.budget)
+
   const askReq: AskMurmurRequest = {
     question,
     locale: (body.locale ?? 'en') as AskMurmurRequest['locale'],
@@ -121,6 +127,7 @@ export async function POST(req: NextRequest) {
     monthly_income: typeof body.monthly_income === 'number' ? body.monthly_income : null,
     transactions,
     recurring_rules,
+    ...(budget ? { budget } : {}),
     ...(history.length > 0 ? { history } : {}),
   }
 
@@ -163,6 +170,7 @@ export async function POST(req: NextRequest) {
       result.calls,
       askReq.question,
       askReq.monthly_income,
+      askReq.budget ? [askReq.budget.amount, askReq.budget.spent, askReq.budget.committed, askReq.budget.remaining] : null,
     )
     if (validation.soft_issues.length > 0) {
       // Soft-issue strings quote the untraced amounts themselves — count only.
@@ -294,6 +302,31 @@ function retryAfterMs(e: { message?: string; headers?: Record<string, string> })
     return Math.min(Math.max(ms + 400, 1500), 6000)
   }
   return 2500
+}
+
+/** Trust boundary for the client-supplied budget block: every numeric
+ *  field must be a finite number and the period one of the app's own; a
+ *  malformed block is dropped (the model then behaves as "no budget set")
+ *  rather than reaching the prompt. */
+function parseBudget(raw: unknown): AskMurmurBudget | null {
+  if (!raw || typeof raw !== 'object') return null
+  const b = raw as Record<string, unknown>
+  const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : null)
+  const amount = num(b.amount), spent = num(b.spent), committed = num(b.committed), remaining = num(b.remaining), days_left = num(b.days_left)
+  const period = b.period
+  const PERIODS = ['weekly', 'biweekly', 'monthly', 'quarterly', 'yearly'] as const
+  if (amount === null || spent === null || committed === null || remaining === null || days_left === null) return null
+  if (typeof period !== 'string' || !(PERIODS as readonly string[]).includes(period)) return null
+  if (typeof b.period_start !== 'string' || typeof b.period_end !== 'string') return null
+  return {
+    amount, spent, committed, remaining,
+    days_left: Math.max(0, Math.trunc(days_left)),
+    period: period as AskMurmurBudget['period'],
+    currency: typeof b.currency === 'string' && b.currency ? b.currency.slice(0, 3).toUpperCase() : 'USD',
+    category_name: typeof b.category_name === 'string' && b.category_name ? b.category_name.slice(0, 80) : null,
+    period_start: b.period_start.slice(0, 40),
+    period_end: b.period_end.slice(0, 40),
+  }
 }
 
 // ─── Non-answer / stall / repeat detectors ──────────────────────────────────

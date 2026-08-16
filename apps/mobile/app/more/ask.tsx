@@ -18,6 +18,7 @@ import { useProfile } from '../../src/hooks/useProfile'
 import { useTransactions } from '../../src/hooks/useTransactions'
 import { useCategories } from '../../src/hooks/useCategories'
 import { useRecurringRules } from '../../src/hooks/useRecurringRules'
+import { useActiveBudget, budgetStatusFor } from '../../src/hooks/useBudget'
 import { usePlusStatus } from '../../src/hooks/usePlusStatus'
 import { AskChart } from '../../src/components/AskChart'
 import { getApiUrl } from '../../src/hooks/useApiUrl'
@@ -82,6 +83,13 @@ export default function AskMurmurScreen() {
   const { transactions } = useTransactions(user?.id)
   const { categories } = useCategories(user?.id)
   const { rules: recurringRules } = useRecurringRules(user?.id)
+  const { budget } = useActiveBudget(user?.id)
+  // The Budgets tab's own status computation — the assistant answers
+  // "how am I doing against my budget?" with exactly these numbers.
+  const budgetStatus = useMemo(
+    () => budgetStatusFor(budget, transactions, recurringRules, profile?.timezone || 'UTC'),
+    [budget, transactions, recurringRules, profile?.timezone],
+  )
 
   // The conversation. Every turn is a question + its own loading / answer /
   // error state, so a failed follow-up retries alone and never disturbs the
@@ -99,8 +107,8 @@ export default function AskMurmurScreen() {
   const insets = useSafeAreaInsets()
 
   // Latest data snapshot for requests fired from callbacks.
-  const dataRef = useRef({ transactions, categories, recurringRules, profile, locale, currency })
-  dataRef.current = { transactions, categories, recurringRules, profile, locale, currency }
+  const dataRef = useRef({ transactions, categories, recurringRules, profile, locale, currency, budget, budgetStatus })
+  dataRef.current = { transactions, categories, recurringRules, profile, locale, currency, budget, budgetStatus }
 
   // One persisted thread per screen visit (ask_conversations / ask_messages
   // — the same tables the desktop history dropdown reads).
@@ -145,6 +153,8 @@ export default function AskMurmurScreen() {
           recurringRules: d.recurringRules,
           categories: d.categories,
           timeZone: d.profile?.timezone || undefined,
+          budget: d.budget,
+          budgetStatus: d.budgetStatus,
         }),
         history: historyFor(priorTurns),
       }

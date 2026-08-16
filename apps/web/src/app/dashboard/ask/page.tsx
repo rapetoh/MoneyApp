@@ -21,6 +21,9 @@ import {
   addDays,
   civilDateTimeToInstant,
   localParts,
+  daysBetween,
+  budgetStatus,
+  resolveCategoryKind,
   type AskConversationRow,
   type AskMessageRow,
 } from '@voice-expense/shared'
@@ -30,6 +33,10 @@ import type {
   AskMurmurTransaction,
   AskMurmurRecurringRule,
   AskMurmurHistoryTurn,
+  AskMurmurBudget,
+  Budget,
+  BudgetStatusTransaction,
+  CategoryKind,
   Locale,
   RecurringRule,
   Transaction,
@@ -130,6 +137,7 @@ export default function AskMurmurPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [rules, setRules] = useState<RecurringRule[]>([])
   const [categories, setCategories] = useState<Category[]>([])
+  const [budgets, setBudgets] = useState<Budget[]>([])
   // Read-error state (fix-plan 2.13 / audit 08-F21 family). This page has
   // no separate list body — a failed read used to render as an honest-
   // looking "0 voice expenses / 0 income deposits / 0 recurring bills" in
@@ -162,7 +170,7 @@ export default function AskMurmurPage() {
     if (!user) return
     setAuthed(true)
     setUserId(user.id)
-    const [p, t, r, c, mostRecent, convs] = await Promise.all([
+    const [p, t, r, c, b, mostRecent, convs] = await Promise.all([
       supabase.from('profiles').select('*').eq('id', user.id).single(),
       supabase
         .from('transactions')
@@ -172,6 +180,7 @@ export default function AskMurmurPage() {
         .order('transacted_at', { ascending: false }),
       supabase.from('recurring_rules').select('*').eq('user_id', user.id),
       supabase.from('categories').select('*').eq('user_id', user.id).eq('is_archived', false),
+      supabase.from('budgets').select('*').eq('user_id', user.id).eq('is_active', true),
       loadMostRecentConversation(supabase, user.id),
       listConversations(supabase, user.id, 30),
     ])
@@ -200,6 +209,7 @@ export default function AskMurmurPage() {
     if (!t.error) setTransactions((t.data ?? []) as Transaction[])
     if (!r.error) setRules((r.data ?? []) as RecurringRule[])
     if (!c.error) setCategories((c.data ?? []) as Category[])
+    if (!b.error) setBudgets((b.data ?? []) as Budget[])
     setConversations(convs)
     if (mostRecent) {
       setActiveConversationId(mostRecent.conversation.id)
@@ -255,16 +265,59 @@ export default function AskMurmurPage() {
     }
   }
 
+  /** The user's overall budget as the Budgets page computes it (same
+   *  shared `budgetStatus`, same selection: overall monthly first) — the
+   *  assistant quotes exactly the numbers that page shows. */
+  function askBudget(nowIso: string, tz: string): AskMurmurBudget | null {
+    const overall = budgets.find((x) => x.category_id === null && x.period === 'monthly') ?? budgets.find((x) => x.category_id === null)
+    if (!overall) return null
+    // `categories.kind` is a CHECK-constrained column the generated row
+    // type sees as `string` — narrowed here the same way budgets/page.tsx
+    // does via `resolveCategoryKind`.
+    const catKind = new Map(categories.map((c) => [c.id, resolveCategoryKind(c.name, c.kind as CategoryKind | null)]))
+    const txnsForStatus: BudgetStatusTransaction[] = transactions.map((t) => ({
+      amount_in_profile_currency: t.amount_in_profile_currency,
+      direction: t.direction,
+      transacted_at: t.transacted_at,
+      category_id: t.category_id,
+      category_kind: t.category_id ? catKind.get(t.category_id) ?? null : null,
+      recurring_rule_id: t.recurring_rule_id,
+    }))
+    const status = budgetStatus(
+      { period: overall.period, starts_at: overall.starts_at, category_id: null, currency_code: overall.currency_code, amount: overall.amount },
+      txnsForStatus,
+      rules,
+      tz,
+    )
+    if (!status) return null
+    const now = localParts(nowIso, tz)
+    const end = localParts(status.window.endExclusive, tz)
+    return {
+      amount: overall.amount,
+      currency: overall.currency_code,
+      period: overall.period,
+      category_name: null,
+      period_start: status.window.start,
+      period_end: status.window.endExclusive,
+      spent: status.spent,
+      committed: status.committed,
+      remaining: status.remaining,
+      days_left: Math.max(1, daysBetween(now.y, now.m, now.d, end.y, end.m, end.d)),
+    }
+  }
+
   function buildRequest(q: string, history: AskMurmurHistoryTurn[]): AskMurmurRequest {
     const tz = profile?.timezone || 'UTC'
     const nowIso = new Date().toISOString()
-    const cutoffIso = daysAgoInstant(nowIso, tz, 90)
+    const budget = askBudget(nowIso, tz)
+    // 12 months / 2,000 rows — same reach as the mobile client (Aug 15).
+    const cutoffIso = daysAgoInstant(nowIso, tz, 366)
     const catById = new Map<string, string>()
     for (const c of categories) catById.set(c.id, c.name)
     const filtered = transactions
       .filter((t) => !t.is_deleted && t.transacted_at >= cutoffIso)
       .sort((a, b) => a.transacted_at.localeCompare(b.transacted_at))
-      .slice(-500)
+      .slice(-2000)
     // `amount_in_profile_currency` is part of the wire contract
     // (packages/shared/src/types/ai.ts, fix-plan 2.10) — sending the
     // real FX-converted figure, never the raw same-name `amount`, is
@@ -301,6 +354,7 @@ export default function AskMurmurPage() {
       monthly_income: profile?.monthly_income ?? null,
       transactions: wireTxns,
       recurring_rules: wireRules,
+      ...(budget ? { budget } : {}),
       ...(history.length > 0 ? { history } : {}),
     }
   }
@@ -462,14 +516,16 @@ export default function AskMurmurPage() {
 
   // Sources Used panel data — reflects what the model has access to.
   const sources = (() => {
-    const ninetyAgoIso = daysAgoInstant(new Date().toISOString(), profile?.timezone || 'UTC', 90)
-    const recentTxns = transactions.filter((t) => !t.is_deleted && t.transacted_at >= ninetyAgoIso)
+    // Mirrors the request window (12 months) so the panel describes what
+    // the model actually sees.
+    const yearAgoIso = daysAgoInstant(new Date().toISOString(), profile?.timezone || 'UTC', 366)
+    const recentTxns = transactions.filter((t) => !t.is_deleted && t.transacted_at >= yearAgoIso)
     const voiceCount = transactions.filter((t) => t.source === 'voice' && !t.is_deleted).length
     const incomeCount = recentTxns.filter((t) => t.direction === 'credit').length
     const activeRules = rules.filter((r) => r.is_active).length
     return [
       { label: `${voiceCount} voice ${voiceCount === 1 ? 'expense' : 'expenses'}`, sub: 'all time' },
-      { label: `${incomeCount} income ${incomeCount === 1 ? 'deposit' : 'deposits'}`, sub: 'last 90d' },
+      { label: `${incomeCount} income ${incomeCount === 1 ? 'deposit' : 'deposits'}`, sub: 'last 12 months' },
       { label: `${activeRules} recurring ${activeRules === 1 ? 'bill' : 'bills'}`, sub: 'detected' },
     ]
   })()

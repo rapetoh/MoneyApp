@@ -204,6 +204,70 @@ describe('tool: total', () => {
   })
 })
 
+describe('tool: total — new named windows and custom ranges (Aug 15 gaps)', () => {
+  // now = 2026-05-03 09:00 America/Chicago (a Sunday). ISO week = Mon Apr 27 – Sun May 3.
+  it('yesterday is a single civil day (2026-05-02): none of the fixture rows', () => {
+    expect(call('total', { window: 'yesterday' })).toMatchObject({ count: 0 })
+  })
+  it('thisWeek (Apr 27 – May 3) is empty; lastWeek (Apr 20 – 26) is empty; both resolve without throwing', () => {
+    expect(call('total', { window: 'thisWeek' })).toMatchObject({ count: 0 })
+    expect(call('total', { window: 'lastWeek' })).toMatchObject({ count: 0 })
+  })
+  it('thisQuarter (Apr–Jun 2026) has the 4 April rows; lastQuarter (Jan–Mar) has the March + Feb rows', () => {
+    expect(call('total', { window: 'thisQuarter' })).toMatchObject({ count: 4 })
+    expect(call('total', { window: 'lastQuarter' })).toMatchObject({ count: 2, total: 55 })
+  })
+  it('custom: "April 11–15" catches exactly the Apr 11 and Apr 14 rows', () => {
+    expect(call('total', { window: 'custom', start_date: '2026-04-11', end_date: '2026-04-15' })).toMatchObject({ count: 2, total: 70 })
+  })
+  it('custom: a named month ("April") equals lastMonth', () => {
+    expect(call('total', { window: 'custom', start_date: '2026-04-01', end_date: '2026-04-30' })).toEqual(call('total', { window: 'lastMonth' }))
+  })
+  it('custom without dates / with an impossible date / reversed range → self-correcting errors', () => {
+    expect(resolveToolCall('total', { window: 'custom' }, ctx).ok).toBe(false)
+    const bad = resolveToolCall('total', { window: 'custom', start_date: '2026-02-30', end_date: '2026-03-01' }, ctx)
+    expect(bad.ok).toBe(false)
+    expect(bad.ok || bad.error).toMatch(/calendar date/)
+    const rev = resolveToolCall('total', { window: 'custom', start_date: '2026-04-15', end_date: '2026-04-11' }, ctx)
+    expect(rev.ok).toBe(false)
+  })
+})
+
+describe('tool: recurring_total — charged vs still due this month', () => {
+  // now = 2026-05-03; Netflix's rule already produced a row this month? No —
+  // the fixture's Netflix charge is 2026-04-19 (last month). Housing is
+  // April too. So with rules for both, both are still due in May.
+  const ctxWithRules: ToolContext = {
+    ...ctx,
+    recurring_rules: [
+      { name: 'Netflix', amount: 55, direction: 'debit', frequency: 'monthly' },
+      { name: 'Housing', amount: 20000, direction: 'debit', frequency: 'monthly' },
+    ],
+  }
+  it('flags each rule and totals only the ones not yet charged this month', () => {
+    const r = resolveToolCall('recurring_total', {}, ctxWithRules)
+    expect(r.ok).toBe(true)
+    const out = (r as { ok: true; result: any }).result
+    expect(out.monthly_total).toBe(20055)
+    expect(out.rules.every((x: any) => x.charged_this_month === false)).toBe(true)
+    expect(out.still_due_this_month_total).toBe(20055)
+  })
+  it('a rule with a matching transaction this month is charged, not still due', () => {
+    const c2: ToolContext = {
+      ...ctxWithRules,
+      transactions: [
+        ...transactions,
+        { amount: 55, amount_in_profile_currency: 55, direction: 'debit', merchant: 'Netflix', category_name: 'Subscriptions', transacted_at: '2026-05-02T12:00:00Z', is_recurring: true },
+      ],
+    }
+    const out = (resolveToolCall('recurring_total', {}, c2) as { ok: true; result: any }).result
+    const netflix = out.rules.find((x: any) => x.name === 'Netflix')
+    expect(netflix.charged_this_month).toBe(true)
+    expect(out.still_due_this_month_total).toBe(20000)
+    expect(out.still_due_this_month.map((x: any) => x.name)).toEqual(['Housing'])
+  })
+})
+
 describe('tool: sum_by_category', () => {
   it('this year, by category produces 3 categories', () => {
     const out = call('sum_by_category', { window: 'thisYear' }) as {

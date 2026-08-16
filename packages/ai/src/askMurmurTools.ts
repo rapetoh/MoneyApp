@@ -61,6 +61,7 @@ import {
   resolveCategoryKind,
   roundCents,
   summarize,
+  weekBounds,
   weekStart,
   weekdayLabels,
   type SummarizableTransaction,
@@ -207,8 +208,13 @@ function monthsAgoWindow(y: number, m: number, d: number, tz: string, n: number)
 
 export const WINDOW_NAMES = [
   'today',
+  'yesterday',
+  'thisWeek',
+  'lastWeek',
   'thisMonth',
   'lastMonth',
+  'thisQuarter',
+  'lastQuarter',
   'thisYear',
   'lastYear',
   'last7Days',
@@ -216,6 +222,11 @@ export const WINDOW_NAMES = [
   'last90Days',
   'last6Months',
   'last12Months',
+  // Any other range — a named month ("June"), "between the 1st and the
+  // 10th", a specific quarter of last year — via start_date / end_date
+  // (inclusive civil dates in the user's zone). Owner report Aug 15: the
+  // fixed list could not answer "last week" or "in June" at all.
+  'custom',
 ] as const
 
 export type WindowName = (typeof WINDOW_NAMES)[number]
@@ -229,10 +240,23 @@ export function buildWindows(nowUtcStr: string, tz: string): Record<WindowName, 
   const { y, m, d } = resolveNowParts(nowUtcStr, resolvedTz)
   const prevMonth = addMonthsClamped(y, m, 1, -1)
 
+  const yday = addDays(y, m, d, -1)
+  const nowIso = civilDateTimeToInstant(y, m, d, 12, 0, 0, resolvedTz)
+  const lastWeekAnchor = (() => { const p = addDays(y, m, d, -7); return civilDateTimeToInstant(p.y, p.m, p.d, 12, 0, 0, resolvedTz) })()
+  const thisWeekB = weekBounds(nowIso, resolvedTz)
+  const lastWeekB = weekBounds(lastWeekAnchor, resolvedTz)
+  const qStartM = Math.floor((m - 1) / 3) * 3 + 1
+  const prevQ = addMonthsClamped(y, qStartM, 1, -3)
+
   return {
     today: dayWindow(y, m, d, resolvedTz),
+    yesterday: dayWindow(yday.y, yday.m, yday.d, resolvedTz),
+    thisWeek: { start: toDate(thisWeekB.start), end: toDate(thisWeekB.endExclusive) },
+    lastWeek: { start: toDate(lastWeekB.start), end: toDate(lastWeekB.endExclusive) },
     thisMonth: monthWindow(y, m, resolvedTz),
     lastMonth: monthWindow(prevMonth.y, prevMonth.m, resolvedTz),
+    thisQuarter: quarterWindow(y, qStartM, resolvedTz),
+    lastQuarter: quarterWindow(prevQ.y, prevQ.m, resolvedTz),
     thisYear: yearWindow(y, resolvedTz),
     lastYear: yearWindow(y - 1, resolvedTz),
     last7Days: trailingDaysWindow(y, m, d, resolvedTz, 7),
@@ -240,7 +264,46 @@ export function buildWindows(nowUtcStr: string, tz: string): Record<WindowName, 
     last90Days: trailingDaysWindow(y, m, d, resolvedTz, 90),
     last6Months: monthsAgoWindow(y, m, d, resolvedTz, 5),
     last12Months: monthsAgoWindow(y, m, d, resolvedTz, 11),
+    // Placeholder — a 'custom' filter is resolved from its own dates by
+    // `resolveWindow`; this entry only keeps the record shape total.
+    custom: { start: new Date(0), end: new Date(0) },
   }
+}
+
+/** Calendar quarter starting at month `qStartM` (1, 4, 7, 10) of `y`. */
+function quarterWindow(y: number, qStartM: number, tz: string): DateWindow {
+  const startB = monthBounds(monthIsoStr(y, qStartM), tz)
+  const endMonth = addMonthsClamped(y, qStartM, 1, 2)
+  const endB = monthBounds(monthIsoStr(endMonth.y, endMonth.m), tz)
+  return { start: toDate(startB.start), end: toDate(endB.endExclusive) }
+}
+
+const CIVIL_DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/
+
+function parseCivilDate(v: unknown, field: string): { y: number; m: number; d: number } | undefined {
+  if (v == null || v === '') return undefined
+  const m = typeof v === 'string' ? CIVIL_DATE_RE.exec(v.trim()) : null
+  if (!m) throw new Error(`"${field}" must be a civil date YYYY-MM-DD; got ${JSON.stringify(v)}`)
+  const y = Number(m[1]), mo = Number(m[2]), d = Number(m[3])
+  const dim = new Date(Date.UTC(y, mo, 0)).getUTCDate()
+  if (mo < 1 || mo > 12 || d < 1 || d > dim) throw new Error(`"${field}" is not a real calendar date: ${v}`)
+  return { y, m: mo, d }
+}
+
+/** The window a filter names — a named window, or for 'custom' the
+ *  inclusive civil range [start_date, end_date] in the user's zone. */
+function resolveWindow(filter: RowFilter, windows: Record<WindowName, DateWindow>, ctx: ToolContext): DateWindow {
+  if (filter.window !== 'custom') return windows[filter.window]
+  if (!filter.start_date || !filter.end_date) {
+    throw new Error('window "custom" requires both "start_date" and "end_date" (YYYY-MM-DD, inclusive)')
+  }
+  const tz = resolveTz(ctx.tz)
+  const s = filter.start_date, e = filter.end_date
+  const next = addDays(e.y, e.m, e.d, 1)
+  const start = toDate(civilDateTimeToInstant(s.y, s.m, s.d, 0, 0, 0, tz))
+  const end = toDate(civilDateTimeToInstant(next.y, next.m, next.d, 0, 0, 0, tz))
+  if (end.getTime() <= start.getTime()) throw new Error('"end_date" must be on or after "start_date"')
+  return { start, end }
 }
 
 function inWindow<T extends { transacted_at?: string | null }>(arr: readonly T[], w: DateWindow): T[] {
@@ -294,6 +357,9 @@ function parseLimit(v: unknown, fallback: number, max: number): number {
 
 interface RowFilter {
   window: WindowName
+  /** Only with window 'custom' — inclusive civil dates in the user's zone. */
+  start_date?: { y: number; m: number; d: number }
+  end_date?: { y: number; m: number; d: number }
   direction?: 'debit' | 'credit'
   category_name?: string
   merchant_contains?: string
@@ -315,7 +381,7 @@ function filterRows(
   windows: Record<WindowName, DateWindow>,
   filter: RowFilter,
 ): FilteredRows {
-  let rows = inWindow(ctx.transactions ?? [], windows[filter.window])
+  let rows = inWindow(ctx.transactions ?? [], resolveWindow(filter, windows, ctx))
   if (filter.direction) rows = rows.filter((t) => t.direction === filter.direction)
   if (filter.category_name) {
     const target = filter.category_name.toLowerCase()
@@ -348,6 +414,8 @@ interface TotalArgs extends RowFilter {}
 function parseTotalArgs(args: Record<string, unknown>): TotalArgs {
   return {
     window: parseWindowName(args.window),
+    start_date: parseCivilDate(args.start_date, 'start_date'),
+    end_date: parseCivilDate(args.end_date, 'end_date'),
     direction: parseDirection(args.direction),
     category_name: parseOptionalString(args.category_name),
     merchant_contains: parseOptionalString(args.merchant_contains),
@@ -366,13 +434,15 @@ function totalTool(args: TotalArgs, ctx: ToolContext, windows: Record<WindowName
 
 // ─── sum_by_category ────────────────────────────────────────────────────
 
-interface SumByCategoryArgs {
-  window: WindowName
-  direction?: 'debit' | 'credit'
-}
+interface SumByCategoryArgs extends Pick<RowFilter, 'window' | 'start_date' | 'end_date' | 'direction'> {}
 
 function parseSumByCategoryArgs(args: Record<string, unknown>): SumByCategoryArgs {
-  return { window: parseWindowName(args.window), direction: parseDirection(args.direction) }
+  return {
+    window: parseWindowName(args.window),
+    start_date: parseCivilDate(args.start_date, 'start_date'),
+    end_date: parseCivilDate(args.end_date, 'end_date'),
+    direction: parseDirection(args.direction),
+  }
 }
 
 function sumByCategoryTool(
@@ -381,7 +451,7 @@ function sumByCategoryTool(
   windows: Record<WindowName, DateWindow>,
 ): unknown {
   const direction = args.direction ?? 'debit'
-  const { rows, pendingCount } = filterRows(ctx, windows, { window: args.window, direction })
+  const { rows, pendingCount } = filterRows(ctx, windows, { window: args.window, start_date: args.start_date, end_date: args.end_date, direction })
   const byCat = new Map<string, { total: number; count: number }>()
   for (const t of rows) {
     const key = t.category_name || 'Uncategorized'
@@ -400,6 +470,8 @@ function sumByCategoryTool(
 
 interface TopMerchantsArgs {
   window: WindowName
+  start_date?: RowFilter['start_date']
+  end_date?: RowFilter['end_date']
   direction?: 'debit' | 'credit'
   category_name?: string
   limit: number
@@ -408,6 +480,8 @@ interface TopMerchantsArgs {
 function parseTopMerchantsArgs(args: Record<string, unknown>): TopMerchantsArgs {
   return {
     window: parseWindowName(args.window),
+    start_date: parseCivilDate(args.start_date, 'start_date'),
+    end_date: parseCivilDate(args.end_date, 'end_date'),
     direction: parseDirection(args.direction),
     category_name: parseOptionalString(args.category_name),
     limit: parseLimit(args.limit, 5, 20),
@@ -422,6 +496,8 @@ function topMerchantsTool(
   const direction = args.direction ?? 'debit'
   const { rows, pendingCount } = filterRows(ctx, windows, {
     window: args.window,
+    start_date: args.start_date,
+    end_date: args.end_date,
     direction,
     category_name: args.category_name,
   })
@@ -445,10 +521,8 @@ function topMerchantsTool(
 const SERIES_BUCKETS = ['day', 'week', 'month', 'weekday'] as const
 type SeriesBucket = (typeof SERIES_BUCKETS)[number]
 
-interface SeriesArgs {
-  window: WindowName
+interface SeriesArgs extends Pick<RowFilter, 'window' | 'start_date' | 'end_date' | 'direction'> {
   bucket: SeriesBucket
-  direction?: 'debit' | 'credit'
 }
 
 function parseSeriesArgs(args: Record<string, unknown>): SeriesArgs {
@@ -458,6 +532,8 @@ function parseSeriesArgs(args: Record<string, unknown>): SeriesArgs {
   }
   return {
     window: parseWindowName(args.window),
+    start_date: parseCivilDate(args.start_date, 'start_date'),
+    end_date: parseCivilDate(args.end_date, 'end_date'),
     bucket: bucket as SeriesBucket,
     direction: parseDirection(args.direction),
   }
@@ -466,7 +542,7 @@ function parseSeriesArgs(args: Record<string, unknown>): SeriesArgs {
 function seriesTool(args: SeriesArgs, ctx: ToolContext, windows: Record<WindowName, DateWindow>): unknown {
   const direction = args.direction ?? 'debit'
   const tz = resolveTz(ctx.tz)
-  const { rows, pendingCount } = filterRows(ctx, windows, { window: args.window, direction })
+  const { rows, pendingCount } = filterRows(ctx, windows, { window: args.window, start_date: args.start_date, end_date: args.end_date, direction })
 
   const byBucket = new Map<string, { total: number; count: number; order: number }>()
   for (const t of rows) {
@@ -530,16 +606,48 @@ function recurringTotalTool(args: RecurringTotalArgs, ctx: ToolContext): unknown
   const rules = (ctx.recurring_rules ?? []).filter(
     (r) => r.direction === direction && VALID_FREQUENCIES.has(r.frequency),
   )
+  // Which of these rules has already produced a transaction THIS month —
+  // deterministic, so an end-of-month forecast never counts a bill that
+  // was charged on the 12th as "still upcoming" (the double-count the
+  // prompt rule alone kept letting through). A rule is "paid this month"
+  // when a same-direction transaction in the current month matches it by
+  // name (either contains the other, case-insensitive) or is flagged
+  // recurring with the same amount.
+  const tz = resolveTz(ctx.tz)
+  const windows = buildWindows(ctx.now_utc, tz)
+  const thisMonthRows = filterRows(ctx, windows, { window: 'thisMonth', direction }).rows
+  const matchesRule = (rule: AskMurmurRecurringRule, t: AskMurmurTransaction): boolean => {
+    const rn = (rule.name ?? '').trim().toLowerCase()
+    const mn = (t.merchant ?? '').trim().toLowerCase()
+    if (rn && mn && (mn.includes(rn) || rn.includes(mn))) return true
+    return !!t.is_recurring && Math.abs(amountOf(t) - rule.amount) < 0.005
+  }
   const normalized = rules
-    .map((r) => ({
-      name: r.name?.trim() || 'Unnamed',
-      monthly_amount: roundCents(
-        monthlyEquivalent({ frequency: r.frequency as RecurringFrequency, interval: 1, amount: r.amount }),
-      ),
-    }))
+    .map((r) => {
+      const paid = thisMonthRows.some((t) => matchesRule(r, t))
+      return {
+        name: r.name?.trim() || 'Unnamed',
+        amount: roundCents(r.amount),
+        frequency: r.frequency,
+        monthly_amount: roundCents(
+          monthlyEquivalent({ frequency: r.frequency as RecurringFrequency, interval: 1, amount: r.amount }),
+        ),
+        charged_this_month: paid,
+      }
+    })
     .sort((a, b) => b.monthly_amount - a.monthly_amount)
   const monthly_total = roundCents(normalized.reduce((acc, r) => acc + r.monthly_amount, 0))
-  return { rules: normalized, monthly_total, annual_total: roundCents(monthly_total * 12) }
+  const still_due_this_month = normalized.filter((r) => !r.charged_this_month)
+  const still_due_this_month_total = roundCents(still_due_this_month.reduce((acc, r) => acc + r.monthly_amount, 0))
+  return {
+    rules: normalized,
+    monthly_total,
+    annual_total: roundCents(monthly_total * 12),
+    // For "will I make it to the end of the month" / "what's left after
+    // bills": only these are not yet in this month's spending total.
+    still_due_this_month: still_due_this_month.map((r) => ({ name: r.name, monthly_amount: r.monthly_amount })),
+    still_due_this_month_total,
+  }
 }
 
 // ─── compare ────────────────────────────────────────────────────────────
@@ -578,7 +686,11 @@ function compareTool(args: { a: ComparePayload; b: ComparePayload }) {
 // ─── Catalog (OpenAI function-calling format) ──────────────────────────
 
 const WINDOW_ENUM_DESCRIPTION =
-  'One of: "today", "thisMonth", "lastMonth", "thisYear", "lastYear", "last7Days" (last 7 calendar days incl. today), "last30Days", "last90Days" (last quarter), "last6Months", "last12Months" (rolling last year). Always pick one of these — never compute your own date range.'
+  'One of: "today", "yesterday", "thisWeek" / "lastWeek" (Monday–Sunday), "thisMonth", "lastMonth", "thisQuarter", "lastQuarter", "thisYear", "lastYear", "last7Days" (last 7 calendar days incl. today), "last30Days", "last90Days", "last6Months", "last12Months" (rolling), or "custom" with start_date + end_date (inclusive YYYY-MM-DD in the user\'s zone) for anything else — a named month ("June" → 2026-06-01..2026-06-30), "between the 1st and the 10th", a specific past quarter. Prefer a named window when one matches exactly.'
+const CUSTOM_DATE_PROPS = {
+  start_date: { type: 'string', description: 'Only with window "custom": first day, inclusive, YYYY-MM-DD in the user\'s time zone.' },
+  end_date: { type: 'string', description: 'Only with window "custom": last day, inclusive, YYYY-MM-DD in the user\'s time zone.' },
+}
 
 export const TOOLS = [
   {
@@ -592,6 +704,7 @@ export const TOOLS = [
         required: ['window'],
         properties: {
           window: { type: 'string', enum: WINDOW_NAMES, description: WINDOW_ENUM_DESCRIPTION },
+          ...CUSTOM_DATE_PROPS,
           direction: {
             type: 'string',
             enum: ['debit', 'credit'],
@@ -621,6 +734,7 @@ export const TOOLS = [
         required: ['window'],
         properties: {
           window: { type: 'string', enum: WINDOW_NAMES, description: WINDOW_ENUM_DESCRIPTION },
+          ...CUSTOM_DATE_PROPS,
           direction: {
             type: 'string',
             enum: ['debit', 'credit'],
@@ -642,6 +756,7 @@ export const TOOLS = [
         required: ['window'],
         properties: {
           window: { type: 'string', enum: WINDOW_NAMES, description: WINDOW_ENUM_DESCRIPTION },
+          ...CUSTOM_DATE_PROPS,
           direction: { type: 'string', enum: ['debit', 'credit'], description: 'Default "debit".' },
           category_name: {
             type: 'string',
@@ -664,6 +779,7 @@ export const TOOLS = [
         required: ['window', 'bucket'],
         properties: {
           window: { type: 'string', enum: WINDOW_NAMES, description: WINDOW_ENUM_DESCRIPTION },
+          ...CUSTOM_DATE_PROPS,
           bucket: {
             type: 'string',
             enum: SERIES_BUCKETS,
@@ -681,7 +797,7 @@ export const TOOLS = [
     function: {
       name: 'recurring_total',
       description:
-        'Normalized monthly + annual total of the user’s active recurring rules (each rule’s frequency converted to its monthly-equivalent cost), plus the per-rule breakdown. Use for "how much do my subscriptions cost" / "recurring bills" questions — never estimate this from raw rule amounts yourself; a weekly rule’s monthly cost is not its raw amount.',
+        'Normalized monthly + annual total of the user’s active recurring rules (each rule’s frequency converted to its monthly-equivalent cost), plus the per-rule breakdown with `charged_this_month`, and `still_due_this_month_total` (rules that have NOT yet produced a transaction this month). Use for "how much do my subscriptions cost" / "recurring bills" questions — never estimate this from raw rule amounts yourself. For end-of-month forecasts use `still_due_this_month_total`, never `monthly_total` (bills already charged are already inside this month’s spending).',
       parameters: {
         type: 'object',
         properties: {
