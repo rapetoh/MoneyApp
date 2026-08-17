@@ -88,9 +88,11 @@ web/desktop: read profiles.plus_status (server-resolved); "Refresh" = plus-sync
 Everything below needs *your* Apple / RevenueCat login or your bank details.
 Send me the values marked ⟵ and I do the rest.
 
-1. **App Store Connect → Business (Agreements, Tax, and Banking)** — sign
-   the *Paid Apps* agreement; add bank account + tax forms. Nothing sells
-   until Apple marks it Active (can take a day).
+1. ~~**App Store Connect → Business** — Paid Apps agreement + banking + tax.~~
+   **Already done (verified Aug 17, 2026):** Paid Apps Agreement *Active*
+   Jan 23 – **Dec 20, 2026** (renew then), bank account GSCU (…7115)
+   *Active*, W-9 *Active* — account-level, inherited from the owner's
+   earlier app. Real charges will work as soon as the app is live.
 2. **App Store Connect → Apps → Murmur → Subscriptions** — create
    subscription group **Murmur Plus**, then two auto-renewable subscriptions:
    - Product ID `murmur_plus_monthly` — 1 month — price tier $3.99
@@ -232,8 +234,9 @@ is exercised, and prices go live with the store submission.
   (03:13:35) — both paths live. Phone Settings: "Free trial · ends
   Aug 17, 2026"; Apple's manage sheet shows the sandbox subscription.
   Remaining: web Settings check, optional cancel → lapsed lifecycle
-  check, Paid Apps agreement + banking, review screenshot per product,
-  support email, re-lock the other five test profiles.
+  check, review screenshot per product, support email, re-lock the other
+  five test profiles. (Paid Apps agreement/banking/tax: already Active
+  since Jan 2026 — verified Aug 17.)
 
 ## Verification of what shipped today
 
