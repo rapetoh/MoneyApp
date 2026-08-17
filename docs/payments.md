@@ -169,6 +169,30 @@ is exercised, and prices go live with the store submission.
   a new app version** — the products go live with the 1.0 store
   submission, not independently. Banking/tax untouched.
 
+- **Aug 16–17, 2026 — RevenueCat + server live:** RevenueCat project
+  **Murmur** (id 6f7fbd01, separate from the owner's older "Expense
+  Tracker"/"PocketChef" projects), App Store app `com.voiceexpense.app`
+  with IAP key F47D86V9PG uploaded ("Valid credentials"), products
+  `murmur_plus_monthly` / `murmur_plus_yearly`, entitlement `plus`,
+  offering `default` (current) with `$rc_annual` + `$rc_monthly`, public
+  iOS key in `eas.json` production env, secret v1 key + webhook secret set
+  as Supabase function secrets, webhook `revenuecat-webhook` configured for
+  Production+Sandbox / all events. Migration 031 applied by the owner in
+  the SQL editor; verified in prod: 8 `plus_*` columns, `guard_plus_entitlement`
+  refuses an `authenticated`-role write ("plus entitlement is managed by the
+  server"). Both functions deployed via CLI (owner token in git-ignored
+  root `.env`); webhook smoke-tested: 401 on wrong secret, 200 + `synced: []`
+  for anonymous ids, 200 + `no_rc_record` for a UUID with no history.
+  **Behavioural correction:** RevenueCat v1 `GET /subscribers/{id}`
+  auto-creates the subscriber (never 404s), so "no history" is detected by
+  the resolver returning `free` and the server writes nothing in that case
+  — hand-granted early access survives Refresh/Restore until a real store
+  record exists. Side effect of the smoke test: a junk customer
+  `11111111-1111-4111-8111-111111111111` exists in the RevenueCat project
+  (delete at will). EAS cloud iOS build quota for the free plan is
+  exhausted until Sep 1 → the TestFlight build is produced with
+  `eas build --local` on the owner's Mac and uploaded with `eas submit`.
+
 ## Verification of what shipped today
 
 - `packages/shared`: 267/267 tests (18 files) incl. 15 new entitlement cases
