@@ -147,6 +147,28 @@ sandbox expiry (minutes) → `lapsed`. After that, you re-lock the six test
 profiles (`update public.profiles set plus_status = null;`) so real gating
 is exercised, and prices go live with the store submission.
 
+## Progress log
+
+- **Aug 16, 2026 — App Store Connect done (owner + Claude-in-Chrome):**
+  subscription group **Murmur Plus** (id 22313976), group localization
+  en-US "Murmur Plus" / Use App Name. Products `murmur_plus_monthly`
+  (level 1, 1 month, US $3.99) and `murmur_plus_yearly` (level 2, 1 year,
+  US $29.99), auto-generated prices accepted for 175 countries, both with
+  **Introductory Offer: Free, 1 Week** (ASC has no "7 days" option; 1 week
+  = 7 days), no end date, status "Prepare for Submission". Descriptions
+  are capped at 55 chars: monthly "Ask Murmur, recurring detection,
+  export, desktop app.", yearly "Ask Murmur, recurring, export, desktop.
+  Best value." Existing In-App Purchase key **F47D86V9PG** ("RevenueCat
+  In-App Purchase Key", downloaded Jan 19 2026), Issuer ID
+  `53b3b2a6-e851-4277-988a-ce6470fdebae` — the .p8 is not on the Mac
+  (only `AuthKey_D5NYC4452X.p8`, a different key); if it isn't on the
+  Windows machine either, generate a new IAP key in ASC (multiple allowed).
+  Still open in ASC: **review screenshot per subscription** (required
+  before "Add for Review"; any paywall screenshot works), and Apple's
+  banner: **the first subscription group must be submitted together with
+  a new app version** — the products go live with the 1.0 store
+  submission, not independently. Banking/tax untouched.
+
 ## Verification of what shipped today
 
 - `packages/shared`: 267/267 tests (18 files) incl. 15 new entitlement cases
