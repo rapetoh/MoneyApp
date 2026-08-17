@@ -16,6 +16,7 @@ import { runRecurringCatchUp } from '../src/services/recurringCatchUp'
 import { runFxBackfill } from '../src/services/fxBackfill'
 import { registerDevice } from '../src/services/sync/deviceRegistry'
 import { runOncePerSession } from '../src/services/launchOnce'
+import { configurePurchases } from '../src/services/purchases'
 import { UndoProvider } from '../src/hooks/useUndo'
 import { VoiceSessionProvider } from '../src/hooks/useVoiceSession'
 import { SyncFailureBanner } from '../src/components/SyncFailureBanner'
@@ -109,6 +110,15 @@ export default function RootLayout() {
     syncManager.start()
     return () => syncManager.stop()
   }, [])
+
+  // RevenueCat identity follows the signed-in user (payments, Aug 16 2026):
+  // the app user id *is* the Supabase user id, which is how a store event
+  // maps back to profiles.plus_status on the server. No-op in builds
+  // without a RevenueCat key (services/purchases.ts).
+  useEffect(() => {
+    if (!userId) return
+    configurePurchases(userId).catch((e) => console.warn('purchases: configure failed', e))
+  }, [userId])
 
   // Track the previous segment group so we can skip the onboarding bounce
   // for one render cycle after the user finishes the flow. updateProfile +

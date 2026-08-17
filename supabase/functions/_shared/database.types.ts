@@ -313,6 +313,13 @@ export type Database = {
           monthly_income_source: string | null
           onboarding_completed_at: string | null
           plus_status: string | null
+          plus_product_id: string | null
+          plus_period_type: string | null
+          plus_expires_at: string | null
+          plus_will_renew: boolean | null
+          plus_store: string | null
+          plus_is_sandbox: boolean | null
+          plus_synced_at: string | null
           timezone: string
           updated_at: string
           voice_language: string
@@ -330,6 +337,13 @@ export type Database = {
           monthly_income_source?: string | null
           onboarding_completed_at?: string | null
           plus_status?: string | null
+          plus_product_id?: string | null
+          plus_period_type?: string | null
+          plus_expires_at?: string | null
+          plus_will_renew?: boolean | null
+          plus_store?: string | null
+          plus_is_sandbox?: boolean | null
+          plus_synced_at?: string | null
           timezone?: string
           updated_at?: string
           voice_language?: string
@@ -347,6 +361,13 @@ export type Database = {
           monthly_income_source?: string | null
           onboarding_completed_at?: string | null
           plus_status?: string | null
+          plus_product_id?: string | null
+          plus_period_type?: string | null
+          plus_expires_at?: string | null
+          plus_will_renew?: boolean | null
+          plus_store?: string | null
+          plus_is_sandbox?: boolean | null
+          plus_synced_at?: string | null
           timezone?: string
           updated_at?: string
           voice_language?: string

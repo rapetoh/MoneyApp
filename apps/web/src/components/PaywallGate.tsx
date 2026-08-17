@@ -4,16 +4,21 @@
 // hidden behind a blur overlay so the user can preview what's behind the
 // wall.
 //
-// Fix-plan 3.1: this used to render `<div>Upgrade to Plus</div>` — not a
-// button, no `onClick`, nothing it could do when clicked — next to a note
-// that only ever printed in the deployed build ("Plus is free in the dev
-// build — production sees the upgrade flow here" is exactly backwards:
-// there was no dev/prod branch, and no upgrade flow to see in either).
-// There's no purchase flow yet on any platform, so this gate states that
-// plainly instead of pretending a CTA exists.
+// Payments (Aug 16, 2026 owner decision): Murmur Plus is sold as an iOS
+// subscription through RevenueCat; web and desktop unlock from the same
+// account because the server writes `profiles.plus_status` from the store
+// record. So this gate does not sell — it tells the truth: subscribe in
+// the iPhone app (plans, prices and trial come from the store there — the
+// web never states a price it can't read), and offers a "Refresh" that
+// re-reads the entitlement for someone who just did.
+//
+// History (fix-plan 3.1): this used to render an inert `<div>Upgrade to
+// Plus</div>` next to a note that lied about a dev/prod branch; then an
+// honest "Plus is in preview" state while no purchase flow existed.
 import type { ReactNode } from 'react'
 import { colors, font, radius } from '../lib/theme'
 import { Icon } from './Icons'
+import { PlusRefreshButton } from './PlusRefreshButton'
 
 export function PaywallGate({
   title,
@@ -37,8 +42,10 @@ export function PaywallGate({
           <div style={styles.title}>{title}</div>
           <div style={styles.body}>{body}</div>
           <div style={styles.note}>
-            {"Plus is in preview. Purchases aren't live yet, so there's nothing to buy here."}
+            Subscribe in the Murmur app on your iPhone (Settings → Subscription — the app shows the plans,
+            prices and free trial). Your account unlocks everywhere, including here.
           </div>
+          <PlusRefreshButton compact />
         </div>
       </div>
       {children && <div style={styles.behind}>{children}</div>}

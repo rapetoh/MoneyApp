@@ -7,9 +7,10 @@ import { Toolbar } from '../../../components/Toolbar'
 import { Icon } from '../../../components/Icons'
 import { ErrorState } from '../../../components/ErrorState'
 import { usePlus } from '../../../lib/plus'
+import { PlusRefreshButton } from '../../../components/PlusRefreshButton'
 import { changeCurrency } from '../../../lib/changeCurrency'
 import { formatRelativeSync } from '../../../lib/relativeTime'
-import { SUPPORT_EMAIL, SUPPORT_MAILTO } from '@voice-expense/shared'
+import { SUPPORT_EMAIL, SUPPORT_MAILTO, describePlus, PLUS_MANAGE_URL_APPLE, type Profile } from '@voice-expense/shared'
 
 /** `devices.platform` -> a human label (fix-plan 3.7's real device rows). */
 function platformLabel(platform: string): string {
@@ -60,6 +61,11 @@ export default function SettingsPage() {
     monthly_income?: number | null
     timezone?: string | null
     voice_language?: string | null
+    plus_status?: 'active' | 'lapsed' | 'free' | null
+    plus_product_id?: string | null
+    plus_period_type?: 'trial' | 'intro' | 'normal' | null
+    plus_expires_at?: string | null
+    plus_will_renew?: boolean | null
   } | null>(null)
   // Fix-plan 3.7: real rows from `devices` (populated by mobile's
   // `deviceRegistry.ts`) instead of one hardcoded "This device · Synced
@@ -191,7 +197,10 @@ export default function SettingsPage() {
       setLoadError(error.message)
     } else if (data) {
       setLoadError(null)
-      setProfile(data)
+      // `plus_status` / `plus_period_type` carry CHECK constraints the
+      // generated Row type can't see (same narrowing as
+      // packages/shared/src/types/profile.ts).
+      setProfile(data as Profile)
       const loadedDisplayName = data.display_name ?? ''
       const loadedLocale = data.locale ?? 'en'
       const loadedMonthlyIncomeInput = data.monthly_income != null ? String(data.monthly_income) : ''
@@ -414,6 +423,9 @@ export default function SettingsPage() {
 
   const initial = (displayName || email || 'U').trim()[0]?.toUpperCase() ?? 'U'
   const { isPlus } = usePlus()
+  const plan = describePlus(profile)
+  const fmtPlanDate = (iso: string | null) =>
+    iso ? new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '—'
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -642,14 +654,13 @@ export default function SettingsPage() {
               </div>
             </SettingsCard>
 
-            {/* Fix-plan 3.1: this card used to show "Murmur Plus · Yearly /
-                Renews on your billing date · cancel anytime" next to a
-                "Manage" span with no `onClick` — a fabricated subscription
-                (there is no billing provider wired up; `plus_status` is a
-                manual grant) next to a control that couldn't act. There's
-                no purchase flow yet on any platform, so this card states
-                the account's real, current status and nothing it can't
-                back up. */}
+            {/* Plan & billing — the real entitlement (server-written plus_*
+                columns via describePlus; payments, Aug 16 2026). Web does not
+                sell Plus (iOS subscription through RevenueCat); it shows what
+                the account has, links Apple's manage page for a subscriber,
+                and offers Refresh for someone who just subscribed on the
+                phone. History (fix-plan 3.1): a fabricated "Yearly · renews on
+                your billing date" card, then an honest preview state. */}
             <SettingsCard
               title="Plan & billing"
               refCb={(el) => (sectionRefs.current.plan = el)}
@@ -662,11 +673,35 @@ export default function SettingsPage() {
               }
             >
               <SettingRow
-                label={isPlus ? 'Murmur Plus' : 'Free plan'}
+                label={
+                  plan.kind === 'trial'
+                    ? 'Murmur Plus · Free trial'
+                    : plan.kind === 'active'
+                      ? `Murmur Plus${plan.plan ? ` · ${plan.plan === 'yearly' ? 'Yearly' : 'Monthly'}` : ''}`
+                      : 'Free plan'
+                }
                 sub={
-                  isPlus
-                    ? 'Granted for early access — no billing, nothing to cancel'
-                    : 'Purchases are not live yet'
+                  plan.kind === 'trial'
+                    ? `Trial ends ${fmtPlanDate(plan.endsAt)}${plan.willRenew ? ', then your plan starts' : ' — auto-renew is off'}`
+                    : plan.kind === 'active'
+                      ? plan.endsAt
+                        ? `${plan.willRenew ? 'Renews' : 'Ends'} ${fmtPlanDate(plan.endsAt)}`
+                        : 'Active'
+                      : plan.kind === 'lapsed'
+                        ? `Plus ended ${fmtPlanDate(plan.endedAt)}`
+                        : 'Ask Murmur, recurring detection, export and this desktop app are part of Murmur Plus.'
+                }
+                right={
+                  plan.kind === 'active' || plan.kind === 'trial' ? (
+                    <a
+                      href={PLUS_MANAGE_URL_APPLE}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{ fontFamily: font.sans, fontSize: 12, fontWeight: 600, color: colors.accent }}
+                    >
+                      Manage on Apple
+                    </a>
+                  ) : undefined
                 }
               />
               {!isPlus && (
@@ -680,9 +715,16 @@ export default function SettingsPage() {
                     color: colors.ink2,
                     lineHeight: 1.5,
                     fontFamily: font.sans,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 8,
                   }}
                 >
-                  Ask Murmur, recurring detection and full export are part of Murmur Plus. Plus is in preview — there's nothing to buy here yet.
+                  <span>
+                    Subscribe in the Murmur app on your iPhone (Settings → Subscription). Plans, prices and the
+                    free trial are shown there; your account unlocks everywhere, including here.
+                  </span>
+                  <PlusRefreshButton compact />
                 </div>
               )}
             </SettingsCard>

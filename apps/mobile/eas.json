@@ -43,6 +43,7 @@
         "EXPO_PUBLIC_SUPABASE_URL": "https://ohaqhwampmyoeaopdybd.supabase.co",
         "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_HseSmiHYgNP-C3J5XvG6ag_UK6JbfDU",
         "EXPO_PUBLIC_API_BASE_URL": "https://money-app-web-w6su.vercel.app",
+        "EXPO_PUBLIC_REVENUECAT_IOS_KEY": "",
         "ELECTRON_SKIP_BINARY_DOWNLOAD": "1",
         "SHARP_IGNORE_GLOBAL_LIBVIPS": "1"
       }

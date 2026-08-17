@@ -24,6 +24,7 @@ import { useNotificationListener } from '../../src/hooks/useNotificationListener
 import { useApiUrl } from '../../src/hooks/useApiUrl'
 import { changeCurrency } from '../../src/services/profileCurrency'
 import { SetGroup, SetRow } from '../../src/components/SettingsList'
+import { manageSubscription } from '../../src/services/purchases'
 import { BudgetEditorModal } from '../../src/components/BudgetEditorModal'
 import { IncomeEditorModal } from '../../src/components/IncomeEditorModal'
 import {
@@ -43,7 +44,7 @@ import {
 } from '../../src/services/sync/syncQueue'
 import { getDeviceLastSynced } from '../../src/services/sync/deviceRegistry'
 import { Colors, Typography, Radius, Hairline, Spacing } from '../../src/theme'
-import { t, formatMoney, SHORTCUT_INSTALL_URL, type Locale } from '@voice-expense/shared'
+import { t, formatMoney, SHORTCUT_INSTALL_URL, type Locale, describePlus } from '@voice-expense/shared'
 import type { BudgetPeriod } from '@voice-expense/shared'
 import { useRouter } from 'expo-router'
 
@@ -119,6 +120,29 @@ export default function SettingsScreen() {
   const [currencyProgress, setCurrencyProgress] = useState<{ converted: number; total: number } | null>(null)
 
   const locale = (profile?.locale ?? 'en') as Locale
+  // Settings copy for the subscription, derived only from the server-
+  // written entitlement columns (payments, Aug 16 2026).
+  const plan = describePlus(profile)
+  const planDateFmt = (iso: string | null) =>
+    iso ? new Date(iso).toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' }) : '—'
+  const planName = (p: 'monthly' | 'yearly' | null) =>
+    p === 'yearly' ? t('paywall.plan_yearly', locale) : p === 'monthly' ? t('paywall.plan_monthly', locale) : t('settings.plan_plus', locale)
+  const planLine =
+    plan.kind === 'trial'
+      ? t('settings.plan_trial', locale).replace('{date}', planDateFmt(plan.endsAt))
+      : plan.kind === 'active'
+        ? t('settings.plan_plus', locale)
+        : t('settings.plan_free', locale)
+  const planDetail =
+    plan.kind === 'trial'
+      ? t('settings.plan_trial', locale).replace('{date}', planDateFmt(plan.endsAt))
+      : plan.kind === 'active'
+        ? t(plan.willRenew ? 'settings.plan_active_renews' : 'settings.plan_active_ends', locale)
+            .replace('{plan}', planName(plan.plan))
+            .replace('{date}', planDateFmt(plan.endsAt))
+        : plan.kind === 'lapsed'
+          ? t('settings.plan_lapsed', locale).replace('{date}', planDateFmt(plan.endedAt))
+          : t('settings.get_plus', locale)
   const currency = profile?.currency_code ?? 'USD'
   const localeName = LOCALES.find((l) => l.value === locale)?.label ?? 'English'
 
@@ -392,8 +416,7 @@ export default function SettingsScreen() {
             <View style={styles.profileInfo}>
               <Text style={styles.profileName} numberOfLines={1}>{displayName}</Text>
               <Text style={styles.profilePlan} numberOfLines={1}>
-                {isPlus ? t('settings.plan_plus', locale) : t('settings.plan_free', locale)} ·{' '}
-                {txnCount} {t('settings.expenses_count', locale)}
+                {planLine} · {txnCount} {t('settings.expenses_count', locale)}
               </Text>
             </View>
             {!isPlus && (
@@ -406,6 +429,22 @@ export default function SettingsScreen() {
             )}
           </View>
         </View>
+
+        {/* Subscription — the real entitlement (server-written plus_* columns,
+            see describePlus) with the only two actions that exist: Apple's
+            manage sheet for a subscriber, the paywall for everyone else. */}
+        <SetGroup label={t('settings.subscription', locale)}>
+          <SetRow
+            label={plan.kind === 'free' ? t('settings.plan_row_free', locale) : t('settings.plan_plus', locale)}
+            detail={planDetail}
+            onPress={
+              plan.kind === 'active' || plan.kind === 'trial'
+                ? () => { manageSubscription() }
+                : () => router.push('/more/paywall')
+            }
+            last
+          />
+        </SetGroup>
 
         {/* Account */}
         <SetGroup label={t('settings.account', locale)}>

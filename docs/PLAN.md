@@ -166,7 +166,7 @@ truth: `docs/voice redesign/` (screenshot + Claude Design HTML, artboards
   (4) frozen listening animation — waveform no longer gated on volume
   metering (continuous mockup-style loop, mic level as amplitude boost),
   edge glow strengthened.
-- **Monetization**: mobile free forever; Murmur Plus $3.99/mo or $29.99/yr unlocks Ask Murmur + auto recurring + export + desktop. **Superseded Aug 9, 2026 (fix-plan 3.1)**: no purchase flow exists yet on any platform, so the price and the "Upgrade" CTA are gone from the product until IAP/Stripe ships — see the dated entry below. The feature bundle (Ask Murmur + auto recurring + export + desktop) is unchanged; only "there is a working checkout for it today" was false.
+- **Monetization**: mobile free forever; Murmur Plus $3.99/mo or $29.99/yr unlocks Ask Murmur + auto recurring + export + desktop. **Aug 16, 2026 — payments built:** iOS auto-renewable subscription through RevenueCat, **7-day free trial on both plans**, web/desktop unlocked by the same account (no Stripe in v1); prices/trial read from the store, never hard-coded; entitlement written only by the server (migration 031 + `revenuecat-webhook` / `plus-sync` functions). Code complete and tested; goes live once the owner completes App Store Connect / RevenueCat setup — full design, files and owner runbook in [payments.md](payments.md). (History: fix-plan 3.1 removed the fake price/CTA on Aug 9 while no purchase flow existed.)
 - **Storage**: Supabase-first; no CloudKit rewrite. Privacy story via on-device voice + transcript-only sync + explicit controls.
 - **Auth**: all 3 providers preserved (Apple + Google + email); lazy identity — no sign-in wall at launch.
 - **Platforms**: iOS + Android, iOS-style design on both; lockscreen widget deferred to v1.1.
@@ -946,7 +946,7 @@ Dependencies: `expo-linear-gradient` (installed), `@expo/vector-icons` (already 
 - [x] **App name** — **Murmur**
 - [x] **Monetization model** — **Mobile free forever; Murmur Plus gates Ask Murmur + auto-recurring + export + desktop**
 - [x] **Free tier scope** — **Full mobile app, no feature limits, unlimited history**
-- [x] **Pricing** — **$3.99/month or $29.99/year (~35% off yearly)**; no trial
+- [x] **Pricing** — **$3.99/month or $29.99/year (~37% off yearly)**; **7-day free trial on both** (Aug 16 2026, replaces the earlier "no trial" — see payments.md)
 
 See [DESIGN.md](./DESIGN.md) and this file's "Murmur redesign" section above.
 

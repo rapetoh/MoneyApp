@@ -11,14 +11,35 @@ type ProfileRow = Database['public']['Tables']['profiles']['Row']
  *  `analytics_opt_in` / `crash_reports_opt_in` fields this used to spell
  *  out by hand, flows straight from the generated Row: see
  *  database.types.ts for the column list this is derived from. */
-export type Profile = Omit<ProfileRow, 'locale' | 'plus_status'> & {
+export type Profile = Omit<ProfileRow, 'locale' | 'plus_status' | 'plus_period_type'> & {
   locale: Locale
-  /** Plus entitlement state. `'active'` is the only value that
-   *  unlocks gated surfaces; `'lapsed'` / `'free'` / NULL are all
-   *  treated as free. Populated by IAP / RevenueCat receipt
-   *  validation when that wires up; until then the column is NULL
-   *  and per-platform dev hatches govern unlock. */
+  /** Plus entitlement state. `'active'` is the only value that unlocks
+   *  gated surfaces (it includes the free-trial period); `'lapsed'` /
+   *  `'free'` / NULL are all treated as free. Written only by the server
+   *  from RevenueCat (supabase/functions/revenuecat-webhook, plus-sync);
+   *  migration 031's trigger refuses client writes. The sibling
+   *  `plus_product_id` / `plus_expires_at` / `plus_will_renew` / … columns
+   *  describe the subscription for Settings — see `describePlus()` in
+   *  ../plus.ts. */
   plus_status: 'active' | 'lapsed' | 'free' | null
+  plus_period_type: 'trial' | 'intro' | 'normal' | null
 }
 
-export type ProfileUpdate = Partial<Omit<Profile, 'id' | 'created_at' | 'updated_at'>>
+/** Client-writable profile fields. The `plus_*` entitlement columns are
+ *  excluded at the type level as well as by the database trigger. */
+export type ProfileUpdate = Partial<
+  Omit<
+    Profile,
+    | 'id'
+    | 'created_at'
+    | 'updated_at'
+    | 'plus_status'
+    | 'plus_product_id'
+    | 'plus_period_type'
+    | 'plus_expires_at'
+    | 'plus_will_renew'
+    | 'plus_store'
+    | 'plus_is_sandbox'
+    | 'plus_synced_at'
+  >
+>

@@ -28,3 +28,82 @@ export function isPlusFromProfile(
 ): boolean {
   return profile?.plus_status === 'active'
 }
+
+// ── Payments (Aug 16, 2026 owner decision) ─────────────────────────────────
+//
+// Murmur Plus is an iOS auto-renewable subscription sold through
+// RevenueCat: monthly $3.99 / yearly $29.99, 7-day free trial on both.
+// Prices and trial length are *never* hard-coded in the product — the
+// paywall reads them from the store offering — so a change in App Store
+// Connect / RevenueCat needs no app release. These identifiers are the
+// contract between App Store Connect, RevenueCat and this codebase.
+
+/** App Store Connect product identifiers (subscription group "Murmur Plus"). */
+export const PLUS_PRODUCTS = {
+  monthly: 'murmur_plus_monthly',
+  yearly: 'murmur_plus_yearly',
+} as const
+
+/** RevenueCat entitlement id both products attach to. */
+export const PLUS_ENTITLEMENT_ID = 'plus'
+
+/** RevenueCat offering the paywall renders (`Purchases.getOfferings().current`). */
+export const PLUS_OFFERING_ID = 'default'
+
+/** Apple's subscription-management page — the only "manage" destination
+ *  for an App Store subscription (cancel / change plan / see renewal). */
+export const PLUS_MANAGE_URL_APPLE = 'https://apps.apple.com/account/subscriptions'
+
+/** Legal pages required next to any subscription price (App Store 3.1.2). */
+export const LEGAL_URLS = {
+  terms: 'https://money-app-web-w6su.vercel.app/terms',
+  privacy: 'https://money-app-web-w6su.vercel.app/privacy',
+} as const
+
+export type PlusPlan = 'monthly' | 'yearly'
+
+export function planFromProductId(productId: string | null | undefined): PlusPlan | null {
+  if (!productId) return null
+  if (productId === PLUS_PRODUCTS.yearly || /year|annual/i.test(productId)) return 'yearly'
+  if (productId === PLUS_PRODUCTS.monthly || /month/i.test(productId)) return 'monthly'
+  return null
+}
+
+/** What Settings should say about the subscription — one structured
+ *  answer both platforms render, derived only from the server-written
+ *  `plus_*` columns. `endsAt` is ISO or null. */
+export type PlusDescription =
+  | { kind: 'free' }
+  | { kind: 'lapsed'; plan: PlusPlan | null; endedAt: string | null }
+  | { kind: 'trial'; plan: PlusPlan | null; endsAt: string | null; willRenew: boolean }
+  | { kind: 'active'; plan: PlusPlan | null; endsAt: string | null; willRenew: boolean }
+
+export function describePlus(
+  profile:
+    | {
+        plus_status?: 'active' | 'lapsed' | 'free' | null
+        plus_product_id?: string | null
+        plus_period_type?: 'trial' | 'intro' | 'normal' | string | null
+        plus_expires_at?: string | null
+        plus_will_renew?: boolean | null
+      }
+    | null
+    | undefined,
+): PlusDescription {
+  if (!profile) return { kind: 'free' }
+  const plan = planFromProductId(profile.plus_product_id)
+  if (profile.plus_status === 'active') {
+    // `plus_will_renew` is null when the store record carried no
+    // subscription detail (e.g. an entitlement granted by hand); treat
+    // "unknown" as renewing so we never wrongly announce an end date.
+    const willRenew = profile.plus_will_renew !== false
+    if (profile.plus_period_type === 'trial') {
+      return { kind: 'trial', plan, endsAt: profile.plus_expires_at ?? null, willRenew }
+    }
+    return { kind: 'active', plan, endsAt: profile.plus_expires_at ?? null, willRenew }
+  }
+  if (profile.plus_status === 'lapsed') {
+    return { kind: 'lapsed', plan, endedAt: profile.plus_expires_at ?? null }
+  }
+  return { kind: 'free' }
+}
