@@ -254,3 +254,15 @@ Status: app side is built (deep link `voiceexpense://shortcut?amount=…&merchan
 - Inside the automation the input is typed ("Receive transaction as input"), so `Select Variable → Shortcut Input → Amount / Merchant` works for building the URL. Owner built: Text (`voiceexpense://shortcut?amount=<Amount>&merchant=<Merchant>&currency=USD&payment_method=digital_wallet`) → Open URLs. Card-tap test pending.
 - **Personal automations cannot be shared** (Apple). Distribution = publish the *shortcut* ("Log In Murmur": Text + Open URLs) to iCloud once → one-tap install from a Murmur button → user creates the Wallet automation themselves (~6 taps) guided by an in-app screen. MonAi (market leader) ships exactly this: Shortcuts-based, guided setup with steps + video, "set it once and track forever", shortcut runs in background with fallback persistence.
 - Next: owner card-tap test → Claude builds the Settings button + guided setup screen (4 locales) + queued fallback → owner publishes the shortcut (Share → Copy iCloud Link) → `SHORTCUT_INSTALL_URL` set → next build.
+- **Aug 17, 2026 — Apple Pay tap test + build 32:** owner's real Apple Pay
+  purchase ($2.11, Three Square Market Vending) fired the Wallet automation
+  and opened Murmur — on Today, not the confirm sheet: Wallet's Amount is a
+  formatted currency string (`$2.11`) and `shortcutRouteParams` did
+  `parseFloat` → NaN → fallback. Fixed: `parseShortcutAmount` handles
+  symbols/letters/spaces/thousands/comma decimals; currency inferred from
+  the symbol when the Shortcut omits it; negative (refund) → ignored. 18
+  tests. **Build 32** built locally, verified, submitted to TestFlight
+  (submission e8e6c7ce, finished). Next: owner re-tests a tap on 32 →
+  then Claude builds the customer-facing setup (Settings button + guided
+  automation screen + queued fallback) → owner publishes the "Log In
+  Murmur" shortcut → `SHORTCUT_INSTALL_URL`.
