@@ -205,6 +205,22 @@ is exercised, and prices go live with the store submission.
   watches `profiles.plus_*` + function logs. Sandbox clocks: 1-week trial
   ≈ 3 min, monthly renewal ≈ 5 min, then EXPIRATION → `lapsed`.
 
+- **Aug 16, 2026 (late) — build 30 defect → build 31:** on build 30 the
+  owner's hand-unlocked account (`plus_status='active'` since Aug 15, no
+  store record) was treated as a subscriber: Settings → Subscription and
+  the paywall routed to Apple's sandbox "Subscriptions" sheet ("You do not
+  have any subscriptions") + an Apple sign-in prompt, instead of the plans.
+  Fix (commit "Plus: only a server-synced store record counts as
+  'subscribed'"): `describePlus` now carries `storeBacked =
+  !!plus_synced_at`; only store-backed active/trial shows "already
+  subscribed"/Manage (mobile paywall + Settings, web Settings "Manage on
+  Apple"); a hand-granted active still sees the plans, Settings routes to
+  the paywall ("Get Murmur Plus"), web shows "Early access — subscribe in
+  the Murmur app on your iPhone to keep Plus." So the six test profiles can
+  stay unlocked while the purchase flow is tested. **Build 31** built
+  locally, verified (build 31, RC key, `storeBacked` in bundle), submitted
+  to TestFlight. Test on 31, not 30.
+
 ## Verification of what shipped today
 
 - `packages/shared`: 267/267 tests (18 files) incl. 15 new entitlement cases
