@@ -221,6 +221,20 @@ is exercised, and prices go live with the store submission.
   locally, verified (build 31, RC key, `storeBacked` in bundle), submitted
   to TestFlight. Test on 31, not 30.
 
+- **Aug 17, 2026 03:13 UTC — SANDBOX PURCHASE VERIFIED END TO END (build 31):**
+  owner started the Monthly free trial from the paywall on TestFlight
+  build 31 (Apple sheet: "1-week free trial · $3.99/month starting Aug 23 ·
+  For testing purposes only"). Server wrote the row within 10 s:
+  `plus_status=active, product=murmur_plus_monthly, period=trial,
+  expires 2026-08-18 03:13Z, will_renew=true, store=app_store,
+  is_sandbox=true, synced_at 03:13:35`. Function logs: `revenuecat-webhook:
+  INITIAL_PURCHASE → <uid> active` (03:13:34) and `plus-sync 200`
+  (03:13:35) — both paths live. Phone Settings: "Free trial · ends
+  Aug 17, 2026"; Apple's manage sheet shows the sandbox subscription.
+  Remaining: web Settings check, optional cancel → lapsed lifecycle
+  check, Paid Apps agreement + banking, review screenshot per product,
+  support email, re-lock the other five test profiles.
+
 ## Verification of what shipped today
 
 - `packages/shared`: 267/267 tests (18 files) incl. 15 new entitlement cases
