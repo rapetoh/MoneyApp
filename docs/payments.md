@@ -193,6 +193,18 @@ is exercised, and prices go live with the store submission.
   exhausted until Sep 1 → the TestFlight build is produced with
   `eas build --local` on the owner's Mac and uploaded with `eas submit`.
 
+- **Aug 16, 2026 (evening) — TestFlight build 30 submitted:** built with
+  `eas build --platform ios --profile production --local` (Xcode 26.6 on
+  the owner's Mac; cloud quota exhausted), IPA inspected before upload
+  (Hermes bundle contains the RevenueCat public key; `RevenueCat.bundle`,
+  `PurchasesHybridCommon.bundle` and `RNPurchases` symbols present; version
+  1.0.0, build 30, `com.voiceexpense.app`), uploaded with `eas submit
+  --path` (submission b9d34a86…). First build that can sell Plus. Next:
+  owner installs it, signs a **sandbox tester** in (Settings → App Store →
+  Sandbox Account), starts the trial from Settings → Subscription; Claude
+  watches `profiles.plus_*` + function logs. Sandbox clocks: 1-week trial
+  ≈ 3 min, monthly renewal ≈ 5 min, then EXPIRATION → `lapsed`.
+
 ## Verification of what shipped today
 
 - `packages/shared`: 267/267 tests (18 files) incl. 15 new entitlement cases
