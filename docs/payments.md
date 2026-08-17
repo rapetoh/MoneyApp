@@ -245,3 +245,12 @@ is exercised, and prices go live with the store submission.
 - `apps/web`: 38/38 tests; `next build` succeeds; `/privacy` and `/terms`
   are static public routes
 - Prettier-clean on every new file
+
+## Side thread — Apple Pay capture (Aug 17, 2026, owner question)
+
+Status: app side is built (deep link `voiceexpense://shortcut?amount=…&merchant=…&currency=…&payment_method=digital_wallet`, parser, confirm sheet, `shortcut` source, Settings row hidden while `SHORTCUT_INSTALL_URL` is empty). Findings tonight, verified on the owner's iPhone:
+
+- The Shortcuts trigger is named **"Wallet — When I tap a Wallet Card or Pass"** on current iOS (Apple's docs call it the Transaction trigger; older name "Transaction"). It only appears with a card in Wallet; the automation sheet's search is unreliable — scroll to the group with NFC / App / Wallet.
+- Inside the automation the input is typed ("Receive transaction as input"), so `Select Variable → Shortcut Input → Amount / Merchant` works for building the URL. Owner built: Text (`voiceexpense://shortcut?amount=<Amount>&merchant=<Merchant>&currency=USD&payment_method=digital_wallet`) → Open URLs. Card-tap test pending.
+- **Personal automations cannot be shared** (Apple). Distribution = publish the *shortcut* ("Log In Murmur": Text + Open URLs) to iCloud once → one-tap install from a Murmur button → user creates the Wallet automation themselves (~6 taps) guided by an in-app screen. MonAi (market leader) ships exactly this: Shortcuts-based, guided setup with steps + video, "set it once and track forever", shortcut runs in background with fallback persistence.
+- Next: owner card-tap test → Claude builds the Settings button + guided setup screen (4 locales) + queued fallback → owner publishes the shortcut (Share → Copy iCloud Link) → `SHORTCUT_INSTALL_URL` set → next build.
