@@ -75,8 +75,20 @@ export function planFromProductId(productId: string | null | undefined): PlusPla
 export type PlusDescription =
   | { kind: 'free' }
   | { kind: 'lapsed'; plan: PlusPlan | null; endedAt: string | null }
-  | { kind: 'trial'; plan: PlusPlan | null; endsAt: string | null; willRenew: boolean }
-  | { kind: 'active'; plan: PlusPlan | null; endsAt: string | null; willRenew: boolean }
+  | {
+      kind: 'trial'
+      plan: PlusPlan | null
+      endsAt: string | null
+      willRenew: boolean
+      storeBacked: boolean
+    }
+  | {
+      kind: 'active'
+      plan: PlusPlan | null
+      endsAt: string | null
+      willRenew: boolean
+      storeBacked: boolean
+    }
 
 export function describePlus(
   profile:
@@ -86,6 +98,7 @@ export function describePlus(
         plus_period_type?: 'trial' | 'intro' | 'normal' | string | null
         plus_expires_at?: string | null
         plus_will_renew?: boolean | null
+        plus_synced_at?: string | null
       }
     | null
     | undefined,
@@ -97,10 +110,23 @@ export function describePlus(
     // subscription detail (e.g. an entitlement granted by hand); treat
     // "unknown" as renewing so we never wrongly announce an end date.
     const willRenew = profile.plus_will_renew !== false
+    // `plus_synced_at` is set only by the server after reading a real
+    // store record (plus-sync / revenuecat-webhook). An `active` without
+    // it is a hand-granted entitlement (early access, test accounts):
+    // Plus features are unlocked, but there is no App Store subscription
+    // to "manage" — the paywall must still offer the plans, and Settings
+    // must route to the paywall, not to Apple's (empty) manage sheet.
+    const storeBacked = !!profile.plus_synced_at
     if (profile.plus_period_type === 'trial') {
-      return { kind: 'trial', plan, endsAt: profile.plus_expires_at ?? null, willRenew }
+      return {
+        kind: 'trial',
+        plan,
+        endsAt: profile.plus_expires_at ?? null,
+        willRenew,
+        storeBacked,
+      }
     }
-    return { kind: 'active', plan, endsAt: profile.plus_expires_at ?? null, willRenew }
+    return { kind: 'active', plan, endsAt: profile.plus_expires_at ?? null, willRenew, storeBacked }
   }
   if (profile.plus_status === 'lapsed') {
     return { kind: 'lapsed', plan, endedAt: profile.plus_expires_at ?? null }

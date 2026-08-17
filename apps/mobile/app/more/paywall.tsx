@@ -15,9 +15,8 @@ import { StatusBar } from 'expo-status-bar'
 import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '../../src/hooks/useAuth'
 import { useProfile } from '../../src/hooks/useProfile'
-import { usePlusStatus } from '../../src/hooks/usePlusStatus'
 import { Typography, Colors } from '../../src/theme'
-import { t, LEGAL_URLS, type Locale, type PlusPlan } from '@voice-expense/shared'
+import { t, LEGAL_URLS, describePlus, type Locale, type PlusPlan } from '@voice-expense/shared'
 import {
   purchasesEnabled,
   configurePurchases,
@@ -53,7 +52,11 @@ import {
 export default function PaywallScreen() {
   const { user } = useAuth()
   const { profile, refetch } = useProfile(user?.id)
-  const { isPlus } = usePlusStatus()
+  // "Already subscribed" means a *store* subscription exists — a
+  // hand-granted `active` (early access) still gets the plans, because
+  // there is nothing on Apple's side to manage (describePlus.storeBacked).
+  const plan = describePlus(profile)
+  const isStoreSubscriber = (plan.kind === 'active' || plan.kind === 'trial') && plan.storeBacked
   const locale = (profile?.locale ?? 'en') as Locale
   const router = useRouter()
 
@@ -211,7 +214,7 @@ export default function PaywallScreen() {
             </View>
 
             {/* Plans */}
-            {isPlus ? (
+            {isStoreSubscriber ? (
               <View style={styles.plansWrap}>
                 <View style={styles.alreadyCard}>
                   <Ionicons name="checkmark-circle" size={20} color="#9DBB9C" />
@@ -285,7 +288,7 @@ export default function PaywallScreen() {
 
           {/* Footer: CTA + auto-renew statement + legal/restore links */}
           <View style={styles.bottom}>
-            {isPlus ? (
+            {isStoreSubscriber ? (
               <Pressable
                 onPress={manageSubscription}
                 style={({ pressed }) => [

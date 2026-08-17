@@ -210,7 +210,13 @@ describe('describePlus / planFromProductId', () => {
         plus_expires_at: FUTURE,
         plus_will_renew: true,
       }),
-    ).toEqual({ kind: 'trial', plan: 'yearly', endsAt: FUTURE, willRenew: true })
+    ).toEqual({
+      kind: 'trial',
+      plan: 'yearly',
+      endsAt: FUTURE,
+      willRenew: true,
+      storeBacked: false,
+    })
     expect(
       describePlus({
         plus_status: 'active',
@@ -219,7 +225,13 @@ describe('describePlus / planFromProductId', () => {
         plus_expires_at: FUTURE,
         plus_will_renew: false,
       }),
-    ).toEqual({ kind: 'active', plan: 'monthly', endsAt: FUTURE, willRenew: false })
+    ).toEqual({
+      kind: 'active',
+      plan: 'monthly',
+      endsAt: FUTURE,
+      willRenew: false,
+      storeBacked: false,
+    })
     expect(
       describePlus({
         plus_status: 'lapsed',
@@ -228,12 +240,24 @@ describe('describePlus / planFromProductId', () => {
       }),
     ).toEqual({ kind: 'lapsed', plan: 'yearly', endedAt: PAST })
   })
-  it('a hand-granted active (no store detail) reads as active + renewing, never as ending', () => {
+  it('a hand-granted active (no store detail) reads as active + renewing, never as ending, and is not store-backed', () => {
     expect(describePlus({ plus_status: 'active' })).toEqual({
       kind: 'active',
       plan: null,
       endsAt: null,
       willRenew: true,
+      storeBacked: false,
     })
+  })
+  it('a server-synced active is store-backed (Manage on Apple offered; paywall shows already-subscribed)', () => {
+    const d = describePlus({
+      plus_status: 'active',
+      plus_product_id: PLUS_PRODUCTS.yearly,
+      plus_period_type: 'normal',
+      plus_expires_at: FUTURE,
+      plus_will_renew: true,
+      plus_synced_at: '2026-08-16T20:00:00Z',
+    })
+    expect(d.kind === 'active' && d.storeBacked).toBe(true)
   })
 })

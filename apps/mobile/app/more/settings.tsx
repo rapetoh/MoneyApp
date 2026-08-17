@@ -44,7 +44,13 @@ import {
 } from '../../src/services/sync/syncQueue'
 import { getDeviceLastSynced } from '../../src/services/sync/deviceRegistry'
 import { Colors, Typography, Radius, Hairline, Spacing } from '../../src/theme'
-import { t, formatMoney, SHORTCUT_INSTALL_URL, type Locale, describePlus } from '@voice-expense/shared'
+import {
+  t,
+  formatMoney,
+  SHORTCUT_INSTALL_URL,
+  type Locale,
+  describePlus,
+} from '@voice-expense/shared'
 import type { BudgetPeriod } from '@voice-expense/shared'
 import { useRouter } from 'expo-router'
 
@@ -117,16 +123,29 @@ export default function SettingsScreen() {
   // `currencyProgress` is `null` until the first batch reports back, so
   // the row reads "Converting…" before any counts exist yet.
   const [currencyConverting, setCurrencyConverting] = useState(false)
-  const [currencyProgress, setCurrencyProgress] = useState<{ converted: number; total: number } | null>(null)
+  const [currencyProgress, setCurrencyProgress] = useState<{
+    converted: number
+    total: number
+  } | null>(null)
 
   const locale = (profile?.locale ?? 'en') as Locale
   // Settings copy for the subscription, derived only from the server-
   // written entitlement columns (payments, Aug 16 2026).
   const plan = describePlus(profile)
   const planDateFmt = (iso: string | null) =>
-    iso ? new Date(iso).toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' }) : '—'
+    iso
+      ? new Date(iso).toLocaleDateString(locale, {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric',
+        })
+      : '—'
   const planName = (p: 'monthly' | 'yearly' | null) =>
-    p === 'yearly' ? t('paywall.plan_yearly', locale) : p === 'monthly' ? t('paywall.plan_monthly', locale) : t('settings.plan_plus', locale)
+    p === 'yearly'
+      ? t('paywall.plan_yearly', locale)
+      : p === 'monthly'
+        ? t('paywall.plan_monthly', locale)
+        : t('settings.plan_plus', locale)
   const planLine =
     plan.kind === 'trial'
       ? t('settings.plan_trial', locale).replace('{date}', planDateFmt(plan.endsAt))
@@ -137,9 +156,13 @@ export default function SettingsScreen() {
     plan.kind === 'trial'
       ? t('settings.plan_trial', locale).replace('{date}', planDateFmt(plan.endsAt))
       : plan.kind === 'active'
-        ? t(plan.willRenew ? 'settings.plan_active_renews' : 'settings.plan_active_ends', locale)
-            .replace('{plan}', planName(plan.plan))
-            .replace('{date}', planDateFmt(plan.endsAt))
+        ? plan.storeBacked
+          ? t(plan.willRenew ? 'settings.plan_active_renews' : 'settings.plan_active_ends', locale)
+              .replace('{plan}', planName(plan.plan))
+              .replace('{date}', planDateFmt(plan.endsAt))
+          : // Hand-granted early access — no store subscription; the row
+            // routes to the paywall so the user can subscribe.
+            t('settings.get_plus', locale)
         : plan.kind === 'lapsed'
           ? t('settings.plan_lapsed', locale).replace('{date}', planDateFmt(plan.endedAt))
           : t('settings.get_plus', locale)
@@ -276,7 +299,9 @@ export default function SettingsScreen() {
   // The shared formatter (fix-plan 2.6) — replaces the `"${currency}
   // ${amount.toFixed(0)}"` concatenation, which printed the raw ISO code
   // instead of a currency glyph and ignored the user's own locale.
-  const budgetDisplay = budget ? `${formatMoney(budget.amount, currency, locale)} / ${periodLabel}` : '—'
+  const budgetDisplay = budget
+    ? `${formatMoney(budget.amount, currency, locale)} / ${periodLabel}`
+    : '—'
 
   // Income row detail: "$7,000 · Microsoft" or "$7,000" if no source, or "—"
   // if the user skipped income entry during onboarding. Same shared-
@@ -286,9 +311,7 @@ export default function SettingsScreen() {
   // for chart axes; a settings row showing the user's own figure back to
   // them is a precise amount, the same class as a hero or a row.
   const incomeAmountFmt =
-    profile?.monthly_income != null
-      ? formatMoney(profile.monthly_income, currency, locale)
-      : null
+    profile?.monthly_income != null ? formatMoney(profile.monthly_income, currency, locale) : null
   const incomeDisplay = incomeAmountFmt
     ? profile?.monthly_income_source
       ? `${incomeAmountFmt} · ${profile.monthly_income_source}`
@@ -414,7 +437,9 @@ export default function SettingsScreen() {
               <Text style={styles.avatarInitial}>{initial}</Text>
             </View>
             <View style={styles.profileInfo}>
-              <Text style={styles.profileName} numberOfLines={1}>{displayName}</Text>
+              <Text style={styles.profileName} numberOfLines={1}>
+                {displayName}
+              </Text>
               <Text style={styles.profilePlan} numberOfLines={1}>
                 {planLine} · {txnCount} {t('settings.expenses_count', locale)}
               </Text>
@@ -435,11 +460,17 @@ export default function SettingsScreen() {
             manage sheet for a subscriber, the paywall for everyone else. */}
         <SetGroup label={t('settings.subscription', locale)}>
           <SetRow
-            label={plan.kind === 'free' ? t('settings.plan_row_free', locale) : t('settings.plan_plus', locale)}
+            label={
+              plan.kind === 'free'
+                ? t('settings.plan_row_free', locale)
+                : t('settings.plan_plus', locale)
+            }
             detail={planDetail}
             onPress={
-              plan.kind === 'active' || plan.kind === 'trial'
-                ? () => { manageSubscription() }
+              (plan.kind === 'active' || plan.kind === 'trial') && plan.storeBacked
+                ? () => {
+                    manageSubscription()
+                  }
                 : () => router.push('/more/paywall')
             }
             last
@@ -564,7 +595,11 @@ export default function SettingsScreen() {
           />
           <SetRow
             label={t('settings.sync_issues', locale)}
-            detail={deadCount === 0 ? t('common.none', locale) : `${deadCount} ${t('settings.sync_failed_suffix', locale)}`}
+            detail={
+              deadCount === 0
+                ? t('common.none', locale)
+                : `${deadCount} ${t('settings.sync_failed_suffix', locale)}`
+            }
             onPress={openSyncIssues}
             last
           />
@@ -609,11 +644,13 @@ export default function SettingsScreen() {
 
         {/* About */}
         <SetGroup label={t('settings.about', locale)}>
+          <SetRow label={t('more.help', locale)} onPress={() => router.push('/more/help')} />
           <SetRow
-            label={t('more.help', locale)}
-            onPress={() => router.push('/more/help')}
+            label={t('settings.version', locale)}
+            detail={Constants.expoConfig?.version ?? '—'}
+            chevron={false}
+            last
           />
-          <SetRow label={t('settings.version', locale)} detail={Constants.expoConfig?.version ?? '—'} chevron={false} last />
         </SetGroup>
 
         {/* Sign out */}
@@ -678,12 +715,8 @@ export default function SettingsScreen() {
                   disabled={exporting !== null}
                 >
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.localeLabel}>
-                      {t(`export.fmt_${fmt}_label`, locale)}
-                    </Text>
-                    <Text style={styles.modalHint}>
-                      {t(`export.fmt_${fmt}_hint`, locale)}
-                    </Text>
+                    <Text style={styles.localeLabel}>{t(`export.fmt_${fmt}_label`, locale)}</Text>
+                    <Text style={styles.modalHint}>{t(`export.fmt_${fmt}_hint`, locale)}</Text>
                   </View>
                   {isExportingThis && <ActivityIndicator color={Colors.accent} />}
                 </Pressable>

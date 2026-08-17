@@ -66,6 +66,7 @@ export default function SettingsPage() {
     plus_period_type?: 'trial' | 'intro' | 'normal' | null
     plus_expires_at?: string | null
     plus_will_renew?: boolean | null
+    plus_synced_at?: string | null
   } | null>(null)
   // Fix-plan 3.7: real rows from `devices` (populated by mobile's
   // `deviceRegistry.ts`) instead of one hardcoded "This device · Synced
@@ -684,15 +685,17 @@ export default function SettingsPage() {
                   plan.kind === 'trial'
                     ? `Trial ends ${fmtPlanDate(plan.endsAt)}${plan.willRenew ? ', then your plan starts' : ' — auto-renew is off'}`
                     : plan.kind === 'active'
-                      ? plan.endsAt
-                        ? `${plan.willRenew ? 'Renews' : 'Ends'} ${fmtPlanDate(plan.endsAt)}`
-                        : 'Active'
+                      ? plan.storeBacked
+                        ? plan.endsAt
+                          ? `${plan.willRenew ? 'Renews' : 'Ends'} ${fmtPlanDate(plan.endsAt)}`
+                          : 'Active'
+                        : 'Early access — subscribe in the Murmur app on your iPhone to keep Plus.'
                       : plan.kind === 'lapsed'
                         ? `Plus ended ${fmtPlanDate(plan.endedAt)}`
                         : 'Ask Murmur, recurring detection, export and this desktop app are part of Murmur Plus.'
                 }
                 right={
-                  plan.kind === 'active' || plan.kind === 'trial' ? (
+                  (plan.kind === 'active' || plan.kind === 'trial') && plan.storeBacked ? (
                     <a
                       href={PLUS_MANAGE_URL_APPLE}
                       target="_blank"
