@@ -1,5 +1,7 @@
+import { useEffect } from 'react'
 import { Redirect, useLocalSearchParams } from 'expo-router'
 import { shortcutRouteParams } from '../src/services/shortcutLink'
+import { enqueueWalletCapture } from '../src/services/walletCapture'
 
 /**
  * `voiceexpense://shortcut?amount=…&merchant=…` — the iOS Shortcuts entry
@@ -23,6 +25,21 @@ export default function ShortcutRoute() {
     payment_method?: string
   }>()
   const params = shortcutRouteParams(query)
-  if (!params) return <Redirect href="/(tabs)" />
-  return <Redirect href={{ pathname: '/(tabs)/record', params }} />
+  // Aug 17 2026: no confirm sheet — the amount and merchant come from the
+  // card network. Enqueue and let WalletCaptureDrain save it silently with
+  // an undo toast, exactly like the background App Intent path; then land
+  // on Today. (`params` is validated: a refund / empty amount is dropped.)
+  const key = params
+    ? `${params.shortcut_amount}|${params.shortcut_merchant}|${query.currency ?? ''}`
+    : ''
+  useEffect(() => {
+    if (!params) return
+    enqueueWalletCapture({
+      amount: params.shortcut_amount,
+      merchant: params.shortcut_merchant,
+      currency: params.shortcut_currency,
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key])
+  return <Redirect href="/(tabs)" />
 }

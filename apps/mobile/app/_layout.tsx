@@ -20,6 +20,7 @@ import { configurePurchases } from '../src/services/purchases'
 import { UndoProvider } from '../src/hooks/useUndo'
 import { VoiceSessionProvider } from '../src/hooks/useVoiceSession'
 import { SyncFailureBanner } from '../src/components/SyncFailureBanner'
+import { WalletCaptureDrain } from '../src/components/WalletCaptureDrain'
 import { t } from '@voice-expense/shared'
 import type { Locale } from '@voice-expense/shared'
 
@@ -226,6 +227,10 @@ export default function RootLayout() {
       {ready && (
         <UndoProvider key="app">
           <VoiceSessionProvider>
+          {/* Apple Pay capture consumer — saves queued Wallet transactions
+              silently (native App Intent + deep link), see
+              src/services/walletCapture.ts. Renders nothing. */}
+          <WalletCaptureDrain />
           <StatusBar style="dark" backgroundColor="#FBFAF7" />
           <Stack screenOptions={{ headerShown: false }}>
             {/* Top-level groups swap on auth / onboarding boundaries via
@@ -318,6 +323,15 @@ export default function RootLayout() {
               options={{
                 headerShown: true,
                 headerTitle: t('more.help', locale),
+                headerBackTitle: t('common.back', locale),
+                presentation: 'card',
+              }}
+            />
+            <Stack.Screen
+              name="more/apple-pay-setup"
+              options={{
+                headerShown: true,
+                headerTitle: t('settings.apple_pay_capture', locale),
                 headerBackTitle: t('common.back', locale),
                 presentation: 'card',
               }}

@@ -46,6 +46,9 @@ module.exports = {
       // provisioning profile has no Push Notifications capability and
       // builds fail if the entitlement survives.
       './plugins/withoutRemotePush.js',
+      // "Log Expense in Murmur" App Intent — Apple Pay capture runs in the
+      // background via a Wallet automation (native/ios/WalletCapture.swift).
+      './plugins/withWalletCapture.js',
       'expo-router',
       'expo-secure-store',
       // Native launch screen: the Coin & Wave mark, `SPLASH_IMAGE_WIDTH`

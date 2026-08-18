@@ -47,7 +47,6 @@ import { Colors, Typography, Radius, Hairline, Spacing } from '../../src/theme'
 import {
   t,
   formatMoney,
-  SHORTCUT_INSTALL_URL,
   type Locale,
   describePlus,
 } from '@voice-expense/shared'
@@ -544,13 +543,15 @@ export default function SettingsScreen() {
             dead link. On Android the toggle is real: the payload it grants
             access to now reaches the confirm sheet via the root-level
             listener in app/_layout.tsx. */}
-        {(Platform.OS === 'android' || SHORTCUT_INSTALL_URL) && (
-          <SetGroup label={t('settings.automations', locale)}>
+        {/* Aug 17 2026: iOS row is always shown — the "Log Expense in Murmur"
+            App Intent ships in the app, so the guided screen can honestly
+            offer set-up without any published shortcut. */}
+        <SetGroup label={t('settings.automations', locale)}>
             {Platform.OS === 'ios' ? (
               <SetRow
-                label={t('settings.apple_pay_shortcut', locale)}
-                detail={t('settings.set_up', locale)}
-                onPress={() => Linking.openURL(SHORTCUT_INSTALL_URL)}
+                label={t('settings.apple_pay_capture', locale)}
+                detail={t('settings.apple_pay_capture_detail', locale)}
+                onPress={() => router.push('/more/apple-pay-setup' as never)}
                 last
               />
             ) : (
@@ -562,8 +563,7 @@ export default function SettingsScreen() {
                 last
               />
             )}
-          </SetGroup>
-        )}
+        </SetGroup>
 
         {/* Data — Plus-gated export. */}
         <SetGroup label={t('settings.data', locale)}>

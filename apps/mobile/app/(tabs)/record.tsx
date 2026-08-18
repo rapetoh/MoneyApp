@@ -43,43 +43,8 @@ export default function RecordBridge() {
 
   useFocusEffect(
     useCallback(() => {
-      const amount = parseFloat(params.shortcut_amount ?? '')
-      if (!isNaN(amount) && amount > 0) {
-        // Shortcut params are URL input — exactly as untrusted as a model's
-        // output. Same typed-boundary validation as before the redesign
-        // (fix-plan 1.7): an unrecognised currency/payment method falls
-        // back honestly instead of riding into ParsedExpense.
-        const shortcutCurrency = params.shortcut_currency?.trim().toUpperCase()
-        const currency = shortcutCurrency && ISO_4217_CODES.has(shortcutCurrency) ? shortcutCurrency : userCurrency
-        const paymentMethod = PAYMENT_METHOD_VALUES.includes(params.shortcut_payment_method as PaymentMethod)
-          ? (params.shortcut_payment_method as PaymentMethod)
-          : 'digital_wallet'
-        presentParsed(
-          {
-            amount,
-            currency,
-            // A Shortcut has no notion of intent beyond "log this" —
-            // always a plain expense; direction derives from flow_type.
-            direction: deriveDirectionFromFlowType('expense'),
-            flow_type: 'expense',
-            merchant: params.shortcut_merchant || null,
-            merchant_domain: null,
-            note: null,
-            category_suggestion: null,
-            payment_method: paymentMethod,
-            transacted_at: new Date().toISOString(),
-            confidence: 1.0,
-            needs_clarification: false,
-            clarifying_question: null,
-            is_recurring_suggestion: false,
-            recurring_frequency_suggestion: null,
-          },
-          'shortcut',
-        )
-        router.replace('/(tabs)')
-        return
-      }
-
+      // Shortcut params no longer land here: app/shortcut.tsx enqueues the
+      // capture for WalletCaptureDrain (silent save, Aug 17 2026).
       if (params.tab === 'manual') {
         router.replace('/transaction/new')
         return
@@ -88,7 +53,7 @@ export default function RecordBridge() {
       router.replace('/(tabs)')
       openVoice()
        
-    }, [params.shortcut_amount, params.tab, params._nonce, userCurrency]),
+    }, [params.tab, params._nonce]),
   )
 
   return <View style={{ flex: 1, backgroundColor: Colors.background }} />
