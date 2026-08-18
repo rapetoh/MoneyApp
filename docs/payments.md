@@ -307,3 +307,22 @@ confirms each save "the premium way". Same model as MonAi.
 phone using the "Log Expense in Murmur" action (replacing the Text/Open URLs
 version), pay → no app launch, notification "Saved $x · Merchant" →
 replaced with category + Undo/Edit → row in Today.
+
+**Aug 17, 2026 20:49 CDT — REAL PURCHASE VERIFIED on build 33:** owner paid
+$1.85 at a vending machine ("Canteen Des Moines 2", Chase Freedom
+Unlimited via Apple Pay). Murmur did not open; the App Intent ran in the
+background, the JS drain booted and saved the row (−$1.85 · Digital
+Wallet · Logged via Apple Pay Shortcut, correct time), notifications
+fired. Two flaws seen: (1) the native placeholder and the final
+notification both remained — iOS did not replace in place; (2) category
+"Uncategorised" (AI guess missed the 2.5 s budget). **Build 34** fixes
+both: `notifySaved` dismisses the placeholder before posting the final;
+`guessCategoryFromMerchant` (packages/shared categoryResolver) gives an
+instant local guess from card-network merchant strings (canteen / vending
+/ café / Starbucks → Food & Dining, Shell / Uber → Transport, Walgreens →
+Health & Medical, Hy-Vee → Groceries, Amazon / Target → Shopping, Netflix
+→ Subscriptions, …; 23 tests) with the AI refining within 4 s; copy
+matches the mockup ("Captured from Apple Pay · $1.85" / "Merchant ·
+Category · Tap to edit"). Build 34 submitted to TestFlight. Vending
+machines report their own name, never the product — that is the card
+network, same for every app.
