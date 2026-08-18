@@ -132,3 +132,82 @@ export function resolveCategorySuggestion(
   }
   return null
 }
+
+// ── Merchant-name → default category (Apple Pay capture, Aug 17 2026) ──────
+//
+// The card network hands over merchant strings like "Canteen Des Moines 2",
+// "Three Square Market Vending", "SHELL 4412", "UBER *TRIP", "WALGREENS".
+// The AI parser is the refinement, but a Wallet capture saves in the
+// background with a hard time budget, so a first-pass local guess must be
+// instant. Names are matched against the *default* seed categories
+// (supabase/migrations/004_default_categories.sql); a user who renamed or
+// deleted one simply gets no guess. Ordered: first match wins.
+const MERCHANT_KEYWORDS: ReadonlyArray<{ pattern: RegExp; categoryName: string }> = [
+  {
+    pattern:
+      /\b(uber|lyft|taxi|cab|metro|transit|mta|bart|parking|park(ing)?\s?mobile|amtrak|greyhound)\b/i,
+    categoryName: 'Transport',
+  },
+  {
+    pattern:
+      /\b(shell|exxon|mobil|chevron|bp|citgo|sunoco|marathon|casey'?s|kum\s?&?\s?go|speedway|wawa|sheetz|circle\s?k|7-?eleven|gas|fuel|petro)\b/i,
+    categoryName: 'Transport',
+  },
+  {
+    pattern:
+      /\b(walmart|target|costco|sam'?s club|amazon|amzn|best ?buy|apple store|ikea|home ?depot|lowe'?s|dollar (tree|general)|tj ?maxx|marshalls|macy'?s|nike|zara|h&m|shein|temu|ebay|etsy)\b/i,
+    categoryName: 'Shopping',
+  },
+  {
+    pattern:
+      /\b(kroger|aldi|hy-?vee|trader joe'?s|whole foods|safeway|publix|wegmans|heb|h-e-b|meijer|lidl|food ?lion|giant|stop ?& ?shop|grocery|market ?basket|fareway|sprouts)\b/i,
+    categoryName: 'Groceries',
+  },
+  {
+    pattern:
+      /\b(walgreens|cvs|rite ?aid|pharmacy|clinic|dental|dentist|hospital|urgent care|medical|md|dr\.?|optical|vision)\b/i,
+    categoryName: 'Health & Medical',
+  },
+  {
+    pattern:
+      /\b(netflix|spotify|hulu|disney\+?|hbo|max|apple\.com\/bill|itunes|google \*?(play|storage|one)|youtube|prime video|paramount|peacock|adobe|microsoft|openai|chatgpt|icloud|dropbox|planet fitness|anytime fitness|gym)\b/i,
+    categoryName: 'Subscriptions',
+  },
+  {
+    pattern:
+      /\b(delta|united|american air|southwest|jetblue|spirit|frontier|airbnb|marriott|hilton|hyatt|hotel|motel|expedia|booking\.com|hertz|avis|enterprise rent)\b/i,
+    categoryName: 'Travel',
+  },
+  {
+    pattern:
+      /\b(amc|cinemark|regal|theat(er|re)|cinema|steam|playstation|xbox|nintendo|ticketmaster|stubhub|bowling|golf|arcade|dave ?& ?buster)\b/i,
+    categoryName: 'Entertainment',
+  },
+  {
+    pattern: /\b(salon|barber|spa|nails?|sephora|ulta|massage|beauty)\b/i,
+    categoryName: 'Personal Care',
+  },
+  { pattern: /\b(petco|petsmart|chewy|vet(erinary)?|animal hospital)\b/i, categoryName: 'Pets' },
+  {
+    pattern:
+      /\b(canteen|vending|vend|snack|cafe|caf[eé]|coffee|starbucks|dunkin|mcdonald'?s|burger|pizza|taco|chipotle|subway|wendy'?s|chick-?fil-?a|kfc|popeyes|panera|domino'?s|papa john|sonic|arby'?s|dairy queen|culver'?s|five guys|shake shack|panda express|restaurant|grill|bistro|diner|kitchen|bakery|donut|doughnut|deli|sushi|ramen|pho|thai|bbq|steak|wings|doordash|uber ?eats|grubhub|instacart|bar\b|pub\b|brew|tavern|lounge)\b/i,
+    categoryName: 'Food & Dining',
+  },
+]
+
+/** Instant local guess from a card-network merchant string, resolved
+ *  against the user's own categories. Null when nothing matches or the
+ *  user lacks the seed category. */
+export function guessCategoryFromMerchant(
+  merchant: string | null | undefined,
+  categories: readonly Category[],
+): CategoryResolution | null {
+  const raw = (merchant ?? '').trim()
+  if (!raw || categories.length === 0) return null
+  for (const { pattern, categoryName } of MERCHANT_KEYWORDS) {
+    if (!pattern.test(raw)) continue
+    const target = categories.find((c) => c.name_normalized === normalize(categoryName))
+    if (target) return { category: target, strategy: 'synonym' }
+  }
+  return null
+}

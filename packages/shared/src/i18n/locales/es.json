@@ -661,5 +661,6 @@
   "applepay.notif_body": "Permite las notificaciones para que Murmur te diga qué guardó — con Deshacer y Editar ahí mismo.",
   "applepay.notif_allow": "Permitir notificaciones",
   "applepay.notif_denied": "Las notificaciones están desactivadas para Murmur — actívalas en Ajustes → Notificaciones para ver las confirmaciones.",
-  "common.edit": "Editar"
+  "common.edit": "Editar",
+  "applepay.notif_captured": "Capturado de Apple Pay"
 }

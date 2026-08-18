@@ -36,10 +36,11 @@ import {
   formatMoney,
   localDay,
   resolveCategorySuggestion,
+  guessCategoryFromMerchant,
   type Locale,
 } from '@voice-expense/shared'
 
-const CATEGORY_BUDGET_MS = 2500
+const CATEGORY_BUDGET_MS = 4000
 
 export function WalletCaptureDrain() {
   const { user } = useAuth()
@@ -82,8 +83,11 @@ export function WalletCaptureDrain() {
       const n = normaliseCapture(entry, currency)
       if (!n) return // refund / unusable amount — deliberately not logged
 
-      // Best-effort category + merchant domain from the parser, bounded.
-      let categoryId: string | null = null
+      // Category: instant local guess from the merchant string (canteen /
+      // vending / Shell / Uber …), then the AI parser as refinement within
+      // a hard budget — a Wallet capture must never wait on the network.
+      let categoryId: string | null =
+        guessCategoryFromMerchant(n.merchant, categories)?.category.id ?? null
       let merchantDomain: string | null = null
       if (n.merchant) {
         try {
@@ -104,8 +108,9 @@ export function WalletCaptureDrain() {
             new Promise<null>((resolve) => setTimeout(() => resolve(null), CATEGORY_BUDGET_MS)),
           ])
           if (parsed) {
-            categoryId =
+            const refined =
               resolveCategorySuggestion(parsed.category_suggestion, categories)?.category.id ?? null
+            if (refined) categoryId = refined
             merchantDomain = parsed.merchant_domain ?? null
           }
         } catch {
@@ -153,8 +158,10 @@ export function WalletCaptureDrain() {
         captureId: entry.id,
         transactionId: savedId ?? null,
         userId,
-        title: `${t('voice.saved', locale)} ${money} · ${label}`,
-        body: `${categoryName ?? t('applepay.uncategorised', locale)} · ${t('applepay.tap_to_edit', locale)}`,
+        // Mockup copy (docs/money-app/project): "Captured from Apple Pay"
+        // / "Merchant · Category · just now".
+        title: `${t('applepay.notif_captured', locale)} · ${money}`,
+        body: `${label} · ${categoryName ?? t('applepay.uncategorised', locale)} · ${t('applepay.tap_to_edit', locale)}`,
       })
     }
 

@@ -84,6 +84,11 @@ export async function notifySaved(n: SavedCaptureNotice): Promise<void> {
     return
   }
   try {
+    // iOS is documented to replace a delivered notification when a new
+    // request reuses its identifier, but on the owner's iPhone (build 33)
+    // both the native placeholder and the final one stayed. Remove the
+    // placeholder explicitly first — one banner, always.
+    await Notifications.dismissNotificationAsync(identifier).catch(() => undefined)
     await Notifications.scheduleNotificationAsync({
       identifier,
       content: {

@@ -59,8 +59,8 @@ struct LogExpenseIntent: AppIntent {
     ]
     try WalletCaptureQueue.append(entry)
     let id = entry["id"] as! String
-    let at = (merchant?.isEmpty == false) ? " · \(merchant!)" : ""
-    let title = "Saved \(amount)\(at)"
+    let title = "Captured from Apple Pay · \(amount)"
+    let place = (merchant?.isEmpty == false) ? merchant! : "Apple Pay"
     // Feedback: a Murmur-branded local notification (app icon, not the
     // Shortcuts banner — and no Shortcuts dialog, so there is exactly one
     // banner). Identifier = entry id, so the JS side REPLACES it with the
@@ -71,7 +71,7 @@ struct LogExpenseIntent: AppIntent {
     if settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional {
       let content = UNMutableNotificationContent()
       content.title = title
-      content.body = "Filing it in Murmur…"
+      content.body = "\(place) · Saving…"
       content.threadIdentifier = "wallet-capture"
       content.userInfo = ["walletCaptureId": id]
       content.interruptionLevel = .active

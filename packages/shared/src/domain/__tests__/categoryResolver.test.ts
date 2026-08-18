@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { resolveCategorySuggestion } from '../categoryResolver'
+import { resolveCategorySuggestion, guessCategoryFromMerchant } from '../categoryResolver'
 import type { Category } from '../../types/category'
 
 /** Minimal fixture — every field the resolver structurally needs. */
@@ -96,5 +96,44 @@ describe('resolveCategorySuggestion — edge cases', () => {
   })
   it('empty category list returns null', () => {
     expect(resolveCategorySuggestion('Housing', [])).toBeNull()
+  })
+})
+
+describe('guessCategoryFromMerchant — card-network merchant strings (Apple Pay capture)', () => {
+  const cats = [
+    'Groceries',
+    'Food & Dining',
+    'Transport',
+    'Shopping',
+    'Health & Medical',
+    'Subscriptions',
+    'Entertainment',
+  ].map(
+    (name, i) =>
+      ({ id: `c${i}`, name, name_normalized: name.toLowerCase() }) as unknown as Category,
+  )
+  it.each([
+    ['Canteen Des Moines 2', 'Food & Dining'],
+    ['Three Square Market Vending, Cedar Rapids', 'Food & Dining'],
+    ['STARBUCKS #12345', 'Food & Dining'],
+    ['SHELL 4412 CEDAR RAPIDS', 'Transport'],
+    ['UBER *TRIP', 'Transport'],
+    ['WALGREENS #0987', 'Health & Medical'],
+    ['HY-VEE 1234', 'Groceries'],
+    ['Amazon.com*AB12', 'Shopping'],
+    ['NETFLIX.COM', 'Subscriptions'],
+    ['AMC THEATRES', 'Entertainment'],
+  ])('%s → %s', (merchant, expected) => {
+    expect(guessCategoryFromMerchant(merchant, cats)?.category.name).toBe(expected)
+  })
+  it('null when nothing matches or the user lacks the seed category', () => {
+    expect(guessCategoryFromMerchant('ACME WIDGETS 42', cats)).toBeNull()
+    expect(
+      guessCategoryFromMerchant(
+        'Canteen Des Moines 2',
+        cats.filter((c) => c.name !== 'Food & Dining'),
+      ),
+    ).toBeNull()
+    expect(guessCategoryFromMerchant('', cats)).toBeNull()
   })
 })

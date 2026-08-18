@@ -661,5 +661,6 @@
   "applepay.notif_body": "Autorisez les notifications pour que Murmur vous indique ce qui a été enregistré — avec Annuler et Modifier directement.",
   "applepay.notif_allow": "Autoriser les notifications",
   "applepay.notif_denied": "Les notifications sont désactivées pour Murmur — activez-les dans Réglages → Notifications pour voir les confirmations.",
-  "common.edit": "Modifier"
+  "common.edit": "Modifier",
+  "applepay.notif_captured": "Capturé depuis Apple Pay"
 }
