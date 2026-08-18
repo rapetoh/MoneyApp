@@ -266,3 +266,44 @@ Status: app side is built (deep link `voiceexpense://shortcut?amount=…&merchan
   then Claude builds the customer-facing setup (Settings button + guided
   automation screen + queued fallback) → owner publishes the "Log In
   Murmur" shortcut → `SHORTCUT_INSTALL_URL`.
+
+## Apple Pay capture — built end to end (Aug 17, 2026)
+
+**Owner decisions:** no confirm sheet — the amount and merchant come from
+the card network, so the purchase **saves itself**; and a **notification**
+confirms each save "the premium way". Same model as MonAi.
+
+**How it works**
+- `apps/mobile/native/ios/WalletCapture.swift` — App Intent **"Log Expense
+  in Murmur"** (`openAppWhenRun = false`, iOS 16+). A Shortcuts *Wallet*
+  automation calls it with the transaction's Amount / Merchant. It appends
+  one JSON line to `Documents/wallet-capture-queue.jsonl` and posts a
+  Murmur-branded local notification (id `wallet-capture-<id>`: "Saved
+  $2.11 · Merchant / Filing it in Murmur…") — no Shortcuts dialog, so
+  exactly one banner. Compiled into the app target by
+  `plugins/withWalletCapture.js` (App Intents must live in the app target).
+- `src/services/walletCapture.ts` — queue read/clear, deep-link enqueue,
+  poke, `normaliseCapture` (uses `parseShortcutAmount` /
+  `inferShortcutCurrency`; refunds dropped).
+- `src/components/WalletCaptureDrain.tsx` (root layout, inside
+  UndoProvider) — drains on launch / foreground / poke; for each entry:
+  best-effort category from the AI parser (2.5 s budget) → `createTransaction`
+  (`source: shortcut`, `payment_method: digital_wallet`, offline-first,
+  FX, sync) → undo toast → `notifySaved` **replaces** the native placeholder
+  with the final notification (category line, **Undo** / **Edit** actions,
+  tap opens the transaction). In the foreground: toast only.
+- `app/shortcut.tsx` (legacy `voiceexpense://shortcut?…` link) now
+  enqueues + pokes instead of showing the confirm sheet.
+- `app/more/apple-pay-setup.tsx` — Settings → Automations → **Apple Pay
+  capture**: notification-permission card, the six taps (Automation → + →
+  Wallet → Any Card / Run Immediately / Notify off → New Blank Automation →
+  Add Action "Log Expense in Murmur" → Amount ← Shortcut Input › Amount,
+  Merchant ← Shortcut Input › Merchant → Done), "Open Shortcuts", optional
+  ready-made shortcut link when `SHORTCUT_INSTALL_URL` is set. Personal
+  automations cannot be shared (Apple) — every user does these taps once.
+- Tests: `shortcutLink.test.ts` (18), `walletCapture.test.ts` (3).
+
+**Build 33** carries all of it. Owner test: rebuild the automation on the
+phone using the "Log Expense in Murmur" action (replacing the Text/Open URLs
+version), pay → no app launch, notification "Saved $x · Merchant" →
+replaced with category + Undo/Edit → row in Today.
