@@ -326,3 +326,17 @@ matches the mockup ("Captured from Apple Pay · $1.85" / "Merchant ·
 Category · Tap to edit"). Build 34 submitted to TestFlight. Vending
 machines report their own name, never the product — that is the card
 network, same for every app.
+
+**Aug 18, 2026 — wake-up gap found and fixed (build 35):** owner's real
+tap at 1:12 PM on build 34 produced only the "Saving…" placeholder; the
+row was saved at 1:32 PM when the app was opened (toast + category Food &
+Dining via the merchant guesser). Cause: the App Intent runs in the app's
+process, and when Murmur was *suspended in memory* nothing woke its
+JavaScript (the day before, iOS had launched the app for the intent, so
+it worked by luck). Fix: local Expo module `modules/wallet-capture`
+(`WalletCaptureModule.swift` + `src/index.ts`) bridges intent ⇄ JS via
+NotificationCenter names only: the intent posts `…DidAppend` (JS drains
+immediately) and **waits up to 20 s** for JS to `reportDone(id)` after the
+save + final notification; only on timeout does it post the placeholder
+(and skips it if a final notification with that id already exists). The
+drain calls `reportCaptureDone` in a `finally` for every entry.

@@ -59,26 +59,63 @@ struct LogExpenseIntent: AppIntent {
     ]
     try WalletCaptureQueue.append(entry)
     let id = entry["id"] as! String
-    let title = "Captured from Apple Pay · \(amount)"
-    let place = (merchant?.isEmpty == false) ? merchant! : "Apple Pay"
-    // Feedback: a Murmur-branded local notification (app icon, not the
-    // Shortcuts banner — and no Shortcuts dialog, so there is exactly one
-    // banner). Identifier = entry id, so the JS side REPLACES it with the
-    // final version (category filled in, Undo / Edit actions) the moment
-    // the real save lands. The guided set-up screen asks for notification
-    // permission up front; without it the save still happens silently.
-    let settings = await UNUserNotificationCenter.current().notificationSettings()
+
+    // Wake the app's JavaScript (modules/wallet-capture bridge) and give it
+    // up to `jsBudget` seconds to save the row and post the final
+    // notification itself. This is what makes the save happen at tap time
+    // even when Murmur is suspended in memory (Aug 18 2026 owner test:
+    // without it the row was saved 20 minutes later, on next open).
+    let handledByJS = await WalletCaptureCoordinator.wakeAndWait(id: id, timeout: 20)
+    if handledByJS { return .result() }
+
+    // JS did not answer (app not running and iOS did not launch it, or a
+    // very slow start): leave a Murmur-branded placeholder so the user
+    // still sees the capture; the drain replaces it on next open. Skip if a
+    // final notification with this id already exists (late JS finish).
+    let center = UNUserNotificationCenter.current()
+    let delivered = await center.deliveredNotifications()
+    let notifId = "wallet-capture-\(id)"
+    if delivered.contains(where: { $0.request.identifier == notifId }) { return .result() }
+    let settings = await center.notificationSettings()
     if settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional {
       let content = UNMutableNotificationContent()
-      content.title = title
-      content.body = "\(place) · Saving…"
+      content.title = "Captured from Apple Pay · \(amount)"
+      content.body = "\((merchant?.isEmpty == false) ? merchant! : "Apple Pay") · Saving…"
       content.threadIdentifier = "wallet-capture"
       content.userInfo = ["walletCaptureId": id]
       content.interruptionLevel = .active
-      let request = UNNotificationRequest(identifier: "wallet-capture-\(id)", content: content, trigger: nil)
-      try? await UNUserNotificationCenter.current().add(request)
+      try? await center.add(UNNotificationRequest(identifier: notifId, content: content, trigger: nil))
     }
     return .result()
+  }
+}
+
+/// Intent ⇄ JavaScript hand-off. The bridge module (modules/wallet-capture)
+/// forwards `MurmurWalletCaptureDidAppend` to JS as an event and posts
+/// `MurmurWalletCaptureDone` when JS calls `reportDone(id)`. Both sides
+/// share only these notification names — no symbols across targets.
+enum WalletCaptureCoordinator {
+  static let didAppend = Notification.Name("MurmurWalletCaptureDidAppend")
+  static let done = Notification.Name("MurmurWalletCaptureDone")
+
+  static func wakeAndWait(id: String, timeout: TimeInterval) async -> Bool {
+    await withCheckedContinuation { (cont: CheckedContinuation<Bool, Never>) in
+      let lock = NSLock()
+      var finished = false
+      var token: NSObjectProtocol?
+      let finish: (Bool) -> Void = { ok in
+        lock.lock(); defer { lock.unlock() }
+        if finished { return }
+        finished = true
+        if let t = token { NotificationCenter.default.removeObserver(t) }
+        cont.resume(returning: ok)
+      }
+      token = NotificationCenter.default.addObserver(forName: done, object: nil, queue: nil) { n in
+        if (n.userInfo?["id"] as? String) == id { finish(true) }
+      }
+      NotificationCenter.default.post(name: didAppend, object: nil, userInfo: ["id": id])
+      DispatchQueue.global().asyncAfter(deadline: .now() + timeout) { finish(false) }
+    }
   }
 }
 

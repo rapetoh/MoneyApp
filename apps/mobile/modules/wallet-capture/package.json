@@ -1,0 +1,7 @@
+{
+  "name": "@voice-expense/wallet-capture",
+  "version": "1.0.0",
+  "description": "iOS bridge between the 'Log Expense in Murmur' App Intent and the app's JavaScript (Apple Pay capture)",
+  "main": "src/index.ts",
+  "expo-module-config": "expo-module.config.json"
+}

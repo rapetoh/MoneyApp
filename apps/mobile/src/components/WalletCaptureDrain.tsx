@@ -30,6 +30,7 @@ import {
   notifySaved,
   subscribeWalletCaptureResponses,
 } from '../services/walletCaptureNotifications'
+import { addCaptureAppendedListener, reportCaptureDone } from '../../modules/wallet-capture/src'
 import { parseExpense, deriveDirectionFromFlowType } from '@voice-expense/ai'
 import {
   t,
@@ -67,7 +68,12 @@ export function WalletCaptureDrain() {
         for (const entry of entries) {
           if (seen.current.has(entry.id)) continue
           seen.current.add(entry.id)
-          await saveOne(entry)
+          try {
+            await saveOne(entry)
+          } finally {
+            // Release the waiting App Intent (no-op without the bridge).
+            reportCaptureDone(entry.id)
+          }
         }
       } finally {
         draining.current = false
@@ -175,10 +181,14 @@ export function WalletCaptureDrain() {
     })
     // Deep-link route poke.
     const off = onWalletCapturePoke(() => void drain())
+    // Native App Intent poke (app suspended in memory or launched in the
+    // background for the intent) — the reason the save happens at tap time.
+    const native = addCaptureAppendedListener(() => void drain())
     return () => {
       sub.remove()
       off()
       offResponses()
+      native.remove()
     }
   }, [userId])
 
