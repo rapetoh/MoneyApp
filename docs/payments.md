@@ -340,3 +340,7 @@ immediately) and **waits up to 20 s** for JS to `reportDone(id)` after the
 save + final notification; only on timeout does it post the placeholder
 (and skips it if a final notification with that id already exists). The
 drain calls `reportCaptureDone` in a `finally` for every entry.
+**Build 35 submitted to TestFlight (Aug 18, 2026)** — carries the
+intent ⇄ JS wake-up bridge. Owner test: next real Apple Pay tap → within
+seconds, one notification "Captured from Apple Pay · $x / Merchant ·
+Category · Tap to edit", no app launch, row in Today.
