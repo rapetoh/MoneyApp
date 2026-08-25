@@ -70,6 +70,8 @@ const BRAND_DOMAINS: ReadonlyArray<{ pattern: RegExp; domain: string }> = [
   { pattern: /\buber\b/i, domain: 'uber.com' },
   { pattern: /\blyft\b/i, domain: 'lyft.com' },
   { pattern: /\bmaverik\b/i, domain: 'maverik.com' },
+  { pattern: /\bkwik\s?(star|trip)\b/i, domain: 'kwiktrip.com' },
+  { pattern: /\bmurphy\s?(usa|express)?\b/i, domain: 'murphyusa.com' },
   { pattern: /\bshell\b/i, domain: 'shell.com' },
   { pattern: /\bchevron\b/i, domain: 'chevron.com' },
   { pattern: /\bexxon\b/i, domain: 'exxon.com' },

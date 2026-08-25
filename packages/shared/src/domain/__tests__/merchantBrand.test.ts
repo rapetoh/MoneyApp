@@ -31,6 +31,8 @@ describe('brandDomainForMerchant', () => {
     ['CHICK-FIL-A #01822', 'chick-fil-a.com'],
     ['STARBUCKS #12345', 'starbucks.com'],
     ['HY-VEE 1234', 'hy-vee.com'],
+    ['KWIK STAR #1071', 'kwiktrip.com'],
+    ['MURPHY USA #7602', 'murphyusa.com'],
     ['UBER *TRIP', 'uber.com'],
     ['UBER EATS', 'ubereats.com'],
     ['NETFLIX.COM', 'netflix.com'],

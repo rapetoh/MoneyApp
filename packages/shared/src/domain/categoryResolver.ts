@@ -150,7 +150,7 @@ const MERCHANT_KEYWORDS: ReadonlyArray<{ pattern: RegExp; categoryName: string }
   },
   {
     pattern:
-      /\b(shell|exxon|mobil|chevron|bp|citgo|sunoco|marathon|maverik|casey'?s|kum\s?&?\s?go|speedway|wawa|sheetz|circle\s?k|7-?eleven|gas|fuel|petro)\b/i,
+      /\b(shell|exxon|mobil|chevron|bp|citgo|sunoco|marathon|maverik|kwik\s?(star|trip)|murphy\s?(usa|express)?|casey'?s|kum\s?&?\s?go|speedway|wawa|sheetz|circle\s?k|7-?eleven|gas|fuel|petro)\b/i,
     categoryName: 'Transport',
   },
   {
