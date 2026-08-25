@@ -344,3 +344,34 @@ drain calls `reportCaptureDone` in a `finally` for every entry.
 intent ⇄ JS wake-up bridge. Owner test: next real Apple Pay tap → within
 seconds, one notification "Captured from Apple Pay · $x / Merchant ·
 Category · Tap to edit", no app launch, row in Today.
+
+**Aug 24, 2026 — owner field-test review (builds 35 ran Aug 19–22), three fixes → build 36:**
+1. **Logos.** Chase shows Target's logo for "Target T-1768"; Murmur showed a
+   letter tile — `guessDomain` built `targett1768.com` → 404. New shared
+   `domain/merchantBrand.ts`: `cleanMerchantDescriptor` (strips `#05213`,
+   `T-1768`, `*AB12`, trailing ", City, ST") + `brandDomainForMerchant`
+   (~60-chain regex→domain table). Wired: capture drain persists the domain
+   at save; mobile `merchantLogo.ts` and web `MerchantLogo.tsx` fall back
+   stored → brand table → guess(cleaned) — existing rows get logos too.
+   Unknown locals (Canteen, Peking Buffet) keep the letter tile — honest
+   ceiling without a paid enrichment feed (same as Chase's fork icon).
+2. **Gas pumps / "Automation failed".** Three Maverik purchases (2× Aug 22,
+   1× weekend) never captured; Shortcuts said "There was a problem running
+   the automation". Cause: pay-at-pump pre-auths reach the automation with
+   NO amount, and the intent's *required* Amount parameter made iOS kill
+   the run before anything was queued. Amount is now optional: missing →
+   still queued → notification "Captured from Apple Pay / Merchant ·
+   Couldn't read the amount · Tap to add it" → tap opens Quick entry with
+   the merchant pre-filled (`/transaction/new?merchant=`). Native wait
+   20 s → 8 s (automations have a tight execution budget; overrunning it
+   also reads as "failed"). Keywords: Maverik → Transport, buffet/peking/
+   wok/hibachi → Food & Dining (Peking Buffet had saved uncategorised).
+3. **Quick entry sheet.** Owner: dead gap between scan row and keypad,
+   everything sticking to borders. Cause: `space-between` body with a
+   compact top cluster. Keypad stays bottom-anchored; the slack now goes
+   to the amount hero (flexGrow chain); side padding 16→20, inputs 8→12pt
+   vertical, keypad gaps 5→8. Short screens scroll as before.
+Tests: 298 shared / 123 mobile / 38 web. **Build 36.** NOTE for owner: the
+Shortcuts automation must be re-pointed once — the action's Amount field
+shows as optional now; open the automation, confirm Amount ← Shortcut
+Input › Amount is still set after updating to build 36.
