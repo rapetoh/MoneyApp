@@ -375,3 +375,17 @@ Tests: 298 shared / 123 mobile / 38 web. **Build 36.** NOTE for owner: the
 Shortcuts automation must be re-pointed once — the action's Amount field
 shows as optional now; open the automation, confirm Amount ← Shortcut
 Input › Amount is still set after updating to build 36.
+
+**Aug 24, 2026 (cont.) — keep-until-resolved + local stations → build 38:**
+owner asked "is this the best way?"; review exposed that the tap-to-add
+notification was the *only* trace of an amount-less capture — swiping it
+away lost the purchase again. Now: amount-less captures persist in
+`wallet-capture-incomplete.jsonl`; the reminder re-posts on every
+launch/foreground; the notification carries captureId + capturedAt; Quick
+entry saving from a capture writes `digital_wallet` / `source: shortcut`
+at the tap's own timestamp and clears the parked capture. Brand table +
+gas keywords gained **Kwik Star** (kwiktrip.com) and **Murphy USA** — the
+owner's local stations. Builds 36/37 superseded unshipped; **build 38**
+(verified: optional amount, incomplete store, brand table, kwik) submitted
+to TestFlight. Owner on install: 10-s check that the automation's Amount ←
+Shortcut Input › Amount is still set.
