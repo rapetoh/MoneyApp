@@ -23,6 +23,8 @@ import {
   takePendingInMemory,
   onWalletCapturePoke,
   normaliseCapture,
+  stashIncompleteCapture,
+  pendingIncompleteCaptures,
   type WalletCaptureEntry,
 } from '../services/walletCapture'
 import {
@@ -90,17 +92,13 @@ export function WalletCaptureDrain() {
       const tz = profile?.timezone || 'UTC'
       const n = normaliseCapture(entry, currency)
       if (!n) {
-        // Missing amount (pay-at-pump pre-auth, Aug 24 2026) → tell the
-        // user and let a tap finish the entry. A *negative* amount is a
-        // refund and stays deliberately unlogged, silently.
-        const merchant = entry.merchant.trim()
-        if (entry.amount.trim() === '' && merchant) {
-          await notifyIncomplete({
-            captureId: entry.id,
-            merchant,
-            title: t('applepay.notif_captured', locale),
-            body: `${merchant} · ${t('applepay.amount_unknown', locale)}`,
-          })
+        // Missing amount (pay-at-pump pre-auth, Aug 24 2026): park it until
+        // resolved — a notification alone can be swiped away and the
+        // purchase would be lost. `renotifyIncomplete` below re-surfaces it
+        // every launch/foreground until the user saves the pre-filled
+        // entry. A *negative* amount is a refund: deliberately unlogged.
+        if (entry.amount.trim() === '' && entry.merchant.trim()) {
+          stashIncompleteCapture(entry)
         }
         return
       }
@@ -190,13 +188,28 @@ export function WalletCaptureDrain() {
       })
     }
 
+    const renotifyIncomplete = async () => {
+      const { profile } = ref.current
+      const locale = (profile?.locale ?? 'en') as Locale
+      for (const entry of pendingIncompleteCaptures()) {
+        const merchant = entry.merchant.trim()
+        await notifyIncomplete({
+          captureId: entry.id,
+          merchant,
+          capturedAt: entry.captured_at,
+          title: t('applepay.notif_captured', locale),
+          body: `${merchant} · ${t('applepay.amount_unknown', locale)}`,
+        })
+      }
+    }
+
     // Notification actions (Undo / Edit / tap) for the lifetime of the drain.
     const offResponses = subscribeWalletCaptureResponses()
     // Launch / user change.
-    void drain()
+    void drain().then(renotifyIncomplete)
     // Foreground.
     const sub = AppState.addEventListener('change', (s) => {
-      if (s === 'active') void drain()
+      if (s === 'active') void drain().then(renotifyIncomplete)
     })
     // Deep-link route poke.
     const off = onWalletCapturePoke(() => void drain())

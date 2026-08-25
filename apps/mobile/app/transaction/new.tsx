@@ -16,6 +16,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router'
 import { useAuth } from '../../src/hooks/useAuth'
 import { useCategories } from '../../src/hooks/useCategories'
 import { useTransactions, deleteTransactionAndEnqueue } from '../../src/hooks/useTransactions'
+import { clearIncompleteCapture } from '../../src/services/walletCapture'
 import { useProfile } from '../../src/hooks/useProfile'
 import { useUndo } from '../../src/hooks/useUndo'
 import { useVoiceSession } from '../../src/hooks/useVoiceSession'
@@ -69,7 +70,11 @@ function amountErrorMessage(
  */
 export default function QuickEntryScreen() {
   // ?merchant= — pre-fill from an incomplete Apple Pay capture (Aug 24 2026).
-  const params = useLocalSearchParams<{ merchant?: string }>()
+  const params = useLocalSearchParams<{
+    merchant?: string
+    captureId?: string
+    capturedAt?: string
+  }>()
   const { user } = useAuth()
   const { profile } = useProfile(user?.id)
   const { categories, createCategory } = useCategories(user?.id)
@@ -184,6 +189,10 @@ export default function QuickEntryScreen() {
     if (!user) return
 
     setSaving(true)
+    // Arriving from an incomplete Apple Pay capture (?captureId=): keep the
+    // capture's identity — digital wallet, the tap's own timestamp, source
+    // 'shortcut' — and clear the parked capture once the row exists.
+    const fromCapture = typeof params.captureId === 'string' && params.captureId.length > 0
     const result = await createTransaction({
       amount: validation.amount,
       direction,
@@ -191,7 +200,11 @@ export default function QuickEntryScreen() {
       merchant: merchant.trim() || null,
       note: note.trim() || null,
       category_id: categoryId,
-      payment_method: paymentMethod,
+      payment_method: fromCapture ? 'digital_wallet' : paymentMethod,
+      ...(fromCapture && typeof params.capturedAt === 'string' && params.capturedAt
+        ? { transacted_at: params.capturedAt }
+        : {}),
+      ...(fromCapture ? { source: 'shortcut' as const } : {}),
       is_recurring: isRecurring,
       recurring_frequency: isRecurring ? recurringFreq : null,
     })
@@ -201,6 +214,7 @@ export default function QuickEntryScreen() {
       Alert.alert(t('common.error', userLocale), result.error)
       return
     }
+    if (fromCapture) clearIncompleteCapture(params.captureId as string)
 
     // Saved-with-undo snackbar (artboard 15) — every save path gets one now.
     const savedId = result.id

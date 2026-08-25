@@ -109,6 +109,7 @@ export async function notifySaved(n: SavedCaptureNotice): Promise<void> {
 export interface IncompleteCaptureNotice {
   captureId: string
   merchant: string
+  capturedAt: string
   title: string // "Captured from Apple Pay"
   body: string // "Maverik — couldn't read the amount · Tap to add it"
 }
@@ -126,7 +127,12 @@ export async function notifyIncomplete(n: IncompleteCaptureNotice): Promise<void
         title: n.title,
         body: n.body,
         sound: false,
-        data: { kind: 'wallet-capture-incomplete', merchant: n.merchant },
+        data: {
+          kind: 'wallet-capture-incomplete',
+          merchant: n.merchant,
+          captureId: n.captureId,
+          capturedAt: n.capturedAt,
+        },
         ...(Platform.OS === 'ios' ? { threadIdentifier: 'wallet-capture' } : {}),
       },
       trigger: null,
@@ -144,8 +150,15 @@ export function subscribeWalletCaptureResponses(): () => void {
       | { kind?: string; transactionId?: string | null; userId?: string }
       | undefined
     if (data?.kind === 'wallet-capture-incomplete') {
-      const merchant = (data as { merchant?: string }).merchant ?? ''
-      router.push({ pathname: '/transaction/new', params: merchant ? { merchant } : {} })
+      const d = data as { merchant?: string; captureId?: string; capturedAt?: string }
+      router.push({
+        pathname: '/transaction/new',
+        params: {
+          ...(d.merchant ? { merchant: d.merchant } : {}),
+          ...(d.captureId ? { captureId: d.captureId } : {}),
+          ...(d.capturedAt ? { capturedAt: d.capturedAt } : {}),
+        },
+      })
       return
     }
     if (data?.kind !== 'wallet-capture') return

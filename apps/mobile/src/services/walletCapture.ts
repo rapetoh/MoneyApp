@@ -106,6 +106,65 @@ export function takePendingInMemory(): WalletCaptureEntry[] {
   return pending.splice(0, pending.length)
 }
 
+// ── Incomplete captures (no amount — pay-at-pump pre-auths) ─────────────────
+//
+// Aug 24, 2026 owner review: a notification alone was the only trace of an
+// amount-less capture — swiping it away lost the purchase. These persist in
+// their own file until the user saves the pre-filled entry (which calls
+// `clearIncompleteCapture`), and the drain re-surfaces the reminder on each
+// launch/foreground until then.
+
+const INCOMPLETE_FILE = 'wallet-capture-incomplete.jsonl'
+
+function incompleteFile(): File {
+  return new File(Paths.document, INCOMPLETE_FILE)
+}
+
+function readIncomplete(): WalletCaptureEntry[] {
+  const f = incompleteFile()
+  if (!f.exists) return []
+  try {
+    return f
+      .textSync()
+      .split('\n')
+      .map((l) => l.trim())
+      .filter(Boolean)
+      .map((l) => JSON.parse(l) as WalletCaptureEntry)
+      .filter((e) => typeof e.id === 'string')
+  } catch {
+    return []
+  }
+}
+
+function writeIncomplete(entries: WalletCaptureEntry[]): void {
+  const f = incompleteFile()
+  try {
+    if (entries.length === 0) {
+      if (f.exists) f.delete()
+      return
+    }
+    f.write(entries.map((e) => JSON.stringify(e)).join('\n') + '\n')
+  } catch {
+    /* best effort */
+  }
+}
+
+/** Park an amount-less capture until the user resolves it. Idempotent. */
+export function stashIncompleteCapture(entry: WalletCaptureEntry): void {
+  const all = readIncomplete()
+  if (!all.some((e) => e.id === entry.id)) writeIncomplete([...all, entry])
+}
+
+/** All captures still waiting for an amount (oldest first). */
+export function pendingIncompleteCaptures(): WalletCaptureEntry[] {
+  return readIncomplete()
+}
+
+/** The user saved (or explicitly abandoned) this capture — forget it. */
+export function clearIncompleteCapture(id: string): void {
+  writeIncomplete(readIncomplete().filter((e) => e.id !== id))
+}
+
 // ── Drain signalling ─────────────────────────────────────────────────────────
 
 type Listener = () => void
