@@ -106,6 +106,36 @@ export async function notifySaved(n: SavedCaptureNotice): Promise<void> {
   }
 }
 
+export interface IncompleteCaptureNotice {
+  captureId: string
+  merchant: string
+  title: string // "Captured from Apple Pay"
+  body: string // "Maverik — couldn't read the amount · Tap to add it"
+}
+
+/** Pay-at-pump case (Aug 24 2026): the automation delivered no amount.
+ *  The capture is real but unsaveable — tell the user, and a tap opens
+ *  Quick entry with the merchant pre-filled. Replaces the placeholder. */
+export async function notifyIncomplete(n: IncompleteCaptureNotice): Promise<void> {
+  const identifier = `wallet-capture-${n.captureId}`
+  try {
+    await Notifications.dismissNotificationAsync(identifier).catch(() => undefined)
+    await Notifications.scheduleNotificationAsync({
+      identifier,
+      content: {
+        title: n.title,
+        body: n.body,
+        sound: false,
+        data: { kind: 'wallet-capture-incomplete', merchant: n.merchant },
+        ...(Platform.OS === 'ios' ? { threadIdentifier: 'wallet-capture' } : {}),
+      },
+      trigger: null,
+    })
+  } catch {
+    /* permission missing */
+  }
+}
+
 /** Response handling: Undo deletes the row (background action); Edit or a
  *  plain tap opens the transaction. Returns the unsubscribe. */
 export function subscribeWalletCaptureResponses(): () => void {
@@ -113,6 +143,11 @@ export function subscribeWalletCaptureResponses(): () => void {
     const data = response.notification.request.content.data as
       | { kind?: string; transactionId?: string | null; userId?: string }
       | undefined
+    if (data?.kind === 'wallet-capture-incomplete') {
+      const merchant = (data as { merchant?: string }).merchant ?? ''
+      router.push({ pathname: '/transaction/new', params: merchant ? { merchant } : {} })
+      return
+    }
     if (data?.kind !== 'wallet-capture') return
     if (response.actionIdentifier === ACTION_UNDO) {
       if (data.transactionId && data.userId) {

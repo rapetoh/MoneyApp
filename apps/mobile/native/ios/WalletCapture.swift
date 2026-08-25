@@ -33,8 +33,13 @@ struct LogExpenseIntent: AppIntent {
   )
   static var openAppWhenRun: Bool = false
 
+  // Optional (Aug 24, 2026): pay-at-pump pre-authorizations can reach the
+  // automation with NO amount — with a required parameter iOS killed the
+  // whole run ("Automation failed", owner's three Maverik misses; nothing
+  // was even queued). Missing amount now queues anyway; the app notifies
+  // "couldn't read the amount — tap to add it".
   @Parameter(title: "Amount", description: "The transaction amount, e.g. $2.11 — a Wallet automation's Amount.")
-  var amount: String
+  var amount: String?
 
   @Parameter(title: "Merchant", description: "Where the money went — a Wallet automation's Merchant.")
   var merchant: String?
@@ -51,7 +56,7 @@ struct LogExpenseIntent: AppIntent {
   func perform() async throws -> some IntentResult {
     let entry: [String: Any] = [
       "id": UUID().uuidString,
-      "amount": amount,
+      "amount": amount ?? "",
       "merchant": merchant ?? "",
       "currency": currency ?? "",
       "source": "shortcut",
@@ -65,7 +70,9 @@ struct LogExpenseIntent: AppIntent {
     // notification itself. This is what makes the save happen at tap time
     // even when Murmur is suspended in memory (Aug 18 2026 owner test:
     // without it the row was saved 20 minutes later, on next open).
-    let handledByJS = await WalletCaptureCoordinator.wakeAndWait(id: id, timeout: 20)
+    // 8 s, not 20: automations run the intent with a tight execution
+    // budget, and overrunning it reads as "Automation failed" to the user.
+    let handledByJS = await WalletCaptureCoordinator.wakeAndWait(id: id, timeout: 8)
     if handledByJS { return .result() }
 
     // JS did not answer (app not running and iOS did not launch it, or a
@@ -79,7 +86,7 @@ struct LogExpenseIntent: AppIntent {
     let settings = await center.notificationSettings()
     if settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional {
       let content = UNMutableNotificationContent()
-      content.title = "Captured from Apple Pay · \(amount)"
+      content.title = (amount?.isEmpty == false) ? "Captured from Apple Pay · \(amount!)" : "Captured from Apple Pay"
       content.body = "\((merchant?.isEmpty == false) ? merchant! : "Apple Pay") · Saving…"
       content.threadIdentifier = "wallet-capture"
       content.userInfo = ["walletCaptureId": id]

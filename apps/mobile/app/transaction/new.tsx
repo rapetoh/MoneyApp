@@ -12,7 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
-import { useRouter } from 'expo-router'
+import { useRouter, useLocalSearchParams } from 'expo-router'
 import { useAuth } from '../../src/hooks/useAuth'
 import { useCategories } from '../../src/hooks/useCategories'
 import { useTransactions, deleteTransactionAndEnqueue } from '../../src/hooks/useTransactions'
@@ -27,7 +27,12 @@ import { parseScan } from '@voice-expense/ai'
 import { supabase } from '../../src/lib/supabase'
 import { getApiUrl } from '../../src/hooks/useApiUrl'
 import { t, currencySymbolFor, formatMoney, validateAmount } from '@voice-expense/shared'
-import type { TransactionDirection, PaymentMethod, Locale, AmountValidation } from '@voice-expense/shared'
+import type {
+  TransactionDirection,
+  PaymentMethod,
+  Locale,
+  AmountValidation,
+} from '@voice-expense/shared'
 import type { RecurringFrequency } from '@voice-expense/shared'
 
 const PAYMENT_METHODS: { value: PaymentMethod; key: string }[] = [
@@ -40,7 +45,10 @@ const PAYMENT_METHODS: { value: PaymentMethod; key: string }[] = [
 
 /** Maps `validateAmount`'s typed rejection reason to a localized message —
  *  see the identical helper the old Record screen carried (fix-plan 2.14). */
-function amountErrorMessage(reason: Extract<AmountValidation, { ok: false }>['reason'], locale: Locale): string {
+function amountErrorMessage(
+  reason: Extract<AmountValidation, { ok: false }>['reason'],
+  locale: Locale,
+): string {
   switch (reason) {
     case 'too_large':
       return t('voice.amount_too_large', locale)
@@ -60,6 +68,8 @@ function amountErrorMessage(reason: Extract<AmountValidation, { ok: false }>['re
  * voice flow uses.
  */
 export default function QuickEntryScreen() {
+  // ?merchant= — pre-fill from an incomplete Apple Pay capture (Aug 24 2026).
+  const params = useLocalSearchParams<{ merchant?: string }>()
   const { user } = useAuth()
   const { profile } = useProfile(user?.id)
   const { categories, createCategory } = useCategories(user?.id)
@@ -72,7 +82,9 @@ export default function QuickEntryScreen() {
   const userCurrency = profile?.currency_code ?? 'USD'
 
   const [amount, setAmount] = useState('')
-  const [merchant, setMerchant] = useState('')
+  const [merchant, setMerchant] = useState(
+    typeof params.merchant === 'string' ? params.merchant : '',
+  )
   const [note, setNote] = useState('')
   const [categoryId, setCategoryId] = useState<string | null>(null)
   const [direction, setDirection] = useState<TransactionDirection>('debit')
@@ -101,7 +113,10 @@ export default function QuickEntryScreen() {
   async function handleScan(type: 'receipt' | 'paycheck') {
     const { granted } = await ImagePicker.requestCameraPermissionsAsync()
     if (!granted) {
-      Alert.alert(t('voice.permission_required', userLocale), t('voice.camera_permission', userLocale))
+      Alert.alert(
+        t('voice.permission_required', userLocale),
+        t('voice.camera_permission', userLocale),
+      )
       return
     }
 
@@ -148,7 +163,10 @@ export default function QuickEntryScreen() {
       presentParsed(scanResult.expense, 'scan')
       router.navigate('/(tabs)')
     } catch (err) {
-      Alert.alert(t('voice.scan_failed', userLocale), err instanceof Error ? err.message : t('common.error', userLocale))
+      Alert.alert(
+        t('voice.scan_failed', userLocale),
+        err instanceof Error ? err.message : t('common.error', userLocale),
+      )
     } finally {
       setScanningType(null)
     }
@@ -157,7 +175,10 @@ export default function QuickEntryScreen() {
   async function handleSave() {
     const validation = validateAmount(amount, userCurrency)
     if (!validation.ok) {
-      Alert.alert(t('voice.invalid_amount', userLocale), amountErrorMessage(validation.reason, userLocale))
+      Alert.alert(
+        t('voice.invalid_amount', userLocale),
+        amountErrorMessage(validation.reason, userLocale),
+      )
       return
     }
     if (!user) return
@@ -184,9 +205,10 @@ export default function QuickEntryScreen() {
     // Saved-with-undo snackbar (artboard 15) — every save path gets one now.
     const savedId = result.id
     const userId = user.id
-    const label = merchant.trim()
-      || categories.find((c) => c.id === categoryId)?.name
-      || t(direction === 'credit' ? 'voice.income_label' : 'voice.expense', userLocale)
+    const label =
+      merchant.trim() ||
+      categories.find((c) => c.id === categoryId)?.name ||
+      t(direction === 'credit' ? 'voice.income_label' : 'voice.expense', userLocale)
     showUndo({
       message: `${t('voice.saved', userLocale)} · ${label} ${formatMoney(validation.amount, userCurrency, userLocale)}`,
       undoLabel: t('common.undo', userLocale),
@@ -229,15 +251,28 @@ export default function QuickEntryScreen() {
                 style={[styles.directionBtn, direction === 'debit' && styles.directionBtnActive]}
                 onPress={() => setDirection('debit')}
               >
-                <Text style={[styles.directionLabel, direction === 'debit' && styles.directionLabelActive]}>
+                <Text
+                  style={[
+                    styles.directionLabel,
+                    direction === 'debit' && styles.directionLabelActive,
+                  ]}
+                >
                   {t('voice.expense', userLocale)}
                 </Text>
               </Pressable>
               <Pressable
-                style={[styles.directionBtn, direction === 'credit' && styles.directionBtnActiveIncome]}
+                style={[
+                  styles.directionBtn,
+                  direction === 'credit' && styles.directionBtnActiveIncome,
+                ]}
                 onPress={() => setDirection('credit')}
               >
-                <Text style={[styles.directionLabel, direction === 'credit' && styles.directionLabelActiveIncome]}>
+                <Text
+                  style={[
+                    styles.directionLabel,
+                    direction === 'credit' && styles.directionLabelActiveIncome,
+                  ]}
+                >
                   {t('voice.income_label', userLocale)}
                 </Text>
               </Pressable>
@@ -317,7 +352,12 @@ export default function QuickEntryScreen() {
         {/* Keypad + Add CTA, anchored to the bottom */}
         <View style={styles.bottomCluster}>
           <View style={styles.keypad}>
-            {[['1', '2', '3'], ['4', '5', '6'], ['7', '8', '9'], ['.', '0', '⌫']].map((row, r) => (
+            {[
+              ['1', '2', '3'],
+              ['4', '5', '6'],
+              ['7', '8', '9'],
+              ['.', '0', '⌫'],
+            ].map((row, r) => (
               <View key={r} style={styles.keypadRow}>
                 {row.map((k) => (
                   <Pressable
@@ -399,7 +439,9 @@ export default function QuickEntryScreen() {
                   style={[styles.chip, paymentMethod === m.value && styles.chipActive]}
                   onPress={() => setPaymentMethod(m.value)}
                 >
-                  <Text style={[styles.chipLabel, paymentMethod === m.value && styles.chipLabelActive]}>
+                  <Text
+                    style={[styles.chipLabel, paymentMethod === m.value && styles.chipLabelActive]}
+                  >
                     {t(m.key, userLocale)}
                   </Text>
                 </Pressable>
@@ -434,22 +476,32 @@ const styles = StyleSheet.create({
   headerSide: {
     flex: 1,
   },
+  // Layout (Aug 24, 2026 owner remark: "empty space between the keypad
+  // and the scan row", "everything sticks to the borders"): the body used
+  // `space-between` with a compact top cluster, so all leftover height
+  // collapsed into one dead gap above the keypad. The keypad stays
+  // bottom-anchored (thumb reach); the slack now goes to the amount hero
+  // — the natural centre of a keypad-driven quick entry — via
+  // flexGrow down the ScrollView → content → amountCard chain. On short
+  // screens the content is taller than the space and simply scrolls, as
+  // before. Side padding base→lg for breathing room.
   body: {
     flex: 1,
-    paddingHorizontal: Spacing.base,
+    paddingHorizontal: Spacing.lg,
     paddingTop: 4,
     paddingBottom: Spacing.sm,
-    justifyContent: 'space-between',
   },
   topClusterScroll: {
-    flexGrow: 0,
+    flexGrow: 1,
     flexShrink: 1,
   },
   topCluster: {
-    gap: 8,
+    flexGrow: 1,
+    gap: 10,
   },
   bottomCluster: {
-    gap: 8,
+    gap: 10,
+    marginTop: Spacing.sm,
   },
   directionRow: {
     flexDirection: 'row',
@@ -474,10 +526,11 @@ const styles = StyleSheet.create({
   directionLabelActive: { color: Colors.white },
   directionLabelActiveIncome: { color: Colors.white },
   amountCard: {
+    flexGrow: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 14,
-    gap: 8,
+    paddingVertical: 18,
+    gap: 10,
     backgroundColor: Colors.surface,
     borderRadius: 20,
     borderWidth: Hairline.width,
@@ -507,15 +560,15 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   quickFields: {
-    gap: Spacing.xs,
+    gap: Spacing.sm,
   },
   quickInput: {
     backgroundColor: Colors.surface,
     borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingHorizontal: Spacing.base,
+    paddingVertical: 12,
     fontFamily: Typography.fontFamily.sans,
-    fontSize: 14,
+    fontSize: 15,
     color: Colors.ink,
     borderWidth: Hairline.width,
     borderColor: Hairline.color,
@@ -523,7 +576,7 @@ const styles = StyleSheet.create({
   scanRow: {
     flexDirection: 'row',
     gap: Spacing.md,
-    marginTop: 2,
+    marginTop: Spacing.xs,
     alignSelf: 'stretch',
     alignItems: 'stretch',
   },
@@ -551,11 +604,11 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   keypad: {
-    gap: 5,
+    gap: 8,
   },
   keypadRow: {
     flexDirection: 'row',
-    gap: 5,
+    gap: 8,
   },
   keypadKey: {
     flex: 1,

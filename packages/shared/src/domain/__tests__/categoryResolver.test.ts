@@ -123,6 +123,8 @@ describe('guessCategoryFromMerchant — card-network merchant strings (Apple Pay
     ['Amazon.com*AB12', 'Shopping'],
     ['NETFLIX.COM', 'Subscriptions'],
     ['AMC THEATRES', 'Entertainment'],
+    ['MAVERIK #05213 CEDAR R, Cedar Rapids, IA', 'Transport'],
+    ['Peking Buffet Inc', 'Food & Dining'],
   ])('%s → %s', (merchant, expected) => {
     expect(guessCategoryFromMerchant(merchant, cats)?.category.name).toBe(expected)
   })

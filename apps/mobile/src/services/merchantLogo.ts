@@ -1,5 +1,5 @@
 import { Image } from 'expo-image'
-import { guessDomain } from '@voice-expense/shared'
+import { guessDomain, brandDomainForMerchant, cleanMerchantDescriptor } from '@voice-expense/shared'
 import type { Transaction, RecurringRule } from '@voice-expense/shared'
 
 /**
@@ -7,10 +7,17 @@ import type { Transaction, RecurringRule } from '@voice-expense/shared'
  * `prefetchMerchantLogos` warms it. Google's favicon service, fetched
  * directly (see color.ts's rationale for not proxying).
  */
-export function merchantLogoUrl(merchant: string | null | undefined, merchantDomain?: string | null): string | null {
+export function merchantLogoUrl(
+  merchant: string | null | undefined,
+  merchantDomain?: string | null,
+): string | null {
   const name = merchant?.trim()
   if (!name) return null
-  const domain = merchantDomain ?? guessDomain(name)
+  // Brand table first ("Target T-1768" → target.com — guessDomain would
+  // build targett1768.com and 404, owner remark Aug 24); then the naive
+  // guess from the *cleaned* descriptor so store numbers can't poison it.
+  const domain =
+    merchantDomain ?? brandDomainForMerchant(name) ?? guessDomain(cleanMerchantDescriptor(name))
   if (!domain) return null
   return `https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=http://${domain}&size=128`
 }
@@ -27,7 +34,9 @@ const requested = new Set<string>()
  * on the first launch it lets the whole set land together rather than one
  * row at a time as each `<Image>` mounts and fetches on its own.
  */
-export function prefetchMerchantLogos(items: Array<Pick<Transaction, 'merchant' | 'merchant_domain'> | Pick<RecurringRule, 'name'>>): void {
+export function prefetchMerchantLogos(
+  items: Array<Pick<Transaction, 'merchant' | 'merchant_domain'> | Pick<RecurringRule, 'name'>>,
+): void {
   const fresh: string[] = []
   for (const item of items) {
     const merchant = 'merchant' in item ? item.merchant : item.name

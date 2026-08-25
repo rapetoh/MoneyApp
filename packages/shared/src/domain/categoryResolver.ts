@@ -150,7 +150,7 @@ const MERCHANT_KEYWORDS: ReadonlyArray<{ pattern: RegExp; categoryName: string }
   },
   {
     pattern:
-      /\b(shell|exxon|mobil|chevron|bp|citgo|sunoco|marathon|casey'?s|kum\s?&?\s?go|speedway|wawa|sheetz|circle\s?k|7-?eleven|gas|fuel|petro)\b/i,
+      /\b(shell|exxon|mobil|chevron|bp|citgo|sunoco|marathon|maverik|casey'?s|kum\s?&?\s?go|speedway|wawa|sheetz|circle\s?k|7-?eleven|gas|fuel|petro)\b/i,
     categoryName: 'Transport',
   },
   {
@@ -190,7 +190,7 @@ const MERCHANT_KEYWORDS: ReadonlyArray<{ pattern: RegExp; categoryName: string }
   { pattern: /\b(petco|petsmart|chewy|vet(erinary)?|animal hospital)\b/i, categoryName: 'Pets' },
   {
     pattern:
-      /\b(canteen|vending|vend|snack|cafe|caf[eé]|coffee|starbucks|dunkin|mcdonald'?s|burger|pizza|taco|chipotle|subway|wendy'?s|chick-?fil-?a|kfc|popeyes|panera|domino'?s|papa john|sonic|arby'?s|dairy queen|culver'?s|five guys|shake shack|panda express|restaurant|grill|bistro|diner|kitchen|bakery|donut|doughnut|deli|sushi|ramen|pho|thai|bbq|steak|wings|doordash|uber ?eats|grubhub|instacart|bar\b|pub\b|brew|tavern|lounge)\b/i,
+      /\b(canteen|vending|vend|snack|cafe|caf[eé]|coffee|starbucks|dunkin|mcdonald'?s|burger|pizza|taco|chipotle|subway|wendy'?s|chick-?fil-?a|kfc|popeyes|panera|domino'?s|papa john|sonic|arby'?s|dairy queen|culver'?s|five guys|shake shack|panda express|restaurant|grill|bistro|diner|kitchen|bakery|donut|doughnut|deli|sushi|ramen|pho|thai|bbq|steak|wings|buffet|peking|wok|hibachi|doordash|uber ?eats|grubhub|instacart|bar\b|pub\b|brew|tavern|lounge)\b/i,
     categoryName: 'Food & Dining',
   },
 ]

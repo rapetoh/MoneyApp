@@ -28,6 +28,7 @@ import {
 import {
   ensureWalletCaptureCategory,
   notifySaved,
+  notifyIncomplete,
   subscribeWalletCaptureResponses,
 } from '../services/walletCaptureNotifications'
 import { addCaptureAppendedListener, reportCaptureDone } from '../../modules/wallet-capture/src'
@@ -38,6 +39,7 @@ import {
   localDay,
   resolveCategorySuggestion,
   guessCategoryFromMerchant,
+  brandDomainForMerchant,
   type Locale,
 } from '@voice-expense/shared'
 
@@ -87,14 +89,31 @@ export function WalletCaptureDrain() {
       const locale = (profile?.locale ?? 'en') as Locale
       const tz = profile?.timezone || 'UTC'
       const n = normaliseCapture(entry, currency)
-      if (!n) return // refund / unusable amount — deliberately not logged
+      if (!n) {
+        // Missing amount (pay-at-pump pre-auth, Aug 24 2026) → tell the
+        // user and let a tap finish the entry. A *negative* amount is a
+        // refund and stays deliberately unlogged, silently.
+        const merchant = entry.merchant.trim()
+        if (entry.amount.trim() === '' && merchant) {
+          await notifyIncomplete({
+            captureId: entry.id,
+            merchant,
+            title: t('applepay.notif_captured', locale),
+            body: `${merchant} · ${t('applepay.amount_unknown', locale)}`,
+          })
+        }
+        return
+      }
 
       // Category: instant local guess from the merchant string (canteen /
       // vending / Shell / Uber …), then the AI parser as refinement within
       // a hard budget — a Wallet capture must never wait on the network.
       let categoryId: string | null =
         guessCategoryFromMerchant(n.merchant, categories)?.category.id ?? null
-      let merchantDomain: string | null = null
+      // Brand domain (logo) from the local table first — instant, no
+      // network; the AI refinement below may override with something
+      // more specific (owner remark Aug 24: Target showed a letter tile).
+      let merchantDomain: string | null = brandDomainForMerchant(n.merchant)
       if (n.merchant) {
         try {
           const { data } = await supabase.auth.getSession()
@@ -117,7 +136,7 @@ export function WalletCaptureDrain() {
             const refined =
               resolveCategorySuggestion(parsed.category_suggestion, categories)?.category.id ?? null
             if (refined) categoryId = refined
-            merchantDomain = parsed.merchant_domain ?? null
+            merchantDomain = parsed.merchant_domain ?? merchantDomain
           }
         } catch {
           /* uncategorised is fine */
