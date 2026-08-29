@@ -216,7 +216,7 @@ export default async function RootPage() {
         <div className="lp-marquee-label">Purchases that filed themselves</div>
         <div className="lp-marquee">
           <div className="lp-marquee-track">
-            {[...MARQUEE, ...MARQUEE].map((d, i) => (
+            {[...MARQUEE, ...MARQUEE, ...MARQUEE, ...MARQUEE].map((d, i) => (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 key={d + i}
@@ -244,6 +244,134 @@ export default async function RootPage() {
             <div className="lp-stat-label">{label}</div>
           </div>
         ))}
+      </section>
+
+      {/* ── Mind map showcase ───────────────────────────────────────── */}
+      <section className="lp-shell lp-map">
+        <div className="lp-map-copy">
+          <div className="lp-kicker">Desktop · Mind map</div>
+          <h2 className="lp-h2">Your month, as a map.</h2>
+          <p className="lp-p" style={{ maxWidth: 400 }}>
+            On the desktop and web dashboard, the month unfolds as a living map: every category
+            branches into the merchants behind it. Pan around, fold what you don&rsquo;t need, and
+            follow the money to the exact purchase.
+          </p>
+          <Link href={appHref} className="lp-maplink">
+            Explore it in the dashboard →
+          </Link>
+        </div>
+        <div className="lp-map-stage">
+          <svg
+            viewBox="0 0 620 400"
+            className="lp-map-svg"
+            role="img"
+            aria-label="Mind map of a month of spending: categories branching into merchants"
+          >
+            <g fill="none" stroke="#3F5A3E" strokeWidth="1.5" opacity="0.35">
+              <path d="M158 200 C 230 200, 240 78, 300 74" />
+              <path d="M158 200 C 235 200, 245 200, 300 200" />
+              <path d="M158 200 C 230 200, 240 322, 300 326" />
+              <path d="M436 74 C 470 74, 475 48, 506 46" />
+              <path d="M436 74 C 470 74, 475 104, 506 102" />
+              <path d="M436 200 C 470 200, 475 174, 506 172" />
+              <path d="M436 200 C 470 200, 475 230, 506 228" />
+              <path d="M436 326 C 470 326, 475 300, 506 298" />
+              <path d="M436 326 C 470 326, 475 356, 506 354" />
+            </g>
+            <g className="lp-map-root">
+              <rect x="18" y="168" width="140" height="64" rx="18" fill="#1B1915" />
+              <text x="38" y="194" fontFamily="Georgia, serif" fontSize="17" fill="#FBFAF7">
+                August
+              </text>
+              <text x="38" y="216" fontSize="11.5" fontWeight="600" fill="#9DBB9C">
+                $1,284 spent
+              </text>
+            </g>
+            <g className="lp-map-cat">
+              <rect
+                x="300"
+                y="52"
+                width="136"
+                height="44"
+                rx="14"
+                fill="#FFFFFF"
+                stroke="rgba(40,36,28,0.1)"
+              />
+              <circle cx="320" cy="74" r="5" fill="#FF6B35" />
+              <text x="333" y="70" fontSize="11.5" fontWeight="700" fill="#1B1915">
+                Food &amp; Dining
+              </text>
+              <text x="333" y="86" fontSize="11" fill="#6C675E">
+                $412
+              </text>
+              <rect
+                x="300"
+                y="178"
+                width="136"
+                height="44"
+                rx="14"
+                fill="#FFFFFF"
+                stroke="rgba(40,36,28,0.1)"
+              />
+              <circle cx="320" cy="200" r="5" fill="#9B59B6" />
+              <text x="333" y="196" fontSize="11.5" fontWeight="700" fill="#1B1915">
+                Shopping
+              </text>
+              <text x="333" y="212" fontSize="11" fill="#6C675E">
+                $310
+              </text>
+              <rect
+                x="300"
+                y="304"
+                width="136"
+                height="44"
+                rx="14"
+                fill="#FFFFFF"
+                stroke="rgba(40,36,28,0.1)"
+              />
+              <circle cx="320" cy="326" r="5" fill="#4A90E2" />
+              <text x="333" y="322" fontSize="11.5" fontWeight="700" fill="#1B1915">
+                Transport
+              </text>
+              <text x="333" y="338" fontSize="11" fill="#6C675E">
+                $164
+              </text>
+            </g>
+            {[
+              { y: 24, d: 'starbucks.com', n: 'Starbucks', a: '$86' },
+              { y: 80, d: 'chick-fil-a.com', n: 'Chick-fil-A', a: '$54' },
+              { y: 150, d: 'target.com', n: 'Target', a: '$121' },
+              { y: 206, d: 'amazon.com', n: 'Amazon', a: '$89' },
+              { y: 276, d: 'shell.com', n: 'Shell', a: '$38' },
+              { y: 332, d: 'uber.com', n: 'Uber', a: '$47' },
+            ].map((m) => (
+              <g key={m.d} className="lp-map-leaf">
+                <rect
+                  x="506"
+                  y={m.y}
+                  width="112"
+                  height="44"
+                  rx="14"
+                  fill="#FFFFFF"
+                  stroke="rgba(40,36,28,0.08)"
+                />
+                <image href={logo(m.d)} x="518" y={m.y + 12} width="20" height="20" />
+                <text x="546" y={m.y + 20} fontSize="11" fontWeight="600" fill="#1B1915">
+                  {m.n}
+                </text>
+                <text
+                  x="546"
+                  y={m.y + 34}
+                  fontSize="10.5"
+                  fill="#6C675E"
+                  fontFamily="Georgia, serif"
+                >
+                  {m.a}
+                </text>
+              </g>
+            ))}
+          </svg>
+        </div>
       </section>
 
       {/* ── Features (bento) ────────────────────────────────────────── */}
@@ -438,13 +566,22 @@ export default async function RootPage() {
         .lp-marquee-wrap { padding: 20px 0 8px; }
         .lp-marquee-label { text-align: center; font-size: 11px; font-weight: 700; letter-spacing: 1.6px; text-transform: uppercase; color: #9C9589; margin-bottom: 18px; }
         .lp-marquee { overflow: hidden; -webkit-mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent); mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent); }
-        .lp-marquee-track { display: flex; gap: 44px; width: max-content; padding: 4px 0; animation: lp-scroll 36s linear infinite; }
-        .lp-marquee-logo { border-radius: 12px; opacity: 0.85; }
+        .lp-marquee-track { display: flex; width: max-content; padding: 4px 0; animation: lp-scroll 60s linear infinite; }
+        .lp-marquee-logo { border-radius: 12px; opacity: 0.85; margin-right: 44px; }
 
         .lp-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; padding-top: 72px; padding-bottom: 8px; }
         .lp-stat { text-align: center; padding: 10px; }
         .lp-stat-n { font-family: ${font.serif}; font-size: 44px; letter-spacing: -1px; color: #3F5A3E; }
         .lp-stat-label { font-size: 13px; color: #6C675E; margin-top: 4px; line-height: 1.45; }
+
+        .lp-map { display: grid; grid-template-columns: 0.9fr 1.1fr; gap: 40px; align-items: center; padding-top: 88px; }
+        .lp-map-stage { background: #FFFFFF; border: 0.5px solid rgba(40,36,28,0.08); border-radius: 28px; padding: 18px; box-shadow: 0 24px 60px rgba(27,25,21,0.07); }
+        .lp-map-svg { width: 100%; height: auto; display: block; }
+        .lp-map-root, .lp-map-cat, .lp-map-leaf { animation: lp-float 6s ease-in-out infinite; }
+        .lp-map-cat { animation-delay: 1.2s; }
+        .lp-map-leaf { animation-delay: 2.2s; }
+        .lp-maplink { display: inline-block; margin-top: 20px; font-weight: 600; font-size: 14px; color: #3F5A3E; }
+        .lp-maplink:hover { text-decoration: underline; }
 
         .lp-bento { display: grid; grid-template-columns: repeat(6, 1fr); gap: 14px; padding-top: 64px; padding-bottom: 24px; }
         .lp-card { grid-column: span 2; background: #FFFFFF; border: 0.5px solid rgba(40,36,28,0.08); border-radius: 24px; padding: 28px; transition: transform .18s, box-shadow .18s; }
@@ -499,6 +636,7 @@ export default async function RootPage() {
           .lp-hero-grid { grid-template-columns: 1fr; gap: 72px; }
           .lp-sub { max-width: none; }
           .lp-stats { grid-template-columns: repeat(2, 1fr); }
+          .lp-map { grid-template-columns: 1fr; gap: 28px; padding-top: 64px; }
           .lp-card, .lp-card-voice, .lp-card-dark { grid-column: span 6; }
           .lp-navlink:not(.lp-cta-pill) { display: none; }
         }
