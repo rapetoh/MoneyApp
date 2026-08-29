@@ -420,7 +420,7 @@ export default async function RootPage() {
 
       {/* ── Features (bento) ────────────────────────────────────────── */}
       <section id="features" className="lp-shell lp-bento">
-        <div className="lp-card lp-card-voice">
+        <div className="lp-card">
           <div className="lp-kicker">Voice</div>
           <h3 className="lp-h3">&ldquo;Eight dollars at Lay&rsquo;s.&rdquo;</h3>
           <p className="lp-p">
@@ -448,29 +448,25 @@ export default async function RootPage() {
           </div>
         </div>
 
-        <div className="lp-card">
-          <div className="lp-kicker">Apple Pay capture</div>
-          <h3 className="lp-h3">Pay. That&rsquo;s it.</h3>
-          <p className="lp-p">
-            A one-time setup, then every tap-to-pay purchase files itself in the background with a
-            quiet confirmation. Undo or edit from the notification.
-          </p>
-          <div className="lp-tap" aria-hidden>
-            <div className="lp-tap-card">
-              <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
-                <path
-                  d="M6.5 8.5a7 7 0 0 1 0 7M9.5 10a4.2 4.2 0 0 1 0 4M12.5 11.2a1.8 1.8 0 0 1 0 1.6"
-                  stroke="#FBFAF7"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                />
-              </svg>
-              <span className="lp-tap-dots">•••• 4406</span>
-              <span className="lp-tap-ring" />
-              <span className="lp-tap-ring lp-tap-ring2" />
-            </div>
-            <div className="lp-tap-captured">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+        <div className="lp-card lp-card-pay">
+          <div className="lp-pay-copy">
+            <div className="lp-kicker">Apple Pay capture</div>
+            <h3 className="lp-h3">Pay. That&rsquo;s it.</h3>
+            <p className="lp-p">
+              A one-time setup, then every tap-to-pay purchase files itself in the background with a
+              quiet confirmation. Undo or edit from the notification.
+            </p>
+          </div>
+          {/* Photo: Unsplash (Nathan Dumlao), Unsplash License: free commercial
+              use, no attribution required. Self-hosted for CSP. */}
+          <div className="lp-pay-photo">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/img/apple-pay-tap.jpg"
+              alt="A hand paying with Apple Pay on an iPhone at a card terminal"
+            />
+            <span className="lp-pay-chip">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
                 <path
                   d="M4 12.5 9.5 18 20 6.5"
                   stroke="#3F5A3E"
@@ -479,8 +475,8 @@ export default async function RootPage() {
                   strokeLinejoin="round"
                 />
               </svg>
-              Captured · $4.06
-            </div>
+              Captured · $4.06 · Food &amp; Dining
+            </span>
           </div>
         </div>
 
@@ -772,7 +768,11 @@ export default async function RootPage() {
         .lp-bento { display: grid; grid-template-columns: repeat(6, 1fr); gap: 14px; padding-top: 64px; padding-bottom: 24px; }
         .lp-card { grid-column: span 2; background: #FFFFFF; border: 0.5px solid rgba(40,36,28,0.08); border-radius: 24px; padding: 28px; transition: transform .18s, box-shadow .18s; }
         .lp-card:hover { transform: translateY(-3px); box-shadow: 0 18px 44px rgba(27,25,21,0.08); }
-        .lp-card-voice { grid-column: span 4; }
+        .lp-card-pay { grid-column: span 4; display: grid; grid-template-columns: 1fr 1.1fr; gap: 24px; overflow: hidden; }
+        .lp-pay-copy { align-self: center; }
+        .lp-pay-photo { position: relative; margin: -28px -28px -28px 0; min-height: 280px; }
+        .lp-pay-photo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 42% 78%; -webkit-mask-image: linear-gradient(90deg, transparent, #000 26%); mask-image: linear-gradient(90deg, transparent, #000 26%); }
+        .lp-pay-chip { position: absolute; left: 22px; bottom: 18px; display: inline-flex; align-items: center; gap: 7px; background: rgba(251,250,247,0.95); color: #2E4A2D; font-size: 12px; font-weight: 700; border-radius: 999px; padding: 8px 14px; box-shadow: 0 10px 26px rgba(27,25,21,0.25); }
         .lp-card-dark { grid-column: span 6; background: #1B1915; border-color: #1B1915; }
         .lp-kicker { font-size: 11px; font-weight: 700; letter-spacing: 1.4px; text-transform: uppercase; color: #3F5A3E; }
         .lp-kicker-light { color: #9DBB9C; }
@@ -792,12 +792,6 @@ export default async function RootPage() {
 
         .lp-voice-vis { display: flex; align-items: center; gap: 16px; margin-top: 22px; }
         .lp-voice-mic { flex: none; width: 46px; height: 46px; border-radius: 50%; background: #1B1915; display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 20px rgba(27,25,21,0.25); }
-        .lp-tap { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 10px; margin-top: 22px; }
-        .lp-tap-card { position: relative; display: flex; align-items: center; gap: 10px; background: linear-gradient(135deg, #2C4A2B, #1B2B1A); color: #FBFAF7; border-radius: 14px; padding: 14px 18px; box-shadow: 0 12px 28px rgba(27,25,21,0.2); }
-        .lp-tap-dots { font-size: 12px; font-weight: 700; letter-spacing: 1.5px; opacity: 0.85; }
-        .lp-tap-ring { position: absolute; right: -9px; top: 50%; width: 26px; height: 26px; margin-top: -13px; border-radius: 50%; border: 2px solid rgba(63,90,62,0.55); animation: lp-pulse 2.2s ease-out infinite; }
-        .lp-tap-ring2 { animation-delay: 1.1s; }
-        .lp-tap-captured { display: inline-flex; align-items: center; gap: 7px; background: #E8EDE3; color: #2E4A2D; font-size: 12px; font-weight: 700; border-radius: 999px; padding: 7px 13px; }
         .lp-files { display: flex; gap: 10px; margin-top: 22px; }
         .lp-file { position: relative; font-size: 12px; font-weight: 800; letter-spacing: 0.6px; border-radius: 10px 16px 10px 10px; padding: 16px 16px 10px; box-shadow: 0 6px 16px rgba(27,25,21,0.07); }
         .lp-file::before { content: ''; position: absolute; top: 0; right: 0; width: 14px; height: 14px; background: rgba(27,25,21,0.1); border-radius: 0 16px 0 10px; }
@@ -848,7 +842,10 @@ export default async function RootPage() {
           .lp-map { grid-template-columns: 1fr; gap: 28px; padding-top: 64px; }
           .lp-ask-grid { grid-template-columns: 1fr; gap: 8px; }
           .lp-ask-side { padding-top: 16px; }
-          .lp-card, .lp-card-voice, .lp-card-dark { grid-column: span 6; }
+          .lp-card, .lp-card-pay, .lp-card-dark { grid-column: span 6; }
+          .lp-card-pay { grid-template-columns: 1fr; }
+          .lp-pay-photo { margin: 0 -28px -28px; min-height: 230px; }
+          .lp-pay-photo img { -webkit-mask-image: linear-gradient(180deg, transparent, #000 22%); mask-image: linear-gradient(180deg, transparent, #000 22%); }
           .lp-navlink:not(.lp-cta-pill) { display: none; }
         }
         @media (prefers-reduced-motion: reduce) {
