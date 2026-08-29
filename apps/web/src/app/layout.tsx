@@ -31,8 +31,10 @@ const dmMono = DM_Mono({
 })
 
 export const metadata: Metadata = {
+  metadataBase: new URL('https://itsmurmur.com'),
   title: 'Murmur',
-  description: 'Your personal finance dashboard',
+  description:
+    'The voice-first, privacy-first expense tracker. Say what you spent — Murmur files it. No bank linking, ever.',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

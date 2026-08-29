@@ -20,18 +20,16 @@ export const PRODUCT_NAME = 'Murmur'
  */
 
 /**
- * Customer support inbox. `null` until `murmur.app` is registered and its
- * MX records point at a real inbox (fix-plan 3.6 / audit 08-F33) —
- * `support@murmur.app` looked like a working address but the domain has no
- * MX record, so every bug report, refund request and GDPR enquiry sent to
- * it silently bounced. `null` is the honest state: nothing in the shipping
- * app exposes a developer's personal email either. Every consumer
- * (`apps/mobile/app/more/help.tsx`, `apps/web/.../settings/page.tsx`) hides
- * its "contact us" row while this is `null` — an offered channel that
- * doesn't deliver is worse than no channel. Set this the moment the domain
- * resolves MX; no other code change needed.
+ * Customer support inbox. `support@itsmurmur.com`, forwarded to the
+ * owner's Gmail via Cloudflare Email Routing (domain registered Aug 28,
+ * 2026 — the owner completes the routing verification in the Cloudflare
+ * dashboard; check `dig MX itsmurmur.com` resolves before advertising
+ * this anywhere new). History: fix-plan 3.6 / audit 08-F33 — the earlier
+ * `support@murmur.app` had no MX record and silently bounced, so this
+ * constant was `null` (which hides every "contact us" row) until a real
+ * inbox existed.
  */
-export const SUPPORT_EMAIL: string | null = null
+export const SUPPORT_EMAIL: string | null = 'support@itsmurmur.com'
 
 /** Pre-formatted mailto: link with a sensible subject, or `null` when
  *  `SUPPORT_EMAIL` is unset — see its doc comment. */

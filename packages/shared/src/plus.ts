@@ -56,8 +56,8 @@ export const PLUS_MANAGE_URL_APPLE = 'https://apps.apple.com/account/subscriptio
 
 /** Legal pages required next to any subscription price (App Store 3.1.2). */
 export const LEGAL_URLS = {
-  terms: 'https://money-app-web-w6su.vercel.app/terms',
-  privacy: 'https://money-app-web-w6su.vercel.app/privacy',
+  terms: 'https://itsmurmur.com/terms',
+  privacy: 'https://itsmurmur.com/privacy',
 } as const
 
 export type PlusPlan = 'monthly' | 'yearly'
