@@ -30,6 +30,8 @@ export const metadata: Metadata = {
  *   button; the page itself renders for everyone.
  */
 
+const lpSerif = 'var(--font-fraunces), "New York", "Iowan Old Style", Georgia, serif'
+
 const logo = (domain: string) =>
   'https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=http://' +
   domain +
@@ -316,7 +318,13 @@ export default async function RootPage() {
             </g>
             <g className="lp-map-root">
               <rect x="18" y="168" width="140" height="64" rx="18" fill="#1B1915" />
-              <text x="38" y="194" fontFamily="Georgia, serif" fontSize="17" fill="#FBFAF7">
+              <text
+                x="38"
+                y="194"
+                fontFamily="var(--font-fraunces), Georgia, serif"
+                fontSize="17"
+                fill="#FBFAF7"
+              >
                 August
               </text>
               <text x="38" y="216" fontSize="11.5" fontWeight="600" fill="#9DBB9C">
@@ -400,7 +408,7 @@ export default async function RootPage() {
                   y={m.y + 34}
                   fontSize="10.5"
                   fill="#6C675E"
-                  fontFamily="Georgia, serif"
+                  fontFamily="var(--font-fraunces), Georgia, serif"
                 >
                   {m.a}
                 </text>
@@ -420,10 +428,23 @@ export default async function RootPage() {
             picks the category, and saves it with an undo. Groceries in the car, rent from the
             couch.
           </p>
-          <div className="lp-wave" aria-hidden>
-            {Array.from({ length: 28 }).map((_, i) => (
-              <span key={i} style={{ animationDelay: (i * 0.06).toFixed(2) + 's' }} />
-            ))}
+          <div className="lp-voice-vis" aria-hidden>
+            <span className="lp-voice-mic">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                <rect x="9" y="3" width="6" height="11" rx="3" fill="#FBFAF7" />
+                <path
+                  d="M5 11a7 7 0 0 0 14 0M12 18v3"
+                  stroke="#FBFAF7"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </span>
+            <div className="lp-wave">
+              {Array.from({ length: 28 }).map((_, i) => (
+                <span key={i} style={{ animationDelay: (i * 0.06).toFixed(2) + 's' }} />
+              ))}
+            </div>
           </div>
         </div>
 
@@ -434,6 +455,33 @@ export default async function RootPage() {
             A one-time setup, then every tap-to-pay purchase files itself in the background with a
             quiet confirmation. Undo or edit from the notification.
           </p>
+          <div className="lp-tap" aria-hidden>
+            <div className="lp-tap-card">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
+                <path
+                  d="M6.5 8.5a7 7 0 0 1 0 7M9.5 10a4.2 4.2 0 0 1 0 4M12.5 11.2a1.8 1.8 0 0 1 0 1.6"
+                  stroke="#FBFAF7"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                />
+              </svg>
+              <span className="lp-tap-dots">•••• 4406</span>
+              <span className="lp-tap-ring" />
+              <span className="lp-tap-ring lp-tap-ring2" />
+            </div>
+            <div className="lp-tap-captured">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                <path
+                  d="M4 12.5 9.5 18 20 6.5"
+                  stroke="#3F5A3E"
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              Captured · $4.06
+            </div>
+          </div>
         </div>
 
         <div className="lp-card">
@@ -442,35 +490,43 @@ export default async function RootPage() {
           <p className="lp-p">
             Forecasts, spending patterns and a recurring-bill radar that knows your pay cycle.
           </p>
-          <svg className="lp-chart" viewBox="0 0 260 80" aria-hidden>
+          <svg className="lp-chart" viewBox="0 0 260 92" aria-hidden>
+            <defs>
+              <linearGradient id="lpg" x1="0" x2="0" y1="0" y2="1">
+                <stop offset="0%" stopColor="#3F5A3E" stopOpacity="0.28" />
+                <stop offset="100%" stopColor="#3F5A3E" stopOpacity="0" />
+              </linearGradient>
+            </defs>
+            <g stroke="rgba(40,36,28,0.08)" strokeDasharray="2 4">
+              <line x1="0" x2="260" y1="24" y2="24" />
+              <line x1="0" x2="260" y1="48" y2="48" />
+              <line x1="0" x2="260" y1="72" y2="72" />
+            </g>
             <path
-              d="M0 62 C30 58, 50 40, 80 44 S 140 30, 170 26 S 230 14, 260 10 L260 80 L0 80 Z"
-              fill="#3F5A3E"
-              opacity="0.12"
+              d="M0 70 C30 66, 50 48, 80 52 S 140 38, 165 34 L165 92 L0 92 Z"
+              fill="url(#lpg)"
             />
             <path
-              d="M0 62 C30 58, 50 40, 80 44 S 140 30, 170 26 S 230 14, 260 10"
+              d="M0 70 C30 66, 50 48, 80 52 S 140 38, 165 34"
               fill="none"
               stroke="#3F5A3E"
               strokeWidth="2.5"
             />
-            <circle cx="170" cy="26" r="4" fill="#fff" stroke="#3F5A3E" strokeWidth="2.5" />
+            <path
+              d="M165 34 C 195 29, 225 22, 258 16"
+              fill="none"
+              stroke="#B8860B"
+              strokeWidth="2.5"
+              strokeDasharray="5 4"
+              opacity="0.85"
+            />
+            <circle cx="52" cy="51" r="3.5" fill="#FF6B35" />
+            <circle cx="112" cy="43" r="3.5" fill="#9B59B6" />
+            <circle cx="165" cy="34" r="4.5" fill="#fff" stroke="#3F5A3E" strokeWidth="2.5" />
+            <text x="196" y="12" fontSize="8.5" fontWeight="700" fill="#B8860B">
+              forecast
+            </text>
           </svg>
-        </div>
-
-        <div className="lp-card lp-card-dark" id="ask">
-          <div className="lp-kicker lp-kicker-light">Ask Murmur</div>
-          <h3 className="lp-h3 lp-h3-light">Ask anything about your money.</h3>
-          <div className="lp-chat">
-            <div className="lp-bubble lp-bubble-user">What did food cost me this month?</div>
-            <div className="lp-bubble lp-bubble-ai">
-              <span className="lp-bubble-figure">$412</span>, about 14% less than July. Starbucks is
-              your top spot at $86 across 11 visits.
-            </div>
-          </div>
-          <p className="lp-p lp-p-light">
-            Answers computed from your own transactions. Not generic advice, and never shared.
-          </p>
         </div>
 
         <div className="lp-card">
@@ -480,6 +536,17 @@ export default async function RootPage() {
             CSV for spreadsheets, JSON for backups, a typeset PDF for records and taxes. Or delete
             it all, permanently, from Settings. No email required, no retention tricks.
           </p>
+          <div className="lp-files" aria-hidden>
+            <span className="lp-file" style={{ background: '#E4F0E2', color: '#2E5A2C' }}>
+              CSV
+            </span>
+            <span className="lp-file" style={{ background: '#FBF0D9', color: '#8A6410' }}>
+              JSON
+            </span>
+            <span className="lp-file" style={{ background: '#FDE4DE', color: '#A63A22' }}>
+              PDF
+            </span>
+          </div>
         </div>
 
         <div className="lp-card">
@@ -489,6 +556,77 @@ export default async function RootPage() {
             Murmur never connects to your accounts. Everything in it is something you chose to put
             there. That is the product.
           </p>
+          <div className="lp-priv" aria-hidden>
+            <svg width="54" height="60" viewBox="0 0 54 60">
+              <path
+                d="M27 2 50 10v16c0 15-9.5 25.5-23 30C13.5 51.5 4 41 4 26V10L27 2Z"
+                fill="#E8EDE3"
+                stroke="#3F5A3E"
+                strokeWidth="2"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M17 30l7 7 13-14"
+                fill="none"
+                stroke="#3F5A3E"
+                strokeWidth="3.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            <span className="lp-priv-bank">
+              <svg width="34" height="34" viewBox="0 0 34 34">
+                <g stroke="#9C9589" strokeWidth="1.8" fill="none">
+                  <path
+                    d="M6 14h22M8 14v10M13.5 14v10M19.5 14v10M26 14v10M5 26h24"
+                    strokeLinecap="round"
+                  />
+                  <path d="M17 5 6 12h22L17 5Z" strokeLinejoin="round" />
+                </g>
+                <circle cx="17" cy="17" r="15" stroke="#A63A22" strokeWidth="2.4" fill="none" />
+                <line
+                  x1="6.5"
+                  y1="27.5"
+                  x2="27.5"
+                  y2="6.5"
+                  stroke="#A63A22"
+                  strokeWidth="2.4"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </span>
+          </div>
+        </div>
+
+        <div className="lp-card lp-card-dark" id="ask">
+          <div className="lp-ask-grid">
+            <div>
+              <div className="lp-kicker lp-kicker-light">Ask Murmur</div>
+              <h3 className="lp-h3 lp-h3-light">Ask anything about your money.</h3>
+              <div className="lp-chat">
+                <div className="lp-bubble lp-bubble-user">What did food cost me this month?</div>
+                <div className="lp-ai-row">
+                  <span className="lp-ai-avatar">
+                    <MurmurMark size={26} variant="sage" rounded />
+                  </span>
+                  <div className="lp-bubble lp-bubble-ai">
+                    <span className="lp-bubble-figure">$412</span>, about 14% less than July.
+                    Starbucks is your top spot at $86 across 11 visits.
+                  </div>
+                </div>
+              </div>
+              <p className="lp-p lp-p-light">
+                Answers computed from your own transactions. Not generic advice, and never shared.
+              </p>
+            </div>
+            <div className="lp-ask-side" aria-hidden>
+              <div className="lp-ask-side-label">Things people murmur</div>
+              <span className="lp-ask-chip">Am I over budget this week?</span>
+              <span className="lp-ask-chip">What&rsquo;s my most expensive subscription?</span>
+              <span className="lp-ask-chip">How much at Starbucks this year?</span>
+              <span className="lp-ask-chip">What changed since last month?</span>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -561,12 +699,12 @@ export default async function RootPage() {
         .lp-cta-pill:hover { transform: translateY(-1px); box-shadow: 0 8px 20px rgba(63,90,62,0.25); }
 
         .lp-hero { position: relative; padding: 84px 0 96px; }
-        .lp-hero-word { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); font-family: ${font.serif}; font-size: clamp(160px, 26vw, 380px); line-height: 1; color: #3F5A3E; opacity: 0.055; letter-spacing: -0.04em; user-select: none; pointer-events: none; white-space: nowrap; }
+        .lp-hero-word { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); font-family: ${lpSerif}; font-size: clamp(160px, 26vw, 380px); line-height: 1; color: #3F5A3E; opacity: 0.055; letter-spacing: -0.04em; user-select: none; pointer-events: none; white-space: nowrap; }
         .lp-hero-glow { position: absolute; top: -180px; right: -160px; width: 640px; height: 640px; border-radius: 50%; background: radial-gradient(circle, rgba(92,123,90,0.16), rgba(92,123,90,0) 65%); pointer-events: none; }
         .lp-hero-grid { position: relative; display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 48px; align-items: center; }
         .lp-eyebrow { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: #3F5A3E; background: #E8EDE3; padding: 8px 14px; border-radius: 999px; }
         .lp-eyebrow-dot { width: 6px; height: 6px; border-radius: 50%; background: #3F5A3E; }
-        .lp-h1 { font-family: ${font.serif}; font-weight: 500; font-size: clamp(52px, 7.6vw, 92px); line-height: 0.98; letter-spacing: -0.035em; margin: 26px 0 0; }
+        .lp-h1 { font-family: ${lpSerif}; font-weight: 500; font-size: clamp(52px, 7.6vw, 92px); line-height: 0.98; letter-spacing: -0.035em; margin: 26px 0 0; }
         .lp-h1 em { font-style: italic; color: #3F5A3E; }
         .lp-sub { font-size: 18px; line-height: 1.65; color: #3A3630; max-width: 470px; margin: 24px 0 0; }
         .lp-hero-ctas { display: flex; align-items: center; gap: 12px; margin-top: 34px; flex-wrap: wrap; }
@@ -580,7 +718,7 @@ export default async function RootPage() {
         .lp-branch-curves { position: absolute; left: -168px; top: 96px; z-index: 1; animation: lp-float 7s ease-in-out infinite; animation-delay: 1.6s; }
         .lp-branch-node { position: absolute; z-index: 3; background: #FFFFFF; border: 0.5px solid rgba(40,36,28,0.1); border-radius: 14px; box-shadow: 0 12px 30px rgba(27,25,21,0.1); animation: lp-float 7s ease-in-out infinite; animation-delay: 1.6s; }
         .lp-branch-root { left: -52px; top: 222px; background: #1B1915; border-color: #1B1915; padding: 9px 14px; }
-        .lp-branch-root-month { font-family: ${font.serif}; font-size: 15px; color: #FBFAF7; }
+        .lp-branch-root-month { font-family: ${lpSerif}; font-size: 15px; color: #FBFAF7; }
         .lp-branch-root-amt { font-size: 10.5px; font-weight: 700; color: #9DBB9C; margin-top: 1px; }
         .lp-branch-leaf { display: flex; align-items: center; gap: 9px; padding: 9px 12px; }
         .lp-branch-leaf1 { left: -168px; top: 118px; }
@@ -591,10 +729,10 @@ export default async function RootPage() {
         .lp-phone { position: relative; z-index: 2; width: 320px; background: #FFFFFF; border: 1px solid rgba(40,36,28,0.1); border-radius: 44px; padding: 22px 18px 30px; box-shadow: 0 40px 90px rgba(27,25,21,0.16), 0 6px 18px rgba(27,25,21,0.06); }
         .lp-phone-notch { width: 110px; height: 24px; background: #1B1915; border-radius: 999px; margin: 0 auto 16px; }
         .lp-phone-month { font-size: 10px; font-weight: 700; letter-spacing: 1.6px; color: #9C9589; }
-        .lp-phone-today { font-family: ${font.serif}; font-size: 30px; font-weight: 500; letter-spacing: -0.5px; margin-top: 2px; }
+        .lp-phone-today { font-family: ${lpSerif}; font-size: 30px; font-weight: 500; letter-spacing: -0.5px; margin-top: 2px; }
         .lp-spent { background: #F5F2EB; border-radius: 18px; padding: 14px 16px; margin-top: 14px; }
         .lp-spent-label { font-size: 10px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: #6C675E; }
-        .lp-spent-amt { font-family: ${font.serif}; font-size: 34px; letter-spacing: -0.5px; margin-top: 2px; }
+        .lp-spent-amt { font-family: ${lpSerif}; font-size: 34px; letter-spacing: -0.5px; margin-top: 2px; }
         .lp-spent-cur { font-size: 20px; color: #6C675E; }
         .lp-spent-dec { color: #9C9589; }
         .lp-rows { margin-top: 14px; display: flex; flex-direction: column; }
@@ -603,7 +741,7 @@ export default async function RootPage() {
         .lp-row-logo { border-radius: 10px; }
         .lp-row-name { font-weight: 600; font-size: 14px; }
         .lp-chip { display: inline-block; font-size: 10.5px; font-weight: 600; border-radius: 999px; padding: 2px 8px; margin-top: 3px; }
-        .lp-row-amt { font-family: ${font.serif}; font-size: 16px; letter-spacing: -0.3px; }
+        .lp-row-amt { font-family: ${lpSerif}; font-size: 16px; letter-spacing: -0.3px; }
         .lp-mic { position: absolute; left: 50%; transform: translateX(-50%); bottom: -26px; width: 58px; height: 58px; border-radius: 50%; background: #1B1915; display: flex; align-items: center; justify-content: center; box-shadow: 0 14px 30px rgba(27,25,21,0.35); }
         .lp-mic-ring { position: absolute; inset: 0; border-radius: 50%; border: 2px solid rgba(63,90,62,0.5); animation: lp-pulse 2.4s ease-out infinite; }
         .lp-mic-ring2 { animation-delay: 1.2s; }
@@ -619,7 +757,7 @@ export default async function RootPage() {
 
         .lp-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; padding-top: 72px; padding-bottom: 8px; }
         .lp-stat { text-align: center; padding: 10px; }
-        .lp-stat-n { font-family: ${font.serif}; font-size: 44px; letter-spacing: -1px; color: #3F5A3E; }
+        .lp-stat-n { font-family: ${lpSerif}; font-size: 44px; letter-spacing: -1px; color: #3F5A3E; }
         .lp-stat-label { font-size: 13px; color: #6C675E; margin-top: 4px; line-height: 1.45; }
 
         .lp-map { display: grid; grid-template-columns: 0.9fr 1.1fr; gap: 40px; align-items: center; padding-top: 88px; }
@@ -638,8 +776,8 @@ export default async function RootPage() {
         .lp-card-dark { grid-column: span 6; background: #1B1915; border-color: #1B1915; }
         .lp-kicker { font-size: 11px; font-weight: 700; letter-spacing: 1.4px; text-transform: uppercase; color: #3F5A3E; }
         .lp-kicker-light { color: #9DBB9C; }
-        .lp-h2 { font-family: ${font.serif}; font-weight: 500; font-size: clamp(30px, 4vw, 42px); letter-spacing: -0.8px; margin: 10px 0 0; }
-        .lp-h3 { font-family: ${font.serif}; font-weight: 500; font-size: 24px; letter-spacing: -0.4px; margin: 10px 0 0; }
+        .lp-h2 { font-family: ${lpSerif}; font-weight: 500; font-size: clamp(30px, 4vw, 42px); letter-spacing: -0.8px; margin: 10px 0 0; }
+        .lp-h3 { font-family: ${lpSerif}; font-weight: 500; font-size: 24px; letter-spacing: -0.4px; margin: 10px 0 0; }
         .lp-h3-light { color: #FBFAF7; font-size: clamp(26px, 3.4vw, 34px); }
         .lp-p { font-size: 14.5px; line-height: 1.65; color: #3A3630; margin: 10px 0 0; }
         .lp-p-light { color: rgba(251,250,247,0.72); }
@@ -650,7 +788,27 @@ export default async function RootPage() {
         .lp-bubble { border-radius: 18px; padding: 12px 16px; font-size: 14px; line-height: 1.55; width: fit-content; max-width: 92%; }
         .lp-bubble-user { background: rgba(251,250,247,0.12); color: #FBFAF7; align-self: flex-end; }
         .lp-bubble-ai { background: #FBFAF7; color: #1B1915; }
-        .lp-bubble-figure { font-family: ${font.serif}; font-weight: 600; }
+        .lp-bubble-figure { font-family: ${lpSerif}; font-weight: 600; }
+
+        .lp-voice-vis { display: flex; align-items: center; gap: 16px; margin-top: 22px; }
+        .lp-voice-mic { flex: none; width: 46px; height: 46px; border-radius: 50%; background: #1B1915; display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 20px rgba(27,25,21,0.25); }
+        .lp-tap { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 10px; margin-top: 22px; }
+        .lp-tap-card { position: relative; display: flex; align-items: center; gap: 10px; background: linear-gradient(135deg, #2C4A2B, #1B2B1A); color: #FBFAF7; border-radius: 14px; padding: 14px 18px; box-shadow: 0 12px 28px rgba(27,25,21,0.2); }
+        .lp-tap-dots { font-size: 12px; font-weight: 700; letter-spacing: 1.5px; opacity: 0.85; }
+        .lp-tap-ring { position: absolute; right: -9px; top: 50%; width: 26px; height: 26px; margin-top: -13px; border-radius: 50%; border: 2px solid rgba(63,90,62,0.55); animation: lp-pulse 2.2s ease-out infinite; }
+        .lp-tap-ring2 { animation-delay: 1.1s; }
+        .lp-tap-captured { display: inline-flex; align-items: center; gap: 7px; background: #E8EDE3; color: #2E4A2D; font-size: 12px; font-weight: 700; border-radius: 999px; padding: 7px 13px; }
+        .lp-files { display: flex; gap: 10px; margin-top: 22px; }
+        .lp-file { position: relative; font-size: 12px; font-weight: 800; letter-spacing: 0.6px; border-radius: 10px 16px 10px 10px; padding: 16px 16px 10px; box-shadow: 0 6px 16px rgba(27,25,21,0.07); }
+        .lp-file::before { content: ''; position: absolute; top: 0; right: 0; width: 14px; height: 14px; background: rgba(27,25,21,0.1); border-radius: 0 16px 0 10px; }
+        .lp-priv { display: flex; align-items: center; gap: 18px; margin-top: 22px; }
+        .lp-priv-bank { display: inline-flex; }
+        .lp-ask-grid { display: grid; grid-template-columns: 1.25fr 0.75fr; gap: 36px; align-items: start; }
+        .lp-ai-row { display: flex; align-items: flex-end; gap: 10px; }
+        .lp-ai-avatar { flex: none; display: inline-flex; margin-bottom: 2px; }
+        .lp-ask-side { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; padding-top: 34px; }
+        .lp-ask-side-label { font-size: 11px; font-weight: 700; letter-spacing: 1.4px; text-transform: uppercase; color: rgba(251,250,247,0.45); margin-bottom: 2px; }
+        .lp-ask-chip { font-size: 13px; color: rgba(251,250,247,0.85); border: 1px solid rgba(251,250,247,0.22); border-radius: 999px; padding: 9px 16px; }
 
         .lp-plus { padding-top: 72px; padding-bottom: 88px; text-align: center; }
         .lp-prices { display: flex; gap: 14px; justify-content: center; margin-top: 34px; flex-wrap: wrap; }
@@ -658,7 +816,7 @@ export default async function RootPage() {
         .lp-price-hero { background: #3F5A3E; color: #FBFAF7; border-color: #3F5A3E; box-shadow: 0 24px 60px rgba(63,90,62,0.28); }
         .lp-price-flag { position: absolute; top: -13px; left: 50%; transform: translateX(-50%); background: #1B1915; color: #FBFAF7; font-size: 11px; font-weight: 700; padding: 5px 14px; border-radius: 999px; white-space: nowrap; }
         .lp-price-name { font-size: 13px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; opacity: 0.75; }
-        .lp-price-amt { font-family: ${font.serif}; font-size: 42px; letter-spacing: -1px; margin-top: 8px; }
+        .lp-price-amt { font-family: ${lpSerif}; font-size: 42px; letter-spacing: -1px; margin-top: 8px; }
         .lp-price-amt span { font-size: 15px; font-family: ${font.sans}; opacity: 0.7; letter-spacing: 0; }
         .lp-price-trial { font-size: 13px; font-weight: 600; margin-top: 8px; opacity: 0.85; }
         .lp-fineprint { font-size: 12px; color: #9C9589; margin-top: 22px; }
@@ -668,7 +826,7 @@ export default async function RootPage() {
         .lp-footer-links { display: flex; gap: 22px; font-size: 13.5px; }
         .lp-footer-links a { color: #6C675E; }
         .lp-footer-links a:hover { color: #1B1915; }
-        .lp-footer-word { font-family: ${font.serif}; font-size: clamp(90px, 16vw, 200px); line-height: 1; letter-spacing: -0.04em; color: #3F5A3E; opacity: 0.07; text-align: center; margin: 10px 0 0; user-select: none; }
+        .lp-footer-word { font-family: ${lpSerif}; font-size: clamp(90px, 16vw, 200px); line-height: 1; letter-spacing: -0.04em; color: #3F5A3E; opacity: 0.07; text-align: center; margin: 10px 0 0; user-select: none; }
         .lp-footer-bottom { text-align: center; font-size: 12.5px; color: #9C9589; margin-top: 6px; }
 
         @keyframes lp-rise { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: translateY(0); } }
@@ -688,6 +846,8 @@ export default async function RootPage() {
           .lp-sub { max-width: none; }
           .lp-stats { grid-template-columns: repeat(2, 1fr); }
           .lp-map { grid-template-columns: 1fr; gap: 28px; padding-top: 64px; }
+          .lp-ask-grid { grid-template-columns: 1fr; gap: 8px; }
+          .lp-ask-side { padding-top: 16px; }
           .lp-card, .lp-card-voice, .lp-card-dark { grid-column: span 6; }
           .lp-navlink:not(.lp-cta-pill) { display: none; }
         }

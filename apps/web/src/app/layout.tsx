@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { Plus_Jakarta_Sans, DM_Mono } from 'next/font/google'
+import { Plus_Jakarta_Sans, DM_Mono, Fraunces } from 'next/font/google'
 import { DesktopChrome } from '../components/DesktopChrome'
 import './globals.css'
 
@@ -30,6 +30,18 @@ const dmMono = DM_Mono({
   variable: '--font-dm-mono',
 })
 
+// Display serif for the public landing page (Aug 29, 2026): the in-app
+// brand serif is New York, which only Apple devices have; Chrome fell
+// back to Georgia and read as a generic template. Fraunces is self-hosted
+// via next/font (CSP 'self'), used through --font-fraunces on lp-* styles
+// only, so the app's own typography is untouched.
+const fraunces = Fraunces({
+  subsets: ['latin'],
+  variable: '--font-fraunces',
+  display: 'swap',
+  axes: ['opsz'],
+})
+
 export const metadata: Metadata = {
   metadataBase: new URL('https://itsmurmur.com'),
   title: 'Murmur',
@@ -39,7 +51,10 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${plusJakartaSans.variable} ${dmMono.variable}`}>
+    <html
+      lang="en"
+      className={`${plusJakartaSans.variable} ${dmMono.variable} ${fraunces.variable}`}
+    >
       <body>
         <DesktopChrome />
         {children}
