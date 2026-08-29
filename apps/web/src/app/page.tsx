@@ -166,6 +166,50 @@ export default async function RootPage() {
                 </div>
               </div>
             </div>
+            <div aria-hidden className="lp-hero-branch">
+              <svg viewBox="0 0 250 210" width="250" height="210">
+                <g fill="none" stroke="#3F5A3E" strokeWidth="1.5" opacity="0.4">
+                  <path d="M250 105 C 200 105, 195 40, 148 36" />
+                  <path d="M250 105 C 200 105, 195 168, 148 164" />
+                </g>
+                <g>
+                  <rect
+                    x="12"
+                    y="14"
+                    width="136"
+                    height="44"
+                    rx="14"
+                    fill="#FFFFFF"
+                    stroke="rgba(40,36,28,0.1)"
+                  />
+                  <circle cx="32" cy="36" r="5" fill="#FF6B35" />
+                  <text x="45" y="32" fontSize="11.5" fontWeight="700" fill="#1B1915">
+                    Food &amp; Dining
+                  </text>
+                  <text x="45" y="48" fontSize="11" fill="#6C675E">
+                    $412 this month
+                  </text>
+                </g>
+                <g>
+                  <rect
+                    x="26"
+                    y="142"
+                    width="122"
+                    height="44"
+                    rx="14"
+                    fill="#FFFFFF"
+                    stroke="rgba(40,36,28,0.08)"
+                  />
+                  <image href={logo('starbucks.com')} x="38" y="154" width="20" height="20" />
+                  <text x="66" y="162" fontSize="11" fontWeight="600" fill="#1B1915">
+                    Starbucks
+                  </text>
+                  <text x="66" y="176" fontSize="10.5" fill="#6C675E" fontFamily="Georgia, serif">
+                    $86 · 11 visits
+                  </text>
+                </g>
+              </svg>
+            </div>
             <div className="lp-phone">
               <div className="lp-phone-notch" />
               <div className="lp-phone-head">
@@ -559,6 +603,8 @@ export default async function RootPage() {
         .lp-mic { position: absolute; left: 50%; transform: translateX(-50%); bottom: -26px; width: 58px; height: 58px; border-radius: 50%; background: #1B1915; display: flex; align-items: center; justify-content: center; box-shadow: 0 14px 30px rgba(27,25,21,0.35); }
         .lp-mic-ring { position: absolute; inset: 0; border-radius: 50%; border: 2px solid rgba(63,90,62,0.5); animation: lp-pulse 2.4s ease-out infinite; }
         .lp-mic-ring2 { animation-delay: 1.2s; }
+        .lp-hero-branch { position: absolute; left: calc(50% - 395px); top: 150px; z-index: 1; animation: lp-float 7s ease-in-out infinite; animation-delay: 1.6s; filter: drop-shadow(0 14px 30px rgba(27,25,21,0.08)); }
+        .lp-phone { z-index: 2; }
         .lp-notif { position: absolute; top: -18px; right: -8px; z-index: 2; display: flex; gap: 10px; align-items: center; background: rgba(255,255,255,0.94); backdrop-filter: blur(8px); border: 0.5px solid rgba(40,36,28,0.1); border-radius: 18px; padding: 12px 16px; box-shadow: 0 18px 44px rgba(27,25,21,0.14); max-width: 300px; }
         .lp-notif-title { font-size: 12.5px; font-weight: 700; }
         .lp-notif-body { font-size: 11.5px; color: #6C675E; margin-top: 1px; }
@@ -631,6 +677,9 @@ export default async function RootPage() {
         @keyframes lp-scroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
         @keyframes lp-wave { 0%,100% { height: 26%; } 50% { height: 92%; } }
 
+        @media (max-width: 1180px) {
+          .lp-hero-branch { display: none; }
+        }
         @media (max-width: 920px) {
           .lp-hero { padding: 56px 0 72px; }
           .lp-hero-grid { grid-template-columns: 1fr; gap: 72px; }
