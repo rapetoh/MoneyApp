@@ -247,7 +247,7 @@ export function MatrixLens({ props }: { props: LensProps }) {
           renderRow(id, nameById[id], categoryPalette(colorById[id] || NEUTRAL_CATEGORY_COLOR).fg, matrix[id]),
         )}
         {/* Everything past the top 8, folded into one row rather than
-            dropped — this is what makes `Total` below agree with the
+            dropped - this is what makes `Total` below agree with the
             Overview header's "out" (fix-plan 2.11's done-when). */}
         {hasOther &&
           renderRow(

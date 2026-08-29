@@ -42,7 +42,7 @@ export function PaywallGate({
           <div style={styles.title}>{title}</div>
           <div style={styles.body}>{body}</div>
           <div style={styles.note}>
-            Subscribe in the Murmur app on your iPhone (Settings → Subscription — the app shows the plans,
+            Subscribe in the Murmur app on your iPhone (Settings → Subscription, the app shows the plans,
             prices and free trial). Your account unlocks everywhere, including here.
           </div>
           <PlusRefreshButton compact />

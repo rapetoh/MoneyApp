@@ -558,7 +558,7 @@ export default function RecurringPage() {
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <span style={styles.sortPill}>Sort: Next charge</span>
             {/* Fix-plan 3.3: this was permanently `disabled title="Coming
-                soon"` — a priced-looking control that could never be
+                soon"` - a priced-looking control that could never be
                 pressed. A rule can now be created without touching a
                 transaction, on both platforms. */}
             <button style={styles.addBtn} type="button" onClick={openCreateModal}>
@@ -573,7 +573,7 @@ export default function RecurringPage() {
         <div style={styles.headerRow}>
           <div>
             {/* Matches the sidebar label, the toolbar title above, and the
-                mobile screen's own heading — one name, not a fourth
+                mobile screen's own heading - one name, not a fourth
                 variant (audit 08-F44, fix-plan 4.2's naming-table item). */}
             <div style={styles.serifTitle}>Recurring</div>
             <div style={styles.subtitleLine}>
@@ -608,7 +608,7 @@ export default function RecurringPage() {
             {/* "—" for free users, not "0" — the detector never ran for
                 them (same fact as the subtitle above), and "0" would
                 assert a finding about their data instead of their plan. */}
-            <Stat label="To review" value={isPlus ? String(reviewCount) : '—'} accent="#B07B2A" />
+            <Stat label="To review" value={isPlus ? String(reviewCount) : '-'} accent="#B07B2A" />
           </div>
         </div>
 
@@ -771,7 +771,7 @@ export default function RecurringPage() {
                             ? 'Overdue'
                             : next
                               ? next.toLocaleDateString(locale, { month: 'short', day: 'numeric' })
-                              : '—'}
+                              : '-'}
                         </div>
                         <div style={{ textAlign: 'right' }}>
                           {/* Text now matches the action the click performs

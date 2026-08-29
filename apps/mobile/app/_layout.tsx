@@ -234,7 +234,7 @@ export default function RootLayout() {
           <StatusBar style="dark" backgroundColor="#FBFAF7" />
           <Stack screenOptions={{ headerShown: false }}>
             {/* Top-level groups swap on auth / onboarding boundaries via
-                `router.replace` — a cross-fade there, not a horizontal push:
+                `router.replace` - a cross-fade there, not a horizontal push:
                 signing in or finishing onboarding is a change of world, not a
                 step deeper into the same one. Every other screen keeps the
                 native push (card) / sheet (modal) transition. */}

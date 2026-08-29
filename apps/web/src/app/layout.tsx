@@ -34,7 +34,7 @@ export const metadata: Metadata = {
   metadataBase: new URL('https://itsmurmur.com'),
   title: 'Murmur',
   description:
-    'The voice-first, privacy-first expense tracker. Say what you spent — Murmur files it. No bank linking, ever.',
+    'The voice-first, privacy-first expense tracker. Say what you spent - Murmur files it. No bank linking, ever.',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

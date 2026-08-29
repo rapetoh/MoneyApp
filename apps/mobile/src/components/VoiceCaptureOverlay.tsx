@@ -159,7 +159,7 @@ export function VoiceCaptureOverlay({
 
       {/* Reactive screen-edge glow — the mockup's three inset-shadow
           layers rendered as feathered SVG falloff (solid borders read as
-          a picture frame — build 9's mistake). Inner halo flares with
+          a picture frame - build 9's mistake). Inner halo flares with
           the mic level. */}
       {phase !== 'error' && (
         <Animated.View style={[StyleSheet.absoluteFill, { opacity: presence }]} pointerEvents="none">

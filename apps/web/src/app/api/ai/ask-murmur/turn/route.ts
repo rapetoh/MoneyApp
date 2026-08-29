@@ -340,7 +340,7 @@ async function answer(
   if (DEBUG_TRACE) console.warn('[ask-turn] trace retry reasons:', issues.join(' | '))
   const retryPrompt =
     systemPrompt +
-    `\n\nIMPORTANT — your previous attempt was rejected. Fix each point and answer again:\n- ${issues.join('\n- ')}\nEvery figure must come from a tool result of this turn (call the tools now — arith for any ratio/difference), a COMPUTED figure from an earlier turn, the overview, the budget block, or the user's own words.`
+    `\n\nIMPORTANT - your previous attempt was rejected. Fix each point and answer again:\n- ${issues.join('\n- ')}\nEvery figure must come from a tool result of this turn (call the tools now - arith for any ratio/difference), a COMPUTED figure from an earlier turn, the overview, the budget block, or the user's own words.`
   const second = await runLoop(retryPrompt, contextMessages, message, ctx)
   const secondIssues = issuesFor(second, ctx, message, g)
   if (secondIssues.length === 0) return second
@@ -359,7 +359,7 @@ function issuesFor(
 ): string[] {
   const issues: string[] = []
   if (!r.reply.out_of_scope && r.reply.text.trim().length < 6) {
-    issues.push('empty answer: the "text" field was empty — write the answer, leading with the conclusion and its figure')
+    issues.push('empty answer: the "text" field was empty - write the answer, leading with the conclusion and its figure')
   }
   const trusted = trustedFigures({
     calls: r.calls,
@@ -373,7 +373,7 @@ function issuesFor(
   })
   const grounding = groundAskReply(r.reply, trusted, r.calls)
   if (grounding.untraced.length > 0) {
-    issues.push(`ungrounded figures (${grounding.untraced.slice(0, 4).join('; ')}) — these numbers match no tool result; compute them with the tools (arith for ratios/differences) or drop them`)
+    issues.push(`ungrounded figures (${grounding.untraced.slice(0, 4).join('; ')}) - these numbers match no tool result; compute them with the tools (arith for ratios/differences) or drop them`)
   }
   if (grounding.direction_violation) issues.push(`comparison direction: ${grounding.direction_violation}`)
   if (grounding.recital) issues.push(`unasked figures: ${grounding.recital}`)

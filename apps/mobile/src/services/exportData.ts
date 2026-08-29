@@ -219,7 +219,7 @@ const MURMUR_MARK_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16
  *  dash for an uncategorised debit rather than a blank cell. */
 function pdfCategoryLabel(r: Pick<ExportRow, 'category' | 'direction'>, locale: Locale): string {
   if (r.category) return r.category
-  return r.direction === 'credit' ? t('voice.income_label', locale) : '—'
+  return r.direction === 'credit' ? t('voice.income_label', locale) : '-'
 }
 
 function pdfHTML(input: ExportInput, locale: Locale): string {
@@ -247,12 +247,12 @@ function pdfHTML(input: ExportInput, locale: Locale): string {
       const converted =
         r.amountInProfileCurrency != null
           ? `${r.direction === 'credit' ? '+' : ''}${input.currency} ${r.amountInProfileCurrency.toFixed(2)}`
-          : '—'
+          : '-'
       const numClass = `num ${r.direction === 'credit' ? 'credit' : ''}`
       return `
         <tr>
           <td>${escapeHTML(date)}</td>
-          <td class="merchant">${escapeHTML(r.merchant || '—')}</td>
+          <td class="merchant">${escapeHTML(r.merchant || '-')}</td>
           <td>${escapeHTML(pdfCategoryLabel(r, locale))}</td>
           ${multiCurrency ? `<td class="${numClass}">${escapeHTML(native)}</td>` : ''}
           <td class="${numClass}">${escapeHTML(converted)}</td>

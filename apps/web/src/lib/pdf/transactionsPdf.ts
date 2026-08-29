@@ -115,7 +115,7 @@ function makeFormatters(input: TransactionsPdfInput) {
  *  em dash for an uncategorised debit. */
 export function categoryLabel(row: Pick<ExportRow, 'category' | 'direction'>): string {
   if (row.category) return row.category
-  return row.direction === 'credit' ? 'Income' : '—'
+  return row.direction === 'credit' ? 'Income' : '-'
 }
 
 // ── Brand mark (vector) ──────────────────────────────────────────────────────
@@ -316,8 +316,8 @@ export function buildTransactionsPdf(
     const converted =
       r.amountInProfileCurrency != null
         ? f.signed(r.amountInProfileCurrency, input.currency, r.direction)
-        : '—'
-    const cellsRow = [f.dayText(r.date), r.merchant || '—', categoryLabel(r)]
+        : '-'
+    const cellsRow = [f.dayText(r.date), r.merchant || '-', categoryLabel(r)]
     if (multiCurrency) cellsRow.push(f.signed(r.amount, r.currency, r.direction))
     cellsRow.push(converted)
     return cellsRow.map(pdfSafe)

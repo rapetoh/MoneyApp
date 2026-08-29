@@ -417,7 +417,7 @@ function detectUngrounded(response: AskMurmurResponse, calls: ToolCallRecord[], 
   if (okCalls === 0 && untraced.length > 0) {
     return (
       `previous attempt quoted figures without calling any tool (${untraced.slice(0, 3).join('; ')}). ` +
-      'Every number must come from a tool result, the data overview, the BUDGET block, or the user\'s own words — call the tools now.'
+      'Every number must come from a tool result, the data overview, the BUDGET block, or the user\'s own words - call the tools now.'
     )
   }
   return null
@@ -454,7 +454,7 @@ function detectStall(response: AskMurmurResponse): string | null {
   if (!STALL_RE.test(verdict)) return null
   return (
     `previous attempt described what it would do instead of doing it ("${verdict.slice(0, 140)}"). ` +
-    'This is not allowed. Do not narrate, do not ask permission, do not ask the user for numbers you can compute — ' +
+    'This is not allowed. Do not narrate, do not ask permission, do not ask the user for numbers you can compute - ' +
     'call the tools NOW and lead the verdict with the answer and the figures.'
   )
 }
@@ -465,7 +465,7 @@ function detectRepeat(response: AskMurmurResponse, req: AskMurmurRequest): strin
   if (!last) return null
   if (normalizeVerdict(response.verdict.text) !== normalizeVerdict(last.answer)) return null
   return (
-    `previous attempt repeated the prior answer word for word. The user sent a follow-up ("${req.question.slice(0, 80)}") — respond to THAT. ` +
+    `previous attempt repeated the prior answer word for word. The user sent a follow-up ("${req.question.slice(0, 80)}") - respond to THAT. ` +
     'If the follow-up is an acknowledgement (ok, thanks, sure) and your prior reply promised an analysis, deliver that analysis now with real numbers; ' +
     'otherwise answer in one or two fresh sentences and offer the most useful next thing.'
   )
@@ -562,7 +562,7 @@ async function runConversation(
 ): Promise<ConversationResult> {
   let systemPrompt = buildAskMurmurPrompt(askReq, overview)
   if (priorIssues && priorIssues.length > 0) {
-    systemPrompt += `\n\nIMPORTANT — your previous attempt had issues. Read each one and correct it:\n- ${priorIssues.join('\n- ')}\n\nRewrite the answer. Use run_query for every number you cite, compare for every directional comparison, and answer the user's question with real data.`
+    systemPrompt += `\n\nIMPORTANT - your previous attempt had issues. Read each one and correct it:\n- ${priorIssues.join('\n- ')}\n\nRewrite the answer. Use run_query for every number you cite, compare for every directional comparison, and answer the user's question with real data.`
   }
 
   type Message =
@@ -697,7 +697,7 @@ async function runSummarizeFallback(
   // snapshot full of `null`s.
   const snapshot = buildSummarySnapshot(ctx)
 
-  const systemPrompt = `You are Murmur, a personal-finance reader. Answer the user's question below as directly as the snapshot allows, in 2-3 sentences in ${ctx.locale}; if the snapshot cannot answer it, say exactly what you can see instead — never change the subject silently. The numbers in the snapshot are deterministic — quote them verbatim. Always include a chart if the snapshot has data: a "donut" of top categories (data: name + total) or a "line" of monthly_series (data: label + spent). If the snapshot has no data, say so plainly and offer one concrete next step.
+  const systemPrompt = `You are Murmur, a personal-finance reader. Answer the user's question below as directly as the snapshot allows, in 2-3 sentences in ${ctx.locale}; if the snapshot cannot answer it, say exactly what you can see instead - never change the subject silently. The numbers in the snapshot are deterministic - quote them verbatim. Always include a chart if the snapshot has data: a "donut" of top categories (data: name + total) or a "line" of monthly_series (data: label + spent). If the snapshot has no data, say so plainly and offer one concrete next step.
 
 Output STRICT JSON only:
 {

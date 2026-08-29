@@ -264,7 +264,7 @@ export default async function InsightsPage() {
   if (weekdayPattern?.confident && weekdayPattern.data) {
     const idx = weekdayPattern.data.weekdayIndex as number
     const avg = weekdayPattern.data.average as number
-    patternClaims.push(`${dayNames[idx]} is your heaviest day — avg ${fmtCurrency(avg)} per ${dayNames[idx]}.`)
+    patternClaims.push(`${dayNames[idx]} is your heaviest day - avg ${fmtCurrency(avg)} per ${dayNames[idx]}.`)
   }
   if (categoryPattern?.confident && categoryPattern.data) {
     const categoryId = categoryPattern.data.categoryId as string
@@ -302,7 +302,7 @@ export default async function InsightsPage() {
       <div style={styles.content}>
         <div>
           {/* Matches the sidebar label, the toolbar title above, and the
-              mobile tab — was "Forecast & patterns", a third variant of
+              mobile tab - was "Forecast & patterns", a third variant of
               this destination's name (audit 08-F44, fix-plan 4.2). */}
           <div style={{ fontFamily: font.serif, fontSize: 28, fontWeight: 500, color: colors.ink, letterSpacing: -0.6 }}>
             Insights

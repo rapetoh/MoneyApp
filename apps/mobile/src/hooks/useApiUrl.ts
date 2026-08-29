@@ -10,7 +10,7 @@ function resolveDefaultUrl(): string {
   // without the env var is a misbuilt binary and must fail loudly instead.
   if (__DEV__) return 'http://localhost:3000'
   throw new Error(
-    'EXPO_PUBLIC_API_BASE_URL is not set — this build profile is missing its env (see apps/mobile/eas.json)',
+    'EXPO_PUBLIC_API_BASE_URL is not set - this build profile is missing its env (see apps/mobile/eas.json)',
   )
 }
 

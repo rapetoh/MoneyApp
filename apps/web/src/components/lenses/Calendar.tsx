@@ -284,7 +284,7 @@ export function CalendarLens({ props }: { props: LensProps }) {
                 <div style={{ textAlign: 'right' }}>
                   {/* Fix-plan 2.6 (calendar day-detail raw-amount site,
                       audit F14-class): each row renders in its OWN
-                      currency — `t.amount` was previously formatted with
+                      currency - `t.amount` was previously formatted with
                       `props.currency` (the profile's), so a foreign-
                       currency row showed its native number under the
                       wrong symbol and the panel's rows visibly didn't

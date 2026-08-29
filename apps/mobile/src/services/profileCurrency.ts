@@ -121,5 +121,5 @@ export async function changeCurrency(
     }
   }
 
-  return { ok: false, error: 'Currency change did not finish — please try again' }
+  return { ok: false, error: 'Currency change did not finish - please try again' }
 }

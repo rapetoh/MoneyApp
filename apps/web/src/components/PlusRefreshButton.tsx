@@ -65,7 +65,7 @@ export function PlusRefreshButton({ compact = false }: { compact?: boolean }) {
       )}
       {state === 'error' && (
         <span style={{ fontFamily: font.sans, fontSize: 12, color: colors.ink3 }}>
-          Couldn&apos;t check right now — try again in a moment.
+          Couldn&apos;t check right now, try again in a moment.
         </span>
       )}
     </div>

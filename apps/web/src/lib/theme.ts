@@ -6,7 +6,7 @@
 export const colors = {
   // Canvas
   bg: '#FBFAF7',
-  background: '#F4F1EA', // bgDesk — recessed desktop canvas
+  background: '#F4F1EA', // bgDesk - recessed desktop canvas
   card: '#FFFFFF',
   surface: '#FFFFFF',
   surface2: '#F5F2EB',

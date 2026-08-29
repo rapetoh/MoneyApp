@@ -44,7 +44,7 @@ export default function HelpScreen() {
           )}
           <View style={styles.row}>
             <Text style={styles.rowLabel}>{t('help.version', locale)}</Text>
-            <Text style={styles.rowValue}>{Constants.expoConfig?.version ?? '—'}</Text>
+            <Text style={styles.rowValue}>{Constants.expoConfig?.version ?? '-'}</Text>
           </View>
         </View>
       </ScrollView>

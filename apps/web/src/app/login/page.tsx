@@ -24,7 +24,7 @@ function LoginForm() {
     // (expired code, provider not configured, network drop) — this is as
     // specific as an honest client-side message can be without guessing.
     authError === 'auth_failed'
-      ? "We couldn't complete that sign-in. The link may have expired — try again."
+      ? "We couldn't complete that sign-in. The link may have expired - try again."
       : null,
   )
   const [success, setSuccess] = useState<string | null>(null)
@@ -178,7 +178,7 @@ function LoginForm() {
         <p style={styles.subheading}>
           {mode === 'signin'
             ? 'Speak it. Spend clearly.'
-            : 'Start tracking by speaking — no bank linking.'}
+            : 'Start tracking by speaking - no bank linking.'}
         </p>
 
         {error && <div style={styles.errorBox}>{error}</div>}

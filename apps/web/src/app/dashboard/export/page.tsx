@@ -302,7 +302,7 @@ export default function ExportPage() {
             Export transactions
           </div>
           <div style={{ fontSize: 13, color: colors.ink3, marginTop: 2 }}>
-            Choose a date range and a format. Files stay local — Murmur never uploads exports.
+            Choose a date range and a format. Files stay local. Murmur never uploads exports.
           </div>
         </div>
 
@@ -351,7 +351,7 @@ export default function ExportPage() {
               </div>
               {pendingCount > 0 && (
                 <div style={styles.pendingNote}>
-                  {pendingCount} transaction{pendingCount === 1 ? '' : 's'} awaiting currency conversion —
+                  {pendingCount} transaction{pendingCount === 1 ? '' : 's'} awaiting currency conversion -
                   excluded from the totals above until the exchange rate lands.
                 </div>
               )}

@@ -308,7 +308,7 @@ class SyncManager {
     this.drainQueue()
     for (;;) {
       const entry = await getLatestEntryForEntity(entityId)
-      if (!entry) return { status: 'synced', error: null } // no queue entry left for this id — it drained
+      if (!entry) return { status: 'synced', error: null } // no queue entry left for this id - it drained
       if (entry.status === 'dead') return { status: 'rejected', error: entry.last_error }
       if (Date.now() >= deadline) return { status: 'queued', error: null }
       await new Promise((resolve) => setTimeout(resolve, 150))

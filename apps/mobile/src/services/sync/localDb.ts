@@ -283,7 +283,7 @@ async function initSchema(db: SchemaDb): Promise<void> {
 
     -- Persisted key/value cursor store. A per-hook React ref cannot be a
     -- sync cursor when eleven hook instances exist (fix-plan 1.6 point 5)
-    -- — each entity's pull high-water mark lives here instead.
+    -- - each entity's pull high-water mark lives here instead.
     CREATE TABLE IF NOT EXISTS sync_meta (
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL

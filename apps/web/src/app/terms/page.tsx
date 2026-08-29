@@ -15,8 +15,8 @@ export default function TermsPage() {
   return (
     <LegalPage title="Terms of Use" updated="August 16, 2026">
       <p>
-        These terms govern your use of Murmur — the iPhone app, the desktop app and the web
-        dashboard (the &quot;Service&quot;) — provided by the developer named on Murmur&apos;s App
+        These terms govern your use of Murmur, the iPhone app, the desktop app and the web
+        dashboard (the &quot;Service&quot;), provided by the developer named on Murmur&apos;s App
         Store listing (&quot;Murmur&quot;, &quot;we&quot;, &quot;us&quot;). By creating an account
         or using the Service you agree to them. If you don&apos;t agree, please don&apos;t use
         Murmur.
@@ -24,8 +24,8 @@ export default function TermsPage() {
 
       <h2>1. What Murmur is</h2>
       <p>
-        Murmur is a personal expense tracker. You record your own spending and income — by voice, by
-        scanning a receipt or by typing — and Murmur organises, forecasts and reports on it. Murmur
+        Murmur is a personal expense tracker. You record your own spending and income, by voice, by
+        scanning a receipt or by typing, and Murmur organises, forecasts and reports on it. Murmur
         does not connect to banks or cards, does not move money, and is not a financial institution.
       </p>
 
@@ -46,8 +46,8 @@ export default function TermsPage() {
 
       <h2>4. Murmur Plus subscription</h2>
       <p>
-        Some features — Ask Murmur, automatic recurring detection, export, and the desktop and web
-        dashboard — are part of <strong>Murmur Plus</strong>, an auto-renewable subscription
+        Some features. Ask Murmur, automatic recurring detection, export, and the desktop and web
+        dashboard, are part of <strong>Murmur Plus</strong>, an auto-renewable subscription
         purchased through the App Store on iPhone. Your account then unlocks Plus on every platform
         you sign in to.
       </p>
@@ -103,7 +103,7 @@ export default function TermsPage() {
       <p>
         You own what you record. Our <a href="/privacy">Privacy Policy</a> explains what we collect
         and how it is handled. You can export or permanently delete your data from Settings at any
-        time. If you delete your account, your data is gone — including any active Plus benefits
+        time. If you delete your account, your data is gone, including any active Plus benefits
         tied to it.
       </p>
 
@@ -127,7 +127,7 @@ export default function TermsPage() {
       <p>
         We work hard to keep Murmur available, but it is provided &quot;as is&quot; and &quot;as
         available&quot;. We may change, add or remove features, and we may discontinue the Service
-        with reasonable notice — in which case you will be able to export your data first.
+        with reasonable notice, in which case you will be able to export your data first.
       </p>
 
       <h2>9. Disclaimers and limitation of liability</h2>
@@ -152,7 +152,7 @@ export default function TermsPage() {
       <p>
         These terms are governed by the laws of the jurisdiction in which the developer is
         established, without regard to conflict-of-law rules, and disputes will be brought in the
-        courts there — except that consumers keep any non-waivable protections and forum rights of
+        courts there, except that consumers keep any non-waivable protections and forum rights of
         the country in which they live.
       </p>
 

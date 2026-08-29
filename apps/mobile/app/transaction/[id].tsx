@@ -331,7 +331,7 @@ export default function TransactionDetailScreen() {
 
           {/* Transcript card — sage-tinted, non-interactive. Fix-plan 3.1:
                this used to show a play-triangle glyph, which reads as "tap
-               to hear the recording" — we don't store audio, so that icon
+               to hear the recording" - we don't store audio, so that icon
                promised playback the code has never been able to do. The
                mic glyph below says only what's true: this text came from a
                voice note. If 24h local-audio retention ships, real

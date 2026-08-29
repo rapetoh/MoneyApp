@@ -70,9 +70,9 @@ describe('categoryLabel', () => {
     expect(categoryLabel({ category: 'Shopping', direction: 'debit' })).toBe('Shopping')
     expect(categoryLabel({ category: 'Salary', direction: 'credit' })).toBe('Salary')
   })
-  it('reads "Income" for an uncategorised credit and an em dash for an uncategorised debit', () => {
+  it('reads "Income" for an uncategorised credit and a dash for an uncategorised debit', () => {
     expect(categoryLabel({ category: '', direction: 'credit' })).toBe('Income')
-    expect(categoryLabel({ category: '', direction: 'debit' })).toBe('—')
+    expect(categoryLabel({ category: '', direction: 'debit' })).toBe('-')
   })
 })
 

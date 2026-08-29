@@ -58,7 +58,7 @@ export interface MutationResult {
 export async function deleteTransactionAndEnqueue(userId: string, id: string): Promise<MutationResult> {
   await softDeleteTransaction(id)
   const deleted = await getTransactionById(id)
-  if (!deleted) return { id, status: 'synced', error: null } // nothing to delete — id never existed locally
+  if (!deleted) return { id, status: 'synced', error: null } // nothing to delete - id never existed locally
 
   await enqueue(
     'delete',
@@ -160,7 +160,7 @@ export function useTransactions(userId: string | undefined) {
       return {
         id: null,
         status: 'rejected',
-        error: writeErrors.map((e) => `${e.field} — ${e.message}`).join('; '),
+        error: writeErrors.map((e) => `${e.field} - ${e.message}`).join('; '),
       }
     }
 

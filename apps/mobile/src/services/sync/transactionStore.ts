@@ -130,11 +130,11 @@ export async function upsertTransaction(txn: Transaction): Promise<void> {
     -- the exclusion comment (fix-plan 1.6 point 6 / audit 06-F16). Columns
     -- deliberately left out of SET:
     --   id             — the conflict target itself, never rewritten.
-    --   user_id        — a row's owner cannot change via upsert.
+    --   user_id        - a row's owner cannot change via upsert.
     --   currency_code  — was missing from this SET list entirely (06-F16):
     --                    a synced echo of a row whose currency changed
     --                    silently kept the stale code. Included below now.
-    --   raw_transcript — local-only (the Privacy screen's "voice not
+    --   raw_transcript - local-only (the Privacy screen's "voice not
     --                    stored" promise); a synced-back server row must
     --                    never overwrite the on-device transcript with the
     --                    NULL the server always holds for this column.

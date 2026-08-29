@@ -149,7 +149,7 @@ export async function loadPlusOffers(): Promise<PlusOffers> {
 export type PurchaseOutcome =
   | { kind: 'purchased' }
   | { kind: 'cancelled' }
-  | { kind: 'pending' } // Ask-to-Buy / deferred — Apple will finish it later
+  | { kind: 'pending' } // Ask-to-Buy / deferred - Apple will finish it later
   | { kind: 'error'; message: string }
 
 /** Ask the server to re-read RevenueCat and write `profiles.plus_*` for

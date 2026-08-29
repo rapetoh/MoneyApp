@@ -16,7 +16,7 @@ const rawSupabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY
 // "Invalid URL" thrown from deep inside supabase-js.
 function requireEnv(name: string, value: string | undefined): string {
   if (!value) {
-    throw new Error(`${name} is not set — this build profile is missing its env (see apps/mobile/eas.json)`)
+    throw new Error(`${name} is not set - this build profile is missing its env (see apps/mobile/eas.json)`)
   }
   return value
 }

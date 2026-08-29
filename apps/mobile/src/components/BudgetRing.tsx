@@ -31,7 +31,7 @@ export function BudgetRing({ spent, limit, size = 110, locale = 'en' }: Props) {
   const arcColor = over
     ? Colors.destructive ?? '#A94646'
     : pct > 0.92
-    ? '#C08A3A' // tight-amber — matches the BudgetRow "Tight" chip
+    ? '#C08A3A' // tight-amber - matches the BudgetRow "Tight" chip
     : Colors.accent ?? Colors.primary
 
   // Stroke math — the arc is drawn on a centered circle whose radius accounts

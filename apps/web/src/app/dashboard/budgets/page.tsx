@@ -252,7 +252,7 @@ export default function BudgetsPage() {
     return budgets
       .filter((b) => b.category_id !== null)
       .map((b) => {
-        const cName = b.category_id ? catMap[b.category_id]?.name ?? '—' : '—'
+        const cName = b.category_id ? catMap[b.category_id]?.name ?? '-' : '-'
         // categories.color, not a name-regex guess (fix-plan 4.4) — this
         // is the same hex the category's own row/chip renders elsewhere,
         // so the budget bar can never disagree with it.

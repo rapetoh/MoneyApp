@@ -331,7 +331,7 @@ export default function SettingsPage() {
       // forever with the button reading "Saving…" and no way out
       // (fix-plan 2.13 / audit 08-F21 family).
       setSaving(false)
-      setSaveError('Your session expired — sign in again.')
+      setSaveError('Your session expired, sign in again.')
       return
     }
     // Parse the income input. Strip thousands separators + currency
@@ -385,7 +385,7 @@ export default function SettingsPage() {
   async function handleCurrencyChange(newCode: string) {
     if (newCode === currency) return
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
-      setCurrencyError("You're offline — reconnect to change currency.")
+      setCurrencyError("You're offline, reconnect to change currency.")
       return
     }
     const confirmed = window.confirm(
@@ -404,7 +404,7 @@ export default function SettingsPage() {
 
     if (!result.ok) {
       setCurrencyError(
-        result.error === 'offline' ? "You're offline — reconnect to change currency." : result.error,
+        result.error === 'offline' ? "You're offline, reconnect to change currency." : result.error,
       )
       return
     }
@@ -426,7 +426,7 @@ export default function SettingsPage() {
   const { isPlus } = usePlus()
   const plan = describePlus(profile)
   const fmtPlanDate = (iso: string | null) =>
-    iso ? new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '—'
+    iso ? new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '-'
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -520,7 +520,7 @@ export default function SettingsPage() {
                   <div style={{ ...styles.field, flex: 1 }}>
                     <label style={styles.label}>Currency</label>
                     {/* Changing this fires its own confirm/migrate flow
-                        immediately (fix-plan 2.7) — it is not part of
+                        immediately (fix-plan 2.7), it is not part of
                         "Save changes" below, because a currency change
                         is a data migration, never a silent relabel. */}
                     <select
@@ -549,7 +549,7 @@ export default function SettingsPage() {
                   </div>
                   {/* Fix-plan 3.6 / audit 07-F17: `packages/shared/src/i18n`
                       ships four complete locales, but no web page imports
-                      `t()` — this picker used to change `profiles.locale`
+                      `t()`, this picker used to change `profiles.locale`
                       while every string on every dashboard page stayed
                       English regardless. A picker that only half-works is
                       worse than an honest read-only row: translating the
@@ -602,13 +602,13 @@ export default function SettingsPage() {
             >
               {/* Fix-plan 3.7: real `devices` rows, populated by mobile's
                   `deviceRegistry.ts` on sign-in and stamped with
-                  `last_synced_at` on every successful drain — replacing the
+                  `last_synced_at` on every successful drain, replacing the
                   single hardcoded "This device · Synced just now · web
                   companion" row that rendered unconditionally, including
                   offline and including on an account that had never opened
                   the mobile app at all. Web/desktop don't register a device
                   of their own (no offline outbox to report sync state
-                  for), so an empty list here is itself true information —
+                  for), so an empty list here is itself true information -
                   a fabricated row would be worse than none. */}
               {devices.length === 0 ? (
                 <SettingRow
@@ -683,13 +683,13 @@ export default function SettingsPage() {
                 }
                 sub={
                   plan.kind === 'trial'
-                    ? `Trial ends ${fmtPlanDate(plan.endsAt)}${plan.willRenew ? ', then your plan starts' : ' — auto-renew is off'}`
+                    ? `Trial ends ${fmtPlanDate(plan.endsAt)}${plan.willRenew ? ', then your plan starts' : ', auto-renew is off'}`
                     : plan.kind === 'active'
                       ? plan.storeBacked
                         ? plan.endsAt
                           ? `${plan.willRenew ? 'Renews' : 'Ends'} ${fmtPlanDate(plan.endsAt)}`
                           : 'Active'
-                        : 'Early access — subscribe in the Murmur app on your iPhone to keep Plus.'
+                        : 'Early access, subscribe in the Murmur app on your iPhone to keep Plus.'
                       : plan.kind === 'lapsed'
                         ? `Plus ended ${fmtPlanDate(plan.endedAt)}`
                         : 'Ask Murmur, recurring detection, export and this desktop app are part of Murmur Plus.'
@@ -739,7 +739,7 @@ export default function SettingsPage() {
               {/* Fix-plan 3.5 / audit 06-F39: this used to be a live toggle
                   writing `profiles.analytics_opt_in` / `crash_reports_opt_in`
                   while mobile's own Privacy screen told the user analytics
-                  are shared "Never" — and nothing anywhere reads either
+                  are shared "Never", and nothing anywhere reads either
                   column, so the toggle changed a value with no effect. One
                   product decision (no analytics, no crash reporting
                   collected today), mirrored on both platforms, instead of a
@@ -748,7 +748,7 @@ export default function SettingsPage() {
               <SettingRow label="Crash reporting" sub="Not collected." />
               {/* GDPR-grade controls, mirrored to mobile Privacy.
                   Export-all is free for every user (right to data
-                  portability — can't be paywalled). Delete-all calls
+                  portability, can't be paywalled). Delete-all calls
                   the `delete-user` Edge Function which scrubs every
                   table the user touches and removes their auth user. */}
               <SettingRow
@@ -783,14 +783,14 @@ export default function SettingsPage() {
               {/* Fix-plan 3.5 / audit 02-F4, 02-F16: speech-to-text runs on
                   the phone (true), but the resulting text is sent to our
                   server and to OpenAI to extract the amount, merchant and
-                  category — an "ON-DEVICE" tag on this row claimed the
+                  category, an "ON-DEVICE" tag on this row claimed the
                   whole pipeline never leaves the device. */}
               <SettingRow
                 label="Voice engine"
                 sub="On-device speech-to-text (mobile) · OpenAI for extraction"
               />
               {/* Fix-plan 3.7: `profiles.voice_language` (e.g. "en-US") is
-                  the column mobile's speech recognizer actually reads —
+                  the column mobile's speech recognizer actually reads -
                   `locale` (the UI/display-string language, e.g. "en") is a
                   different setting that happens to default from the same
                   value. Reading the UI locale here could show "FR" while
@@ -811,7 +811,7 @@ export default function SettingsPage() {
               refCb={(el) => (sectionRefs.current.export = el)}
             >
               {/* Same label mobile's Settings row uses for this feature
-                  (audit 08-F44) — distinct from the Privacy card's "Export
+                  (audit 08-F44), distinct from the Privacy card's "Export
                   all my data" above, which is a different, free, complete
                   JSON backup rather than this formatted CSV/JSON/PDF
                   transaction report. */}
@@ -840,7 +840,7 @@ export default function SettingsPage() {
                 }
               />
               {/* Fix-plan 3.6 / audit 08-F33: `support@murmur.app` has no MX
-                  record — every message sent to it bounced. Hidden while
+                  record, every message sent to it bounced. Hidden while
                   `SUPPORT_EMAIL` is unset (see its doc comment in
                   packages/shared/src/brand.ts) rather than offering a
                   channel that silently drops what's sent to it. */}

@@ -27,7 +27,7 @@ export default function PrivacyPage() {
             crash trackers today.
           </li>
           <li>
-            You can export or permanently delete everything, yourself, from Settings — no email
+            You can export or permanently delete everything, yourself, from Settings, no email
             required.
           </li>
         </ul>
@@ -51,7 +51,7 @@ export default function PrivacyPage() {
       <h3>What you record</h3>
       <p>
         The expenses and income you enter: amount, currency, merchant, category, date, payment
-        method, an optional note, and — for recurring items — the rule that generates them. Budgets
+        method, an optional note, and, for recurring items, the rule that generates them. Budgets
         and your monthly income if you set them. Preferences such as language, currency and time
         zone.
       </p>
@@ -64,7 +64,7 @@ export default function PrivacyPage() {
       <h3>Receipts and paychecks you scan</h3>
       <p>
         If you photograph a receipt or a paycheck, the image is sent to our AI provider to extract
-        the amounts and merchant, then discarded by us — we store the extracted transaction, not the
+        the amounts and merchant, then discarded by us, we store the extracted transaction, not the
         image.
       </p>
       <h3>Ask Murmur</h3>
@@ -80,7 +80,7 @@ export default function PrivacyPage() {
       </p>
       <h3>Subscription</h3>
       <p>
-        If you subscribe to Murmur Plus, Apple processes the payment — we never see your card
+        If you subscribe to Murmur Plus, Apple processes the payment, we never see your card
         details. We receive a confirmation of your subscription status (plan, renewal date, trial
         state) so we can unlock Plus on all your devices.
       </p>
@@ -124,7 +124,7 @@ export default function PrivacyPage() {
             <td>Interpreting spoken entries, reading receipts, answering Ask Murmur</td>
             <td>
               The text of what you said, scanned images, and the question plus transaction summary
-              you ask about — never your name or email
+              you ask about, never your name or email
             </td>
           </tr>
           <tr>
@@ -150,7 +150,7 @@ export default function PrivacyPage() {
           <tr>
             <td>Frankfurter (ECB rates)</td>
             <td>Currency conversion for entries in another currency</td>
-            <td>Currency pair and date only — nothing about you</td>
+            <td>Currency pair and date only, nothing about you</td>
           </tr>
         </tbody>
       </table>

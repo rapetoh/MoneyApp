@@ -207,7 +207,7 @@ export default function EditTransactionScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
       {/* `marginBottom: lift` shrinks this column by the keyboard's real
-          overlap (see `useKeyboardLift` above) — same effect as KAV's
+          overlap (see `useKeyboardLift` above) - same effect as KAV's
           'padding' behavior (the ScrollView gives way, the footer stays
           pinned to the new, higher bottom edge) but driven from a
           measured window position instead of RN's parent-relative one. */}

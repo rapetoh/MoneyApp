@@ -111,7 +111,7 @@ export interface IncompleteCaptureNotice {
   merchant: string
   capturedAt: string
   title: string // "Captured from Apple Pay"
-  body: string // "Maverik — couldn't read the amount · Tap to add it"
+  body: string // "Maverik - couldn't read the amount · Tap to add it"
 }
 
 /** Pay-at-pump case (Aug 24 2026): the automation delivered no amount.

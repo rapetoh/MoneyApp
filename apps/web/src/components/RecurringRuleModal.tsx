@@ -164,7 +164,7 @@ export function RecurringRuleModal({
     if (ok) {
       onClose()
     } else {
-      setFormError("Couldn't save this rule — try again.")
+      setFormError("Couldn't save this rule - try again.")
     }
   }
 

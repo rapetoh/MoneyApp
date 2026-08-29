@@ -137,7 +137,7 @@ export default function IncomeScreen() {
           except the Max sizes, pushing Continue off-screen with no way to
           reach it, and the un-dismissable decimal-pad keyboard made it
           worse. Shape copied from `(auth)/sign-in.tsx`, which F37 calls
-          out as already correct — its `SafeAreaView` is the screen root,
+          out as already correct - its `SafeAreaView` is the screen root,
           so the KAV's `onLayout` frame is exactly the top inset and RN's
           own parent-relative lift math is correct here (unlike the sheets
           F37 documents, which need the `measureInWindow` fix instead). */}

@@ -129,7 +129,7 @@ export default function BudgetsScreen() {
           const used = (st?.spent ?? 0) + (st?.committed ?? 0)
           return {
             budget: b,
-            name: cat?.name ?? '—',
+            name: cat?.name ?? '-',
             color: cat?.color ?? merchantColor(cat?.name ?? '?'),
             used,
             pct: b.amount > 0 ? used / b.amount : 0,

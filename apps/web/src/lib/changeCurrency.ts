@@ -73,5 +73,5 @@ export async function changeCurrency(
     if (result.done) return { ok: true }
   }
 
-  return { ok: false, error: 'Currency change did not finish — please try again' }
+  return { ok: false, error: 'Currency change did not finish - please try again' }
 }

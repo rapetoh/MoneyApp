@@ -12,13 +12,13 @@ export const Colors = {
   surface2: '#F5F2EB', // recessed surfaces, bar tracks
 
   // Ink / text
-  ink: '#1B1915', // near-black, warm — primary text
+  ink: '#1B1915', // near-black, warm - primary text
   ink2: '#3A3630', // body
   ink3: '#6C675E', // secondary
   ink4: '#9C9589', // tertiary / hints
 
   // Accent (deep sage)
-  primary: '#3F5A3E', // semantic alias for accent — drives buttons, active tabs, FAB
+  primary: '#3F5A3E', // semantic alias for accent - drives buttons, active tabs, FAB
   primaryLight: '#E8EDE3',
   accent: '#3F5A3E',
   accentSoft: '#E8EDE3',

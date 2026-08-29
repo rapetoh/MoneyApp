@@ -138,7 +138,7 @@ export default function SettingsScreen() {
           day: 'numeric',
           year: 'numeric',
         })
-      : '—'
+      : '-'
   const planName = (p: 'monthly' | 'yearly' | null) =>
     p === 'yearly'
       ? t('paywall.plan_yearly', locale)
@@ -300,7 +300,7 @@ export default function SettingsScreen() {
   // instead of a currency glyph and ignored the user's own locale.
   const budgetDisplay = budget
     ? `${formatMoney(budget.amount, currency, locale)} / ${periodLabel}`
-    : '—'
+    : '-'
 
   // Income row detail: "$7,000 · Microsoft" or "$7,000" if no source, or "—"
   // if the user skipped income entry during onboarding. Same shared-
@@ -315,10 +315,10 @@ export default function SettingsScreen() {
     ? profile?.monthly_income_source
       ? `${incomeAmountFmt} · ${profile.monthly_income_source}`
       : incomeAmountFmt
-    : '—'
+    : '-'
 
   const txnCount = transactions.filter((x) => !x.is_deleted).length
-  const displayName = profile?.display_name ?? user?.email?.split('@')[0] ?? '—'
+  const displayName = profile?.display_name ?? user?.email?.split('@')[0] ?? '-'
   const initial = (profile?.display_name ?? user?.email ?? '?').charAt(0).toUpperCase()
 
   async function handleSignOut() {
@@ -420,14 +420,14 @@ export default function SettingsScreen() {
     <SafeAreaView style={styles.safe} edges={['bottom', 'left', 'right']}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {/* Profile card — matches S_Settings avatar + plan pill. The plan
-            line and pill are branched on `isPlus` (fix-plan 3.1) — both
+            line and pill are branched on `isPlus` (fix-plan 3.1) - both
             used to be unconditional strings ("Free plan" / "Upgrade")
             regardless of the account's actual entitlement, and the pill
             always said "Upgrade" even though there is no purchase flow
             to upgrade through yet. A Plus account now sees its real plan
             name and no pill (there is nothing to press); a free account
-            sees "Free plan" — true today, since entitlement reads
-            `profiles.plus_status` alone — and a pill labelled "Plus"
+            sees "Free plan" - true today, since entitlement reads
+            `profiles.plus_status` alone - and a pill labelled "Plus"
             that opens the honest preview screen, not an "Upgrade" button
             that cannot act. */}
         <View style={styles.profileWrap}>
@@ -478,10 +478,10 @@ export default function SettingsScreen() {
 
         {/* Account */}
         <SetGroup label={t('settings.account', locale)}>
-          <SetRow label={t('auth.email', locale)} detail={user?.email ?? '—'} chevron={false} />
+          <SetRow label={t('auth.email', locale)} detail={user?.email ?? '-'} chevron={false} />
           <SetRow
             label={t('settings.display_name', locale)}
-            detail={profile?.display_name ?? '—'}
+            detail={profile?.display_name ?? '-'}
             onPress={() => {
               setNameInput(profile?.display_name ?? '')
               setNameModal(true)
@@ -647,7 +647,7 @@ export default function SettingsScreen() {
           <SetRow label={t('more.help', locale)} onPress={() => router.push('/more/help')} />
           <SetRow
             label={t('settings.version', locale)}
-            detail={Constants.expoConfig?.version ?? '—'}
+            detail={Constants.expoConfig?.version ?? '-'}
             chevron={false}
             last
           />

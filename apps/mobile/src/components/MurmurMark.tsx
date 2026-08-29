@@ -23,15 +23,15 @@ import Svg, { Path, Circle, Defs, RadialGradient, Stop } from 'react-native-svg'
  */
 
 export type MurmurVariant =
-  | 'cream' // default — gradient coin on cream background, cream waves
-  | 'sage' // brand — cream coin on sage background, sage waves
-  | 'ink' // dark mode — cream coin on ink background, ink waves
-  | 'tinted' // iOS 18 tinted — silhouette only, no waves
+  | 'cream' // default - gradient coin on cream background, cream waves
+  | 'sage' // brand - cream coin on sage background, sage waves
+  | 'ink' // dark mode - cream coin on ink background, ink waves
+  | 'tinted' // iOS 18 tinted - silhouette only, no waves
   | 'cream-accent' // cream tile, ink coin, sage waves (accent)
   | 'stone' // sage coin on stone background
   | 'outline' // outlined coin, ink stroke + primary wave only
-  | 'mono-ink' // solid ink coin silhouette — for ≤16px / favicon territory
-  | 'mono-cream' // solid cream coin silhouette — for use on dark backgrounds
+  | 'mono-ink' // solid ink coin silhouette - for ≤16px / favicon territory
+  | 'mono-cream' // solid cream coin silhouette - for use on dark backgrounds
 
 interface MurmurMarkProps {
   size?: number
@@ -47,7 +47,7 @@ interface MurmurMarkProps {
 // trivial and works everywhere without extra deps.
 
 interface PaletteResolved {
-  bg: string | null // null = no fill (transparent — caller's wrapper provides bg)
+  bg: string | null // null = no fill (transparent - caller's wrapper provides bg)
   /** Coin fill. 'gradient' renders the hero radial gradient. */
   coin: string
   /** Wave stroke color. Null = no waves (silhouette-only variants). */

@@ -60,7 +60,7 @@ const FREQ_SHORT_KEY: Record<RecurringFrequency, string> = {
 function formatNextDue(rule: RecurringRule, locale: Locale): string {
   if (isRuleOverdue(rule)) return t('recurring.overdue', locale)
   const next = computeNextOccurrence(rule)
-  if (!next) return '—'
+  if (!next) return '-'
   return next.toLocaleDateString(locale, { month: 'short', day: 'numeric' })
 }
 
@@ -289,7 +289,7 @@ export default function RecurringScreen() {
               <Text style={styles.emptyTitle}>{t('recurring.empty', locale)}</Text>
               <Text style={styles.emptySub}>{t('recurring.empty_sub', locale)}</Text>
               {/* The one action every user can reach regardless of plan
-                  (fix-plan 3.3 — "never name a control that is rendered
+                  (fix-plan 3.3 - "never name a control that is rendered
                   disabled": unlike the detected-patterns banner, which is
                   Plus-gated, this button always works). */}
               <Pressable

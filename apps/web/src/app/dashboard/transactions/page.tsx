@@ -795,7 +795,7 @@ export default function TransactionsPage() {
                       ) : isIncome ? (
                         <span style={styles.incomeChip}>INCOME</span>
                       ) : (
-                        <span style={{ fontSize: 11, color: colors.ink4 }}>—</span>
+                        <span style={{ fontSize: 11, color: colors.ink4 }}>-</span>
                       )}
                     </div>
                     <div>
