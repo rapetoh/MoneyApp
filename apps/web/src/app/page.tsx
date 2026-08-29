@@ -166,89 +166,81 @@ export default async function RootPage() {
                 </div>
               </div>
             </div>
-            <div aria-hidden className="lp-hero-branch">
-              <svg viewBox="0 0 250 210" width="250" height="210">
-                <g fill="none" stroke="#3F5A3E" strokeWidth="1.5" opacity="0.4">
-                  <path d="M250 105 C 200 105, 195 40, 148 36" />
-                  <path d="M250 105 C 200 105, 195 168, 148 164" />
-                </g>
-                <g>
-                  <rect
-                    x="12"
-                    y="14"
-                    width="136"
-                    height="44"
-                    rx="14"
-                    fill="#FFFFFF"
-                    stroke="rgba(40,36,28,0.1)"
-                  />
-                  <circle cx="32" cy="36" r="5" fill="#FF6B35" />
-                  <text x="45" y="32" fontSize="11.5" fontWeight="700" fill="#1B1915">
-                    Food &amp; Dining
-                  </text>
-                  <text x="45" y="48" fontSize="11" fill="#6C675E">
-                    $412 this month
-                  </text>
-                </g>
-                <g>
-                  <rect
-                    x="26"
-                    y="142"
-                    width="122"
-                    height="44"
-                    rx="14"
-                    fill="#FFFFFF"
-                    stroke="rgba(40,36,28,0.08)"
-                  />
-                  <image href={logo('starbucks.com')} x="38" y="154" width="20" height="20" />
-                  <text x="66" y="162" fontSize="11" fontWeight="600" fill="#1B1915">
-                    Starbucks
-                  </text>
-                  <text x="66" y="176" fontSize="10.5" fill="#6C675E" fontFamily="Georgia, serif">
-                    $86 · 11 visits
-                  </text>
-                </g>
-              </svg>
-            </div>
-            <div className="lp-phone">
-              <div className="lp-phone-notch" />
-              <div className="lp-phone-head">
-                <div className="lp-phone-month">AUGUST</div>
-                <div className="lp-phone-today">Today</div>
+            <div className="lp-phone-wrap">
+              <div aria-hidden className="lp-branch-curves">
+                <svg viewBox="0 0 190 290" width="190" height="290">
+                  <g fill="none" stroke="#3F5A3E" strokeWidth="1.5" opacity="0.4">
+                    <path d="M150 148 C 110 148, 140 52, 118 50" />
+                    <path d="M150 148 C 110 148, 140 244, 118 246" />
+                  </g>
+                </svg>
               </div>
-              <div className="lp-spent">
-                <div className="lp-spent-label">Spent today</div>
-                <div className="lp-spent-amt">
-                  <span className="lp-spent-cur">$</span>85<span className="lp-spent-dec">.08</span>
+              <div aria-hidden className="lp-branch-node lp-branch-root">
+                <div className="lp-branch-root-month">August</div>
+                <div className="lp-branch-root-amt">$1,284</div>
+              </div>
+              <div aria-hidden className="lp-branch-node lp-branch-leaf lp-branch-leaf1">
+                <span className="lp-branch-dot" style={{ background: '#FF6B35' }} />
+                <div>
+                  <div className="lp-branch-name">Food &amp; Dining</div>
+                  <div className="lp-branch-sub">$412 this month</div>
                 </div>
               </div>
-              <div className="lp-rows">
-                {HERO_ROWS.map((r) => (
-                  <div key={r.d} className="lp-row">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={logo(r.d)} alt="" width={34} height={34} className="lp-row-logo" />
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div className="lp-row-name">{r.name}</div>
-                      <span className="lp-chip" style={{ background: r.tint, color: r.fg }}>
-                        {r.cat}
-                      </span>
-                    </div>
-                    <div className="lp-row-amt">{r.amt}</div>
-                  </div>
-                ))}
+              <div aria-hidden className="lp-branch-node lp-branch-leaf lp-branch-leaf2">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={logo('starbucks.com')}
+                  alt=""
+                  width={20}
+                  height={20}
+                  style={{ borderRadius: 6 }}
+                />
+                <div>
+                  <div className="lp-branch-name">Starbucks</div>
+                  <div className="lp-branch-sub">$86 · 11 visits</div>
+                </div>
               </div>
-              <div className="lp-mic">
-                <span className="lp-mic-ring" />
-                <span className="lp-mic-ring lp-mic-ring2" />
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
-                  <rect x="9" y="3" width="6" height="11" rx="3" fill="#FBFAF7" />
-                  <path
-                    d="M5 11a7 7 0 0 0 14 0M12 18v3"
-                    stroke="#FBFAF7"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                  />
-                </svg>
+              <div className="lp-phone">
+                <div className="lp-phone-notch" />
+                <div className="lp-phone-head">
+                  <div className="lp-phone-month">AUGUST</div>
+                  <div className="lp-phone-today">Today</div>
+                </div>
+                <div className="lp-spent">
+                  <div className="lp-spent-label">Spent today</div>
+                  <div className="lp-spent-amt">
+                    <span className="lp-spent-cur">$</span>85
+                    <span className="lp-spent-dec">.08</span>
+                  </div>
+                </div>
+                <div className="lp-rows">
+                  {HERO_ROWS.map((r) => (
+                    <div key={r.d} className="lp-row">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={logo(r.d)} alt="" width={34} height={34} className="lp-row-logo" />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div className="lp-row-name">{r.name}</div>
+                        <span className="lp-chip" style={{ background: r.tint, color: r.fg }}>
+                          {r.cat}
+                        </span>
+                      </div>
+                      <div className="lp-row-amt">{r.amt}</div>
+                    </div>
+                  ))}
+                </div>
+                <div className="lp-mic">
+                  <span className="lp-mic-ring" />
+                  <span className="lp-mic-ring lp-mic-ring2" />
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
+                    <rect x="9" y="3" width="6" height="11" rx="3" fill="#FBFAF7" />
+                    <path
+                      d="M5 11a7 7 0 0 0 14 0M12 18v3"
+                      stroke="#FBFAF7"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                </div>
               </div>
             </div>
           </div>
@@ -584,7 +576,19 @@ export default async function RootPage() {
         .lp-trust { margin-top: 26px; font-size: 12.5px; color: #9C9589; letter-spacing: 0.2px; }
 
         .lp-phone-stage { position: relative; display: flex; justify-content: center; }
-        .lp-phone { position: relative; width: 320px; background: #FFFFFF; border: 1px solid rgba(40,36,28,0.1); border-radius: 44px; padding: 22px 18px 30px; box-shadow: 0 40px 90px rgba(27,25,21,0.16), 0 6px 18px rgba(27,25,21,0.06); }
+        .lp-phone-wrap { position: relative; }
+        .lp-branch-curves { position: absolute; left: -168px; top: 96px; z-index: 1; animation: lp-float 7s ease-in-out infinite; animation-delay: 1.6s; }
+        .lp-branch-node { position: absolute; z-index: 3; background: #FFFFFF; border: 0.5px solid rgba(40,36,28,0.1); border-radius: 14px; box-shadow: 0 12px 30px rgba(27,25,21,0.1); animation: lp-float 7s ease-in-out infinite; animation-delay: 1.6s; }
+        .lp-branch-root { left: -52px; top: 222px; background: #1B1915; border-color: #1B1915; padding: 9px 14px; }
+        .lp-branch-root-month { font-family: ${font.serif}; font-size: 15px; color: #FBFAF7; }
+        .lp-branch-root-amt { font-size: 10.5px; font-weight: 700; color: #9DBB9C; margin-top: 1px; }
+        .lp-branch-leaf { display: flex; align-items: center; gap: 9px; padding: 9px 12px; }
+        .lp-branch-leaf1 { left: -168px; top: 118px; }
+        .lp-branch-leaf2 { left: -168px; top: 314px; }
+        .lp-branch-dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+        .lp-branch-name { font-size: 11.5px; font-weight: 700; color: #1B1915; white-space: nowrap; }
+        .lp-branch-sub { font-size: 10.5px; color: #6C675E; white-space: nowrap; margin-top: 1px; }
+        .lp-phone { position: relative; z-index: 2; width: 320px; background: #FFFFFF; border: 1px solid rgba(40,36,28,0.1); border-radius: 44px; padding: 22px 18px 30px; box-shadow: 0 40px 90px rgba(27,25,21,0.16), 0 6px 18px rgba(27,25,21,0.06); }
         .lp-phone-notch { width: 110px; height: 24px; background: #1B1915; border-radius: 999px; margin: 0 auto 16px; }
         .lp-phone-month { font-size: 10px; font-weight: 700; letter-spacing: 1.6px; color: #9C9589; }
         .lp-phone-today { font-family: ${font.serif}; font-size: 30px; font-weight: 500; letter-spacing: -0.5px; margin-top: 2px; }
@@ -603,9 +607,7 @@ export default async function RootPage() {
         .lp-mic { position: absolute; left: 50%; transform: translateX(-50%); bottom: -26px; width: 58px; height: 58px; border-radius: 50%; background: #1B1915; display: flex; align-items: center; justify-content: center; box-shadow: 0 14px 30px rgba(27,25,21,0.35); }
         .lp-mic-ring { position: absolute; inset: 0; border-radius: 50%; border: 2px solid rgba(63,90,62,0.5); animation: lp-pulse 2.4s ease-out infinite; }
         .lp-mic-ring2 { animation-delay: 1.2s; }
-        .lp-hero-branch { position: absolute; left: calc(50% - 395px); top: 150px; z-index: 1; animation: lp-float 7s ease-in-out infinite; animation-delay: 1.6s; filter: drop-shadow(0 14px 30px rgba(27,25,21,0.08)); }
-        .lp-phone { z-index: 2; }
-        .lp-notif { position: absolute; top: -18px; right: -8px; z-index: 2; display: flex; gap: 10px; align-items: center; background: rgba(255,255,255,0.94); backdrop-filter: blur(8px); border: 0.5px solid rgba(40,36,28,0.1); border-radius: 18px; padding: 12px 16px; box-shadow: 0 18px 44px rgba(27,25,21,0.14); max-width: 300px; }
+        .lp-notif { position: absolute; top: -34px; right: -26px; z-index: 4; display: flex; gap: 10px; align-items: center; background: rgba(255,255,255,0.94); backdrop-filter: blur(8px); border: 0.5px solid rgba(40,36,28,0.1); border-radius: 18px; padding: 12px 16px; box-shadow: 0 18px 44px rgba(27,25,21,0.14); max-width: 300px; }
         .lp-notif-title { font-size: 12.5px; font-weight: 700; }
         .lp-notif-body { font-size: 11.5px; color: #6C675E; margin-top: 1px; }
 
@@ -677,8 +679,8 @@ export default async function RootPage() {
         @keyframes lp-scroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
         @keyframes lp-wave { 0%,100% { height: 26%; } 50% { height: 92%; } }
 
-        @media (max-width: 1180px) {
-          .lp-hero-branch { display: none; }
+        @media (max-width: 1200px) {
+          .lp-branch-curves, .lp-branch-node { display: none; }
         }
         @media (max-width: 920px) {
           .lp-hero { padding: 56px 0 72px; }
