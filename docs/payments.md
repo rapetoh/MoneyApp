@@ -389,3 +389,16 @@ owner's local stations. Builds 36/37 superseded unshipped; **build 38**
 (verified: optional amount, incomplete store, brand table, kwik) submitted
 to TestFlight. Owner on install: 10-s check that the automation's Amount ←
 Shortcut Input › Amount is still set.
+
+**Aug 29, 2026 — Google login from itsmurmur.com fixed:** owner's Google
+sign-in bounced to `localhost:3000` (ERR_CONNECTION_REFUSED). Cause: the
+domain cutover never touched Supabase Auth; `site_url` was still
+`http://localhost:3000` and the redirect allow-list lacked the new domain,
+so Supabase ignored the app's `redirectTo` and fell back. Fixed via the
+management API: `site_url = https://itsmurmur.com`, allow-list =
+itsmurmur.com/**, www.itsmurmur.com/**, the vercel.app fallback,
+localhost for dev, and the mobile deep links (unchanged). Email templates
+now also stamp the real domain ({{ .SiteURL }}). Verified: the authorize
+endpoint 302s to Google with the new redirect accepted. Lesson recorded:
+a domain cutover must sweep auth config (site URL, allow-list), not just
+DNS and metadata.
