@@ -34,6 +34,7 @@ export const metadata: Metadata = {
 // release script keeps these in step with the latest version.
 const MAC_DMG_ARM = 'https://github.com/rapetoh/murmur-releases/releases/latest/download/Murmur-1.0.0-arm64.dmg'
 const MAC_DMG_INTEL = 'https://github.com/rapetoh/murmur-releases/releases/latest/download/Murmur-1.0.0.dmg'
+const WIN_EXE = 'https://github.com/rapetoh/murmur-releases/releases/latest/download/Murmur-Setup-1.0.0.exe'
 
 const lpSerif = 'var(--font-fraunces), "New York", "Iowan Old Style", Georgia, serif'
 
@@ -164,7 +165,7 @@ export default async function RootPage() {
               <span className="lp-badge-soon"> App Store, soon</span>
             </div>
             <div className="lp-hero-dlnote lp-rise" style={{ animationDelay: '.32s' }}>
-              Apple Silicon · signed &amp; notarized · <a href={MAC_DMG_INTEL}>Intel Mac version</a>
+              Apple Silicon · signed &amp; notarized · <a href={MAC_DMG_INTEL}>Intel Mac</a> · <a href={WIN_EXE}>Windows</a>
             </div>
             <div className="lp-trust lp-rise" style={{ animationDelay: '.36s' }}>
               No bank linking · Speech stays on your phone · Export or erase everything, anytime
@@ -685,6 +686,7 @@ export default async function RootPage() {
               <Link href="/terms">Terms</Link>
               <Link href={appHref}>Web dashboard</Link>
               <a href={MAC_DMG_ARM}>Download for Mac</a>
+              <a href={WIN_EXE}>Download for Windows</a>
               {SUPPORT_EMAIL && <a href={'mailto:' + SUPPORT_EMAIL}>{SUPPORT_EMAIL}</a>}
             </nav>
           </div>
