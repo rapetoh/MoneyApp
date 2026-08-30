@@ -26,6 +26,13 @@ extraResources:
       - '**/*'
       - '!**/.env*'
 
+# Release config = SIGNED + notarized (Aug 29, 2026). This file describes
+# the shippable artifact; the dev-only unsigned path is `npm run pack`,
+# which overrides identity/notarize off on the CLI. Requirements at
+# release time: a "Developer ID Application" identity in the login
+# keychain, and APPLE_ID / APPLE_APP_SPECIFIC_PASSWORD / APPLE_TEAM_ID in
+# the env for notarization. afterPack.cjs ad-hoc-signs ONLY when no real
+# identity was used, so dev builds still launch.
 mac:
   category: public.app-category.finance
   icon: build/icon.icns
@@ -35,15 +42,10 @@ mac:
         - arm64
         - x64
   gatekeeperAssess: false
-  # Unsigned v1 build — ad-hoc signature only. When the Developer ID
-  # Application cert is wired up, set:
-  #   CSC_LINK / CSC_KEY_PASSWORD env vars (or signing identity) +
-  #   APPLE_ID / APPLE_APP_SPECIFIC_PASSWORD / APPLE_TEAM_ID for
-  # notarization, and re-enable hardenedRuntime + entitlements:
-  #   hardenedRuntime: true
-  #   entitlements: build/entitlements.mac.plist
-  #   entitlementsInherit: build/entitlements.mac.plist
-  identity: null
+  hardenedRuntime: true
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
+  notarize: true
 
 dmg:
   title: Install Murmur
@@ -81,3 +83,13 @@ nsis:
   installerIcon: build/icon.ico
   uninstallerIcon: build/icon.ico
   artifactName: ${productName}-Setup-${version}.${ext}
+
+# Auto-update + download hosting: public GitHub releases repo (the code
+# repo stays private; releases live in their own public repo so download
+# URLs and the electron-updater feed need no auth). `dist`/`dist:win`
+# write latest-mac.yml / latest.yml + blockmaps into release/, and the
+# release script uploads everything with `gh release`.
+publish:
+  provider: github
+  owner: rapetoh
+  repo: murmur-releases

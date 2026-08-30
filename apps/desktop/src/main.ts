@@ -360,6 +360,7 @@ app.whenReady().then(() => {
   if (process.platform === 'darwin') {
     Menu.setApplicationMenu(buildAppMenu())
   }
+  startAutoUpdater()
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -376,6 +377,49 @@ app.on('window-all-closed', () => {
 app.on('before-quit', () => {
   stopServers()
 })
+
+/**
+ * Auto-update (Aug 29, 2026 — public desktop distribution). Checks the
+ * GitHub releases feed (publish config in electron-builder.yml) on
+ * launch and every 4 hours; downloads in the background; installs on
+ * quit. On the first update found we tell the user once, quietly, via
+ * dialog, rather than interrupting with progress UI. Signed builds only:
+ * electron-updater refuses unsigned updates on macOS, which is exactly
+ * right. Errors are logged and swallowed — an offline launch or a rate-
+ * limited feed must never affect the app.
+ */
+function startAutoUpdater(): void {
+  if (!app.isPackaged) return
+  // Lazy import keeps dev launches (electron .) free of the dependency.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { autoUpdater } = require('electron-updater') as typeof import('electron-updater')
+  autoUpdater.autoDownload = true
+  autoUpdater.autoInstallOnAppQuit = true
+  let notified = false
+  autoUpdater.on('update-downloaded', (info) => {
+    if (notified) return
+    notified = true
+    const win = BrowserWindow.getAllWindows()[0]
+    const message = `Murmur ${info.version} is ready. It installs the next time you quit the app.`
+    if (win) {
+      dialog.showMessageBox(win, {
+        type: 'info',
+        message: 'Update ready',
+        detail: message,
+        buttons: ['OK', 'Restart now'],
+        defaultId: 0,
+      }).then(({ response }) => {
+        if (response === 1) autoUpdater.quitAndInstall()
+      }).catch(() => undefined)
+    }
+  })
+  autoUpdater.on('error', (err) => {
+    console.warn('[updater]', err?.message ?? err)
+  })
+  const check = () => autoUpdater.checkForUpdates().catch(() => undefined)
+  check()
+  setInterval(check, 4 * 60 * 60 * 1000)
+}
 
 function buildAppMenu(): Menu {
   const isMac = process.platform === 'darwin'

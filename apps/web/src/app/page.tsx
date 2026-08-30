@@ -30,6 +30,11 @@ export const metadata: Metadata = {
  *   button; the page itself renders for everyone.
  */
 
+// Desktop downloads (signed + notarized, published Aug 29, 2026). The
+// release script keeps these in step with the latest version.
+const MAC_DMG_ARM = 'https://github.com/rapetoh/murmur-releases/releases/latest/download/Murmur-1.0.0-arm64.dmg'
+const MAC_DMG_INTEL = 'https://github.com/rapetoh/murmur-releases/releases/latest/download/Murmur-1.0.0.dmg'
+
 const lpSerif = 'var(--font-fraunces), "New York", "Iowan Old Style", Georgia, serif'
 
 const logo = (domain: string) =>
@@ -147,10 +152,19 @@ export default async function RootPage() {
               to maintain.
             </p>
             <div className="lp-hero-ctas lp-rise" style={{ animationDelay: '.28s' }}>
-              <span className="lp-badge-soon"> App Store, soon</span>
-              <Link href={appHref} className="lp-btn-primary">
-                Open the web dashboard
+              <a href={MAC_DMG_ARM} className="lp-btn-primary">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden>
+                  <path d="M12 3v12m0 0 5-5m-5 5-5-5M4 21h16" stroke="#FBFAF7" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                Download for Mac
+              </a>
+              <Link href={appHref} className="lp-badge-soon">
+                Web dashboard →
               </Link>
+              <span className="lp-badge-soon"> App Store, soon</span>
+            </div>
+            <div className="lp-hero-dlnote lp-rise" style={{ animationDelay: '.32s' }}>
+              Apple Silicon · signed &amp; notarized · <a href={MAC_DMG_INTEL}>Intel Mac version</a>
             </div>
             <div className="lp-trust lp-rise" style={{ animationDelay: '.36s' }}>
               No bank linking · Speech stays on your phone · Export or erase everything, anytime
@@ -670,6 +684,7 @@ export default async function RootPage() {
               <Link href="/privacy">Privacy</Link>
               <Link href="/terms">Terms</Link>
               <Link href={appHref}>Web dashboard</Link>
+              <a href={MAC_DMG_ARM}>Download for Mac</a>
               {SUPPORT_EMAIL && <a href={'mailto:' + SUPPORT_EMAIL}>{SUPPORT_EMAIL}</a>}
             </nav>
           </div>
@@ -704,7 +719,10 @@ export default async function RootPage() {
         .lp-h1 em { font-style: italic; color: #3F5A3E; }
         .lp-sub { font-size: 18px; line-height: 1.65; color: #3A3630; max-width: 470px; margin: 24px 0 0; }
         .lp-hero-ctas { display: flex; align-items: center; gap: 12px; margin-top: 34px; flex-wrap: wrap; }
-        .lp-btn-primary { background: #3F5A3E; color: #fff; font-weight: 600; font-size: 14px; padding: 13px 24px; border-radius: 999px; transition: transform .15s, box-shadow .15s; }
+        .lp-btn-primary { display: inline-flex; align-items: center; gap: 9px; background: #3F5A3E; color: #fff; font-weight: 600; font-size: 14px; padding: 13px 24px; border-radius: 999px; transition: transform .15s, box-shadow .15s; }
+        .lp-hero-dlnote { margin-top: 14px; font-size: 12px; color: #9C9589; }
+        .lp-hero-dlnote a { color: #3F5A3E; font-weight: 600; }
+        .lp-hero-dlnote a:hover { text-decoration: underline; }
         .lp-btn-primary:hover { transform: translateY(-1px); box-shadow: 0 10px 26px rgba(63,90,62,0.3); }
         .lp-badge-soon { font-size: 13px; font-weight: 600; color: #6C675E; background: #F5F2EB; padding: 13px 20px; border-radius: 999px; }
         .lp-trust { margin-top: 26px; font-size: 12.5px; color: #9C9589; letter-spacing: 0.2px; }

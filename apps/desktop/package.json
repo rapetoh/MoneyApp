@@ -1,7 +1,7 @@
 {
   "name": "@voice-expense/desktop",
   "productName": "Murmur",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "description": "Murmur desktop app — Electron shell serving the Next.js web UI from an embedded standalone server; /api/ai/* is forwarded to the hosted deployment so no server secret exists on the user's machine.",
   "main": "dist/main.js",
@@ -10,9 +10,9 @@
     "build:web": "npm --prefix ../web run build && node scripts/bundle-web.mjs",
     "build": "npm run build:web && npm run build:main",
     "dev": "npm run build:main && electron .",
-    "pack": "npm run build && electron-builder --mac --x64 --arm64 --dir",
-    "dist": "npm run build && electron-builder --mac --x64 --arm64",
-    "dist:win": "npm run build && electron-builder --win --x64",
+    "pack": "npm run build && electron-builder --mac --x64 --arm64 --dir -c.mac.identity=null -c.mac.notarize=false",
+    "dist": "npm run build && electron-builder --mac --x64 --arm64 --publish never",
+    "dist:win": "npm run build && electron-builder --win --x64 --publish never",
     "icns": "node scripts/generate-icns.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
@@ -23,5 +23,8 @@
     "png-to-ico": "^3.0.1",
     "sharp": "^0.33.5",
     "typescript": "^5.7.3"
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.9"
   }
 }

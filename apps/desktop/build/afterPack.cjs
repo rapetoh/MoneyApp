@@ -15,6 +15,15 @@ const { execFileSync } = require('node:child_process')
 
 module.exports = async function afterPack(context) {
   if (context.electronPlatformName !== 'darwin') return
+  // Real Developer ID signing active (release path)? Then electron-builder
+  // has already signed properly and the ad-hoc pass below would CLOBBER
+  // that signature. Only ad-hoc-sign the dev/unsigned path.
+  const identity = context.packager.platformSpecificBuildOptions?.identity
+  const hasRealSigning = identity !== null && process.env.CSC_IDENTITY_AUTO_DISCOVERY !== 'false'
+  if (hasRealSigning) {
+    console.log('  • [afterPack] real signing configured — skipping ad-hoc pass')
+    return
+  }
 
   const appPath = `${context.appOutDir}/${context.packager.appInfo.productFilename}.app`
   console.log(`  • [afterPack] ad-hoc signing ${appPath}`)
