@@ -438,3 +438,16 @@ page. What was done, end to end:
 - *Landing page:* hero primary is now "Download for Mac" (arm64) with an
   "Intel Mac version" note line and a footer link; App Store stays
   "soon". Screenshot-verified at 1440 and 390 before push.
+
+**Aug 29, 2026 (later) — Windows published:** the owner decided to
+publish Windows (he will test it on his own Windows machine).
+Murmur-Setup-1.0.0.exe, its blockmap and latest.yml were uploaded to the
+same v1.0.0 release; the published exe was downloaded back and is
+byte-identical to the local build (97,874,401 bytes). The landing hero
+note line now reads "Apple Silicon · signed & notarized · Intel Mac ·
+Windows" and the footer gained "Download for Windows". The installer is
+UNSIGNED: first run shows the SmartScreen "Windows protected your PC"
+dialog and the tester clicks "More info" then "Run anyway". Windows
+auto-update via latest.yml works for future versions; a code-signing
+certificate for Windows remains an open decision (cost vs SmartScreen
+reputation).
