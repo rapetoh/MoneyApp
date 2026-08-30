@@ -402,3 +402,39 @@ now also stamp the real domain ({{ .SiteURL }}). Verified: the authorize
 endpoint 302s to Google with the new redirect accepted. Lesson recorded:
 a domain cutover must sweep auth config (site URL, allow-list), not just
 DNS and metadata.
+
+**Aug 29, 2026 — Desktop 1.0.0 shipped (Mac public, Windows built and
+held):** the packaged Electron app is now downloadable from the landing
+page. What was done, end to end:
+
+- *Signing:* Developer ID Application certificate created for team
+  47WU47J52M (CSR + private key generated locally; key material lives in
+  `~/.murmur-signing/`, chmod 700, never committed). electron-builder
+  release config gained `hardenedRuntime`, the original
+  `entitlements.mac.plist` (JIT, mic, network), and `notarize: true`;
+  `afterPack.cjs` now skips its ad-hoc re-sign whenever a real identity
+  is in play so the Developer ID signature survives.
+- *Notarization:* notarytool with the Apple ID + app-specific password
+  (creds in `~/.murmur-signing/notary.env`, never committed). First-ever
+  submission for this team took ~2.5 h in Apple's deep scan, verdict
+  **Accepted**. Verified locally: `spctl` says "accepted, source =
+  Notarized Developer ID" for both arches and `stapler validate` passes
+  on the apps inside the DMGs, so first launch works even offline.
+- *Distribution:* public artifacts repo **github.com/rapetoh/murmur-releases**
+  (installers only, source stays private). Release **v1.0.0** carries
+  Murmur-1.0.0-arm64.dmg, Murmur-1.0.0.dmg (Intel), both blockmaps and
+  latest-mac.yml. All URLs verified 200 via
+  `releases/latest/download/...`. The **Windows** installer
+  (Murmur-Setup-1.0.0.exe + latest.yml, unsigned) was built and then
+  deliberately **removed from the public release**: the owner wants to
+  decide on Windows himself. It sits in `apps/desktop/release/`;
+  publishing it is one `gh release upload` away.
+- *Auto-update:* electron-updater wired in `main.ts` (packaged builds
+  only): check on launch + every 4 h, auto-download, quiet failures,
+  restart prompt when ready. Feed = the GitHub release's latest-mac.yml.
+  Shipping an update = bump version, rebuild (signing + notarization run
+  automatically), `gh release create vX.Y.Z` with the new artifacts, and
+  update the two versioned download URLs in `apps/web/src/app/page.tsx`.
+- *Landing page:* hero primary is now "Download for Mac" (arm64) with an
+  "Intel Mac version" note line and a footer link; App Store stays
+  "soon". Screenshot-verified at 1440 and 390 before push.
