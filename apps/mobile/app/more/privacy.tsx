@@ -221,13 +221,14 @@ export default function PrivacyScreen() {
             <Text style={styles.lead}>{t('privacy.lead', locale)}</Text>
           </View>
 
-          {/* What's stored where. Four rows, not three (fix-plan 3.5 /
-              audit 02-F4, 02-F16, 01-F28): merchant-logo lookups are their
-              own third-party data flow — a direct device→Google request
-              that never touches our servers at all — so folding it into
-              the "servers" row would misdescribe it. The servers row's
-              icon changed from 🚫 ("nothing leaves") to 🌐, since the
-              detail below now honestly says data does leave, to OpenAI. */}
+          {/* What's stored where. Four rows, one per real data flow
+              (fix-plan 3.5 / audit 02-F4, 02-F16, 01-F28; corrected
+              Aug 29 2026): transcripts stay local, transactions sync
+              through OUR servers (Supabase — the mockup's "Your iCloud"
+              row described an architecture we never built and was a
+              false claim), merchant-logo lookups are a direct
+              device→Google request, and extraction sends transcript
+              text + receipt photos to OpenAI. */}
           <SetGroup label={t('privacy.group_where', locale)}>
             <PrivacyRow
               icon="📱"
@@ -236,8 +237,8 @@ export default function PrivacyScreen() {
             />
             <PrivacyRow
               icon="☁️"
-              label={t('privacy.icloud_label', locale)}
-              detail={t('privacy.icloud_detail', locale)}
+              label={t('privacy.cloud_label', locale)}
+              detail={t('privacy.cloud_detail', locale)}
             />
             <PrivacyRow
               icon="🖼️"
@@ -246,34 +247,37 @@ export default function PrivacyScreen() {
             />
             <PrivacyRow
               icon="🌐"
-              label={t('privacy.servers_label', locale)}
-              detail={t('privacy.servers_detail', locale)}
+              label={t('privacy.openai_label', locale)}
+              detail={t('privacy.openai_detail', locale)}
               last
             />
           </SetGroup>
 
-          {/* Guarantees (not user-controllable). The mockup shows three toggles
-              here, but each is a permanent product decision in our build:
-              voice processing is always on-device (speech-recognition never
-              leaves the phone), we don't collect any analytics, and we don't
-              store audio at all — only transcripts. Showing them as toggles
-              implied the user could disable behaviors we've already locked
-              down, so we render them as static read-only rows with a detail
-              label describing the guarantee. */}
+          {/* Guarantees (not user-controllable). The mockup shows three
+              toggles here, but each is a permanent product decision in our
+              build, so they render as read-only rows. Reworked Aug 29 2026
+              to only state what the code actually enforces: audio is never
+              recorded to a file at all (recognition streams it, nothing to
+              delete "after 24h" — the old row promised a deletion schedule
+              for recordings that don't exist), there is no analytics SDK
+              in the app, and we never sell data. The old "stays on-device
+              — Always" row overclaimed: recognition is forced on-device
+              where supported but falls back to Apple's recognizer, which
+              the lead copy now discloses instead. */}
           <SetGroup label={t('privacy.group_guarantees', locale)}>
             <SetRow
-              label={t('privacy.ctrl_voice_on_device', locale)}
-              detail={t('privacy.status_always', locale)}
+              label={t('privacy.guar_audio', locale)}
+              detail={t('privacy.status_never_stored', locale)}
               chevron={false}
             />
             <SetRow
-              label={t('privacy.ctrl_share_analytics', locale)}
+              label={t('privacy.guar_analytics', locale)}
+              detail={t('common.none', locale)}
+              chevron={false}
+            />
+            <SetRow
+              label={t('privacy.guar_selling', locale)}
               detail={t('privacy.status_never', locale)}
-              chevron={false}
-            />
-            <SetRow
-              label={t('privacy.ctrl_delete_voice_24h', locale)}
-              detail={t('privacy.status_not_stored', locale)}
               chevron={false}
               last
             />

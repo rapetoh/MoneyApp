@@ -15,8 +15,11 @@ Murmur is a **voice-first, privacy-first personal expense tracker**.
 - **Desktop companion** (macOS) is the paid tier. It hosts deep analytics,
   forecasting, and the AI goal planner.
 - **No bank linking.** Ever. That's a product principle, not a v1 shortcut.
-- **No surveillance.** Voice is processed on-device by default. Data lives
-  in the user's own iCloud. Our servers store nothing identifying.
+- **No surveillance.** Voice is processed on-device by default.
+  *(As built, Aug 2026: data syncs through our own encrypted Supabase
+  backend, not iCloud — the iCloud architecture in this document was never
+  implemented. In-app privacy copy describes the real Supabase + OpenAI
+  data flows; keep it that way.)*
 
 ### One-line pitch
 > Log any expense, any way, in under 3 seconds — without handing your bank
@@ -280,9 +283,11 @@ Profile card at top with upgrade badge if on free plan. Grouped lists:
 Voice & capture, Privacy, Sync, About. Standard iOS pattern.
 
 ### Privacy Center
-Headline "Your money, yours." Three tiles explaining what's stored
-where (device / iCloud / our servers). Controls with toggles. At the
-bottom: Your rights — export and delete everything.
+Headline "Your money, yours." Tiles explaining what's stored where
+*(as built: device / our servers / Google logo lookups / OpenAI — there
+is no iCloud storage)*. Read-only guarantee rows, not toggles (each is a
+permanent product decision, not a user choice). At the bottom: Your
+rights — export and delete everything.
 
 ### Paywall
 Dark, premium. **"Mobile stays free. Forever."** is the headline. Not
@@ -298,7 +303,8 @@ This is deliberate:
 
 **The user creates no account to install and use Murmur.** Data lives
 in iCloud by default. No sign-in wall. Most users never see an account
-screen.
+screen. *(As built, Aug 2026: the app ships with email sign-in and
+Supabase sync instead — this section was not implemented as designed.)*
 
 Sign-in only appears when the user asks for something that needs it:
 

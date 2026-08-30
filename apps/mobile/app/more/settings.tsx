@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useMemo } from 'react'
 import {
   View,
   Text,
@@ -21,6 +21,7 @@ import { useTransactions } from '../../src/hooks/useTransactions'
 import { useActiveBudget } from '../../src/hooks/useBudget'
 import { useRecurringRules } from '../../src/hooks/useRecurringRules'
 import { useNotificationListener } from '../../src/hooks/useNotificationListener'
+import { ExpoSpeechRecognitionModule } from 'expo-speech-recognition'
 import { useApiUrl } from '../../src/hooks/useApiUrl'
 import { changeCurrency } from '../../src/services/profileCurrency'
 import { SetGroup, SetRow } from '../../src/components/SettingsList'
@@ -168,6 +169,21 @@ export default function SettingsScreen() {
   const currency = profile?.currency_code ?? 'USD'
   const localeName = LOCALES.find((l) => l.value === locale)?.label ?? 'English'
 
+  // The Voice engine row reports what recognition actually does on THIS
+  // device, not a marketing constant: `useVoice` starts recognition with
+  // `requiresOnDeviceRecognition: true`, which the module only honours
+  // when the device supports on-device recognition — otherwise it falls
+  // back to Apple's networked recognizer. Same check, same truth.
+  const voiceEngineDetail = useMemo(() => {
+    try {
+      return ExpoSpeechRecognitionModule.supportsOnDeviceRecognition()
+        ? t('settings.voice_engine_on_device', locale)
+        : t('settings.voice_engine_apple', locale)
+    } catch {
+      return t('settings.voice_engine_apple', locale)
+    }
+  }, [locale])
+
   // Fix-plan 1.3: read-only display of the device's own zone (distinct from
   // `profiles.timezone`, which `useProfile.ts` captures and writes through
   // on launch) — `Intl` reads it directly with no async dependency, so this
@@ -181,6 +197,7 @@ export default function SettingsScreen() {
   // counts from the same `syncManager.addListener` channel, plus per-entry
   // `last_error`, retry and discard wired to the outbox's own recovery API.
   const [pendingCount, setPendingCount] = useState(0)
+  const [isSyncing, setIsSyncing] = useState(false)
   const [deadCount, setDeadCount] = useState(0)
   const [syncIssuesModal, setSyncIssuesModal] = useState(false)
   const [deadEntries, setDeadEntries] = useState<QueueEntry[]>([])
@@ -203,6 +220,7 @@ export default function SettingsScreen() {
   useEffect(() => {
     return syncManager.addListener((syncing, pending, dead) => {
       setPendingCount(pending)
+      setIsSyncing(syncing)
       setDeadCount(dead)
       if (!syncing) refreshLastSynced()
     })
@@ -495,23 +513,52 @@ export default function SettingsScreen() {
           />
         </SetGroup>
 
-        {/* Voice & capture */}
+        {/* Voice & capture — the two ways money enters the app. Matches
+            S_Settings in mobile-screens-4.jsx, which groups the Apple Pay
+            auto-log row here rather than in a one-row "Automations" group
+            (folded in, Aug 29 2026). On Android the equivalent capture
+            surface is the notification-listener toggle; the payload it
+            grants access to reaches the confirm sheet via the root-level
+            listener in app/_layout.tsx (fix-plan 3.4). */}
         <SetGroup label={t('settings.voice_capture', locale)}>
           <SetRow
             label={t('settings.voice_engine', locale)}
-            detail={t('settings.voice_engine_on_device', locale)}
+            detail={voiceEngineDetail}
             chevron={false}
           />
+          {Platform.OS === 'ios' ? (
+            <SetRow
+              label={t('settings.apple_pay_capture', locale)}
+              detail={t('settings.apple_pay_capture_detail', locale)}
+              onPress={() => router.push('/more/apple-pay-setup' as never)}
+              last
+            />
+          ) : (
+            <SetRow
+              label={t('settings.payment_notifications', locale)}
+              toggle
+              value={permissionGranted}
+              onToggle={handleNotificationToggle}
+              last
+            />
+          )}
+        </SetGroup>
+
+        {/* Preferences. Language leads — it drives the whole app (UI copy
+            AND the voice recognizer's locale), so it belongs with the
+            general preferences, not under Voice & capture where it read
+            as voice-only. */}
+        <SetGroup label={t('settings.preferences', locale)}>
           <SetRow
             label={t('settings.language', locale)}
             detail={localeName}
             onPress={() => setLocaleModal(true)}
-            last
           />
-        </SetGroup>
-
-        {/* Preferences */}
-        <SetGroup label={t('settings.preferences', locale)}>
+          <SetRow
+            label={t('settings.currency', locale)}
+            detail={currency}
+            onPress={() => setCurrencyModal(true)}
+          />
           <SetRow
             label={t('settings.budget', locale)}
             detail={budgetDisplay}
@@ -523,84 +570,8 @@ export default function SettingsScreen() {
             onPress={() => setIncomeModal(true)}
           />
           <SetRow
-            label={t('settings.currency', locale)}
-            detail={currency}
-            onPress={() => setCurrencyModal(true)}
-          />
-          <SetRow
             label={t('settings.recurring', locale)}
             onPress={() => router.push('/recurring')}
-            last
-          />
-        </SetGroup>
-
-        {/* Automations (platform-specific). Fix-plan 3.4 / audit 07-F12,
-            08-F19, 08-F20, 02-F34: no permission prompt or dead link stays
-            visible for a feature that does nothing. On iOS the row only
-            renders once a real shortcut is published (SHORTCUT_INSTALL_URL
-            non-empty) — until then there is nothing this row can honestly
-            offer, so the whole group is hidden rather than shown with a
-            dead link. On Android the toggle is real: the payload it grants
-            access to now reaches the confirm sheet via the root-level
-            listener in app/_layout.tsx. */}
-        {/* Aug 17 2026: iOS row is always shown — the "Log Expense in Murmur"
-            App Intent ships in the app, so the guided screen can honestly
-            offer set-up without any published shortcut. */}
-        <SetGroup label={t('settings.automations', locale)}>
-            {Platform.OS === 'ios' ? (
-              <SetRow
-                label={t('settings.apple_pay_capture', locale)}
-                detail={t('settings.apple_pay_capture_detail', locale)}
-                onPress={() => router.push('/more/apple-pay-setup' as never)}
-                last
-              />
-            ) : (
-              <SetRow
-                label={t('settings.payment_notifications', locale)}
-                toggle
-                value={permissionGranted}
-                onToggle={handleNotificationToggle}
-                last
-              />
-            )}
-        </SetGroup>
-
-        {/* Data — Plus-gated export. */}
-        <SetGroup label={t('settings.data', locale)}>
-          <SetRow
-            label={t('settings.export_label', locale)}
-            detail={
-              isPlus
-                ? t('settings.export_detail_plus', locale)
-                : t('settings.export_detail_free', locale)
-            }
-            onPress={openExport}
-            last
-          />
-        </SetGroup>
-
-        {/* Sync — outbox health (fix-plan 1.6 point 4). Persistent (not
-            gated on deadCount > 0) so a user can confirm the outbox is
-            clean, not just be told when it isn't. */}
-        <SetGroup label={t('settings.sync', locale)}>
-          <SetRow
-            label={t('settings.sync_last_synced', locale)}
-            detail={formatLastSynced(lastSyncedAt, locale)}
-            chevron={false}
-          />
-          <SetRow
-            label={t('settings.sync_pending', locale)}
-            detail={`${pendingCount} ${t('settings.sync_queued_suffix', locale)}`}
-            chevron={false}
-          />
-          <SetRow
-            label={t('settings.sync_issues', locale)}
-            detail={
-              deadCount === 0
-                ? t('common.none', locale)
-                : `${deadCount} ${t('settings.sync_failed_suffix', locale)}`
-            }
-            onPress={openSyncIssues}
             last
           />
         </SetGroup>
@@ -616,12 +587,55 @@ export default function SettingsScreen() {
           />
         </SetGroup>
 
-        {/* Privacy */}
-        <SetGroup label={t('settings.privacy', locale)}>
+        {/* Privacy & data — one group (Aug 29 2026; previously a one-row
+            "Data" group and a one-row "Privacy" group). The Privacy
+            Center owns the full story + GDPR rights; the export row here
+            is the Plus convenience exporter (format picker). */}
+        <SetGroup label={t('settings.privacy_data', locale)}>
           <SetRow
             label={t('more.privacy', locale)}
             detail={t('settings.review', locale)}
             onPress={() => router.push('/more/privacy')}
+          />
+          <SetRow
+            label={t('settings.export_label', locale)}
+            detail={
+              isPlus
+                ? t('settings.export_detail_plus', locale)
+                : t('settings.export_detail_free', locale)
+            }
+            onPress={openExport}
+            last
+          />
+        </SetGroup>
+
+        {/* Sync — outbox health (fix-plan 1.6 point 4). Persistent (not
+            gated on deadCount > 0) so a user can confirm the outbox is
+            clean, not just be told when it isn't. Two rows, not three
+            (Aug 29 2026): the old permanent "Pending — 0 queued" row was
+            outbox jargon with no action; its signal only matters while
+            something is actually queued, so it now surfaces as this
+            row's transient detail instead. */}
+        <SetGroup label={t('settings.sync', locale)}>
+          <SetRow
+            label={t('settings.sync_last_synced', locale)}
+            detail={
+              pendingCount > 0
+                ? isSyncing
+                  ? t('settings.sync_in_progress', locale)
+                  : `${pendingCount} ${t('settings.sync_queued_suffix', locale)}`
+                : formatLastSynced(lastSyncedAt, locale)
+            }
+            chevron={false}
+          />
+          <SetRow
+            label={t('settings.sync_issues', locale)}
+            detail={
+              deadCount === 0
+                ? t('common.none', locale)
+                : `${deadCount} ${t('settings.sync_failed_suffix', locale)}`
+            }
+            onPress={openSyncIssues}
             last
           />
         </SetGroup>

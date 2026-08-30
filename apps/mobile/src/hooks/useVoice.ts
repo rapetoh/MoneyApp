@@ -205,6 +205,12 @@ export function useVoice(
       continuous: false,
       interimResults: true,
       maxAlternatives: 1,
+      // Privacy screen promise: audio is transcribed on the phone and
+      // never sent over the network. The module only honours this when
+      // the device supports on-device recognition for the locale;
+      // otherwise it falls back to networked (Apple-server) recognition
+      // rather than erroring — which the Privacy copy discloses.
+      requiresOnDeviceRecognition: true,
       // Display telemetry only — drives the capture overlay's waveform.
       // No effect on recognition or parsing.
       volumeChangeEventOptions: { enabled: true, intervalMillis: 80 },
