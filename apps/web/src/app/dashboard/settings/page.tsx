@@ -736,16 +736,38 @@ export default function SettingsPage() {
               title="Privacy"
               refCb={(el) => (sectionRefs.current.privacy = el)}
             >
-              {/* Fix-plan 3.5 / audit 06-F39: this used to be a live toggle
-                  writing `profiles.analytics_opt_in` / `crash_reports_opt_in`
-                  while mobile's own Privacy screen told the user analytics
-                  are shared "Never", and nothing anywhere reads either
-                  column, so the toggle changed a value with no effect. One
-                  product decision (no analytics, no crash reporting
-                  collected today), mirrored on both platforms, instead of a
-                  control that does nothing. */}
-              <SettingRow label="Anonymous usage analytics" sub="Not collected." />
-              <SettingRow label="Crash reporting" sub="Not collected." />
+              {/* The policy documents, then the GDPR controls. The old
+                  "Anonymous usage analytics: Not collected." / "Crash
+                  reporting: Not collected." rows were cut Sep 2 2026 on
+                  the owner's review (same pass as mobile's Privacy
+                  Center): a settings screen links its policy, it does
+                  not enumerate the bad things it doesn't do. */}
+              <SettingRow
+                label="Privacy Policy"
+                right={
+                  <a
+                    href="https://itsmurmur.com/privacy"
+                    target="_blank"
+                    rel="noreferrer"
+                    style={styles.linkBtn}
+                  >
+                    Read
+                  </a>
+                }
+              />
+              <SettingRow
+                label="Terms of Service"
+                right={
+                  <a
+                    href="https://itsmurmur.com/terms"
+                    target="_blank"
+                    rel="noreferrer"
+                    style={styles.linkBtn}
+                  >
+                    Read
+                  </a>
+                }
+              />
               {/* GDPR-grade controls, mirrored to mobile Privacy.
                   Export-all is free for every user (right to data
                   portability, can't be paywalled). Delete-all calls

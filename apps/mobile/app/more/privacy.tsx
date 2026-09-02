@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { View, Text, StyleSheet, ScrollView, Pressable, Alert } from 'react-native'
+import { View, Text, StyleSheet, ScrollView, Pressable, Alert, Linking } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Stack, useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
@@ -11,7 +11,7 @@ import { supabase } from '../../src/lib/supabase'
 import { exportAndShare } from '../../src/services/exportData'
 import { wipeAllUserData } from '../../src/services/sync/transactionStore'
 import { Colors, Typography, Hairline } from '../../src/theme'
-import { t, type Locale } from '@voice-expense/shared'
+import { t, LEGAL_URLS, type Locale } from '@voice-expense/shared'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Sub-components — match SetGroup / SetRow / PrivacyRow in
@@ -54,55 +54,32 @@ function PrivacyRow({
 function SetRow({
   label,
   detail,
-  toggle,
-  value,
-  onToggle,
   onPress,
   danger,
   last,
-  chevron = true,
 }: {
   label: string
   detail?: string
-  /** Enable a switch-style toggle on the right instead of a chevron. */
-  toggle?: boolean
-  value?: boolean
-  onToggle?: (next: boolean) => void
   onPress?: () => void
   danger?: boolean
   last?: boolean
-  chevron?: boolean
 }) {
   const labelColor = danger ? Colors.destructive ?? '#A94646' : Colors.ink ?? Colors.text
-  const Inner = (
-    <>
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [styles.row, !last && styles.rowDivider, pressed && styles.rowPressed]}
+    >
       <Text style={[styles.rowLabelSingle, { color: labelColor }]} numberOfLines={1}>
         {label}
       </Text>
       {detail ? <Text style={styles.rowDetailInline}>{detail}</Text> : null}
-      {toggle ? (
-        <Pressable
-          onPress={() => onToggle?.(!value)}
-          style={[styles.toggle, value ? styles.toggleOn : styles.toggleOff]}
-        >
-          <View style={[styles.toggleKnob, value ? styles.toggleKnobOn : styles.toggleKnobOff]} />
-        </Pressable>
-      ) : chevron ? (
-        <Ionicons
-          name="chevron-forward"
-          size={14}
-          color={Colors.ink4 ?? Colors.textMuted}
-          style={{ marginLeft: 4 }}
-        />
-      ) : null}
-    </>
-  )
-  return (
-    <Pressable
-      onPress={!toggle ? onPress : undefined}
-      style={({ pressed }) => [styles.row, !last && styles.rowDivider, pressed && !toggle && styles.rowPressed]}
-    >
-      {Inner}
+      <Ionicons
+        name="chevron-forward"
+        size={14}
+        color={Colors.ink4 ?? Colors.textMuted}
+        style={{ marginLeft: 4 }}
+      />
     </Pressable>
   )
 }
@@ -253,41 +230,17 @@ export default function PrivacyScreen() {
             />
           </SetGroup>
 
-          {/* Guarantees (not user-controllable). The mockup shows three
-              toggles here, but each is a permanent product decision in our
-              build, so they render as read-only rows. Reworked Aug 29 2026
-              to only state what the code actually enforces: audio is never
-              recorded to a file at all (recognition streams it, nothing to
-              delete "after 24h" — the old row promised a deletion schedule
-              for recordings that don't exist), there is no analytics SDK
-              in the app, and we never sell data. The old "stays on-device
-              — Always" row overclaimed: recognition is forced on-device
-              where supported but falls back to Apple's recognizer, which
-              the lead copy now discloses instead. */}
-          <SetGroup label={t('privacy.group_guarantees', locale)}>
-            <SetRow
-              label={t('privacy.guar_audio', locale)}
-              detail={t('privacy.status_never_stored', locale)}
-              chevron={false}
-            />
-            <SetRow
-              label={t('privacy.guar_analytics', locale)}
-              detail={t('common.none', locale)}
-              chevron={false}
-            />
-            <SetRow
-              label={t('privacy.guar_selling', locale)}
-              detail={t('privacy.status_never', locale)}
-              chevron={false}
-              last
-            />
-          </SetGroup>
-
-          {/* Your rights — GDPR-grade controls. Export lands as a
-              machine-readable JSON dump via the system share sheet;
+          {/* Your data (GDPR rights, free for every user). Export lands
+              as a machine-readable JSON dump via the system share sheet;
               Delete tears down the entire account through the
-              `delete-user` Edge Function and signs the user out. Both
-              are unconditionally available, including for free users. */}
+              `delete-user` Edge Function and signs the user out.
+              The old "What we guarantee" group (Selling your data:
+              Never / Analytics: None) was cut Sep 2 2026 on the owner's
+              review: real settings screens state facts and link the
+              policy, they don't enumerate the bad things they don't do.
+              The substance (no recorded audio, no analytics SDK, no
+              data sales) lives in the lead copy and the privacy
+              policy. */}
           <SetGroup label={t('privacy.group_rights', locale)}>
             <SetRow
               label={exporting ? t('privacy.export_all_busy', locale) : t('privacy.export_all', locale)}
@@ -297,6 +250,21 @@ export default function PrivacyScreen() {
               label={deleting ? t('privacy.delete_all_busy', locale) : t('privacy.delete_all', locale)}
               onPress={handleDeleteAll}
               danger
+              last
+            />
+          </SetGroup>
+
+          {/* Legal. The same documents Apple requires next to the
+              subscription (paywall.tsx links them too), one tap from
+              the screen where a user actually wonders about them. */}
+          <SetGroup label={t('privacy.group_legal', locale)}>
+            <SetRow
+              label={t('privacy.policy_label', locale)}
+              onPress={() => Linking.openURL(LEGAL_URLS.privacy)}
+            />
+            <SetRow
+              label={t('privacy.terms_label', locale)}
+              onPress={() => Linking.openURL(LEGAL_URLS.terms)}
               last
             />
           </SetGroup>
@@ -445,33 +413,4 @@ const styles = StyleSheet.create({
     fontFamily: Typography.fontFamily.sans,
   },
 
-  // Toggle (matches SetRow's pill toggle)
-  toggle: {
-    width: 42,
-    height: 26,
-    borderRadius: 13,
-    padding: 2,
-    justifyContent: 'center',
-  },
-  toggleOn: {
-    backgroundColor: Colors.accent ?? Colors.primary,
-    alignItems: 'flex-end',
-  },
-  toggleOff: {
-    backgroundColor: '#E2DED3',
-    alignItems: 'flex-start',
-  },
-  toggleKnob: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: '#FFFFFF',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  toggleKnobOn: {},
-  toggleKnobOff: {},
 })
