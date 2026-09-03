@@ -464,3 +464,26 @@ questionnaire answers, review notes) delivered in-session. Still open
 before Submit: attach build 41, attach the Murmur Plus subscription
 group to the version, Yearly review screenshot. Before public RELEASE:
 re-lock the hand-granted plus_status test accounts.
+
+**Sep 3, 2026 (overnight) — Invalid Binary (ITMS-90111) and the Xcode 27
+fix, build 44:** the 12:15 AM review submission was auto-rejected in one
+minute: version flagged "Invalid Binary" with NO reason anywhere in ASC
+(TestFlight still said Validated). The reason arrived only by email to
+the gmail (found in Outlook's "Other" tab): ITMS-90111, App Store
+submissions must use the latest Xcode/SDK RC; our Xcode 26.6 (latest
+GA, iOS 26.5 SDK) no longer qualifies. Fix: owner downloaded Xcode 27
+beta 6 (no RC exists yet) from ADC; installed to
+/Applications/Xcode-27-beta6.app (license accepted via admin prompt;
+26.6 kept). First rebuild failed: Xcode 27 hard-errors pods declaring
+deployment targets 9.0-13.0 (AppAuth, SDWebImage, GoogleSignIn, GTM*,
+RevenueCat, RNSVG bundles). Editing apps/mobile/ios/Podfile did NOTHING
+(workflow is MANAGED: EAS prebuilds into a temp dir every build) — the
+durable fix is the config plugin plugins/withPodTargetFloor.js, which
+injects a 15.1 deployment-target clamp into the generated Podfile.
+Build 44 (1.0.0, iphoneos27.0, 27A5252f) built clean and was uploaded
+via eas submit. Remaining: swap build 41 -> 44 on the version page and
+"Update Review" (the subscriptions stayed Ready for Review). Builds:
+DEVELOPER_DIR=/Applications/Xcode-27-beta6.app/Contents/Developer must
+be exported for eas build --local until 27 goes GA and replaces
+/Applications/Xcode.app. Risk noted: if Apple's gate refuses beta-built
+binaries, resubmit unchanged the day the 27 RC ships.
