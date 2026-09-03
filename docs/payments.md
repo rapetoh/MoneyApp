@@ -487,3 +487,17 @@ DEVELOPER_DIR=/Applications/Xcode-27-beta6.app/Contents/Developer must
 be exported for eas build --local until 27 goes GA and replaces
 /Applications/Xcode.app. Risk noted: if Apple's gate refuses beta-built
 binaries, resubmit unchanged the day the 27 RC ships.
+
+**Sep 3, 2026 (8:15 AM) — SUBMITTED FOR APP STORE REVIEW.** Build 46
+(EAS CLOUD build, image macos-tahoe-26.5-xcode-26.6) attached to
+version 1.0.0 and resubmitted; all four items (app + Murmur Plus group
++ monthly + yearly) are Waiting for Review with no error banner. ROOT
+CAUSE of the Invalid Binary rejections, finally proven: the owner's
+LOCAL Xcode installs carry SEED-LETTERED (beta) SDK builds (41/45 =
+SDK 23F81a, 44 = 24A5422a) because the Mac rode the beta update
+channel; Apple's gate rejects any beta-stamped toolchain. The cloud
+image's released SDK (23A339) passed instantly. RULE GOING FORWARD:
+store-bound builds go through EAS CLOUD (quota resets monthly, reset
+Sep 1); local builds stay fine for TestFlight/dev. Next: review takes
+1-3 days; on approval DO NOT release until the hand-granted plus_status
+test accounts are re-locked (release mode is manual).
