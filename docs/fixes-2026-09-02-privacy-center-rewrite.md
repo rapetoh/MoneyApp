@@ -103,3 +103,71 @@ screen fits one view. Tests 300/300, both tsc clean.
 
 Income coherence (settings figure = recurring income story) is the next
 work item; owner is sending more remarks before it starts.
+
+## Round 3 (same day): Ask insights on Insights + the income story rebuilt
+
+### Ask insight cards now also live on Insights (owner idea, analyzed: yes)
+
+The Ask entry cards (upcoming bill, budget pace, surges, large purchase)
+are the app's best proactive insights and were locked behind opening
+Ask. Now: `AskInsightCard` + `performAskAction` extracted from ask.tsx
+into `src/components/AskInsightCard.tsx` (one implementation, two
+surfaces), and the Insights tab renders a "Highlights" section (top 3
+from the same `computeAskInsights` engine, always current-month, no_data
+filtered) between the hero and Categories. Tapping a card opens Ask;
+the action chip routes identically to Ask's. Verified rendering on the
+simulator. Web Insights page: not yet, follow-up candidate.
+
+### Income: one coherent story (owner mandate: "the story must make sense")
+
+Architecture: `profiles.monthly_income` stopped being client-written
+state. Migration 032 derives it server-side as the SUM of active,
+non-deleted, non-ended recurring CREDIT rules (monthlyEquivalent
+calendar ratios, matching packages/shared/recurrence.ts; profile
+currency only), maintained by triggers on recurring_rules and on
+profile currency change, with a backfill. `monthly_income_source` = the
+single rule's name when exactly one contributes.
+
+Client changes riding it:
+- Onboarding no longer writes monthly_income directly; the recurring
+  credit rule it creates (via migration 013's transaction trigger) now
+  feeds the profile through 032.
+- Mobile Settings > Monthly Income: with income rules, the row routes
+  to /recurring (the source of truth); with none, the editor modal
+  creates a REAL recurring income (credit transaction -> rule ->
+  profile), exactly like onboarding.
+- Web Settings: the income input became a read-only derived display
+  linking to /dashboard/recurring; the form no longer writes the column.
+- New NameIncomeSheet on Today: one-time "Who pays you?" prompt when an
+  active income rule is unnamed or still the localized "Salary"
+  placeholder; renaming the rule flows into monthly_income_source and
+  the merchant logo. New i18n keys x4 (income.name_prompt_*,
+  insights.highlights).
+
+Owner-account effect (verified in prod): his gmail profile had a
+hand-typed 4500/"The20" but NO income rule (his onboarding predated
+migration 013's trigger; his one rule is an unnamed 20,000 DEBIT test
+rule from April). The backfill therefore derived NULL, which is honest;
+setting income through the new Settings flow recreates it properly.
+
+### Applying migration 032 to prod: the runbook that actually works
+
+`supabase db push` fails on this project: the remote history table
+holds 25 timestamp-style versions (SQL-editor era) that don't match the
+local NNN_ files, and `migration repair --status applied NNN` rejects
+non-timestamp versions. DO NOT push. The working path: direct Postgres
+connection with `SUPABASE_DB_PASSWORD` (root .env) through the SESSION
+POOLER `aws-1-us-east-2.pooler.supabase.com:5432`, user
+`postgres.ohaqhwampmyoeaopdybd` (the direct db.<ref> host is IPv6-only
+and unreachable here; aws-0 is the wrong pooler instance). A
+mid-attempt `repair --status reverted` had emptied the history table;
+all 25 rows were re-inserted and verified (26 total). Triggers verified
+present; backfill verified (1 of 6 profiles derived a value).
+
+### Verification (round 3)
+
+- packages/shared vitest 300/300; mobile + web tsc clean; web
+  production build clean.
+- Simulator: Highlights section live on Insights.
+- Prod DB: functions + both triggers exist; backfill ran; owner profile
+  inspected before/after.

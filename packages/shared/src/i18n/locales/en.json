@@ -634,5 +634,9 @@
   "applepay.notif_denied": "Notifications are off for Murmur, enable them in Settings → Notifications to see confirmations.",
   "common.edit": "Edit",
   "applepay.notif_captured": "Captured from Apple Pay",
-  "applepay.amount_unknown": "Couldn't read the amount · Tap to add it"
+  "applepay.amount_unknown": "Couldn't read the amount · Tap to add it",
+  "insights.highlights": "Highlights",
+  "income.name_prompt_title": "Who pays you?",
+  "income.name_prompt_body": "Give your recurring income a name, like your employer or client. Murmur uses it on the record and for the logo.",
+  "income.name_prompt_later": "Later"
 }

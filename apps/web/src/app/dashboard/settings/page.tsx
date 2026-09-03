@@ -337,15 +337,6 @@ export default function SettingsPage() {
     // Parse the income input. Strip thousands separators + currency
     // symbols the user might paste, then `Number()`. Anything that
     // fails to parse saves as null (clear). Negative numbers are
-    // clamped to null too — income can't be negative.
-    const rawIncome = monthlyIncomeInput.trim()
-    let parsedIncome: number | null = null
-    if (rawIncome) {
-      const cleaned = rawIncome.replace(/[,\s$€£¥]/g, '')
-      const n = Number(cleaned)
-      parsedIncome = Number.isFinite(n) && n >= 0 ? n : null
-    }
-
     // `currency_code` is deliberately not written here — a currency
     // change is its own migration (`handleCurrencyChange` below), never
     // a field on this bare label-swap form (fix-plan 2.7).
@@ -354,7 +345,8 @@ export default function SettingsPage() {
       .update({
         display_name: displayName.trim() || null,
         locale,
-        monthly_income: parsedIncome,
+        // monthly_income is not written here anymore: migration 032
+        // derives it from the user's recurring income rules.
       })
       .eq('id', user.id)
     setSaving(false)
@@ -567,23 +559,21 @@ export default function SettingsPage() {
                     </div>
                   </div>
                 </div>
-                {/* Monthly income — fed to Ask Murmur for affordability
-                    reasoning. Same field that exists in mobile Settings →
-                    Preferences. Leaving it blank stores null (the column
-                    has always been nullable). */}
+                {/* Monthly income — read-only since migration 032: the
+                    figure is the live total of the user's recurring
+                    income rules (mobile Settings shows the same). Fed to
+                    Ask Murmur for affordability reasoning. */}
                 <div style={styles.field}>
                   <label style={styles.label}>Monthly income ({currency})</label>
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    value={monthlyIncomeInput}
-                    onChange={(e) => setMonthlyIncomeInput(e.target.value)}
-                    placeholder="Leave blank to skip"
-                    style={styles.input}
-                  />
+                  <div style={{ ...styles.input, background: 'transparent', display: 'flex', alignItems: 'center' }}>
+                    {monthlyIncomeInput ? monthlyIncomeInput : 'Not set'}
+                  </div>
                   <div style={{ fontSize: 12, color: colors.ink3, marginTop: 6 }}>
-                    Used by Ask Murmur to reason about affordability and
-                    savings rate. Stays on your account; never shared.
+                    Comes from your recurring income.{' '}
+                    <a href="/dashboard/recurring" style={{ color: colors.accent, fontWeight: 600 }}>
+                      Manage it in Recurring
+                    </a>
+                    . Used by Ask Murmur for affordability and savings rate.
                   </div>
                 </div>
                 <div style={styles.actions}>

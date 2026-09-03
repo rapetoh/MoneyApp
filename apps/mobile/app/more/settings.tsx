@@ -101,7 +101,7 @@ function formatLastSynced(iso: string | null, locale: Locale): string {
 export default function SettingsScreen() {
   const { user } = useAuth()
   const { profile, updateProfile, refetch: refetchProfile } = useProfile(user?.id)
-  const { transactions } = useTransactions(user?.id)
+  const { transactions, createTransaction } = useTransactions(user?.id)
   const { categories } = useCategories(user?.id)
   const { budget, setBudget } = useActiveBudget(user?.id)
   const { rules: recurringRules } = useRecurringRules(user?.id)
@@ -567,7 +567,11 @@ export default function SettingsScreen() {
           <SetRow
             label={t('settings.monthly_income', locale)}
             detail={incomeDisplay}
-            onPress={() => setIncomeModal(true)}
+            onPress={() =>
+              recurringRules.some((r) => r.direction === 'credit' && r.is_active && !r.is_deleted)
+                ? router.push('/recurring')
+                : setIncomeModal(true)
+            }
           />
           <SetRow
             label={t('settings.recurring', locale)}
@@ -687,16 +691,35 @@ export default function SettingsScreen() {
         onClose={() => setBudgetModal(false)}
       />
 
-      {/* Monthly income modal — edits profile.monthly_income + _source */}
+      {/* Monthly income modal. Only reachable when the user has NO
+          recurring income yet (the row routes to /recurring otherwise).
+          Saving creates a real recurring income exactly like onboarding
+          does: a credit transaction whose server trigger (migration 013)
+          creates the monthly rule, whose trigger (migration 032) then
+          writes profiles.monthly_income. One story, one writer. */}
       <IncomeEditorModal
         visible={incomeModal}
         initialAmount={profile?.monthly_income ?? null}
         initialSource={profile?.monthly_income_source ?? null}
         currency={currency}
         locale={locale}
-        onSave={async (amount, source) =>
-          updateProfile({ monthly_income: amount, monthly_income_source: source })
-        }
+        onSave={async (amount, source) => {
+          if (amount == null || amount <= 0) return true
+          const { error } = await createTransaction({
+            amount,
+            direction: 'credit',
+            currency_code: currency,
+            merchant: source?.trim() || t('onboarding.income.default_name', locale),
+            note: t('onboarding.income.txn_note', locale),
+            category_id: null,
+            payment_method: 'bank_transfer',
+            is_recurring: true,
+            recurring_frequency: 'monthly',
+          })
+          if (error) return false
+          await refetchProfile()
+          return true
+        }}
         onClose={() => setIncomeModal(false)}
       />
 

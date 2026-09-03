@@ -9,6 +9,7 @@ import { useCategories } from '../../src/hooks/useCategories'
 import { useProfile } from '../../src/hooks/useProfile'
 import { useActiveBudget, budgetStatusFor } from '../../src/hooks/useBudget'
 import { useRecurringRules } from '../../src/hooks/useRecurringRules'
+import { NameIncomeSheet } from '../../src/components/NameIncomeSheet'
 import { useManualRefresh } from '../../src/hooks/useManualRefresh'
 import { RecurringPatternBanner } from '../../src/components/RecurringPatternBanner'
 import type { RecurringPatternCandidate } from '../../src/services/recurringPatternDetector'
@@ -157,7 +158,7 @@ export default function TodayScreen() {
   const { categoryMap } = useCategories(user?.id)
   const { profile } = useProfile(user?.id)
   const { budget, error: budgetError, refetch: refetchBudget } = useActiveBudget(user?.id)
-  const { rules: recurringRules, createRule } = useRecurringRules(user?.id)
+  const { rules: recurringRules, createRule, updateRule } = useRecurringRules(user?.id)
   const { refreshing, onRefresh } = useManualRefresh(user?.id, [refetchBudget])
   const router = useRouter()
 
@@ -425,6 +426,16 @@ export default function TodayScreen() {
           </View>
         )}
       </ScrollView>
+      {/* One-time "who pays you?" prompt for an unnamed recurring income
+          (owner request Sep 2 2026): onboarding may have skipped the
+          employer name; the record and the logo want it. Renaming the
+          rule flows through migration 032 into Settings' Monthly Income
+          source. */}
+      <NameIncomeSheet
+        rules={recurringRules}
+        locale={locale}
+        onRename={(id, name) => updateRule(id, { name })}
+      />
     </SafeAreaView>
   )
 }

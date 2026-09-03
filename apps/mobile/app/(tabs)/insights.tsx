@@ -3,17 +3,21 @@ import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl} from 're
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import Svg, { Path, Defs, LinearGradient, Stop } from 'react-native-svg'
+import { useRouter } from 'expo-router'
 import { useAuth } from '../../src/hooks/useAuth'
 import { useProfile } from '../../src/hooks/useProfile'
 import { useTransactions } from '../../src/hooks/useTransactions'
 import { useCategories } from '../../src/hooks/useCategories'
 import { useRecurringRules } from '../../src/hooks/useRecurringRules'
+import { useActiveBudget, budgetStatusFor } from '../../src/hooks/useBudget'
 import { useManualRefresh } from '../../src/hooks/useManualRefresh'
 import { useInsightsUnlock } from '../../src/hooks/useInsightsUnlock'
 import { syncManager } from '../../src/services/sync/SyncManager'
 import { Money } from '../../src/components/Money'
 import { HistoryHeatmap } from '../../src/components/HistoryHeatmap'
 import { BottomSheet } from '../../src/components/BottomSheet'
+import { AskInsightCard, performAskAction } from '../../src/components/AskInsightCard'
+import { buildAskData } from '../../src/services/askMurmurClient'
 import { Colors, Typography, Hairline, useTabBarClearance } from '../../src/theme'
 import {
   formatCurrency,
@@ -22,6 +26,7 @@ import {
   addMonthsClamped,
   civilDateTimeToInstant,
   daysBetween,
+  computeAskInsights,
   forecastMonthly,
   isSpend,
   localParts,
@@ -33,7 +38,7 @@ import {
   type ForecastTxn,
   type Locale,
 } from '@voice-expense/shared'
-import type { Transaction } from '@voice-expense/shared'
+import type { AskInsight, Transaction } from '@voice-expense/shared'
 
 function pad2(n: number): string {
   return String(n).padStart(2, '0')
@@ -195,8 +200,10 @@ export default function InsightsScreen() {
   // read used to render identically to "nothing to show" in the
   // categories card below (`transactions` stays `[]` either way).
   const { transactions, error: transactionsError } = useTransactions(user?.id)
-  const { categoryMap } = useCategories(user?.id)
+  const { categories, categoryMap } = useCategories(user?.id)
   const { rules, refetch: refetchRules } = useRecurringRules(user?.id)
+  const router = useRouter()
+  const { budget } = useActiveBudget(user?.id)
   const { refreshing, onRefresh } = useManualRefresh(user?.id, [refetchRules])
 
   const locale = (profile?.locale ?? 'en') as Locale
@@ -414,6 +421,41 @@ export default function InsightsScreen() {
   // Single-line month label used inside the forecast serif sentence.
   const selectedMonthName = monthLabel(selY, selM, tz, locale, { month: 'long' })
 
+  // Highlights — the same ranked, deterministic insight cards Ask Murmur
+  // opens with (owner request Sep 2 2026: surface them here too). One
+  // engine (`computeAskInsights`), one card component; this page shows
+  // the top 3, always for the CURRENT month regardless of the month
+  // picker (the cards are about now: upcoming bill, pace, surges).
+  const budgetStatus = useMemo(
+    () => budgetStatusFor(budget, transactions, rules, tz),
+    [budget, transactions, rules, tz],
+  )
+  const highlights = useMemo<AskInsight[]>(() => {
+    const snap = buildAskData({
+      locale,
+      currency,
+      monthly_income: profile?.monthly_income ?? null,
+      transactions,
+      recurringRules: rules,
+      categories,
+      timeZone: tz,
+      budget,
+      budgetStatus,
+    })
+    return computeAskInsights({
+      transactions: snap.transactions,
+      rules: snap.recurring_rules,
+      budget: snap.budget,
+      monthly_income: profile?.monthly_income ?? null,
+      now_utc: snap.now_utc,
+      time_zone: snap.time_zone,
+      currency,
+      locale,
+    })
+      .filter((i) => i.kind !== 'no_data')
+      .slice(0, 3)
+  }, [locale, currency, profile?.monthly_income, transactions, rules, categories, tz, budget, budgetStatus])
+
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView
@@ -501,6 +543,26 @@ export default function InsightsScreen() {
             />
           </View>
         </View>
+
+        {/* Highlights — Ask Murmur's ranked insight cards (see memo above).
+            Tapping a card opens Ask (same card, ready to discuss); the
+            action chip routes exactly as it does on Ask. */}
+        {highlights.length > 0 && (
+          <View style={styles.sectionWrap}>
+            <Text style={styles.sectionLabel}>{t('insights.highlights', locale)}</Text>
+            <View style={styles.highlightList}>
+              {highlights.map((ins) => (
+                <AskInsightCard
+                  key={ins.id}
+                  insight={ins}
+                  locale={locale}
+                  onAsk={() => router.push('/more/ask')}
+                  onAction={(a) => performAskAction(router, a)}
+                />
+              ))}
+            </View>
+          </View>
+        )}
 
         {/* Categories */}
         <View style={styles.sectionWrap}>
@@ -654,6 +716,7 @@ export default function InsightsScreen() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
+  highlightList: { gap: 10 },
   safe: { flex: 1, backgroundColor: Colors.background },
   // `paddingBottom` set per-instance above from `useTabBarClearance()`
   // (audit 01-F13, fix-plan 1.8/2.14).

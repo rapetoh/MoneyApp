@@ -634,5 +634,9 @@
   "applepay.notif_denied": "Las notificaciones están desactivadas para Murmur, actívalas en Ajustes → Notificaciones para ver las confirmaciones.",
   "common.edit": "Editar",
   "applepay.notif_captured": "Capturado de Apple Pay",
-  "applepay.amount_unknown": "No se pudo leer el importe · Toca para añadirlo"
+  "applepay.amount_unknown": "No se pudo leer el importe · Toca para añadirlo",
+  "insights.highlights": "Destacados",
+  "income.name_prompt_title": "¿Quién te paga?",
+  "income.name_prompt_body": "Ponle un nombre a tu ingreso recurrente, por ejemplo tu empleador o cliente. Murmur lo usa en el registro y para el logo.",
+  "income.name_prompt_later": "Más tarde"
 }

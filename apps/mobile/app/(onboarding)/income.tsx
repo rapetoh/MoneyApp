@@ -61,9 +61,11 @@ export default function IncomeScreen() {
     setError(null)
     const useIncome = withIncome && amountNum > 0
 
+    // monthly_income / _source are no longer written here: migration 032
+    // derives them server-side from the recurring credit rule the
+    // transaction below creates, so the Settings figure always equals the
+    // recurring-income total (owner mandate Sep 2 2026: one coherent story).
     const profileSaved = await updateProfile({
-      monthly_income: useIncome ? amountNum : null,
-      monthly_income_source: useIncome && source.trim() ? source.trim() : null,
       onboarding_completed_at: new Date().toISOString(),
     })
 
