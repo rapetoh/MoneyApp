@@ -451,3 +451,16 @@ dialog and the tester clicks "More info" then "Run anyway". Windows
 auto-update via latest.yml works for future versions; a code-signing
 certificate for Windows remains an open decision (cost vs SmartScreen
 reputation).
+
+**Sep 2, 2026 (night) — App Store submission prep:** owner uploading
+screenshots and filling ASC for the 1.0 review. Shipped to support it:
+TestFlight **build 41** (version 1.0.0) built locally and uploaded via
+`eas submit` (submission 91261f63); carries the Privacy Center rewrite,
+the slimmed privacy screen, Insights Highlights, and the income
+coherence work (migration 032, applied to prod). App Review demo
+account created and login-verified: review@itsmurmur.com (password with
+the owner). Full paste-ready metadata (description, keywords, privacy
+questionnaire answers, review notes) delivered in-session. Still open
+before Submit: attach build 41, attach the Murmur Plus subscription
+group to the version, Yearly review screenshot. Before public RELEASE:
+re-lock the hand-granted plus_status test accounts.
