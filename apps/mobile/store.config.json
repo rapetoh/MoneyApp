@@ -84,6 +84,16 @@
       "parentalControls": false,
       "userGeneratedContent": false
     },
-    "copyright": "2026 Roch Apetoh"
+    "copyright": "2026 Roch Apetoh",
+    "review": {
+      "firstName": "Roch",
+      "lastName": "Apetoh",
+      "email": "rochapetoh@hotmail.com",
+      "phone": "+1 319-320-8147",
+      "demoUsername": "review@itsmurmur.com",
+      "demoPassword": "Murmur-Review-8d9202f5",
+      "demoRequired": true,
+      "notes": "Sign in with the demo account via 'More options' (email) on the sign-in screen. Core flow: tap the mic on the Today tab and say e.g. 'fifteen dollars at Starbucks'; the expense files itself. Microphone and speech recognition permissions exist only for this. The Murmur Plus subscription (7-day free trial) is under Settings > Subscription. Apple Pay capture is an optional Shortcuts automation users set up themselves; it is not needed to review the app."
+    }
   }
 }
