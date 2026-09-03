@@ -7,7 +7,7 @@ import { Tappable } from './Tappable'
 // Reproductions of SetGroup / SetRow from docs/money-app/project/
 // mobile-screens-4.jsx. Reused by the Settings screen for its visual
 // primitives. (Privacy Center — app/more/privacy.tsx — keeps its own local
-// PrivacyRow; the two never shared this module's copy.)
+// the old PrivacyRow; the two never shared this module's copy.)
 
 export function SetGroup({ label, children }: { label: string; children: React.ReactNode }) {
   return (

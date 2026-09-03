@@ -143,8 +143,7 @@ export default function PrivacyPage() {
             <td>Google</td>
             <td>Sign in with Google (if you choose it); merchant logos</td>
             <td>
-              Sign-in only if used; for logos, the merchant name alone (disclosed in the app under
-              Settings → Privacy)
+              Sign-in only if used; for logos, the merchant name alone
             </td>
           </tr>
           <tr>

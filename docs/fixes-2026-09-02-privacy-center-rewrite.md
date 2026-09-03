@@ -81,3 +81,25 @@ Changes (mobile `privacy.tsx`, web dashboard settings, locales x4):
 Web/desktop get it on the next Vercel deploy (this commit). Mobile
 rides the next TestFlight build; no native change, but iOS-mandate =
 TestFlight only, so it lands with the next submitted build.
+
+## Round 2 (same day): Privacy Center slimmed to its actual job
+
+Owner follow-up: the "What's stored where" rows (naming OpenAI, Google,
+our servers) do not belong in the app UI at all; that detail belongs in
+the privacy policy. None of it is legally required in-app: the policy
+must disclose third-party processing (it does, including the
+subprocessor table), Apple wants data TYPES in the questionnaire, and
+nothing anywhere requires naming models, databases or hosting.
+
+Final screen: headline + three-sentence lead, "Your data" (export /
+delete), "Legal" (Privacy Policy / Terms). Removed: the stored-where
+group, PrivacyRow component + styles, and 9 more locale keys
+(group_where, on_device_*, cloud_*, merchant_logos_*, openai_*) across
+en/fr/es/pt. Policy page: dropped its now-stale "disclosed in the app
+under Settings > Privacy" cross-reference (the policy already documents
+on-device voice, receipts flow, and the Google logo lookup, so nothing
+was lost by the removal). Verified live on the simulator: the whole
+screen fits one view. Tests 300/300, both tsc clean.
+
+Income coherence (settings figure = recurring income story) is the next
+work item; owner is sending more remarks before it starts.

@@ -14,8 +14,8 @@ import { Colors, Typography, Hairline } from '../../src/theme'
 import { t, LEGAL_URLS, type Locale } from '@voice-expense/shared'
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Sub-components — match SetGroup / SetRow / PrivacyRow in
-// docs/money-app/project/mobile-screens-4.jsx
+// Sub-components. Descended from SetGroup / SetRow in
+// docs/money-app/project/mobile-screens-4.jsx, slimmed since.
 // ─────────────────────────────────────────────────────────────────────────────
 
 function SetGroup({ label, children }: { label: string; children: React.ReactNode }) {
@@ -23,30 +23,6 @@ function SetGroup({ label, children }: { label: string; children: React.ReactNod
     <View style={styles.group}>
       <Text style={styles.groupLabel}>{label}</Text>
       <View style={styles.groupCard}>{children}</View>
-    </View>
-  )
-}
-
-function PrivacyRow({
-  icon,
-  label,
-  detail,
-  last,
-}: {
-  icon: string
-  label: string
-  detail: string
-  last?: boolean
-}) {
-  return (
-    <View style={[styles.row, !last && styles.rowDivider]}>
-      <View style={styles.privacyIcon}>
-        <Text style={styles.privacyIconGlyph}>{icon}</Text>
-      </View>
-      <View style={styles.rowInfo}>
-        <Text style={styles.rowLabel}>{label}</Text>
-        <Text style={styles.rowDetail}>{detail}</Text>
-      </View>
     </View>
   )
 }
@@ -85,7 +61,8 @@ function SetRow({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Screen — matches S_Privacy in mobile-screens-4.jsx
+// Screen. Slimmed Sep 2 2026 (owner): statement + data controls + legal
+// links only; the how-it-works detail lives in the privacy policy.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function PrivacyScreen() {
@@ -197,38 +174,6 @@ export default function PrivacyScreen() {
             <Text style={styles.headline}>{t('privacy.title', locale)}</Text>
             <Text style={styles.lead}>{t('privacy.lead', locale)}</Text>
           </View>
-
-          {/* What's stored where. Four rows, one per real data flow
-              (fix-plan 3.5 / audit 02-F4, 02-F16, 01-F28; corrected
-              Aug 29 2026): transcripts stay local, transactions sync
-              through OUR servers (Supabase — the mockup's "Your iCloud"
-              row described an architecture we never built and was a
-              false claim), merchant-logo lookups are a direct
-              device→Google request, and extraction sends transcript
-              text + receipt photos to OpenAI. */}
-          <SetGroup label={t('privacy.group_where', locale)}>
-            <PrivacyRow
-              icon="📱"
-              label={t('privacy.on_device_label', locale)}
-              detail={t('privacy.on_device_detail', locale)}
-            />
-            <PrivacyRow
-              icon="☁️"
-              label={t('privacy.cloud_label', locale)}
-              detail={t('privacy.cloud_detail', locale)}
-            />
-            <PrivacyRow
-              icon="🖼️"
-              label={t('privacy.merchant_logos_label', locale)}
-              detail={t('privacy.merchant_logos_detail', locale)}
-            />
-            <PrivacyRow
-              icon="🌐"
-              label={t('privacy.openai_label', locale)}
-              detail={t('privacy.openai_detail', locale)}
-              last
-            />
-          </SetGroup>
 
           {/* Your data (GDPR rights, free for every user). Export lands
               as a machine-readable JSON dump via the system share sheet;
@@ -359,7 +304,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
 
-  // Rows (match SetRow + PrivacyRow)
+  // Rows (match SetRow)
   row: {
     paddingHorizontal: 18,
     paddingVertical: 14,
@@ -373,32 +318,6 @@ const styles = StyleSheet.create({
   },
   rowPressed: { opacity: 0.6 },
 
-  // Privacy-specific row (icon tile + 2-line label/detail)
-  privacyIcon: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
-    backgroundColor: Colors.accentSoft ?? Colors.primaryLight,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 4,
-  },
-  privacyIconGlyph: {
-    fontSize: 17,
-  },
-  rowInfo: { flex: 1 },
-  rowLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    fontFamily: Typography.fontFamily.sansSemiBold,
-    color: Colors.ink ?? Colors.text,
-  },
-  rowDetail: {
-    fontSize: 12,
-    color: Colors.ink3 ?? Colors.textSecondary,
-    fontFamily: Typography.fontFamily.sans,
-    marginTop: 1,
-  },
 
   // Settings-style row (single line label + optional detail + toggle/chevron)
   rowLabelSingle: {
