@@ -1,0 +1,89 @@
+{
+  "configVersion": 0,
+  "apple": {
+    "version": "1.0.0",
+    "release": {
+      "automaticRelease": false
+    },
+    "info": {
+      "en-US": {
+        "title": "Murmur: Voice Expense Tracker",
+        "screenshots": {
+          "APP_IPHONE_65": [
+            "store/apple/screenshot/en-US/APP_IPHONE_65/01-hero.png",
+            "store/apple/screenshot/en-US/APP_IPHONE_65/02-voice.png",
+            "store/apple/screenshot/en-US/APP_IPHONE_65/03-confirm.png",
+            "store/apple/screenshot/en-US/APP_IPHONE_65/10-free-forever.png",
+            "store/apple/screenshot/en-US/APP_IPHONE_65/04-apple-pay.png",
+            "store/apple/screenshot/en-US/APP_IPHONE_65/08-ask-murmur.png",
+            "store/apple/screenshot/en-US/APP_IPHONE_65/09-privacy.png",
+            "store/apple/screenshot/en-US/APP_IPHONE_65/07-recurring.png",
+            "store/apple/screenshot/en-US/APP_IPHONE_65/06-budgets.png",
+            "store/apple/screenshot/en-US/APP_IPHONE_65/05-insights.png"
+          ],
+          "APP_IPAD_PRO_3GEN_129": [
+            "store/apple/screenshot/en-US/APP_IPAD_PRO_3GEN_129/01-hero.png",
+            "store/apple/screenshot/en-US/APP_IPAD_PRO_3GEN_129/02-voice-flow.png",
+            "store/apple/screenshot/en-US/APP_IPAD_PRO_3GEN_129/04-patterns.png",
+            "store/apple/screenshot/en-US/APP_IPAD_PRO_3GEN_129/03-understand.png",
+            "store/apple/screenshot/en-US/APP_IPAD_PRO_3GEN_129/05-private.png"
+          ]
+        },
+        "subtitle": "Speak your spending",
+        "description": "Murmur is the fastest way to know where your money goes. Say it once and it's filed: \"twelve fifty at Chipotle\" becomes a categorized expense before your phone is back in your pocket.\n\nNo bank logins. No spreadsheets. No forms.\n\nSPEAK, AND IT'S FILED\nOne tap, one sentence. Murmur hears the amount, the place and the category, in your language, and files it instantly. Income too: say what you earned and it lands on the right side of the ledger.\n\nPAY, AND IT CAPTURES ITSELF\nPay with Apple Pay and Murmur logs the purchase on its own: amount, merchant, logo and category, with a quiet notification you can edit in one tap. Even pay-at-pump purchases that report no amount get parked and resolved, never lost.\n\nSEE THE MONTH CLEARLY\nInsights shows what you spent, how it compares to last month, where it went by category, and highlights that matter: an upcoming bill, a budget running hot, a purchase that is 8x your usual.\n\nBUDGETS AND RECURRING\nSet a budget and watch the daily pace. Recurring bills and income are first-class: Murmur knows what is coming and what is left after it.\n\nASK MURMUR (PLUS)\nAsk anything about your own numbers: \"how am I doing against my budget?\", \"what should I cancel?\" Answers come from your data, instantly.\n\nYOUR DATA IS YOURS\nMurmur never connects to your bank. Your voice is turned into text on your phone whenever the device supports it, and audio is never stored. Export everything or erase everything, anytime.\n\nEVERYWHERE YOU ARE\nMurmur syncs across iPhone, the web dashboard, and the Mac and Windows apps at itsmurmur.com.\n\nMURMUR PLUS\nUnlimited voice entries, Apple Pay capture, Ask Murmur, receipt scanning and exports (CSV, JSON, PDF). Monthly or yearly, both with a 7-day free trial. Prices are shown in the app before you subscribe. Subscriptions renew automatically unless cancelled at least 24 hours before the period ends, and are managed in your App Store account settings.\n\nTerms of Service: https://itsmurmur.com/terms\nPrivacy Policy: https://itsmurmur.com/privacy",
+        "keywords": [
+          "expense",
+          "tracker",
+          "voice",
+          "budget",
+          "money",
+          "spending",
+          "finance",
+          "ai",
+          "apple pay",
+          "budgeting",
+          "bills",
+          "subscription"
+        ],
+        "marketingUrl": "https://itsmurmur.com",
+        "supportUrl": "https://itsmurmur.com",
+        "privacyPolicyUrl": "https://itsmurmur.com/privacy",
+        "promoText": "One sentence and it's filed. Tap to pay and it captures itself. Murmur keeps your money story between you and your phone."
+      }
+    },
+    "categories": [
+      "FINANCE",
+      "PRODUCTIVITY"
+    ],
+    "advisory": {
+      "ageRatingOverride": "NONE",
+      "alcoholTobaccoOrDrugUseOrReferences": "NONE",
+      "contests": "NONE",
+      "gambling": false,
+      "gamblingSimulated": "NONE",
+      "horrorOrFearThemes": "NONE",
+      "kidsAgeBand": null,
+      "koreaAgeRatingOverride": "NONE",
+      "lootBox": false,
+      "matureOrSuggestiveThemes": "NONE",
+      "medicalOrTreatmentInformation": "NONE",
+      "profanityOrCrudeHumor": "NONE",
+      "sexualContentGraphicAndNudity": "NONE",
+      "sexualContentOrNudity": "NONE",
+      "unrestrictedWebAccess": false,
+      "violenceCartoonOrFantasy": "NONE",
+      "violenceRealistic": "NONE",
+      "violenceRealisticProlongedGraphicOrSadistic": "NONE",
+      "advertising": false,
+      "ageAssurance": false,
+      "ageRatingOverrideV2": "NONE",
+      "developerAgeRatingInfoUrl": null,
+      "gunsOrOtherWeapons": "NONE",
+      "healthOrWellnessTopics": false,
+      "messagingAndChat": false,
+      "parentalControls": false,
+      "userGeneratedContent": false
+    },
+    "copyright": "2026 Roch Apetoh"
+  }
+}
