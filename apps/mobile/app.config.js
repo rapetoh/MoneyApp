@@ -30,6 +30,30 @@ module.exports = {
         // Connect never shows the "Missing Compliance" dialog again.
         ITSAppUsesNonExemptEncryption: false,
       },
+      // App privacy manifest (App Store 5.1.1). Expo writes the accessed-
+      // API reasons for its own modules; this declares what the app itself
+      // collects, matching the privacy policy at itsmurmur.com/privacy and
+      // the App Privacy answers in App Store Connect: account email and
+      // display name, the account id, the user's own transactions and
+      // budgets (financial info), the Plus subscription state, and the
+      // text of voice entries / receipts / Ask conversations. Everything
+      // is linked to the account, nothing is used for tracking.
+      privacyManifests: {
+        NSPrivacyTracking: false,
+        NSPrivacyCollectedDataTypes: [
+          'NSPrivacyCollectedDataTypeEmailAddress',
+          'NSPrivacyCollectedDataTypeName',
+          'NSPrivacyCollectedDataTypeUserID',
+          'NSPrivacyCollectedDataTypeOtherFinancialInfo',
+          'NSPrivacyCollectedDataTypePurchaseHistory',
+          'NSPrivacyCollectedDataTypeOtherUserContent',
+        ].map((type) => ({
+          NSPrivacyCollectedDataType: type,
+          NSPrivacyCollectedDataTypeLinked: true,
+          NSPrivacyCollectedDataTypeTracking: false,
+          NSPrivacyCollectedDataTypePurposes: ['NSPrivacyCollectedDataTypePurposeAppFunctionality'],
+        })),
+      },
     },
     android: {
       adaptiveIcon: {
@@ -52,7 +76,17 @@ module.exports = {
       // Xcode 27 deployment-target clamp for old pods (ITMS-90111 fix).
       './plugins/withPodTargetFloor.js',
       'expo-router',
-      'expo-secure-store',
+      // Purpose strings (App Store 5.1.1, Sep 8 2026 rejection): every
+      // NS*UsageDescription says what Murmur does with the resource and
+      // what it never does. The library defaults ("Allow Murmur to access
+      // your photos") are exactly what App Review rejects as insufficient.
+      [
+        'expo-secure-store',
+        {
+          faceIDPermission:
+            'Murmur uses Face ID only to protect the sign-in details it keeps on this device.',
+        },
+      ],
       // Native launch screen: the Coin & Wave mark, `SPLASH_IMAGE_WIDTH`
       // pt wide, centered on the cream canvas — iOS storyboard and the
       // Android 12+ system splash alike. `src/components/LaunchScreen.tsx`
@@ -86,14 +120,19 @@ module.exports = {
       [
         'expo-speech-recognition',
         {
-          microphonePermission: 'Allow Murmur to use the microphone to record expenses.',
-          speechRecognitionPermission: 'Allow Murmur to recognize your speech to log expenses.',
+          microphonePermission:
+            'Murmur listens only while you hold the mic button, to hear the expense you say out loud. Audio is never stored.',
+          speechRecognitionPermission:
+            'Murmur turns what you say into text so it can file the amount, place and category for you. Audio is never stored.',
         },
       ],
       [
         'expo-image-picker',
         {
-          cameraPermission: 'Allow Murmur to use the camera to scan receipts and paychecks.',
+          cameraPermission:
+            'Murmur uses the camera only to scan a receipt or paycheck you point it at, so the amount and place can be filled in for you.',
+          photosPermission:
+            'Murmur opens your photo library only when you choose a receipt or paycheck image, so the amount and place can be filled in for you.',
         },
       ],
       // Android-only: adds MoneyNotificationListenerService to AndroidManifest.xml

@@ -7,9 +7,8 @@ import { useAuth } from '../../src/hooks/useAuth'
 import { useProfile } from '../../src/hooks/useProfile'
 import { useTransactions } from '../../src/hooks/useTransactions'
 import { useCategories } from '../../src/hooks/useCategories'
-import { supabase } from '../../src/lib/supabase'
 import { exportAndShare } from '../../src/services/exportData'
-import { wipeAllUserData } from '../../src/services/sync/transactionStore'
+import { useDeleteAccount } from '../../src/hooks/useDeleteAccount'
 import { Colors, Typography, Hairline } from '../../src/theme'
 import { t, LEGAL_URLS, type Locale } from '@voice-expense/shared'
 
@@ -75,7 +74,6 @@ export default function PrivacyScreen() {
   const router = useRouter()
 
   const [exporting, setExporting] = useState(false)
-  const [deleting, setDeleting] = useState(false)
 
   // Privacy's Export-all is the GDPR right to data portability — free
   // for every user, not Plus-gated (the convenience exporter in Settings
@@ -94,58 +92,10 @@ export default function PrivacyScreen() {
     }
   }
 
-  // GDPR right to erasure. Calls the server-side `delete-user` Edge
-  // Function (the only path that can also remove the auth.users row —
-  // SDK calls can't because they need the service-role key), then wipes
-  // local SQLite, then signs out. The destructive-style Alert is the
-  // confirmation gate; deletion happens only on the second tap.
-  async function handleDeleteAll() {
-    if (deleting || !user?.id) return
-    Alert.alert(
-      t('privacy.delete_all_title', locale),
-      t('privacy.delete_all_body', locale),
-      [
-        { text: t('common.cancel', locale), style: 'cancel' },
-        {
-          text: t('privacy.delete_all_confirm', locale),
-          style: 'destructive',
-          onPress: async () => {
-            setDeleting(true)
-            try {
-              const { data: sessionData } = await supabase.auth.getSession()
-              const token = sessionData?.session?.access_token
-              if (!token) throw new Error('Not authenticated')
-
-              const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL
-              const res = await fetch(`${supabaseUrl}/functions/v1/delete-user`, {
-                method: 'POST',
-                headers: {
-                  Authorization: `Bearer ${token}`,
-                  'Content-Type': 'application/json',
-                },
-              })
-              if (!res.ok) {
-                const body = (await res.json().catch(() => ({}))) as { error?: string }
-                throw new Error(body.error ?? `HTTP ${res.status}`)
-              }
-
-              // Server confirms the account is gone — clear the local
-              // mirror so a re-sign-up on the same device starts truly
-              // empty, then sign out (invalidates the cached session).
-              await wipeAllUserData(user.id)
-              await supabase.auth.signOut()
-              // The root layout's auth listener will route to /(auth)/sign-in
-              // when the session clears; no manual router.replace needed.
-            } catch (err) {
-              const message = err instanceof Error ? err.message : String(err)
-              Alert.alert(t('privacy.delete_all_failed', locale), message)
-              setDeleting(false)
-            }
-          },
-        },
-      ],
-    )
-  }
+  // GDPR right to erasure / App Store 5.1.1(v). The same confirm-then-
+  // delete flow Settings > Account offers (useDeleteAccount): server-side
+  // `delete-user` Edge Function, local wipe, sign-out.
+  const { deleting, requestDeleteAccount } = useDeleteAccount(user?.id, locale)
 
   return (
     <>
@@ -193,7 +143,7 @@ export default function PrivacyScreen() {
             />
             <SetRow
               label={deleting ? t('privacy.delete_all_busy', locale) : t('privacy.delete_all', locale)}
-              onPress={handleDeleteAll}
+              onPress={requestDeleteAccount}
               danger
               last
             />

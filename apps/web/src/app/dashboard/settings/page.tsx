@@ -231,7 +231,7 @@ export default function SettingsPage() {
   async function handleDeleteAll() {
     if (deleting) return
     const confirmed = window.confirm(
-      'Delete everything permanently?\n\nWe will remove every transaction, budget, recurring rule, category, and Ask conversation from your account, then sign you out. This cannot be undone.',
+      'Delete your account?\n\nThis permanently deletes your Murmur account and everything in it: transactions, budgets, recurring rules, categories and Ask conversations. A Murmur Plus subscription is managed by Apple and is not cancelled by deleting the account. This cannot be undone.',
     )
     if (!confirmed) return
     setDeleting(true)
@@ -773,8 +773,8 @@ export default function SettingsPage() {
                 }
               />
               <SettingRow
-                label="Delete everything permanently"
-                sub="Removes your account and all data. Cannot be undone."
+                label="Delete account"
+                sub="Permanently removes your account and all its data. Cannot be undone."
                 right={
                   <button
                     type="button"

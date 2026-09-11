@@ -156,8 +156,8 @@ export default function PrivacyPage() {
 
       <h2>How long we keep it</h2>
       <p>
-        For as long as your account exists. Deleting your account (Settings → Privacy → Delete
-        everything) permanently removes your transactions, budgets, categories, recurring rules,
+        For as long as your account exists. Deleting your account (Settings → Account → Delete
+        account, also in the Privacy Center) permanently removes your transactions, budgets, categories, recurring rules,
         conversations, devices, profile and sign-in record; database backups are purged on their
         rolling schedule shortly after. You can export everything at any time as CSV, JSON or PDF.
       </p>

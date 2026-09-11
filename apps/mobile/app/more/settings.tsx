@@ -36,6 +36,7 @@ import {
 import { exportAndShare, type ExportFormat } from '../../src/services/exportData'
 import { useCategories } from '../../src/hooks/useCategories'
 import { usePlusStatus } from '../../src/hooks/usePlusStatus'
+import { useDeleteAccount } from '../../src/hooks/useDeleteAccount'
 import { syncManager } from '../../src/services/sync/SyncManager'
 import {
   getDeadLetterEntries,
@@ -129,6 +130,9 @@ export default function SettingsScreen() {
   } | null>(null)
 
   const locale = (profile?.locale ?? 'en') as Locale
+  // App Store 5.1.1(v): account deletion lives next to the account, not
+  // only inside the Privacy Center. Same flow both places.
+  const { deleting: deletingAccount, requestDeleteAccount } = useDeleteAccount(user?.id, locale)
   // Settings copy for the subscription, derived only from the server-
   // written entitlement columns (payments, Aug 16 2026).
   const plan = describePlus(profile)
@@ -509,6 +513,18 @@ export default function SettingsScreen() {
             label={t('settings.timezone', locale)}
             detail={deviceTimeZone}
             chevron={false}
+          />
+          {/* Account deletion (App Store 5.1.1(v), Sep 8 2026 rejection):
+              the row a reviewer looks for sits with the account itself.
+              The Privacy Center keeps its copy; both run useDeleteAccount. */}
+          <SetRow
+            label={
+              deletingAccount
+                ? t('privacy.delete_all_busy', locale)
+                : t('privacy.delete_all', locale)
+            }
+            onPress={requestDeleteAccount}
+            danger
             last
           />
         </SetGroup>
