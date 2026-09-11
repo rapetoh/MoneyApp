@@ -65,3 +65,6 @@ coverage/
 # TypeScript incremental build cache
 **/tsconfig.tsbuildinfo
 build-artifacts/
+
+# Local device builds, never committed (three ~60MB files showed up untracked)
+*.ipa

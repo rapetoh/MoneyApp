@@ -13,7 +13,6 @@
             "store/apple/screenshot/en-US/APP_IPHONE_65/01-hero.png",
             "store/apple/screenshot/en-US/APP_IPHONE_65/02-voice.png",
             "store/apple/screenshot/en-US/APP_IPHONE_65/03-confirm.png",
-            "store/apple/screenshot/en-US/APP_IPHONE_65/10-free-forever.png",
             "store/apple/screenshot/en-US/APP_IPHONE_65/04-apple-pay.png",
             "store/apple/screenshot/en-US/APP_IPHONE_65/08-ask-murmur.png",
             "store/apple/screenshot/en-US/APP_IPHONE_65/09-privacy.png",
@@ -30,7 +29,7 @@
           ]
         },
         "subtitle": "Speak your spending",
-        "description": "Murmur is the fastest way to know where your money goes. Say it once and it's filed: \"twelve fifty at Chipotle\" becomes a categorized expense before your phone is back in your pocket.\n\nNo bank logins. No spreadsheets. No forms.\n\nSPEAK, AND IT'S FILED\nOne tap, one sentence. Murmur hears the amount, the place and the category, in your language, and files it instantly. Income too: say what you earned and it lands on the right side of the ledger.\n\nPAY, AND IT CAPTURES ITSELF\nPay with Apple Pay and Murmur logs the purchase on its own: amount, merchant, logo and category, with a quiet notification you can edit in one tap. Even pay-at-pump purchases that report no amount get parked and resolved, never lost.\n\nSEE THE MONTH CLEARLY\nInsights shows what you spent, how it compares to last month, where it went by category, and highlights that matter: an upcoming bill, a budget running hot, a purchase that is 8x your usual.\n\nBUDGETS AND RECURRING\nSet a budget and watch the daily pace. Recurring bills and income are first-class: Murmur knows what is coming and what is left after it.\n\nASK MURMUR (PLUS)\nAsk anything about your own numbers: \"how am I doing against my budget?\", \"what should I cancel?\" Answers come from your data, instantly.\n\nYOUR DATA IS YOURS\nMurmur never connects to your bank. Your voice is turned into text on your phone whenever the device supports it, and audio is never stored. Export everything or erase everything, anytime.\n\nEVERYWHERE YOU ARE\nMurmur syncs across iPhone, the web dashboard, and the Mac and Windows apps at itsmurmur.com.\n\nMURMUR PLUS\nUnlimited voice entries, Apple Pay capture, Ask Murmur, receipt scanning and exports (CSV, JSON, PDF). Monthly or yearly, both with a 7-day free trial. Prices are shown in the app before you subscribe. Subscriptions renew automatically unless cancelled at least 24 hours before the period ends, and are managed in your App Store account settings.\n\nTerms of Service: https://itsmurmur.com/terms\nPrivacy Policy: https://itsmurmur.com/privacy",
+        "description": "Murmur is the fastest way to know where your money goes. Say it once and it's filed: \"twelve fifty at Chipotle\" becomes a categorized expense before your phone is back in your pocket.\n\nNo bank logins. No spreadsheets. No forms.\n\nSPEAK, AND IT'S FILED\nOne tap, one sentence. Murmur hears the amount, the place and the category, in your language, and files it instantly. Income too: say what you earned and it lands on the right side of the ledger.\n\nPAY, AND IT CAPTURES ITSELF\nSet up one Shortcuts automation (Murmur walks you through it) and every purchase you make with your iPhone's wallet logs itself: amount, merchant, logo and category, with a quiet notification you can edit in one tap. Even pay-at-pump purchases that report no amount get parked and resolved, never lost.\n\nSEE THE MONTH CLEARLY\nInsights shows what you spent, how it compares to last month, where it went by category, and highlights that matter: an upcoming bill, a budget running hot, a purchase that is 8x your usual.\n\nBUDGETS AND RECURRING\nSet a budget and watch the daily pace. Recurring bills and income are first-class: Murmur knows what is coming and what is left after it.\n\nASK MURMUR (PLUS)\nAsk anything about your own numbers: \"how am I doing against my budget?\", \"what should I cancel?\" Answers come from your data, instantly.\n\nYOUR DATA IS YOURS\nMurmur never connects to your bank. Your voice is turned into text on your phone whenever the device supports it, and audio is never stored. Export everything or erase everything, anytime.\n\nEVERYWHERE YOU ARE\nMurmur syncs across iPhone and the web dashboard at itsmurmur.com. Murmur Plus adds the Mac and Windows apps.\n\nMURMUR PLUS\nEverything above is free. Murmur Plus adds Ask Murmur, automatic recurring detection, exports (CSV, JSON, PDF) and the Mac and Windows apps. Monthly or yearly, both with a 7-day free trial. Prices are shown in the app before you subscribe. Subscriptions renew automatically unless cancelled at least 24 hours before the period ends, and are managed in your App Store account settings.\n\nTerms of Service: https://itsmurmur.com/terms\nPrivacy Policy: https://itsmurmur.com/privacy",
         "keywords": [
           "expense",
           "tracker",
@@ -40,10 +39,10 @@
           "spending",
           "finance",
           "ai",
-          "apple pay",
           "budgeting",
           "bills",
-          "subscription"
+          "subscription",
+          "receipts"
         ],
         "marketingUrl": "https://itsmurmur.com",
         "supportUrl": "https://itsmurmur.com",
@@ -93,7 +92,7 @@
       "demoUsername": "review@itsmurmur.com",
       "demoPassword": "Murmur-Review-8d9202f5",
       "demoRequired": true,
-      "notes": "Sign in with the demo account via 'More options' (email) on the sign-in screen. Core flow: tap the mic on the Today tab and say e.g. 'fifteen dollars at Starbucks'; the expense files itself. Microphone and speech recognition permissions exist only for this. The Murmur Plus subscription (7-day free trial) is under Settings > Subscription. Apple Pay capture is an optional Shortcuts automation users set up themselves; it is not needed to review the app."
+      "notes": "DEMO ACCOUNT: on the sign-in screen tap 'More options' to reveal the email form, then sign in with the credentials above. The account is pre-loaded with sample transactions and a budget, so Today, Insights and Budgets all show data. CORE FLOW: tap the mic on the Today tab and say e.g. 'fifteen dollars at Starbucks'; the expense files itself. Speech is transcribed by the device (on-device recognition is requested); Murmur never records or transmits audio. ACCOUNT DELETION (guideline 5.1.1(v)): Settings > Account > Delete account, and also Settings > Privacy Center > Your data. One confirmation, then the account and every record attached to it are permanently deleted server-side and the app signs out. DATA EXPORT: Settings > Privacy Center > Export all my data. THIRD-PARTY AI: Murmur sends text to OpenAI through our own server to interpret spoken entries and scanned receipts (gpt-4o-mini) and to answer Ask Murmur (gpt-4o). Sent: the transcribed sentence or the scanned image, and for Ask Murmur the user's own transactions, recurring rules, income figure, currency, time zone and question. Never sent: name, email, account id, device ids, location. Murmur never connects to a bank. Disclosed at https://itsmurmur.com/privacy. SUBSCRIPTION: Murmur Plus (auto-renewable, 7-day free trial) under Settings > Subscription; it unlocks Ask Murmur (More > Ask Murmur), recurring detection, exports and the desktop apps. Everything else is included without a subscription. WALLET CAPTURE is an optional Shortcuts automation the user creates themselves from Settings; it is not needed to review the app. The app is iPhone-only and runs in compatibility mode on iPad."
     }
   }
 }
