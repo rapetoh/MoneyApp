@@ -73,6 +73,13 @@ Deno.serve(async (req) => {
     'recurring_rules',
     'budgets',
     'categories',
+    // `devices` was missing until Sep 11 2026, so a deleted account left
+    // its device registry rows behind (name, platform, last-synced) even
+    // though the privacy policy promises "devices" are removed and App
+    // Review was told deletion removes every record attached to the
+    // account. Found while wiping the owner's own accounts: two rows
+    // survived for one user.
+    'devices',
   ] as const
 
   for (const table of USER_ID_TABLES) {

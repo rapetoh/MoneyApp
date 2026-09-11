@@ -501,3 +501,59 @@ store-bound builds go through EAS CLOUD (quota resets monthly, reset
 Sep 1); local builds stay fine for TestFlight/dev. Next: review takes
 1-3 days; on approval DO NOT release until the hand-granted plus_status
 test accounts are re-locked (release mode is manual).
+
+**Sep 8, 2026 - App Store REJECTED 1.0.0 (46), reviewed on an iPad Air
+11-inch (M3).** Apple cited 2.3.7 (screenshots reference price - they
+count "free" as a price reference), 2.1 Information Needed (answer three
+questions about third-party AI), and 5.1.1(v) (no way to initiate account
+deletion; they also want a screen recording from a physical device).
+Full write-up: `docs/fixes-2026-09-08-app-review-rejection.md`;
+paste-ready reply: `docs/app-review-reply-2026-09-08.md`.
+Shipped: Settings > Account > Delete account (shared `useDeleteAccount`,
+same flow in Privacy Center and on web); five specific purpose strings
+and `ios.privacyManifests` in app.config.js; the pricing screenshot
+dropped from the listing and two paid-tier subtitles rewritten at the
+source; review notes rewritten with the AI disclosure and the deletion
+path; `apps/web/scripts/seed-review-account.mjs` loaded the empty demo
+account with 19 transactions and a budget. Two live defects found in the
+shipped listing and fixed: six Budgets rows rendered "$NaN left" (two
+bundle modules both declared `BudgetRow`), and 07-recurring.png was
+listed with no file on disk. Screenshots are reproducible now via
+`apps/mobile/store/apple/render-screenshots.mjs`. App name stays the
+owner's "Expense Tracker - Murmur". Next: EAS cloud build, TestFlight
+install, record the deletion flow, reply in the review thread, resubmit.
+
+**Sep 11, 2026 - LIVE ON THE APP STORE.** Murmur 1.0.0 (build 47) was
+approved and released. Public listing:
+https://apps.apple.com/app/id6799316747 ("Expense Tracker - Murmur").
+The approved submission was aabda46d-04d3-4869-8e4e-c47a267f2332,
+carrying four items: the app version plus the Murmur Plus group and both
+subscription products, so Plus is purchasable from day one. Note for
+future submissions: the three subscription items would not attach from
+the group page; each product had to be added from its own page, and a
+group on its own raises "New subscription groups must be submitted with
+an auto-renewable subscription from within that group".
+
+Shipped alongside launch:
+
+- **Landing page** (`apps/web/src/app/page.tsx`): "App Store, soon"
+  replaced by a real primary CTA, "Download on the App Store", with the
+  Apple mark. iPhone now leads and Mac is the secondary button, since
+  the phone is where speaking an expense actually happens. The hero note
+  line reads "iPhone · Mac (Apple Silicon, signed & notarized) · Intel
+  Mac · Windows", and the footer gained an App Store link. New
+  `.lp-btn-secondary` style. Verified rendered at 1440 and 390.
+- **`delete-user` Edge Function gap closed.** It never cleared the
+  `devices` table, so a deleted account left its device registry rows
+  (name, platform, last-synced) behind, contradicting the privacy policy
+  ("devices" are listed as removed) and what App Review was told. Found
+  while wiping the owner's own accounts: two rows survived for one user,
+  one for the other. `devices` added to `USER_ID_TABLES` and redeployed.
+- **Owner's accounts wiped** for a fresh install from the public build:
+  rapetohsenyo@gmail.com (apple+google, 15 transactions, 12 Ask threads,
+  20 categories, 2 devices) and his Apple private-relay account. A JSON
+  backup was taken first. Six accounts remain, including the App Review
+  demo account, which must be kept working for update reviews.
+- **No hand-granted Plus remains.** The Aug 15 blanket
+  `plus_status = 'active'` is fully unwound; a live read shows five null
+  and one lapsed, zero active. Nothing to re-lock.

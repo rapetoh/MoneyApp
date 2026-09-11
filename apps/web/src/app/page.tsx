@@ -24,14 +24,18 @@ export const metadata: Metadata = {
  *   favicon. No JS libraries; motion is pure CSS with a
  *   prefers-reduced-motion off-switch.
  * - Honesty: no invented user counts or ratings. The stats band states
- *   facts about the product. No dead download links: App Store reads
- *   "soon", the web dashboard link is real.
+ *   facts about the product. No dead download links: every destination
+ *   here is live, the App Store listing included.
  * - Signed-in users still go straight to their dashboard via the nav
  *   button; the page itself renders for everyone.
  */
 
 // Desktop downloads (signed + notarized, published Aug 29, 2026). The
 // release script keeps these in step with the latest version.
+// Live on the App Store since Sep 11, 2026. The short id form is the
+// canonical link: Apple resolves it to the localised store page, so it
+// cannot rot if the listing title ever changes.
+const APP_STORE_URL = 'https://apps.apple.com/app/id6799316747'
 const MAC_DMG_ARM = 'https://github.com/rapetoh/murmur-releases/releases/latest/download/Murmur-1.0.0-arm64.dmg'
 const MAC_DMG_INTEL = 'https://github.com/rapetoh/murmur-releases/releases/latest/download/Murmur-1.0.0.dmg'
 const WIN_EXE = 'https://github.com/rapetoh/murmur-releases/releases/latest/download/Murmur-Setup-1.0.0.exe'
@@ -152,20 +156,28 @@ export default async function RootPage() {
               your money story between you and your phone: no spreadsheets, no bank logins, nothing
               to maintain.
             </p>
+            {/* iPhone leads now that the app is live: Murmur is a
+                speak-it-and-it-is-filed tool, and the phone is where that
+                happens. Mac keeps a button, just the quieter one. */}
             <div className="lp-hero-ctas lp-rise" style={{ animationDelay: '.28s' }}>
-              <a href={MAC_DMG_ARM} className="lp-btn-primary">
+              <a href={APP_STORE_URL} className="lp-btn-primary" rel="noreferrer">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="#FBFAF7" aria-hidden>
+                  <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z" />
+                </svg>
+                Download on the App Store
+              </a>
+              <a href={MAC_DMG_ARM} className="lp-btn-secondary">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden>
-                  <path d="M12 3v12m0 0 5-5m-5 5-5-5M4 21h16" stroke="#FBFAF7" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M12 3v12m0 0 5-5m-5 5-5-5M4 21h16" stroke="#1B1915" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
                 Download for Mac
               </a>
               <Link href={appHref} className="lp-badge-soon">
                 Web dashboard →
               </Link>
-              <span className="lp-badge-soon"> App Store, soon</span>
             </div>
             <div className="lp-hero-dlnote lp-rise" style={{ animationDelay: '.32s' }}>
-              Apple Silicon · signed &amp; notarized · <a href={MAC_DMG_INTEL}>Intel Mac</a> · <a href={WIN_EXE}>Windows</a>
+              iPhone · Mac (Apple Silicon, signed &amp; notarized) · <a href={MAC_DMG_INTEL}>Intel Mac</a> · <a href={WIN_EXE}>Windows</a>
             </div>
             <div className="lp-trust lp-rise" style={{ animationDelay: '.36s' }}>
               No bank linking · Speech stays on your phone · Export or erase everything, anytime
@@ -685,6 +697,7 @@ export default async function RootPage() {
               <Link href="/privacy">Privacy</Link>
               <Link href="/terms">Terms</Link>
               <Link href={appHref}>Web dashboard</Link>
+              <a href={APP_STORE_URL} rel="noreferrer">Download on the App Store</a>
               <a href={MAC_DMG_ARM}>Download for Mac</a>
               <a href={WIN_EXE}>Download for Windows</a>
               {SUPPORT_EMAIL && <a href={'mailto:' + SUPPORT_EMAIL}>{SUPPORT_EMAIL}</a>}
@@ -726,6 +739,8 @@ export default async function RootPage() {
         .lp-hero-dlnote a { color: #3F5A3E; font-weight: 600; }
         .lp-hero-dlnote a:hover { text-decoration: underline; }
         .lp-btn-primary:hover { transform: translateY(-1px); box-shadow: 0 10px 26px rgba(63,90,62,0.3); }
+        .lp-btn-secondary { display: inline-flex; align-items: center; gap: 9px; background: #F5F2EB; color: #1B1915; font-weight: 600; font-size: 14px; padding: 13px 22px; border-radius: 999px; transition: transform .15s, box-shadow .15s; }
+        .lp-btn-secondary:hover { transform: translateY(-1px); box-shadow: 0 8px 20px rgba(27,25,21,0.12); }
         .lp-badge-soon { font-size: 13px; font-weight: 600; color: #6C675E; background: #F5F2EB; padding: 13px 20px; border-radius: 999px; }
         .lp-trust { margin-top: 26px; font-size: 12.5px; color: #9C9589; letter-spacing: 0.2px; }
 
