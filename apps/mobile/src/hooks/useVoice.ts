@@ -209,7 +209,16 @@ export function useVoice(
 
     sessionGenRef.current++
     discardRecognitionRef.current = false
+    // BOTH transcript refs, always together (owner report Sep 19 2026):
+    // clearing only the final one left the previous capture's interim
+    // text behind, and the 'end' handler below falls back to it when a
+    // recording produced nothing. A silent tap therefore re-parsed the
+    // last utterance, hit the parse cache, and raised the result sheet
+    // holding the previous expense, complete with the amount the user
+    // had already corrected by hand. Saving it created a second, wrong
+    // transaction.
     finalTranscriptRef.current = ''
+    lastInterimRef.current = ''
     setTranscript('')
     setInterimTranscript('')
     setParsedExpense(null)
@@ -252,6 +261,7 @@ export function useVoice(
     setErrorMessage(null)
     setParseDurationMs(null)
     finalTranscriptRef.current = ''
+    lastInterimRef.current = ''
     volumeLevel.setValue(0)
   }, [volumeLevel])
 
@@ -270,6 +280,8 @@ export function useVoice(
       ExpoSpeechRecognitionModule.abort()
     }
     setParsedExpense(parsed)
+    finalTranscriptRef.current = ''
+    lastInterimRef.current = ''
     setTranscript('')
     setInterimTranscript('')
     setErrorMessage(null)
