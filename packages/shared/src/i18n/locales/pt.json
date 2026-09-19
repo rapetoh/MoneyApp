@@ -673,5 +673,9 @@
   "onboarding.setup.privacy_note": "O Murmur guarda dados anônimos de uso e falhas para corrigir o que quebra. Nunca suas transações, valores ou o que você fala. Desligue quando quiser em Ajustes, Privacidade.",
   "privacy.improve_note": "Ligado por padrão. Anônimo, nosso, nunca compartilhado. Nunca suas transações, valores ou o que você fala.",
   "start.collapse": "Recolher",
-  "start.expand": "Mostrar as etapas"
+  "start.expand": "Mostrar as etapas",
+  "start.more": "Mais opções",
+  "start.remove": "Remover",
+  "start.remove_title": "Remover Primeiros passos?",
+  "start.remove_body": "Ele não volta. Você ainda pode definir um orçamento em Orçamentos, e adicionar sua renda ou a captura do Apple Pay em Ajustes."
 }

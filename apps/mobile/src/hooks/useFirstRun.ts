@@ -87,7 +87,13 @@ export function shouldRetireChecklist(
 const RETIRE_AFTER_EXPENSES = 10
 const RETIRE_AFTER_DAYS = 14
 
-export function useFirstRun(transactions: Transaction[], onboardingCompletedAt?: string | null) {
+export function useFirstRun(
+  transactions: Transaction[],
+  onboardingCompletedAt?: string | null,
+  /** profiles.start_checklist_dismissed_at: the user removed the card for
+   *  good. On the account, so a reinstall cannot resurrect it. */
+  checklistDismissedAt?: string | null,
+) {
   const [dayOneSkipped, dayOneLoaded, setDayOneSkipped] = usePersistedFlag(KEY_DAYONE)
   const [checklistCollapsed, , setChecklistCollapsed] = usePersistedFlag(KEY_CHECKLIST_COLLAPSED)
   const expenses = loggedExpenseCount(transactions)
@@ -96,7 +102,10 @@ export function useFirstRun(transactions: Transaction[], onboardingCompletedAt?:
     expenses,
     dayOneActive: dayOneLoaded && !dayOneSkipped && expenses === 0,
     skipDayOne: () => setDayOneSkipped(true),
-    checklistVisible: !!onboardingCompletedAt && !shouldRetireChecklist(expenses, onboardingCompletedAt),
+    checklistVisible:
+      !!onboardingCompletedAt &&
+      !checklistDismissedAt &&
+      !shouldRetireChecklist(expenses, onboardingCompletedAt),
     checklistCollapsed,
     toggleChecklistCollapsed: () => setChecklistCollapsed(!checklistCollapsed),
   }

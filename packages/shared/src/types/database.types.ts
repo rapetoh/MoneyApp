@@ -379,6 +379,7 @@ export type Database = {
           monthly_income_currency: string | null
           monthly_income_source: string | null
           onboarding_completed_at: string | null
+          start_checklist_dismissed_at: string | null
           plus_status: string | null
           plus_product_id: string | null
           plus_period_type: string | null
@@ -403,6 +404,7 @@ export type Database = {
           monthly_income_currency?: string | null
           monthly_income_source?: string | null
           onboarding_completed_at?: string | null
+          start_checklist_dismissed_at?: string | null
           plus_status?: string | null
           plus_product_id?: string | null
           plus_period_type?: string | null
@@ -427,6 +429,7 @@ export type Database = {
           monthly_income_currency?: string | null
           monthly_income_source?: string | null
           onboarding_completed_at?: string | null
+          start_checklist_dismissed_at?: string | null
           plus_status?: string | null
           plus_product_id?: string | null
           plus_period_type?: string | null

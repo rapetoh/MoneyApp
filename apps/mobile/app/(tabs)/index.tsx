@@ -162,7 +162,7 @@ export default function TodayScreen() {
   // "no budget set" instead of a real error-with-retry state.
   const { transactions, loading, error: transactionsError, createTransaction } = useTransactions(user?.id)
   const { categoryMap } = useCategories(user?.id)
-  const { profile } = useProfile(user?.id)
+  const { profile, updateProfile } = useProfile(user?.id)
   const { budget, error: budgetError, refetch: refetchBudget } = useActiveBudget(user?.id)
   const { rules: recurringRules, createRule, updateRule } = useRecurringRules(user?.id)
   const { refreshing, onRefresh } = useManualRefresh(user?.id, [refetchBudget])
@@ -258,7 +258,11 @@ export default function TodayScreen() {
   // Skip now persists (the "Getting started" card still carries "Log your
   // first expense"). Never shown on a failed read: a read failure with zero
   // cached rows is not the same fact as "nothing logged yet" (fix-plan 2.13).
-  const firstRun = useFirstRun(transactions, profile?.onboarding_completed_at)
+  const firstRun = useFirstRun(
+    transactions,
+    profile?.onboarding_completed_at,
+    profile?.start_checklist_dismissed_at,
+  )
   const showDayOne = !loading && !transactionsError && firstRun.dayOneActive
   const { openVoice } = useVoiceSession()
   const [incomeModal, setIncomeModal] = useState(false)
@@ -397,6 +401,7 @@ export default function TodayScreen() {
             locale={locale}
             collapsed={firstRun.checklistCollapsed}
             onToggleCollapsed={firstRun.toggleChecklistCollapsed}
+            onRemove={() => updateProfile({ start_checklist_dismissed_at: new Date().toISOString() })}
           />
         )}
 

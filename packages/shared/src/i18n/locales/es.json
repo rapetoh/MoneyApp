@@ -673,5 +673,9 @@
   "onboarding.setup.privacy_note": "Murmur guarda datos anónimos de uso y fallos para arreglar lo que se rompe. Nunca tus transacciones, importes ni lo que dices. Puedes desactivarlo cuando quieras en Ajustes, Privacidad.",
   "privacy.improve_note": "Activado por defecto. Anónimo, nuestro, nunca compartido. Nunca tus transacciones, importes ni lo que dices.",
   "start.collapse": "Contraer",
-  "start.expand": "Mostrar los pasos"
+  "start.expand": "Mostrar los pasos",
+  "start.more": "Más opciones",
+  "start.remove": "Quitar",
+  "start.remove_title": "¿Quitar Primeros pasos?",
+  "start.remove_body": "No volverá. Puedes definir un presupuesto en Presupuestos, y añadir tus ingresos o la captura de Apple Pay en Ajustes."
 }

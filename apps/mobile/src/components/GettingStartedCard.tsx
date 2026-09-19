@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { Animated, LayoutAnimation, Platform, Pressable, StyleSheet, Text, View } from 'react-native'
+import { Alert, Animated, LayoutAnimation, Platform, Pressable, StyleSheet, Text, View } from 'react-native'
 import Svg, { Circle } from 'react-native-svg'
 import { Ionicons } from '@expo/vector-icons'
 import { useReduceMotion } from '../hooks/useReduceMotion'
@@ -54,23 +54,27 @@ function ProgressRing({ done, total }: { done: number; total: number }) {
  * first run only mentions once (budget, Apple Pay capture), offered where
  * the user can see why they matter.
  *
- * Dismissing is a *collapse*, never a delete (owner review, Sep 19 2026):
- * the header stays as a single line with the ring and "2 of 4", and
- * tapping it opens the list again, so a mis-tap costs nothing. The card
- * retires itself when every item is done, or once the user is past the
- * first-week stage (useFirstRun). Every item also lives in its own screen,
- * so this is a shortcut, never the only path.
+ * Two different intents, two different actions (owner review, Sep 19 2026):
+ * tapping the header *collapses* the card to a single line with the ring
+ * and "2 of 4", which is "later" and costs nothing to undo; the menu holds
+ * *Remove*, which is "never", behind a confirmation. The card also retires
+ * itself when every item is done, or once the user is past the first-week
+ * stage (useFirstRun). Every item lives in its own screen too, so this is
+ * a shortcut, never the only path.
  */
 export function GettingStartedCard({
   items,
   locale,
   collapsed,
   onToggleCollapsed,
+  onRemove,
 }: {
   items: StartItem[]
   locale: Locale
   collapsed: boolean
   onToggleCollapsed: () => void
+  /** "Never": persisted on the account, so a reinstall cannot bring it back. */
+  onRemove: () => void
 }) {
   const reduceMotion = useReduceMotion()
   const done = items.filter((i) => i.done).length
@@ -103,6 +107,13 @@ export function GettingStartedCard({
     onToggleCollapsed()
   }
 
+  const confirmRemove = () => {
+    Alert.alert(t('start.remove_title', locale), t('start.remove_body', locale), [
+      { text: t('common.cancel', locale), style: 'cancel' },
+      { text: t('start.remove', locale), style: 'destructive', onPress: onRemove },
+    ])
+  }
+
   return (
     <View style={[styles.card, collapsed && styles.cardCollapsed]} testID="getting-started">
       <Pressable
@@ -131,6 +142,18 @@ export function GettingStartedCard({
         >
           <Ionicons name="chevron-up" size={16} color={Colors.ink4} />
         </Animated.View>
+      </Pressable>
+
+      {/* "Never" lives apart from the tap target that means "later", and
+          asks once before it takes effect. */}
+      <Pressable
+        onPress={confirmRemove}
+        style={({ pressed }) => [styles.more, pressed && styles.headPressed]}
+        hitSlop={10}
+        accessibilityRole="button"
+        accessibilityLabel={t('start.more', locale)}
+      >
+        <Ionicons name="ellipsis-horizontal" size={15} color={Colors.ink4} />
       </Pressable>
 
       {!collapsed &&
@@ -171,7 +194,10 @@ const styles = StyleSheet.create({
   },
   // Collapsed it is one quiet line, with the same breathing room top and bottom.
   cardCollapsed: { paddingBottom: 14 },
-  head: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 2 },
+  // The chevron sits at the end of the header's own tap target; the menu
+  // is a separate, smaller target outside it (top-right of the card).
+  head: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 2, paddingRight: 26 },
+  more: { position: 'absolute', top: 12, right: 14, padding: 4 },
   headPressed: { opacity: 0.6 },
   title: { fontSize: 15.5, color: Colors.ink, fontFamily: Typography.fontFamily.sansBold, fontWeight: '700' },
   progress: { fontSize: 13, color: Colors.ink4, fontFamily: Typography.fontFamily.sansSemiBold },

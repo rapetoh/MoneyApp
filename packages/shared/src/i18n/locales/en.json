@@ -673,5 +673,9 @@
   "onboarding.setup.privacy_note": "Murmur keeps anonymous usage and crash data so we can fix what breaks. Never your transactions, amounts or what you say. Turn it off any time in Settings, Privacy Center.",
   "privacy.improve_note": "On by default. Anonymous, kept by us, never shared. Never your transactions, amounts or what you say.",
   "start.collapse": "Collapse",
-  "start.expand": "Show the steps"
+  "start.expand": "Show the steps",
+  "start.more": "More options",
+  "start.remove": "Remove",
+  "start.remove_title": "Remove Getting started?",
+  "start.remove_body": "It won't come back. You can still set a budget in Budgets, and add your income or Apple Pay capture in Settings."
 }
