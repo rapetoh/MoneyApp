@@ -625,8 +625,6 @@
   "onboarding.setup.voice": "Ouve em",
   "onboarding.setup.voice_hint": "Segue seu idioma",
   "onboarding.setup.currency_hint": "Todos os valores aparecem nesta moeda",
-  "onboarding.setup.analytics_title": "Ajude a melhorar o Murmur",
-  "onboarding.setup.analytics_body": "Compartilhe dados anônimos de uso e falhas. Nunca suas transações, valores ou o que você fala.",
   "onboarding.setup.cta": "Tudo certo",
   "onboarding.first_log.headline": "Experimente agora.",
   "onboarding.first_log.lead": "Toque no microfone e diga sua última compra, como contaria a um amigo.",
@@ -672,5 +670,7 @@
   "auth.email_confirmed_body": "Entre para continuar.",
   "voice.recognizer_error": "O Murmur não ouviu direito. Tente de novo ou digite.",
   "voice.parse_failed": "Não foi possível registrar. Verifique sua conexão e tente de novo.",
-  "common.save_failed": "Não foi possível salvar. Verifique sua conexão e tente de novo."
+  "common.save_failed": "Não foi possível salvar. Verifique sua conexão e tente de novo.",
+  "onboarding.setup.privacy_note": "O Murmur guarda dados anônimos de uso e falhas para corrigir o que quebra. Nunca suas transações, valores ou o que você fala. Desligue quando quiser em Ajustes, Privacidade.",
+  "privacy.improve_note": "Ligado por padrão. Anônimo, nosso, nunca compartilhado. Nunca suas transações, valores ou o que você fala."
 }

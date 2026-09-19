@@ -126,6 +126,7 @@ export default function PrivacyScreen() {
               last
             />
           </SetGroup>
+          <Text style={styles.improveNote}>{t('privacy.improve_note', locale)}</Text>
 
           <SetGroup label={t('privacy.group_legal', locale)}>
             <SetRow
@@ -149,6 +150,15 @@ export default function PrivacyScreen() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
+  improveNote: {
+    marginTop: -10,
+    marginBottom: 18,
+    paddingHorizontal: 6,
+    fontSize: 12.5,
+    lineHeight: 18,
+    color: Colors.ink4 ?? Colors.textMuted,
+    fontFamily: Typography.fontFamily.sans,
+  },
   safe: { flex: 1, backgroundColor: Colors.background },
   content: { paddingBottom: 40 },
 

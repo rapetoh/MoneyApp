@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native'
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
@@ -10,7 +10,7 @@ import { useTransactions } from '../../src/hooks/useTransactions'
 import { BottomSheet } from '../../src/components/BottomSheet'
 import { StepDots } from '../../src/components/StepDots'
 import { changeCurrency, setCurrentProfileCurrency } from '../../src/services/profileCurrency'
-import { setAnalyticsConsent, track } from '../../src/services/analytics'
+import { track } from '../../src/services/analytics'
 import { Colors, Typography, Hairline } from '../../src/theme'
 import {
   t,
@@ -33,8 +33,9 @@ import {
  * changed. Currency matters most here: changing it later reconverts every
  * transaction, so it is settled before the first log.
  *
- * Also the opt-in for anonymous usage and crash data (audit H1): off by
- * default, as the privacy policy promises.
+ * Anonymous usage and crash data (audit H1) is on by default and stated
+ * in one line here; the switches to turn it off live in the Privacy
+ * Center, which is where people look for them.
  */
 export default function SetupScreen() {
   const router = useRouter()
@@ -47,7 +48,6 @@ export default function SetupScreen() {
 
   const [locale, setLocale] = useState<Locale>(deviceLocale)
   const [currency, setCurrency] = useState<string>(deviceCurrency)
-  const [shareData, setShareData] = useState(false)
   const [picker, setPicker] = useState<'language' | 'currency' | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -75,8 +75,6 @@ export default function SetupScreen() {
     const ok = await updateProfile({
       locale,
       voice_language: voice,
-      analytics_opt_in: shareData,
-      crash_reports_opt_in: shareData,
       ...(currencyToWrite ? { currency_code: currencyToWrite } : {}),
     })
     if (!ok) {
@@ -85,7 +83,6 @@ export default function SetupScreen() {
       return
     }
     setCurrentProfileCurrency(currency)
-    setAnalyticsConsent({ usage: shareData, crashes: shareData })
     track('onboarding_setup_done', {
       locale,
       currency,
@@ -126,17 +123,9 @@ export default function SetupScreen() {
           />
         </View>
 
-        <View style={styles.optIn}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.optInTitle}>{t('onboarding.setup.analytics_title', locale)}</Text>
-            <Text style={styles.optInBody}>{t('onboarding.setup.analytics_body', locale)}</Text>
-          </View>
-          <Switch
-            value={shareData}
-            onValueChange={setShareData}
-            trackColor={{ true: Colors.accent, false: undefined }}
-            accessibilityLabel={t('onboarding.setup.analytics_title', locale)}
-          />
+        <View style={styles.note}>
+          <Ionicons name="lock-closed" size={13} color={Colors.ink4} style={{ marginTop: 1 }} />
+          <Text style={styles.noteText}>{t('onboarding.setup.privacy_note', locale)}</Text>
         </View>
       </ScrollView>
 
@@ -271,17 +260,8 @@ const styles = StyleSheet.create({
   rowLabel: { fontSize: 15, color: Colors.ink, fontFamily: Typography.fontFamily.sansSemiBold, fontWeight: '600' },
   rowHint: { marginTop: 2, fontSize: 12.5, color: Colors.ink4, fontFamily: Typography.fontFamily.sans },
   rowValue: { fontSize: 15, color: Colors.ink2, fontFamily: Typography.fontFamily.sans },
-  optIn: {
-    marginTop: 18,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    padding: 16,
-    borderRadius: 16,
-    backgroundColor: Colors.surface2,
-  },
-  optInTitle: { fontSize: 14.5, color: Colors.ink, fontFamily: Typography.fontFamily.sansSemiBold, fontWeight: '600' },
-  optInBody: { marginTop: 3, fontSize: 12.5, lineHeight: 18, color: Colors.ink3, fontFamily: Typography.fontFamily.sans },
+  note: { marginTop: 18, flexDirection: 'row', alignItems: 'flex-start', gap: 8, paddingHorizontal: 2 },
+  noteText: { flex: 1, fontSize: 12.5, lineHeight: 18, color: Colors.ink4, fontFamily: Typography.fontFamily.sans },
   footer: { paddingHorizontal: 28, paddingTop: 10, paddingBottom: 8 },
   error: {
     color: Colors.destructive,

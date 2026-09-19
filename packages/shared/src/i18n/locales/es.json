@@ -625,8 +625,6 @@
   "onboarding.setup.voice": "Escucha en",
   "onboarding.setup.voice_hint": "Sigue tu idioma",
   "onboarding.setup.currency_hint": "Todos los importes se muestran en esta moneda",
-  "onboarding.setup.analytics_title": "Ayuda a mejorar Murmur",
-  "onboarding.setup.analytics_body": "Comparte datos anónimos de uso y fallos. Nunca tus transacciones, importes ni lo que dices.",
   "onboarding.setup.cta": "Todo bien",
   "onboarding.first_log.headline": "Pruébalo ahora.",
   "onboarding.first_log.lead": "Toca el micrófono y di tu última compra, como se lo contarías a un amigo.",
@@ -672,5 +670,7 @@
   "auth.email_confirmed_body": "Inicia sesión para continuar.",
   "voice.recognizer_error": "Murmur no te oyó bien. Inténtalo de nuevo o escríbelo.",
   "voice.parse_failed": "No se pudo registrar. Revisa tu conexión e inténtalo de nuevo.",
-  "common.save_failed": "No se pudo guardar. Revisa tu conexión e inténtalo de nuevo."
+  "common.save_failed": "No se pudo guardar. Revisa tu conexión e inténtalo de nuevo.",
+  "onboarding.setup.privacy_note": "Murmur guarda datos anónimos de uso y fallos para arreglar lo que se rompe. Nunca tus transacciones, importes ni lo que dices. Puedes desactivarlo cuando quieras en Ajustes, Privacidad.",
+  "privacy.improve_note": "Activado por defecto. Anónimo, nuestro, nunca compartido. Nunca tus transacciones, importes ni lo que dices."
 }

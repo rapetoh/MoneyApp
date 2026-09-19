@@ -625,8 +625,6 @@
   "onboarding.setup.voice": "Écoute en",
   "onboarding.setup.voice_hint": "Suit votre langue",
   "onboarding.setup.currency_hint": "Tous les montants s'affichent dans cette devise",
-  "onboarding.setup.analytics_title": "Aider à améliorer Murmur",
-  "onboarding.setup.analytics_body": "Partager des données anonymes d'usage et de plantage. Jamais vos transactions, montants ou ce que vous dites.",
   "onboarding.setup.cta": "C'est bon",
   "onboarding.first_log.headline": "Essayez maintenant.",
   "onboarding.first_log.lead": "Touchez le micro et dites votre dernier achat, comme vous le diriez à un ami.",
@@ -672,5 +670,7 @@
   "auth.email_confirmed_body": "Connectez-vous pour continuer.",
   "voice.recognizer_error": "Murmur n'a pas bien entendu. Réessayez, ou tapez la dépense.",
   "voice.parse_failed": "Impossible d'enregistrer. Vérifiez votre connexion et réessayez.",
-  "common.save_failed": "Impossible d'enregistrer. Vérifiez votre connexion et réessayez."
+  "common.save_failed": "Impossible d'enregistrer. Vérifiez votre connexion et réessayez.",
+  "onboarding.setup.privacy_note": "Murmur conserve des données d'usage et de plantage anonymes pour corriger ce qui casse. Jamais vos transactions, montants ou ce que vous dites. Désactivable à tout moment dans Réglages, Confidentialité.",
+  "privacy.improve_note": "Activé par défaut. Anonyme, gardé chez nous, jamais partagé. Jamais vos transactions, montants ou ce que vous dites."
 }

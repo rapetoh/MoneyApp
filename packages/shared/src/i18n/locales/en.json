@@ -625,8 +625,6 @@
   "onboarding.setup.voice": "Listens in",
   "onboarding.setup.voice_hint": "Follows your language",
   "onboarding.setup.currency_hint": "Every amount is shown in this currency",
-  "onboarding.setup.analytics_title": "Help improve Murmur",
-  "onboarding.setup.analytics_body": "Share anonymous usage and crash data. Never your transactions, amounts or what you say.",
   "onboarding.setup.cta": "Looks right",
   "onboarding.first_log.headline": "Try it now.",
   "onboarding.first_log.lead": "Tap the mic and say your last purchase, the way you'd tell a friend.",
@@ -672,5 +670,7 @@
   "auth.email_confirmed_body": "Sign in to continue.",
   "voice.recognizer_error": "Murmur couldn't hear that clearly. Try again, or type it instead.",
   "voice.parse_failed": "Couldn't file that. Check your connection and try again.",
-  "common.save_failed": "Couldn't save. Check your connection and try again."
+  "common.save_failed": "Couldn't save. Check your connection and try again.",
+  "onboarding.setup.privacy_note": "Murmur keeps anonymous usage and crash data so we can fix what breaks. Never your transactions, amounts or what you say. Turn it off any time in Settings, Privacy Center.",
+  "privacy.improve_note": "On by default. Anonymous, kept by us, never shared. Never your transactions, amounts or what you say."
 }
