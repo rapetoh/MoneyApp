@@ -662,7 +662,6 @@
   "start.budget": "Set a monthly budget",
   "start.income": "Add your income",
   "start.applepay": "Log Apple Pay automatically",
-  "start.hide": "Hide",
   "privacy.group_improve": "Help improve Murmur",
   "privacy.analytics_label": "Anonymous usage data",
   "privacy.crash_label": "Crash reports",
@@ -672,5 +671,7 @@
   "voice.parse_failed": "Couldn't file that. Check your connection and try again.",
   "common.save_failed": "Couldn't save. Check your connection and try again.",
   "onboarding.setup.privacy_note": "Murmur keeps anonymous usage and crash data so we can fix what breaks. Never your transactions, amounts or what you say. Turn it off any time in Settings, Privacy Center.",
-  "privacy.improve_note": "On by default. Anonymous, kept by us, never shared. Never your transactions, amounts or what you say."
+  "privacy.improve_note": "On by default. Anonymous, kept by us, never shared. Never your transactions, amounts or what you say.",
+  "start.collapse": "Collapse",
+  "start.expand": "Show the steps"
 }

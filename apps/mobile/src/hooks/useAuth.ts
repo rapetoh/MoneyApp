@@ -21,6 +21,7 @@ const PER_USER_SECURE_KEYS = [
   'recurring_pattern_dismissed_v1', // src/components/RecurringPatternBanner.tsx
   'dayone_skipped', // src/hooks/useFirstRun.ts
   'start_checklist_active', // src/hooks/useFirstRun.ts
+  'start_checklist_collapsed', // src/hooks/useFirstRun.ts
   'onboarding_followup', // app/(onboarding)/habit.tsx
   'analytics_install_id', // src/services/analytics.ts
   ...REMINDER_SECURE_KEYS, // src/services/reminders.ts

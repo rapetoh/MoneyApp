@@ -258,7 +258,7 @@ export default function TodayScreen() {
   // Skip now persists (the "Getting started" card still carries "Log your
   // first expense"). Never shown on a failed read: a read failure with zero
   // cached rows is not the same fact as "nothing logged yet" (fix-plan 2.13).
-  const firstRun = useFirstRun(transactions)
+  const firstRun = useFirstRun(transactions, profile?.onboarding_completed_at)
   const showDayOne = !loading && !transactionsError && firstRun.dayOneActive
   const { openVoice } = useVoiceSession()
   const [incomeModal, setIncomeModal] = useState(false)
@@ -395,7 +395,8 @@ export default function TodayScreen() {
           <GettingStartedCard
             items={startItems.map((item) => ({ ...item, onPress: tapStart(item) }))}
             locale={locale}
-            onHide={firstRun.hideChecklist}
+            collapsed={firstRun.checklistCollapsed}
+            onToggleCollapsed={firstRun.toggleChecklistCollapsed}
           />
         )}
 

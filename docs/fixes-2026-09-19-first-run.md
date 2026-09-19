@@ -50,3 +50,17 @@ soft Plus offer (or Apple Pay setup) → Today with **Getting started**.
 5. **Optional, H6 second half**: Supabase custom domain (e.g. `auth.itsmurmur.com`)
    so the Google sign-in sheet names Murmur's domain instead of `…supabase.co`.
    Check on a device first.
+
+## Same-day follow-ups (owner testing on build 49)
+
+| What | Why | Where |
+|---|---|---|
+| Anonymous usage and crash data now defaults to ON, the onboarding toggle is gone (one line of disclosure instead), the switches stay in the Privacy Center | An opt-in switch nobody turns on leaves the product blind; the policy is ours to set, and it now states exactly what happens | migration 034, `setup.tsx`, `privacy.tsx`, `apps/web/src/app/privacy/page.tsx` |
+| "Getting started" card never appeared after onboarding | Today mounts for a moment at launch before the routing gate redirects, caching the flag as unset; the hook never re-reads a cached key, so onboarding's SecureStore write only took effect on the next cold start. `setFirstRunFlag` now writes through the cache | `useFirstRun.ts`, `queryCache.ts`, test `__tests__/useFirstRun.test.ts` |
+| A silent recording raised the result sheet holding the previous expense (and saving it wrote a second, wrong transaction) | `startListening` cleared `finalTranscriptRef` but left `lastInterimRef`; the end-of-speech handler falls back to the interim text, so the old words were re-parsed and answered from the parse cache. Both refs are cleared together on start, reset and inject | `useVoice.ts`, test `__tests__/useVoice.test.ts` (fails on build 49, passes on the fix) |
+| Dismissing the checklist was permanent and unrecoverable | A mis-tap cost the card for good. "Hide" is now a collapse to a one-line header (ring + "2 of 4"), reopened by tapping it. The card retires itself when all items are done, after 10 logged expenses, or two weeks after onboarding | `GettingStartedCard.tsx`, `useFirstRun.ts` |
+
+Builds: 49 and 51 carry the first two bugs, 52 fixes them, 53 adds the
+collapsible checklist. Local archives (`eas build --local`) because the
+Expo free plan's cloud builds are used up until Oct 1; Xcode 27.0 GA on
+this Mac is store-safe, the beta that caused "Invalid Binary" is not.

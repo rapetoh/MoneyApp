@@ -662,7 +662,6 @@
   "start.budget": "Fixez un budget mensuel",
   "start.income": "Ajoutez vos revenus",
   "start.applepay": "Notez Apple Pay automatiquement",
-  "start.hide": "Masquer",
   "privacy.group_improve": "Aider à améliorer Murmur",
   "privacy.analytics_label": "Données d'usage anonymes",
   "privacy.crash_label": "Rapports de plantage",
@@ -672,5 +671,7 @@
   "voice.parse_failed": "Impossible d'enregistrer. Vérifiez votre connexion et réessayez.",
   "common.save_failed": "Impossible d'enregistrer. Vérifiez votre connexion et réessayez.",
   "onboarding.setup.privacy_note": "Murmur conserve des données d'usage et de plantage anonymes pour corriger ce qui casse. Jamais vos transactions, montants ou ce que vous dites. Désactivable à tout moment dans Réglages, Confidentialité.",
-  "privacy.improve_note": "Activé par défaut. Anonyme, gardé chez nous, jamais partagé. Jamais vos transactions, montants ou ce que vous dites."
+  "privacy.improve_note": "Activé par défaut. Anonyme, gardé chez nous, jamais partagé. Jamais vos transactions, montants ou ce que vous dites.",
+  "start.collapse": "Réduire",
+  "start.expand": "Afficher les étapes"
 }

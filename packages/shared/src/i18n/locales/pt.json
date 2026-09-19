@@ -662,7 +662,6 @@
   "start.budget": "Defina um orçamento mensal",
   "start.income": "Adicione sua renda",
   "start.applepay": "Registre o Apple Pay automaticamente",
-  "start.hide": "Ocultar",
   "privacy.group_improve": "Ajude a melhorar o Murmur",
   "privacy.analytics_label": "Dados de uso anônimos",
   "privacy.crash_label": "Relatórios de falhas",
@@ -672,5 +671,7 @@
   "voice.parse_failed": "Não foi possível registrar. Verifique sua conexão e tente de novo.",
   "common.save_failed": "Não foi possível salvar. Verifique sua conexão e tente de novo.",
   "onboarding.setup.privacy_note": "O Murmur guarda dados anônimos de uso e falhas para corrigir o que quebra. Nunca suas transações, valores ou o que você fala. Desligue quando quiser em Ajustes, Privacidade.",
-  "privacy.improve_note": "Ligado por padrão. Anônimo, nosso, nunca compartilhado. Nunca suas transações, valores ou o que você fala."
+  "privacy.improve_note": "Ligado por padrão. Anônimo, nosso, nunca compartilhado. Nunca suas transações, valores ou o que você fala.",
+  "start.collapse": "Recolher",
+  "start.expand": "Mostrar as etapas"
 }

@@ -57,3 +57,21 @@ describe('setFirstRunFlag', () => {
     expect(store.has(KEY_CHECKLIST)).toBe(false)
   })
 })
+
+describe('shouldRetireChecklist', () => {
+  it('keeps the card during the first week of real use', async () => {
+    const { shouldRetireChecklist } = await import('../useFirstRun')
+    const now = new Date('2026-09-19T12:00:00Z')
+    expect(shouldRetireChecklist(3, '2026-09-17T09:00:00Z', now)).toBe(false)
+    expect(shouldRetireChecklist(0, null, now)).toBe(false)
+  })
+
+  it('retires it once the user is clearly past setting up', async () => {
+    const { shouldRetireChecklist } = await import('../useFirstRun')
+    const now = new Date('2026-09-19T12:00:00Z')
+    // Ten logged expenses: this person knows the app.
+    expect(shouldRetireChecklist(10, '2026-09-18T09:00:00Z', now)).toBe(true)
+    // Or two weeks after finishing onboarding, whatever is left undone.
+    expect(shouldRetireChecklist(2, '2026-09-01T09:00:00Z', now)).toBe(true)
+  })
+})
