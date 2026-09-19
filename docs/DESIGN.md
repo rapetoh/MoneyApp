@@ -41,7 +41,7 @@ A few tensions the design deliberately resolves:
 | Tension | Resolution |
 |---|---|
 | "Voice-first" vs. "users won't speak in public" | **Voice is one of four equal paths.** The lockscreen widget exposes mic · keypad · repeat-last · Apple Pay auto-capture. Voice is the *best* path, not the *only* path. |
-| "No bank linking" vs. "users forget to log" | Multiple low-friction paths + **Apple Pay Shortcut auto-capture** + gentle dunning notifications on day 2+ if the user goes quiet. |
+| "No bank linking" vs. "users forget to log" | Multiple low-friction paths + **Apple Pay Shortcut auto-capture** (offered during onboarding) + an evening check-in and gentle quiet-day nudges. |
 | "Privacy differentiation" vs. "nobody reads privacy pages" | Privacy is surfaced as a first-class screen (Privacy Center) AND reinforced in microcopy across the app ("Processed on-device", "Your voice never leaves your phone"). |
 | "AI advice" vs. "hallucinated financial advice" | **Ask Murmur is a grounded reasoner**, not a chat. It only answers questions about the user's own transactions. No general finance advice, no hallucinations, no external knowledge. |
 
@@ -109,7 +109,7 @@ More is the drawer for everything else.
 
 ### Top-level flows
 
-1. **Onboarding** → Permissions → Income (optional) → Empty state → Day-1 guided log
+1. **Onboarding** (Sep 19 2026): Welcome with live capture demo → Your setup (language, currency, voice from the phone) → Try it now (first spoken expense; mic asked in context) → Never miss one (evening check-in, Apple Pay capture) → one soft Plus offer → Today with Getting started
 2. **Capture loop**: Lockscreen widget → Listening → Confirm → Saved (with Undo)
 3. **Alternate capture**: Keypad, Apple Pay auto-capture notification, manual edit
 4. **Browse**: Today → Transaction detail → Search / History
@@ -140,31 +140,32 @@ Export's explanatory sentence) is not a nav label and may still differ.
 
 ## 5. Screen-by-screen rationale
 
-### Onboarding
-Privacy is the lead. No feature list marketing — one serif headline
-("Speak it. Spend clearly."), three quiet promises (on-device voice, no
-bank linking, desktop clarity), one CTA.
+### Onboarding (rebuilt Sep 19 2026, first-run audit)
+Value before questions. Source of truth: docs/murmur-product-review.html
+(Topic 1) and docs/fixes-2026-09-19-first-run.md.
 
-### Permissions
-Step 2 of 3. Mic + Shortcuts granted; Face ID optional. Minimum
-necessary. The copy on each permission is why-not-what.
-
-### Income setup
-Step 3 of 3. **Optional**. This is the quiet number that makes Ask
-Murmur possible. Never verified, never synced to a bank. A quick-pick
-row ($2.5k / $4k / $6k / $10k) because most users won't type the exact
-amount.
-
-### Empty state (Day 1)
-A single mic glyph on a warm canvas. One suggestion sentence (*"Seven
-fifty at the bakery"*). A "or type it manually" escape hatch. Nothing
-else.
+- **Welcome + sign-in.** One serif headline ("Speak it. Spend clearly."),
+  a looping demo of a real capture in the phone's language and currency
+  (words type in, the filed card lands), one trust line, one-tap Apple.
+- **Your setup.** Language, currency and speech recognizer read from the
+  phone, confirmed in one tap ("Looks right"). Also the opt-in for
+  anonymous usage and crash data, off by default.
+- **Try it now.** Big mic, one example sentence, one line on privacy. The
+  Microphone and Speech Recognition alerts appear when the user taps to
+  speak (in context). Typing is one tap away. "Filed." lands with a
+  success haptic.
+- **Never miss one.** Evening check-in (hour chips, on by default; this
+  screen is the explanation, Continue opens the notification alert) and,
+  on iPhone, "Set up Apple Pay capture next".
+- **After onboarding.** One soft Plus offer with a visible "Not now" (or
+  the Apple Pay setup if chosen), then Today with a Getting started card:
+  first expense, monthly budget, income, Apple Pay capture.
 
 ### Guided first log
-Appears once, on the first time the user sees Today empty. An annotated
-pointer at the mic FAB with three example phrasings. The mic button
-itself gets a glow ring. This is the single most important retention
-moment — we literally show the user how to get value.
+Shown on Today until the first *expense* is logged (an income no longer
+hides it) for users who skipped "Try it now". A "Tap to speak" callout
+points at the mic button, which gets a breathing sage glow ring. Skip
+persists.
 
 ### Lockscreen widget (3 actions)
 `[ Speak | Type | Repeat-last $12.40 ]` — equal surface area, mic
@@ -462,10 +463,15 @@ These were discussed but aren't all in the mockups yet. Budget time to
 build them.
 
 - **Undo snackbar** after every save (4s, tap to reverse).
-- **Day-1 guided first log** (shown once, dismissed on first save).
-- **Day-2 dunning notification** if the user has opened the app but
-  logged nothing for 24h. Copy: "You usually log by now. Anything to
-  capture?" Not "don't miss out" — gentle.
+- **Day-1 guided first log**: now inside onboarding ("Try it now"); the
+  Today coach remains for anyone who skipped it, until the first expense.
+- **Reminders** (Sep 19 2026, src/services/reminders.ts): an evening
+  check-in at a chosen hour (asked on onboarding's habit step, or once via
+  a prime sheet for older accounts), skipped on days something was logged,
+  copy shifting on day 3 and day 7 of silence ("Anything to add from
+  today?", "A few quiet days", "Your week in one minute"). With the
+  check-in off, quiet nudges 1, 3 and 7 days after the last log. Never a
+  cold permission alert: an explanation always comes first.
 - **Day-3 insights unlock** — the Insights tab gets a small badge when
   the user has 3+ entries. First-time tap shows a 1-screen welcome.
 - **Recurring detection** kicks in after 2–3 occurrences of a merchant

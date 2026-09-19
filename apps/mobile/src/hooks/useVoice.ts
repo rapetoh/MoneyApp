@@ -8,6 +8,8 @@ import { parseExpense } from '@voice-expense/ai'
 import { supabase } from '../lib/supabase'
 import { getApiUrl } from './useApiUrl'
 import { localDay } from '@voice-expense/shared'
+import { haptic } from '../services/haptics'
+import { track } from '../services/analytics'
 import type { ParsedExpense } from '@voice-expense/shared'
 
 export type VoiceState = 'idle' | 'listening' | 'processing' | 'done' | 'error'
@@ -141,7 +143,10 @@ export function useVoice(
       setState('error')
       return
     }
-    setErrorMessage(`Speech recognition error: ${event.error}`)
+    // Stable codes, never raw recognizer text: the overlay maps each to
+    // localized copy (first-run audit C2). 'not-allowed' means the user
+    // turned Microphone or Speech Recognition off in iOS Settings.
+    setErrorMessage(event.error === 'not-allowed' ? 'mic-denied' : 'recognizer-error')
     setState('error')
   })
 
@@ -175,7 +180,8 @@ export function useVoice(
         setState('done')
       } catch (err) {
         if (gen !== sessionGenRef.current) return
-        setErrorMessage(err instanceof Error ? err.message : 'Parsing failed')
+        console.warn('[voice] parse failed', err instanceof Error ? err.message : err)
+        setErrorMessage('parse-failed')
         setState('error')
       }
     },
@@ -183,12 +189,23 @@ export function useVoice(
   )
 
   const startListening = useCallback(async (locale: string) => {
-    const { granted } = await ExpoSpeechRecognitionModule.requestPermissionsAsync()
-    if (!granted) {
-      setErrorMessage('Microphone permission denied')
+    // First-run audit C2: once the user declines Microphone or Speech
+    // Recognition, iOS never shows the alert again and requesting returns
+    // "denied" instantly. Ask only when the OS still can; otherwise report
+    // the stable 'mic-denied' code so the overlay offers Open Settings and
+    // typing instead of a retry that can never succeed.
+    let perm = await ExpoSpeechRecognitionModule.getPermissionsAsync()
+    if (!perm.granted && perm.canAskAgain !== false) {
+      perm = await ExpoSpeechRecognitionModule.requestPermissionsAsync()
+      track('mic_permission', { granted: perm.granted })
+    }
+    if (!perm.granted) {
+      haptic.warning()
+      setErrorMessage('mic-denied')
       setState('error')
       return
     }
+    haptic.tap()
 
     sessionGenRef.current++
     discardRecognitionRef.current = false
@@ -218,6 +235,7 @@ export function useVoice(
   }, [])
 
   const stopListening = useCallback(() => {
+    haptic.tap()
     ExpoSpeechRecognitionModule.stop()
   }, [])
 

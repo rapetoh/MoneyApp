@@ -48,8 +48,10 @@ export async function signInWithGoogle() {
 
   const result = await WebBrowser.openAuthSessionAsync(authUrl.url, redirectTo)
 
+  // Closing the sheet is a choice, not a failure (first-run audit H6):
+  // resolve quietly so the sign-in screen shows no error alert.
   if (result.type === 'cancel' || result.type === 'dismiss') {
-    throw new Error('Google sign-in cancelled')
+    return null
   }
   if (result.type !== 'success' || !result.url) {
     throw new Error('Google sign-in failed')

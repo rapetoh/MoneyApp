@@ -6,7 +6,7 @@ import type { Session, User } from '@supabase/supabase-js'
 import { syncManager } from '../services/sync/SyncManager'
 import { wipeLocalDatabase } from '../services/sync/localDb'
 import { setCurrentProfileCurrency } from '../services/profileCurrency'
-import { cancelDayTwo } from '../services/dayTwoDunning'
+import { cancelAllReminders, REMINDER_SECURE_KEYS } from '../services/reminders'
 import { clearParseCache } from '@voice-expense/ai'
 import { cacheClear } from '../services/queryCache'
 
@@ -18,9 +18,12 @@ import { cacheClear } from '../services/queryCache'
 const PER_USER_SECURE_KEYS = [
   'insights_unlocked_seen', // src/hooks/useInsightsUnlock.ts
   'api_base_url', // src/hooks/useApiUrl.ts
-  'day_two_permission_asked', // src/services/dayTwoDunning.ts
-  'day_two_user_opted_out', // src/services/dayTwoDunning.ts
   'recurring_pattern_dismissed_v1', // src/components/RecurringPatternBanner.tsx
+  'dayone_skipped', // src/hooks/useFirstRun.ts
+  'start_checklist_active', // src/hooks/useFirstRun.ts
+  'onboarding_followup', // app/(onboarding)/habit.tsx
+  'analytics_install_id', // src/services/analytics.ts
+  ...REMINDER_SECURE_KEYS, // src/services/reminders.ts
 ]
 
 /**
@@ -50,9 +53,9 @@ export async function resetLocalState(): Promise<void> {
   // change reaches every build, and against the very first parse this
   // session having run before sign-in resolved a `userId` to key on.
   clearParseCache()
-  // The day-2 nudge was scheduled for the old account; cancelling also
-  // drops its persisted notification id.
-  await cancelDayTwo()
+  // Reminders were scheduled for the old account; cancelling also drops
+  // their persisted notification ids.
+  await cancelAllReminders()
   await Promise.all(PER_USER_SECURE_KEYS.map((key) => SecureStore.deleteItemAsync(key)))
   // _layout.tsx starts the SyncManager exactly once on mount, so the
   // teardown must hand back a running instance for the next sign-in.
@@ -123,8 +126,15 @@ export async function signInWithEmail(email: string, password: string) {
   return supabase.auth.signInWithPassword({ email, password })
 }
 
+/**
+ * Email sign-up. The confirmation link comes back into the app
+ * (`app/auth/callback.tsx`, audit M1) instead of landing on the website's
+ * Site URL; `voiceexpense://auth/callback` is already on the Supabase
+ * redirect allow-list for Google sign-in.
+ */
 export async function signUpWithEmail(email: string, password: string) {
-  return supabase.auth.signUp({ email, password })
+  const emailRedirectTo = AuthSession.makeRedirectUri({ scheme: 'voiceexpense', path: 'auth/callback' })
+  return supabase.auth.signUp({ email, password, options: { emailRedirectTo } })
 }
 
 /**

@@ -21,6 +21,11 @@ const DEFAULT_NAMES = new Set(['salary', 'salaire', 'salario', 'salário'])
 
 const storageKey = (ruleId: string) => `income_name_prompted_${ruleId}`
 
+/** App launch time. A rule created during this launch was just entered by
+ *  the user, who chose to leave the name empty seconds ago: asking again
+ *  right away is the double-ask the first-run audit (M3) removed. */
+const LAUNCHED_AT = Date.now()
+
 export function isUnnamedIncomeRule(r: Pick<RecurringRule, 'direction' | 'is_active' | 'name'>): boolean {
   if (r.direction !== 'credit' || !r.is_active) return false
   const name = (r.name ?? '').trim().toLowerCase()
@@ -37,7 +42,11 @@ export function NameIncomeSheet({
   /** Persist the new name on the rule; resolve true on success. */
   onRename: (ruleId: string, name: string) => Promise<boolean>
 }) {
-  const candidate = useMemo(() => rules.find(isUnnamedIncomeRule) ?? null, [rules])
+  const candidate = useMemo(
+    () =>
+      rules.find((r) => isUnnamedIncomeRule(r) && Date.parse(r.created_at) < LAUNCHED_AT) ?? null,
+    [rules],
+  )
   const [visible, setVisible] = useState(false)
   const [name, setName] = useState('')
   const [saving, setSaving] = useState(false)
@@ -54,7 +63,7 @@ export function NameIncomeSheet({
     return () => {
       cancelled = true
     }
-  }, [candidate?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [candidate?.id])
 
   if (!candidate) return null
 

@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 // actually talks to; add a row the day a new integration ships.
 export default function PrivacyPage() {
   return (
-    <LegalPage title="Privacy Policy" updated="August 16, 2026">
+    <LegalPage title="Privacy Policy" updated="September 19, 2026">
       <div className="summary">
         <p style={{ fontWeight: 600 }}>The short version</p>
         <ul>
@@ -23,8 +23,8 @@ export default function PrivacyPage() {
           </li>
           <li>Your voice is transcribed on your device. Audio never leaves your phone.</li>
           <li>
-            We don&apos;t sell your data, we don&apos;t show ads, and we don&apos;t run analytics or
-            crash trackers today.
+            We don&apos;t sell your data and we don&apos;t show ads. Anonymous usage and crash
+            data is collected only if you turn it on, and it is off by default.
           </li>
           <li>
             You can export or permanently delete everything, yourself, from Settings, no email
@@ -85,14 +85,26 @@ export default function PrivacyPage() {
         state) so we can unlock Plus on all your devices.
       </p>
 
+      <h2>Optional usage and crash data</h2>
+      <p>
+        If you choose &ldquo;Help improve Murmur&rdquo; (during setup, or later in the Privacy
+        Center), the app sends anonymous product events, such as finishing a setup step or opening
+        the subscription screen, and error reports when the app hits a bug. These are tied to a
+        random identifier for this installation, not to your account, and never include your
+        transactions, amounts, merchants or anything you say. They are stored in our own database
+        (Supabase) and are not shared with any analytics or advertising company. Turning the option
+        off stops collection immediately; our server rejects events from anyone who has not opted
+        in.
+      </p>
+
       <h2>What we don&apos;t do</h2>
       <ul>
         <li>No bank or card linking, ever. Murmur has no access to your accounts.</li>
         <li>No selling, renting or sharing of your data for advertising.</li>
         <li>No advertising in the product.</li>
         <li>
-          No usage analytics or crash reporting is collected today. If that changes, it will be
-          opt-in and this policy will say so first.
+          No usage analytics or crash reporting unless you opt in. It is off by default, and you
+          can switch it on or off at any time (app: Settings &gt; Privacy Center; web: Settings).
         </li>
       </ul>
 

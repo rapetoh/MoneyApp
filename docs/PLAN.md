@@ -7,6 +7,21 @@
 
 ---
 
+## Post-launch product review (Sep 19, 2026 onward)
+
+iOS 1.0.0 has been live on the App Store since Sep 11, 2026. Product topics
+discussed with the owner after launch live in one visual file:
+[murmur-product-review.html](./murmur-product-review.html) (open it in a
+browser). Topic 1 is the first-run audit, from install to the first logged
+expense: 18 findings (4 critical), a target first run, a three-wave plan,
+and the fixes. All 18 findings were fixed in code the same day for build
+1.0.1 (onboarding rebuilt: setup, first log, habit step; reminders
+rebuilt; opt-in first-party analytics). Record and owner steps (migration
+033, web deploy, EAS build, App Privacy answers):
+[fixes-2026-09-19-first-run.md](./fixes-2026-09-19-first-run.md).
+
+---
+
 ## Murmur redesign (active)
 
 The product is undergoing a top-to-bottom redesign driven by

@@ -1,5 +1,6 @@
-import { Tabs } from 'expo-router'
-import { View, Pressable, StyleSheet } from 'react-native'
+import { useEffect, useRef } from 'react'
+import { Tabs, useRouter } from 'expo-router'
+import { View, Pressable, StyleSheet, Animated, Easing } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { BlurView } from 'expo-blur'
 import { Ionicons } from '@expo/vector-icons'
@@ -7,7 +8,12 @@ import { useAuth } from '../../src/hooks/useAuth'
 import { useProfile } from '../../src/hooks/useProfile'
 import { useTransactions } from '../../src/hooks/useTransactions'
 import { useInsightsUnlock } from '../../src/hooks/useInsightsUnlock'
-import { useDayTwoDunning } from '../../src/hooks/useDayTwoDunning'
+import { useReminders } from '../../src/hooks/useReminders'
+import { useFirstRun, takeOnboardingFollowup } from '../../src/hooks/useFirstRun'
+import { usePlusStatus } from '../../src/hooks/usePlusStatus'
+import { useReduceMotion } from '../../src/hooks/useReduceMotion'
+import { ReminderPrimeSheet } from '../../src/components/ReminderPrimeSheet'
+import { purchasesEnabled } from '../../src/services/purchases'
 import { useVoiceSession } from '../../src/hooks/useVoiceSession'
 import { Colors, Typography, TAB_BAR_HEIGHT, TAB_BAR_BOTTOM_OFFSET, reportTabBarHeight } from '../../src/theme'
 import { t, type Locale } from '@voice-expense/shared'
@@ -39,9 +45,37 @@ function TabIcon({
  *  artboard 14a) it no longer navigates to a Record screen — it opens the
  *  in-place capture overlay over whatever tab is showing. The `record`
  *  route stays registered as a bridge for old deep links only. */
-function RecordFab({ label }: { label: string }) {
+function RecordFab({ label, glow }: { label: string; glow: boolean }) {
   const { openVoice } = useVoiceSession()
+  const reduceMotion = useReduceMotion()
+  // The Day-1 coach's glow ring (first-run audit C3): while no expense has
+  // been logged, a soft sage ring breathes out of the button it points at.
+  const ring = useRef(new Animated.Value(0)).current
+  useEffect(() => {
+    if (!glow || reduceMotion) return
+    const loop = Animated.loop(
+      Animated.timing(ring, { toValue: 1, duration: 1600, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+    )
+    loop.start()
+    return () => {
+      loop.stop()
+      ring.setValue(0)
+    }
+  }, [glow, reduceMotion, ring])
   return (
+    <View style={styles.fabWrap}>
+      {glow && (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.fabGlow,
+            {
+              opacity: reduceMotion ? 0.25 : ring.interpolate({ inputRange: [0, 1], outputRange: [0.45, 0] }),
+              transform: [{ scale: reduceMotion ? 1.2 : ring.interpolate({ inputRange: [0, 1], outputRange: [1, 1.6] }) }],
+            },
+          ]}
+        />
+      )}
     <Pressable
       style={({ pressed }) => [styles.recordButton, pressed && styles.recordButtonPressed]}
       onPress={openVoice}
@@ -51,6 +85,7 @@ function RecordFab({ label }: { label: string }) {
     >
       <Ionicons name="mic" size={26} color={Colors.white} />
     </Pressable>
+    </View>
   )
 }
 
@@ -70,9 +105,34 @@ export default function TabsLayout() {
   // Day-2 dunning local notification. Watches the transaction list at the
   // tabs layer so every save / delete / wipe routes through one lifecycle
   // without each save call site having to remember to schedule.
-  useDayTwoDunning(locale, transactions)
+  // Reminders + the one-time notification prime (first-run audit C4/M4/M6).
+  const { primeVisible, acceptPrime, declinePrime } = useReminders(locale, transactions)
+  const { dayOneActive } = useFirstRun(transactions)
+
+  // One-shot follow-up handed over by onboarding's last step: the Apple Pay
+  // setup when the user asked for it, otherwise the Plus offer (audit H2),
+  // shown once, over Today, after it has painted.
+  const router = useRouter()
+  const { isPlus, loading: plusLoading } = usePlusStatus()
+  const followupDone = useRef(false)
+  useEffect(() => {
+    if (followupDone.current || plusLoading) return
+    followupDone.current = true
+    let alive = true
+    takeOnboardingFollowup().then((f) => {
+      if (!alive || !f) return
+      setTimeout(() => {
+        if (f === 'applepay') router.push('/more/apple-pay-setup')
+        else if (purchasesEnabled && !isPlus) router.push({ pathname: '/more/paywall', params: { origin: 'onboarding' } })
+      }, 700)
+    })
+    return () => {
+      alive = false
+    }
+  }, [plusLoading, isPlus, router])
 
   return (
+    <>
     <Tabs
       screenOptions={{
         headerShown: false,
@@ -140,7 +200,7 @@ export default function TabsLayout() {
           // Custom button: opens the in-place voice overlay instead of
           // navigating. The route itself survives only as a redirect bridge
           // for pre-redesign deep links (see app/(tabs)/record.tsx).
-          tabBarButton: () => <RecordFab label={t('voice.tap_to_record', locale)} />,
+          tabBarButton: () => <RecordFab label={t('voice.tap_to_record', locale)} glow={dayOneActive} />,
         }}
       />
       <Tabs.Screen
@@ -165,6 +225,13 @@ export default function TabsLayout() {
         }}
       />
     </Tabs>
+    <ReminderPrimeSheet
+      visible={primeVisible}
+      locale={locale}
+      onContinue={acceptPrime}
+      onDecline={declinePrime}
+    />
+    </>
   )
 }
 
@@ -256,4 +323,16 @@ const styles = StyleSheet.create({
     elevation: 10,
   },
   recordButtonPressed: { opacity: 0.85 },
+  // Same box as recordButton so the glow sits exactly behind it (the
+  // button's own marginTop: -10 lifts both above the pill).
+  fabWrap: { width: 58, alignSelf: 'center' },
+  fabGlow: {
+    position: 'absolute',
+    top: -10,
+    left: 0,
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    backgroundColor: Colors.accent,
+  },
 })

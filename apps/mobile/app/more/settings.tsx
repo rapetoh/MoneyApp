@@ -15,6 +15,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import * as Linking from 'expo-linking'
 import Constants from 'expo-constants'
+import { getLocales } from 'expo-localization'
 import { useAuth, signOut } from '../../src/hooks/useAuth'
 import { useProfile } from '../../src/hooks/useProfile'
 import { useTransactions } from '../../src/hooks/useTransactions'
@@ -28,11 +29,20 @@ import { SetGroup, SetRow } from '../../src/components/SettingsList'
 import { manageSubscription } from '../../src/services/purchases'
 import { BudgetEditorModal } from '../../src/components/BudgetEditorModal'
 import { IncomeEditorModal } from '../../src/components/IncomeEditorModal'
+import { addMonthlyIncome } from '../../src/services/monthlyIncome'
 import {
-  isUserOptedOut as isDunningOptedOut,
-  setUserOptedOut as setDunningOptedOut,
-  ensureDayTwoPermissionAndSchedule,
-} from '../../src/services/dayTwoDunning'
+  CHECKIN_HOURS,
+  DEFAULT_CHECKIN,
+  enableCheckIn,
+  formatCheckInHour,
+  getCheckIn,
+  getPermissionStatus,
+  isQuietNudgesOptedOut,
+  rescheduleReminders,
+  setCheckIn,
+  setQuietNudgesOptedOut,
+  type CheckIn,
+} from '../../src/services/reminders'
 import { exportAndShare, type ExportFormat } from '../../src/services/exportData'
 import { useCategories } from '../../src/hooks/useCategories'
 import { usePlusStatus } from '../../src/hooks/usePlusStatus'
@@ -51,17 +61,19 @@ import {
   formatMoney,
   type Locale,
   describePlus,
+  LOCALE_LABELS,
+  SUPPORTED_CURRENCIES,
+  voiceLanguageFor,
 } from '@voice-expense/shared'
 import type { BudgetPeriod } from '@voice-expense/shared'
 import { useRouter } from 'expo-router'
 
-const LOCALES: { value: Locale; label: string }[] = [
-  { value: 'en', label: 'English' },
-  { value: 'fr', label: 'Français' },
-  { value: 'es', label: 'Español' },
-  { value: 'pt', label: 'Português' },
-]
-const CURRENCIES = ['USD', 'EUR', 'GBP', 'CAD', 'CHF', 'JPY', 'AUD', 'XAF', 'NGN', 'GHS']
+const LOCALES: { value: Locale; label: string }[] = (Object.keys(LOCALE_LABELS) as Locale[]).map((value) => ({
+  value,
+  label: LOCALE_LABELS[value],
+}))
+// One list with onboarding's setup screen (first-run audit C1).
+const CURRENCIES: readonly string[] = SUPPORTED_CURRENCIES
 const BUDGET_PERIODS: { value: BudgetPeriod; key: string }[] = [
   { value: 'weekly', key: 'settings.period_weekly' },
   { value: 'biweekly', key: 'settings.period_biweekly' },
@@ -261,8 +273,12 @@ export default function SettingsScreen() {
   // reschedules on opt-in. `null` while the SecureStore read is in flight
   // so the toggle doesn't flicker on cold start.
   const [dunningEnabled, setDunningEnabled] = useState<boolean | null>(null)
+  const [checkIn, setCheckInState] = useState<CheckIn | null>(null)
+  const [notifDenied, setNotifDenied] = useState(false)
   useEffect(() => {
-    isDunningOptedOut().then((out) => setDunningEnabled(!out))
+    isQuietNudgesOptedOut().then((out) => setDunningEnabled(!out))
+    getCheckIn().then(setCheckInState)
+    getPermissionStatus().then((st) => setNotifDenied(st === 'denied'))
   }, [])
   // Plus-gated data export. Free users tapping the row see the paywall;
   // Plus users get a three-button format picker (CSV / JSON / PDF) that
@@ -301,17 +317,38 @@ export default function SettingsScreen() {
     }
   }
 
+  // Quiet nudges (1, 3, 7 days after the last log; used when the evening
+  // check-in is off). Reminders module: first-run audit C4/M6.
   const handleDunningToggle = useCallback(async () => {
     if (dunningEnabled === null) return
     const next = !dunningEnabled
     setDunningEnabled(next)
-    if (next) {
-      await setDunningOptedOut(false)
-      await ensureDayTwoPermissionAndSchedule(locale)
-    } else {
-      await setDunningOptedOut(true)
-    }
+    await setQuietNudgesOptedOut(!next)
+    await rescheduleReminders(locale)
   }, [dunningEnabled, locale])
+
+  const handleCheckInToggle = useCallback(async () => {
+    const on = !(checkIn?.enabled ?? false)
+    const hour = checkIn?.hour ?? DEFAULT_CHECKIN.hour
+    if (on) {
+      const result = await enableCheckIn(locale, hour)
+      setNotifDenied(result === 'denied')
+    } else {
+      await setCheckIn({ enabled: false, hour, minute: 0 })
+      await rescheduleReminders(locale)
+    }
+    setCheckInState({ enabled: on, hour, minute: 0 })
+  }, [checkIn, locale])
+
+  const handleCheckInHour = useCallback(
+    async (hour: number) => {
+      const next = { enabled: true, hour, minute: 0 }
+      setCheckInState(next)
+      await setCheckIn(next)
+      await rescheduleReminders(locale)
+    },
+    [locale],
+  )
 
   const periodKey =
     BUDGET_PERIODS.find((p) => p.value === (budget?.period ?? 'monthly'))?.key ??
@@ -596,8 +633,32 @@ export default function SettingsScreen() {
           />
         </SetGroup>
 
-        {/* Reminders — Day-2 dunning toggle. */}
+        {/* Reminders (first-run audit C4/M6): evening check-in with its
+            hour, and quiet nudges for when the check-in is off. */}
         <SetGroup label={t('settings.reminders', locale)}>
+          <SetRow
+            label={t('settings.checkin_label', locale)}
+            toggle
+            value={checkIn?.enabled === true}
+            onToggle={handleCheckInToggle}
+          />
+          {checkIn?.enabled && (
+            <View style={styles.hourRow}>
+              {CHECKIN_HOURS.map((h) => (
+                <Pressable
+                  key={h}
+                  onPress={() => handleCheckInHour(h)}
+                  style={[styles.hourChip, checkIn.hour === h && styles.hourChipOn]}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: checkIn.hour === h }}
+                >
+                  <Text style={[styles.hourChipText, checkIn.hour === h && styles.hourChipTextOn]}>
+                    {formatCheckInHour(h, locale)}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          )}
           <SetRow
             label={t('settings.dunning_label', locale)}
             toggle
@@ -606,6 +667,13 @@ export default function SettingsScreen() {
             last
           />
         </SetGroup>
+        {notifDenied && (
+          <Pressable onPress={() => Linking.openSettings()} style={styles.notifNote}>
+            <Text style={styles.notifNoteText}>
+              {t('settings.notifications_off', locale)} <Text style={styles.notifNoteLink}>{t('common.open_settings', locale)}</Text>
+            </Text>
+          </Pressable>
+        )}
 
         {/* Privacy & data — one group (Aug 29 2026; previously a one-row
             "Data" group and a one-row "Privacy" group). The Privacy
@@ -721,18 +789,8 @@ export default function SettingsScreen() {
         locale={locale}
         onSave={async (amount, source) => {
           if (amount == null || amount <= 0) return true
-          const { error } = await createTransaction({
-            amount,
-            direction: 'credit',
-            currency_code: currency,
-            merchant: source?.trim() || t('onboarding.income.default_name', locale),
-            note: t('onboarding.income.txn_note', locale),
-            category_id: null,
-            payment_method: 'bank_transfer',
-            is_recurring: true,
-            recurring_frequency: 'monthly',
-          })
-          if (error) return false
+          const ok = await addMonthlyIncome(createTransaction, { amount, source, currency, locale })
+          if (!ok) return false
           await refetchProfile()
           return true
         }}
@@ -847,7 +905,12 @@ export default function SettingsScreen() {
               <Pressable
                 style={styles.localeRow}
                 onPress={async () => {
-                  await updateProfile({ locale: l.value })
+                  // The recognizer follows the language (first-run audit
+                  // C1): voice_language was never written before.
+                  await updateProfile({
+                    locale: l.value,
+                    voice_language: voiceLanguageFor(l.value, getLocales()[0]?.regionCode),
+                  })
                   setLocaleModal(false)
                 }}
               >
@@ -1017,6 +1080,21 @@ export default function SettingsScreen() {
 }
 
 const styles = StyleSheet.create({
+  hourRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 16, paddingBottom: 12 },
+  hourChip: {
+    paddingHorizontal: 12,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: Colors.surface2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  hourChipOn: { backgroundColor: Colors.ink },
+  hourChipText: { fontSize: 13, color: Colors.ink2, fontFamily: Typography.fontFamily.sansSemiBold, fontWeight: '600' },
+  hourChipTextOn: { color: Colors.white },
+  notifNote: { marginHorizontal: 20, marginTop: -8, marginBottom: 16 },
+  notifNoteText: { fontSize: 12.5, lineHeight: 18, color: Colors.ink3, fontFamily: Typography.fontFamily.sans },
+  notifNoteLink: { color: Colors.accent, fontFamily: Typography.fontFamily.sansSemiBold, fontWeight: '600' },
   safe: { flex: 1, backgroundColor: Colors.background },
   content: {
     paddingTop: 4,

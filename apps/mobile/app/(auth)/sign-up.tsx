@@ -60,7 +60,7 @@ export default function SignUpScreen() {
             <Text style={styles.successGlyph}>✓</Text>
           </View>
           <Text style={styles.headline}>{t('auth.check_email', locale)}</Text>
-          <Text style={styles.lead}>{t('auth.confirmation_sent', locale)}</Text>
+          <Text style={styles.lead}>{t('auth.confirmation_sent', locale).replace('{email}', email.trim())}</Text>
           <Link href="/(auth)/sign-in" asChild>
             <Pressable style={({ pressed }) => [styles.backBtn, pressed && styles.btnPressed]}>
               <Text style={styles.backBtnText}>{t('auth.back_to_sign_in', locale)}</Text>

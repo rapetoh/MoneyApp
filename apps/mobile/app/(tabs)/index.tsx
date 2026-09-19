@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { ScrollView, View, Text, StyleSheet, ActivityIndicator, Pressable, RefreshControl} from 'react-native'
+import { ScrollView, View, Text, StyleSheet, ActivityIndicator, Pressable, RefreshControl, Platform } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
@@ -19,6 +19,12 @@ import { TransactionRow } from '../../src/components/TransactionRow'
 import { Money, MoneyLabel } from '../../src/components/Money'
 import { MiniBars } from '../../src/components/MiniBars'
 import { DayOneFirstLog } from '../../src/components/DayOneFirstLog'
+import { GettingStartedCard, type StartItem } from '../../src/components/GettingStartedCard'
+import { IncomeEditorModal } from '../../src/components/IncomeEditorModal'
+import { useFirstRun } from '../../src/hooks/useFirstRun'
+import { useVoiceSession } from '../../src/hooks/useVoiceSession'
+import { addMonthlyIncome } from '../../src/services/monthlyIncome'
+import { track } from '../../src/services/analytics'
 import { Colors, Typography, Spacing, Hairline, useTabBarClearance } from '../../src/theme'
 import {
   t,
@@ -154,7 +160,7 @@ export default function TodayScreen() {
   // already expose `error`; this screen is the one that wasn't consuming
   // it, so a failed read rendered identically to "no transactions yet" /
   // "no budget set" instead of a real error-with-retry state.
-  const { transactions, loading, error: transactionsError } = useTransactions(user?.id)
+  const { transactions, loading, error: transactionsError, createTransaction } = useTransactions(user?.id)
   const { categoryMap } = useCategories(user?.id)
   const { profile } = useProfile(user?.id)
   const { budget, error: budgetError, refetch: refetchBudget } = useActiveBudget(user?.id)
@@ -246,21 +252,48 @@ export default function TodayScreen() {
     return Math.max(1, daysBetween(now.y, now.m, now.d, end.y, end.m, end.d))
   }, [budgetStatus, nowInstant, tz, daysLeft])
 
-  // Day-1 coach surface: show until the user has logged anything, unless they
-  // tap Skip this session. Persistence is intentionally not wired — if the
-  // user quits without logging, the hint reappears next launch, which is the
-  // right behavior (the goal is "get them over the first-log hump"). Never
-  // shown on a failed read — a read failure with zero cached rows is not
-  // the same fact as "you haven't logged anything yet" (fix-plan 2.13).
-  const [daySkipped, setDaySkipped] = useState(false)
-  const showDayOne = !loading && transactions.length === 0 && !transactionsError && !daySkipped
+  // Day-1 coach (first-run audit C3): shows until the first *expense* is
+  // logged. It used to key on "zero transactions", so an income entered
+  // during onboarding hid it forever from exactly the most engaged users.
+  // Skip now persists (the "Getting started" card still carries "Log your
+  // first expense"). Never shown on a failed read: a read failure with zero
+  // cached rows is not the same fact as "nothing logged yet" (fix-plan 2.13).
+  const firstRun = useFirstRun(transactions)
+  const showDayOne = !loading && !transactionsError && firstRun.dayOneActive
+  const { openVoice } = useVoiceSession()
+  const [incomeModal, setIncomeModal] = useState(false)
+
+  // "Getting started" (audit M2, H3): income and Apple Pay capture moved
+  // here from onboarding / Settings, each done-state read from real data.
+  const hasIncome =
+    (profile?.monthly_income ?? 0) > 0 ||
+    recurringRules.some((r) => r.direction === 'credit' && r.is_active) ||
+    transactions.some((x) => !x.is_deleted && x.direction === 'credit' && x.is_recurring)
+  const startItems: StartItem[] = [
+    { key: 'first_expense', done: firstRun.expenses > 0, onPress: openVoice },
+    { key: 'budget', done: budget != null, onPress: () => router.push('/(tabs)/budgets') },
+    { key: 'income', done: hasIncome, onPress: () => setIncomeModal(true) },
+    ...(Platform.OS === 'ios'
+      ? [
+          {
+            key: 'applepay' as const,
+            done: transactions.some((x) => !x.is_deleted && x.source === 'shortcut'),
+            onPress: () => router.push('/more/apple-pay-setup'),
+          },
+        ]
+      : []),
+  ]
+  const tapStart = (item: StartItem) => () => {
+    track('getting_started_tap', { item: item.key })
+    item.onPress()
+  }
 
   if (showDayOne) {
     return (
       <SafeAreaView style={styles.safe} edges={['top']}>
         <DayOneFirstLog
           locale={locale}
-          onSkip={() => setDaySkipped(true)}
+          onSkip={firstRun.skipDayOne}
           // Straight to Quick entry — the manual flow's post-redesign home.
           onTypeInstead={() => router.push('/transaction/new')}
         />
@@ -358,6 +391,14 @@ export default function TodayScreen() {
           />
         )}
 
+        {firstRun.checklistVisible && (
+          <GettingStartedCard
+            items={startItems.map((item) => ({ ...item, onPress: tapStart(item) }))}
+            locale={locale}
+            onHide={firstRun.hideChecklist}
+          />
+        )}
+
         {/* Spent today + MiniBars */}
         <View style={styles.spentCard}>
           <View style={{ flex: 1 }}>
@@ -386,7 +427,9 @@ export default function TodayScreen() {
           </View>
         ) : sections.length === 0 ? (
           <View style={styles.emptyState}>
-            <Text style={styles.emptyIcon}>💸</Text>
+            <View style={styles.emptyIconTile}>
+              <Ionicons name="mic-outline" size={22} color={Colors.accent} />
+            </View>
             <Text style={styles.emptyTitle}>{t('transactions.empty', locale)}</Text>
             <Text style={styles.emptySubtitle}>{t('home.first_expense', locale)}</Text>
           </View>
@@ -431,6 +474,18 @@ export default function TodayScreen() {
           employer name; the record and the logo want it. Renaming the
           rule flows through migration 032 into Settings' Monthly Income
           source. */}
+      <IncomeEditorModal
+        visible={incomeModal}
+        initialAmount={null}
+        initialSource={null}
+        currency={currency}
+        locale={locale}
+        onSave={async (amount, source) => {
+          if (amount == null || amount <= 0) return true
+          return addMonthlyIncome(createTransaction, { amount, source, currency, locale })
+        }}
+        onClose={() => setIncomeModal(false)}
+      />
       <NameIncomeSheet
         rules={recurringRules}
         locale={locale}
@@ -604,7 +659,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing['2xl'],
     gap: Spacing.sm,
   },
-  emptyIcon: { fontSize: 40 },
+  emptyIconTile: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: Colors.accentSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   emptyTitle: {
     fontFamily: Typography.fontFamily.sansBold,
     fontSize: Typography.size.md,

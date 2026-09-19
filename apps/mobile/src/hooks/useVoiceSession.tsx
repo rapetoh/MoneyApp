@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Alert, BackHandler } from 'react-native'
+import { getLocales } from 'expo-localization'
 import { useRouter } from 'expo-router'
 import { useAuth } from './useAuth'
 import { useProfile } from './useProfile'
@@ -11,7 +12,8 @@ import { useNotificationListener } from './useNotificationListener'
 import { VoiceCaptureOverlay } from '../components/VoiceCaptureOverlay'
 import { VoiceResultSheet, type ConfirmedExpense } from '../components/VoiceResultSheet'
 import { Presence } from '../components/Presence'
-import { t, formatMoney } from '@voice-expense/shared'
+import { t, formatMoney, effectiveVoiceLanguage } from '@voice-expense/shared'
+import { haptic } from '../services/haptics'
 import type { Locale, ParsedExpense, TransactionSource } from '@voice-expense/shared'
 
 interface VoiceSessionApi {
@@ -26,14 +28,6 @@ interface VoiceSessionApi {
 
 const VoiceSessionContext = createContext<VoiceSessionApi | null>(null)
 
-// App locale → BCP-47 tag for the platform speech recognizer, unless the
-// profile pins an explicit voice_language.
-const LOCALE_TO_BCP47: Record<string, string> = {
-  en: 'en-US',
-  fr: 'fr-FR',
-  es: 'es-ES',
-  pt: 'pt-BR',
-}
 
 /**
  * Root-level owner of the voice capture loop (docs/voice redesign, artboards
@@ -59,7 +53,12 @@ export function VoiceSessionProvider({ children }: { children: ReactNode }) {
   const locale = (profile?.locale ?? 'en') as Locale
   const currency = profile?.currency_code ?? 'USD'
   const timezone = profile?.timezone || 'UTC'
-  const speechLocale = profile?.voice_language ?? LOCALE_TO_BCP47[locale] ?? 'en-US'
+  // First-run audit C1: `voice_language` is NOT NULL DEFAULT 'en-US' and
+  // nothing wrote it before Sep 19 2026, so reading it directly made every
+  // French, Spanish and Portuguese speaker talk to an English recognizer.
+  // The shared rule treats a value that doesn't match the app language as
+  // the untouched default and derives it from language + device region.
+  const speechLocale = effectiveVoiceLanguage(profile?.voice_language, locale, getLocales()[0]?.regionCode)
   const categoryNames = useMemo(() => categories.map((c) => c.name), [categories])
 
   const voice = useVoice(currency, categoryNames, locale, timezone)
@@ -152,6 +151,7 @@ export function VoiceSessionProvider({ children }: { children: ReactNode }) {
     }
 
     const savedId = result.id
+    haptic.success()
     const label = expense.merchant?.trim()
       || categories.find((c) => c.id === expense.categoryId)?.name
       || t(expense.direction === 'credit' ? 'voice.income_label' : 'voice.expense', locale)

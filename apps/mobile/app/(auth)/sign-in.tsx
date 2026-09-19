@@ -20,22 +20,9 @@ import { signInWithEmail, requestPasswordReset } from '../../src/hooks/useAuth'
 import { signInWithApple } from '../../src/services/appleAuth'
 import { signInWithGoogle } from '../../src/services/googleAuth'
 import { MurmurMark } from '../../src/components/MurmurMark'
+import { CaptureDemo } from '../../src/components/CaptureDemo'
 import { Colors, Typography, Hairline } from '../../src/theme'
-import { t, resolveLocale, type Locale } from '@voice-expense/shared'
-
-// Three value props that double as the welcome pitch. Same source of truth as
-// the prior (onboarding)/welcome.tsx — that screen has been retired and its
-// content lives here so the user sees the pitch on the same surface as the
-// one-tap auth CTA, not as a separate step.
-const PROPS: {
-  icon: React.ComponentProps<typeof Ionicons>['name']
-  titleKey: string
-  subKey: string
-}[] = [
-  { icon: 'mic', titleKey: 'onboarding.welcome.prop_voice_title', subKey: 'onboarding.welcome.prop_voice_sub' },
-  { icon: 'lock-closed', titleKey: 'onboarding.welcome.prop_nobank_title', subKey: 'onboarding.welcome.prop_nobank_sub' },
-  { icon: 'analytics', titleKey: 'onboarding.welcome.prop_desktop_title', subKey: 'onboarding.welcome.prop_desktop_sub' },
-]
+import { t, resolveLocale, resolveCurrency, type Locale } from '@voice-expense/shared'
 
 /**
  * Welcome + Sign-in (combined).
@@ -56,6 +43,8 @@ export default function WelcomeSignInScreen() {
   // lives in Settings + onboarding's income step — both reachable
   // post-sign-in — for the user to override this guess.
   const locale: Locale = resolveLocale(getLocales().map((l) => l.languageCode))
+  // The demo speaks the phone's currency too (first-run audit H4).
+  const demoCurrency = resolveCurrency(getLocales()[0]?.currencyCode)
 
   const [appleAvailable, setAppleAvailable] = useState(false)
   const [showEmailForm, setShowEmailForm] = useState(false)
@@ -150,28 +139,19 @@ export default function WelcomeSignInScreen() {
           {/* Murmur's mark — Coin & Wave, sage-tile variant per brand sheet §02.
               ("The Listening Drop" was the retired candidate; see
               packages/shared/src/brand.ts for PRODUCT_NAME vs. mark name.) */}
-          <MurmurMark size={64} variant="sage" />
+          <MurmurMark size={52} variant="sage" />
 
 
           <Text style={styles.headline}>{t('onboarding.welcome.headline', locale)}</Text>
-          <Text style={styles.lead}>{t('onboarding.welcome.lead', locale)}</Text>
 
-          <View style={styles.props}>
-            {PROPS.map((p) => (
-              <View key={p.titleKey} style={styles.propRow}>
-                <View style={styles.propIconTile}>
-                  <Ionicons
-                    name={p.icon}
-                    size={18}
-                    color={Colors.accent ?? Colors.primary}
-                  />
-                </View>
-                <View style={styles.propTextWrap}>
-                  <Text style={styles.propTitle}>{t(p.titleKey, locale)}</Text>
-                  <Text style={styles.propSub}>{t(p.subKey, locale)}</Text>
-                </View>
-              </View>
-            ))}
+          {/* The product, shown rather than described (first-run audit
+              H4): a spoken sentence becomes a filed expense, on a loop.
+              Replaces three static promise rows, one of which ("Clarity
+              on desktop") was a Plus feature presented as included. */}
+          <CaptureDemo locale={locale} currency={demoCurrency} />
+          <View style={styles.trustRow}>
+            <Ionicons name="lock-closed" size={12} color={Colors.ink3 ?? Colors.textSecondary} />
+            <Text style={styles.trustText}>{t('welcome.trust', locale)}</Text>
           </View>
 
           {/* Auth CTA stack — order swaps by platform */}
@@ -312,8 +292,8 @@ const styles = StyleSheet.create({
   content: {
     flexGrow: 1,
     paddingHorizontal: 28,
-    paddingTop: 48,
-    paddingBottom: 32,
+    paddingTop: 36,
+    paddingBottom: 28,
   },
 
   // Brand mark + headline + lead. Coin & Wave is a self-contained tile
@@ -326,45 +306,18 @@ const styles = StyleSheet.create({
     letterSpacing: -1,
     color: Colors.ink ?? Colors.text,
     fontWeight: '500',
-    marginTop: 28,
-  },
-  lead: {
-    color: Colors.ink3 ?? Colors.textSecondary,
-    fontSize: 16,
-    lineHeight: 24,
-    marginTop: 14,
-    fontFamily: Typography.fontFamily.sans,
+    marginTop: 22,
   },
 
-  // Three value props
-  props: { marginTop: 32, gap: 16 },
-  propRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 14 },
-  propIconTile: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: Colors.accentSoft ?? Colors.primaryLight,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  propTextWrap: { flex: 1 },
-  propTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: Colors.ink ?? Colors.text,
-    letterSpacing: -0.2,
-    fontFamily: Typography.fontFamily.sansSemiBold,
-  },
-  propSub: {
-    fontSize: 13.5,
+  trustRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 14, paddingHorizontal: 4 },
+  trustText: {
+    fontSize: 13,
     color: Colors.ink3 ?? Colors.textSecondary,
-    marginTop: 2,
-    lineHeight: 19,
     fontFamily: Typography.fontFamily.sans,
   },
 
   // CTA stack
-  ctaStack: { marginTop: 36, gap: 10 },
+  ctaStack: { marginTop: 28, gap: 10 },
 
   // iOS hero — Apple-styled native button
   appleHeroBtn: { width: '100%', height: 54 },

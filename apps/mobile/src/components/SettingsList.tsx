@@ -5,10 +5,8 @@ import { ScaledText as Text } from './ScaledText'
 import { Tappable } from './Tappable'
 
 // Reproductions of SetGroup / SetRow from docs/money-app/project/
-// mobile-screens-4.jsx. Reused by the Settings screen for its visual
-// primitives. (Privacy Center — app/more/privacy.tsx — keeps its own local
-// the old PrivacyRow; the two never shared this module's copy.)
-
+// mobile-screens-4.jsx: the one copy, used by Settings and (since the
+// Sep 19 2026 opt-in switches) the Privacy Center.
 export function SetGroup({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <View style={styles.group}>

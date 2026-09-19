@@ -5,7 +5,7 @@ module.exports = {
     name: 'Murmur',
     slug: 'voice-expense-tracker',
     scheme: 'voiceexpense',
-    version: '1.0.0',
+    version: '1.0.1',
     orientation: 'portrait',
     icon: './assets/icon.png',
     userInterfaceStyle: 'light',
@@ -47,12 +47,24 @@ module.exports = {
           'NSPrivacyCollectedDataTypeOtherFinancialInfo',
           'NSPrivacyCollectedDataTypePurchaseHistory',
           'NSPrivacyCollectedDataTypeOtherUserContent',
-        ].map((type) => ({
-          NSPrivacyCollectedDataType: type,
-          NSPrivacyCollectedDataTypeLinked: true,
-          NSPrivacyCollectedDataTypeTracking: false,
-          NSPrivacyCollectedDataTypePurposes: ['NSPrivacyCollectedDataTypePurposeAppFunctionality'],
-        })),
+        ]
+          .map((type) => ({
+            NSPrivacyCollectedDataType: type,
+            NSPrivacyCollectedDataTypeLinked: true,
+            NSPrivacyCollectedDataTypeTracking: false,
+            NSPrivacyCollectedDataTypePurposes: ['NSPrivacyCollectedDataTypePurposeAppFunctionality'],
+          }))
+          .concat(
+            // Opt-in only (first-run audit H1, Sep 19 2026): anonymous
+            // product events and JS crash reports, keyed by a random
+            // install id, never linked to the account (migration 033).
+            ['NSPrivacyCollectedDataTypeProductInteraction', 'NSPrivacyCollectedDataTypeCrashData'].map((type) => ({
+              NSPrivacyCollectedDataType: type,
+              NSPrivacyCollectedDataTypeLinked: false,
+              NSPrivacyCollectedDataTypeTracking: false,
+              NSPrivacyCollectedDataTypePurposes: ['NSPrivacyCollectedDataTypePurposeAnalytics'],
+            })),
+          ),
       },
     },
     android: {
@@ -120,8 +132,9 @@ module.exports = {
       [
         'expo-speech-recognition',
         {
+          // First-run audit H5: the mic is tap-to-talk; nobody holds it.
           microphonePermission:
-            'Murmur listens only while you hold the mic button, to hear the expense you say out loud. Audio is never stored.',
+            'Murmur listens only while you are recording, to hear the expense you say out loud. Audio is never stored.',
           speechRecognitionPermission:
             'Murmur turns what you say into text so it can file the amount, place and category for you. Audio is never stored.',
         },

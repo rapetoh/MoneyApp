@@ -84,6 +84,36 @@ export type Database = {
         }
         Relationships: []
       }
+      app_events: {
+        Row: {
+          app_version: string | null
+          created_at: string
+          event: string
+          id: number
+          install_id: string
+          platform: string | null
+          props: Json
+        }
+        Insert: {
+          app_version?: string | null
+          created_at?: string
+          event: string
+          id?: never
+          install_id: string
+          platform?: string | null
+          props?: Json
+        }
+        Update: {
+          app_version?: string | null
+          created_at?: string
+          event?: string
+          id?: never
+          install_id?: string
+          platform?: string | null
+          props?: Json
+        }
+        Relationships: []
+      }
       ask_conversations: {
         Row: {
           created_at: string

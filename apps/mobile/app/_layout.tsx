@@ -17,6 +17,7 @@ import { runFxBackfill } from '../src/services/fxBackfill'
 import { registerDevice } from '../src/services/sync/deviceRegistry'
 import { runOncePerSession } from '../src/services/launchOnce'
 import { configurePurchases } from '../src/services/purchases'
+import { installCrashReporting } from '../src/services/analytics'
 import { UndoProvider } from '../src/hooks/useUndo'
 import { VoiceSessionProvider } from '../src/hooks/useVoiceSession'
 import { SyncFailureBanner } from '../src/components/SyncFailureBanner'
@@ -29,6 +30,10 @@ import type { Locale } from '@voice-expense/shared'
 // frame in JS; that component owns `hideAsync()`, breathes the mark while
 // the gates below resolve, then dissolves into the first screen.
 SplashScreen.preventAutoHideAsync()
+
+// Opt-in JS crash reports (first-run audit H1). Wraps the global handler
+// once; nothing is sent unless the profile has crash_reports_opt_in.
+installCrashReporting()
 
 /** Longest the splash waits on the network half of the data preload. */
 const PRELOAD_NETWORK_BUDGET_MS = 2500
@@ -124,9 +129,9 @@ export default function RootLayout() {
   // Track the previous segment group so we can skip the onboarding bounce
   // for one render cycle after the user finishes the flow. updateProfile +
   // DataEvents.emitProfile is synchronous at the emitter but each listener's
-  // refetch is async and not awaited — so when income.tsx navigates to
+  // refetch is async and not awaited, so when habit.tsx navigates to
   // /(tabs), this layout's `profile` state hasn't updated yet, and without
-  // this guard the routing gate would re-push to /(onboarding)/permissions and
+  // this guard the routing gate would re-push to /(onboarding)/setup and
   // then only settle once the refetch resolves.
   const prevSegmentRef = useRef<string | undefined>(undefined)
 
@@ -148,8 +153,15 @@ export default function RootLayout() {
     // /(tabs)/(onboarding) before the reset form ever appears. The screen
     // owns its own post-success navigation (`router.replace('/(tabs)')`).
     const isPasswordReset = inAuthGroup && segments[1] === 'reset-password'
+    // Email-confirmation landing (audit M1): /auth/callback exchanges the
+    // link's code for a session itself, so it must not be redirected to
+    // sign-in while that exchange is in flight.
+    const isAuthCallback = segmentGroup === 'auth'
+    // Onboarding's "Try it now" step can open Quick entry (typing instead
+    // of speaking); that modal lives outside the (onboarding) group.
+    const isOnboardingModal = segmentGroup === 'transaction'
 
-    if (isPasswordReset) {
+    if (isPasswordReset || isAuthCallback) {
       // no-op — let the screen drive navigation
     } else if (!session && !inAuthGroup) {
       router.replace('/(auth)/sign-in')
@@ -161,7 +173,7 @@ export default function RootLayout() {
       if (!profile) {
         // hold on /(auth) for a moment; the effect re-runs once profile arrives
       } else if (profile.onboarding_completed_at == null) {
-        router.replace('/(onboarding)/permissions')
+        router.replace('/(onboarding)/setup')
       } else {
         router.replace('/(tabs)')
       }
@@ -169,6 +181,7 @@ export default function RootLayout() {
       session &&
       !inAuthGroup &&
       !inOnboardingGroup &&
+      !isOnboardingModal &&
       !justLeftOnboarding &&
       profile &&
       profile.onboarding_completed_at == null
@@ -176,7 +189,7 @@ export default function RootLayout() {
       // Authed user who hasn't finished onboarding — push into the flow.
       // Skipped when the user has just exited /(onboarding) to /(tabs) so
       // the stale profile doesn't bounce them back.
-      router.replace('/(onboarding)/permissions')
+      router.replace('/(onboarding)/setup')
     }
 
     prevSegmentRef.current = segmentGroup

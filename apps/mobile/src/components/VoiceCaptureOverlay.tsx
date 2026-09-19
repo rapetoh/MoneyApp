@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Animated,
   Easing,
+  Linking,
   Pressable,
   StyleSheet,
   Text,
@@ -22,7 +23,8 @@ interface Props {
   phase: 'listening' | 'processing' | 'error'
   /** Live transcript (interim while speaking, final while processing). */
   transcript: string
-  /** Raw error from useVoice — 'no-transcript' gets its localized copy here. */
+  /** Error code from useVoice ('no-transcript' | 'mic-denied' |
+   *  'recognizer-error' | 'parse-failed'); each maps to localized copy here. */
   errorMessage: string | null
   volumeLevel: Animated.Value
   currencyCode: string
@@ -147,10 +149,18 @@ export function VoiceCaptureOverlay({
   const detectedAmount = useMemo(() => extractAmount(transcript), [transcript])
   const timer = `${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, '0')}`
 
-  const errorCopy =
-    errorMessage === 'no-transcript'
-      ? t('voice.no_transcript', locale)
-      : errorMessage ?? t('common.error', locale)
+  // Every error the capture loop can hit, in the user's language (first-run
+  // audit C2: raw English recognizer text used to be shown as-is).
+  const ERROR_COPY: Record<string, string> = {
+    'no-transcript': 'voice.no_transcript',
+    'mic-denied': 'voice.mic_denied',
+    'recognizer-error': 'voice.recognizer_error',
+    'parse-failed': 'voice.parse_failed',
+  }
+  const errorCopy = t(ERROR_COPY[errorMessage ?? ''] ?? 'common.error', locale)
+  // With the mic off in iOS Settings, retrying can never work: the way
+  // forward is Settings, or typing.
+  const micDenied = phase === 'error' && errorMessage === 'mic-denied'
 
   return (
     <View style={styles.root}>
@@ -201,7 +211,27 @@ export function VoiceCaptureOverlay({
         {/* Live transcript — the hero */}
         <View style={styles.transcriptWrap}>
           {phase === 'error' ? (
-            <Text style={styles.errorText}>{errorCopy}</Text>
+            <View>
+              <Text style={styles.errorText}>{errorCopy}</Text>
+              {micDenied && (
+                <View style={styles.deniedActions}>
+                  <Pressable
+                    onPress={() => Linking.openSettings()}
+                    style={({ pressed }) => [styles.deniedPrimary, pressed && styles.pressed]}
+                    accessibilityRole="button"
+                  >
+                    <Text style={styles.deniedPrimaryText}>{t('common.open_settings', locale)}</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={onKeyboard}
+                    style={({ pressed }) => [styles.deniedSecondary, pressed && styles.pressed]}
+                    accessibilityRole="button"
+                  >
+                    <Text style={styles.deniedSecondaryText}>{t('voice.type_instead', locale)}</Text>
+                  </Pressable>
+                </View>
+              )}
+            </View>
           ) : (
             <Text style={styles.transcriptText}>
               {transcript.length > 0 ? (
@@ -240,7 +270,17 @@ export function VoiceCaptureOverlay({
             <Ionicons name="close" size={20} color={Colors.ink2} />
           </Pressable>
 
-          {phase === 'error' ? (
+          {micDenied ? (
+            <Pressable
+              style={({ pressed }) => [styles.stopBtn, pressed && styles.pressed]}
+              onPress={() => Linking.openSettings()}
+              hitSlop={12}
+              accessibilityRole="button"
+              accessibilityLabel={t('common.open_settings', locale)}
+            >
+              <Ionicons name="settings-outline" size={28} color={Colors.white} />
+            </Pressable>
+          ) : phase === 'error' ? (
             <Pressable
               style={({ pressed }) => [styles.stopBtn, pressed && styles.pressed]}
               onPress={onRetry}
@@ -356,6 +396,18 @@ const styles = StyleSheet.create({
   transcriptPlaceholder: {
     color: Colors.ink4,
   },
+  deniedActions: { marginTop: 22, gap: 10, alignItems: 'flex-start' },
+  deniedPrimary: {
+    height: 46,
+    paddingHorizontal: 22,
+    borderRadius: 23,
+    backgroundColor: Colors.ink,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  deniedPrimaryText: { color: Colors.white, fontSize: 15, fontFamily: Typography.fontFamily.sansSemiBold, fontWeight: '600' },
+  deniedSecondary: { height: 40, justifyContent: 'center' },
+  deniedSecondaryText: { color: Colors.accent, fontSize: 15, fontFamily: Typography.fontFamily.sansSemiBold, fontWeight: '600' },
   errorText: {
     fontFamily: Typography.fontFamily.sans,
     fontSize: 16,

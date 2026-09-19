@@ -13,6 +13,7 @@ export * from './utils/currency'
 export * from './utils/period'
 export * from './utils/fx'
 export * from './utils/validation'
+export * from './utils/setup'
 
 // Utils — merchant avatar color, merchant-logo domain guessing, and
 // category-tint derivation (fix-plan 4.4, one copy for both apps)

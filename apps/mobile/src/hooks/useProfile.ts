@@ -3,6 +3,7 @@ import { getCalendars } from 'expo-localization'
 import { supabase } from '../lib/supabase'
 import { DataEvents } from '../events/dataEvents'
 import { setCurrentProfileCurrency } from '../services/profileCurrency'
+import { setAnalyticsConsent } from '../services/analytics'
 import { useCachedState } from '../services/queryCache'
 import type { Profile, ProfileUpdate } from '@voice-expense/shared'
 
@@ -78,6 +79,11 @@ export function useProfile(userId: string | undefined) {
       // paths (createTransaction, recurringCatchUp) can snapshot FX
       // without prop-drilling. See services/profileCurrency.ts.
       setCurrentProfileCurrency((data as Profile).currency_code)
+      // Consent gate for src/services/analytics.ts (opt-in only).
+      setAnalyticsConsent({
+        usage: !!(data as Profile).analytics_opt_in,
+        crashes: !!(data as Profile).crash_reports_opt_in,
+      })
       setLoading(false)
       retryStartRef.current = null
       if (retryTimerRef.current) {

@@ -9,55 +9,11 @@ import { useTransactions } from '../../src/hooks/useTransactions'
 import { useCategories } from '../../src/hooks/useCategories'
 import { exportAndShare } from '../../src/services/exportData'
 import { useDeleteAccount } from '../../src/hooks/useDeleteAccount'
+// Shared rows (the local copies this screen used to keep had no toggle,
+// which the opt-in switches below need).
+import { SetGroup, SetRow } from '../../src/components/SettingsList'
 import { Colors, Typography, Hairline } from '../../src/theme'
 import { t, LEGAL_URLS, type Locale } from '@voice-expense/shared'
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Sub-components. Descended from SetGroup / SetRow in
-// docs/money-app/project/mobile-screens-4.jsx, slimmed since.
-// ─────────────────────────────────────────────────────────────────────────────
-
-function SetGroup({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <View style={styles.group}>
-      <Text style={styles.groupLabel}>{label}</Text>
-      <View style={styles.groupCard}>{children}</View>
-    </View>
-  )
-}
-
-function SetRow({
-  label,
-  detail,
-  onPress,
-  danger,
-  last,
-}: {
-  label: string
-  detail?: string
-  onPress?: () => void
-  danger?: boolean
-  last?: boolean
-}) {
-  const labelColor = danger ? Colors.destructive ?? '#A94646' : Colors.ink ?? Colors.text
-  return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [styles.row, !last && styles.rowDivider, pressed && styles.rowPressed]}
-    >
-      <Text style={[styles.rowLabelSingle, { color: labelColor }]} numberOfLines={1}>
-        {label}
-      </Text>
-      {detail ? <Text style={styles.rowDetailInline}>{detail}</Text> : null}
-      <Ionicons
-        name="chevron-forward"
-        size={14}
-        color={Colors.ink4 ?? Colors.textMuted}
-        style={{ marginLeft: 4 }}
-      />
-    </Pressable>
-  )
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Screen. Slimmed Sep 2 2026 (owner): statement + data controls + legal
@@ -66,7 +22,7 @@ function SetRow({
 
 export default function PrivacyScreen() {
   const { user } = useAuth()
-  const { profile } = useProfile(user?.id)
+  const { profile, updateProfile } = useProfile(user?.id)
   const { transactions } = useTransactions(user?.id)
   const { categories } = useCategories(user?.id)
   const locale = (profile?.locale ?? 'en') as Locale
@@ -152,6 +108,25 @@ export default function PrivacyScreen() {
           {/* Legal. The same documents Apple requires next to the
               subscription (paywall.tsx links them too), one tap from
               the screen where a user actually wonders about them. */}
+          {/* Opt-in only, as the privacy policy promises (first-run audit
+              H1). Same two columns the web Settings toggles; RLS on
+              app_events enforces them server-side (migration 033). */}
+          <SetGroup label={t('privacy.group_improve', locale)}>
+            <SetRow
+              label={t('privacy.analytics_label', locale)}
+              toggle
+              value={!!profile?.analytics_opt_in}
+              onToggle={(next) => updateProfile({ analytics_opt_in: next })}
+            />
+            <SetRow
+              label={t('privacy.crash_label', locale)}
+              toggle
+              value={!!profile?.crash_reports_opt_in}
+              onToggle={(next) => updateProfile({ crash_reports_opt_in: next })}
+              last
+            />
+          </SetGroup>
+
           <SetGroup label={t('privacy.group_legal', locale)}>
             <SetRow
               label={t('privacy.policy_label', locale)}

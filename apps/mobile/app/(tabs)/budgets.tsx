@@ -274,7 +274,9 @@ export default function BudgetsScreen() {
           </View>
         ) : (
           <View style={styles.emptyHero}>
-            <Text style={styles.emptyHeroIcon}>🥧</Text>
+            <View style={styles.emptyHeroIcon}>
+              <Ionicons name="pie-chart-outline" size={22} color={Colors.accent} />
+            </View>
             <Text style={styles.emptyHeroTitle}>{t('budgets.no_budget_title', locale)}</Text>
             <Text style={styles.emptyHeroBody}>{t('budgets.no_budget_body', locale)}</Text>
             <Pressable
@@ -465,7 +467,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
-  emptyHeroIcon: { fontSize: 36 },
+  emptyHeroIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: Colors.accentSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   emptyHeroTitle: {
     fontFamily: Typography.fontFamily.sansBold,
     fontSize: 17,

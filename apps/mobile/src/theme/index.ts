@@ -1,6 +1,6 @@
 export { Colors } from './colors'
 export { Typography, Text } from './typography'
-export { TAB_BAR_HEIGHT, TAB_BAR_BOTTOM_OFFSET, useTabBarClearance, reportTabBarHeight } from './chrome'
+export { TAB_BAR_HEIGHT, TAB_BAR_BOTTOM_OFFSET, TAB_BAR_FAB_OVERHANG, useTabBarClearance, reportTabBarHeight } from './chrome'
 export { Motion } from './motion'
 
 export const Spacing = {

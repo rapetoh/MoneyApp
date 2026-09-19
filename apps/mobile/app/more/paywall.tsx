@@ -10,7 +10,7 @@ import {
   Linking,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Stack, useRouter } from 'expo-router'
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '../../src/hooks/useAuth'
@@ -27,6 +27,7 @@ import {
   type PlusOffers,
   type PlanOffer,
 } from '../../src/services/purchases'
+import { track } from '../../src/services/analytics'
 
 /**
  * Paywall — Murmur Plus (Aug 16, 2026 owner decision: iOS subscription
@@ -59,6 +60,13 @@ export default function PaywallScreen() {
   const isStoreSubscriber = (plan.kind === 'active' || plan.kind === 'trial') && plan.storeBacked
   const locale = (profile?.locale ?? 'en') as Locale
   const router = useRouter()
+  // 'onboarding' when opened once after the first run (audit H2): the
+  // offer then carries a "Not now" as visible as the trial button.
+  const { origin } = useLocalSearchParams<{ origin?: string }>()
+  const fromOnboarding = origin === 'onboarding'
+  useEffect(() => {
+    track('paywall_viewed', { origin: origin ?? 'feature' })
+  }, [origin])
 
   const [offers, setOffers] = useState<PlusOffers | null>(null)
   const [loadState, setLoadState] = useState<'loading' | 'ready' | 'error'>('loading')
@@ -123,6 +131,7 @@ export default function PaywallScreen() {
     await refetch()
     setBusy(null)
     if (outcome.kind === 'purchased') {
+      track('purchase_done', { plan: current.plan, trial: !!current.trialDays, origin: origin ?? 'feature' })
       router.back()
     } else if (outcome.kind === 'pending') {
       Alert.alert(t('paywall.eyebrow', locale), t('paywall.pending', locale))
@@ -322,6 +331,15 @@ export default function PaywallScreen() {
                     </Pressable>
                     <Text style={styles.finePrint}>{finePrint}</Text>
                   </>
+                )}
+                {fromOnboarding && (
+                  <Pressable
+                    onPress={() => router.back()}
+                    style={({ pressed }) => [styles.notNow, pressed && styles.ctaPressed]}
+                    accessibilityRole="button"
+                  >
+                    <Text style={styles.notNowText}>{t('common.not_now', locale)}</Text>
+                  </Pressable>
                 )}
                 <View style={styles.linksRow}>
                   <Pressable onPress={() => Linking.openURL(LEGAL_URLS.terms)} hitSlop={8}>
@@ -608,6 +626,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingHorizontal: 8,
   },
+  notNow: { height: 44, alignItems: 'center', justifyContent: 'center', marginTop: 2 },
+  notNowText: { color: Colors.white, fontSize: 16, fontWeight: '600', fontFamily: Typography.fontFamily.sansSemiBold, opacity: 0.85 },
   linksRow: {
     flexDirection: 'row',
     alignItems: 'center',
