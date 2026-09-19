@@ -6,7 +6,7 @@ import { Ionicons } from '@expo/vector-icons'
 import * as SecureStore from 'expo-secure-store'
 import { useAuth } from '../../src/hooks/useAuth'
 import { useProfile } from '../../src/hooks/useProfile'
-import { KEY_CHECKLIST, KEY_ONBOARDING_FOLLOWUP, setFirstRunFlag, type OnboardingFollowup } from '../../src/hooks/useFirstRun'
+import { KEY_ONBOARDING_FOLLOWUP, type OnboardingFollowup } from '../../src/hooks/useFirstRun'
 import { StepDots } from '../../src/components/StepDots'
 import { CHECKIN_HOURS, DEFAULT_CHECKIN, enableCheckIn, formatCheckInHour, setCheckIn } from '../../src/services/reminders'
 import { track } from '../../src/services/analytics'
@@ -59,7 +59,6 @@ export default function HabitScreen() {
     track('habit_done', { checkin: checkIn, hour, notifications, applepay_next: applePayNext })
     const followup: OnboardingFollowup = applePayNext ? 'applepay' : 'plus'
     await SecureStore.setItemAsync(KEY_ONBOARDING_FOLLOWUP, followup).catch(() => {})
-    await setFirstRunFlag(KEY_CHECKLIST, true)
     setSaving(false)
     router.replace('/(tabs)')
   }

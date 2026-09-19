@@ -20,7 +20,6 @@ const PER_USER_SECURE_KEYS = [
   'api_base_url', // src/hooks/useApiUrl.ts
   'recurring_pattern_dismissed_v1', // src/components/RecurringPatternBanner.tsx
   'dayone_skipped', // src/hooks/useFirstRun.ts
-  'start_checklist_active', // src/hooks/useFirstRun.ts
   'start_checklist_collapsed', // src/hooks/useFirstRun.ts
   'onboarding_followup', // app/(onboarding)/habit.tsx
   'analytics_install_id', // src/services/analytics.ts

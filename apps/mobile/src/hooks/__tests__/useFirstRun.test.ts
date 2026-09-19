@@ -1,6 +1,6 @@
 /**
- * Regression test for the missing "Getting started" card (owner report,
- * Sep 19 2026, build 49).
+ * Regression tests for the "Getting started" card (owner reports, Sep 19
+ * 2026, builds 49 and 53).
  *
  * At launch the Today screen mounts for a moment before the routing gate
  * sends a new user into onboarding, and that mount caches "flag not set"
@@ -27,10 +27,10 @@ vi.mock('expo-secure-store', () => ({
 // only exercises the flag helper.
 vi.mock('../useReminders', () => ({ loggedExpenseCount: () => 0 }))
 
-const { setFirstRunFlag, KEY_CHECKLIST } = await import('../useFirstRun')
+const { setFirstRunFlag, KEY_CHECKLIST_COLLAPSED } = await import('../useFirstRun')
 const { cacheSet, cacheClear, cacheHas, cacheGet } = await import('../../services/queryCache')
 
-const CACHE_KEY = `firstrun:${KEY_CHECKLIST}`
+const CACHE_KEY = `firstrun:${KEY_CHECKLIST_COLLAPSED}`
 
 beforeEach(() => {
   store.clear()
@@ -42,19 +42,19 @@ describe('setFirstRunFlag', () => {
     // What the early Today mount leaves behind: the flag read as unset.
     cacheSet(CACHE_KEY, false)
 
-    await setFirstRunFlag(KEY_CHECKLIST, true)
+    await setFirstRunFlag(KEY_CHECKLIST_COLLAPSED, true)
 
     expect(cacheHas(CACHE_KEY)).toBe(true)
     // The screens already mounted must see it on this launch.
     expect(cacheGet(CACHE_KEY)).toBe(true)
-    expect(store.get(KEY_CHECKLIST)).toBe('1')
+    expect(store.get(KEY_CHECKLIST_COLLAPSED)).toBe('1')
   })
 
   it('clearing removes it from both', async () => {
-    await setFirstRunFlag(KEY_CHECKLIST, true)
-    await setFirstRunFlag(KEY_CHECKLIST, false)
+    await setFirstRunFlag(KEY_CHECKLIST_COLLAPSED, true)
+    await setFirstRunFlag(KEY_CHECKLIST_COLLAPSED, false)
     expect(cacheGet(CACHE_KEY)).toBe(false)
-    expect(store.has(KEY_CHECKLIST)).toBe(false)
+    expect(store.has(KEY_CHECKLIST_COLLAPSED)).toBe(false)
   })
 })
 

@@ -1,0 +1,717 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Murmur Notifications 360</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&family=Newsreader:opsz,wght@6..72,400;6..72,500&display=swap">
+<style>
+  @font-face { font-family: "Short Hyphen"; src: local("Helvetica Neue"), local("HelveticaNeue"), local("Arial"), local("Roboto"); unicode-range: U+002D; }
+
+  :root {
+    --bg: #FBFAF7; --surface: #FFFFFF; --surface-2: #F5F2EB;
+    --line: rgba(40, 36, 28, 0.09); --line-strong: rgba(40, 36, 28, 0.18);
+    --ink: #1B1915; --ink-2: #3A3630; --ink-3: #6C675E; --ink-4: #9C9589;
+    --accent: #3F5A3E; --accent-soft: #E8EDE3; --on-accent: #FFFFFF;
+    --crit: #B44A3F; --crit-soft: #F6E2DD;
+    --high: #9A6418; --high-soft: #F5EAD6;
+    --med: #4F6273; --med-soft: #E5EBF0;
+    --low: #7C766B; --low-soft: #EEEBE4;
+    --nav-bg: rgba(251, 250, 247, 0.9);
+    --serif: ui-serif, "New York", "Newsreader", "Iowan Old Style", Georgia, serif;
+    --sans: "Short Hyphen", "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --mono: "DM Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #131210; --surface: #1B1916; --surface-2: #24211D;
+      --line: rgba(242, 238, 230, 0.09); --line-strong: rgba(242, 238, 230, 0.2);
+      --ink: #F2EEE6; --ink-2: #D8D2C7; --ink-3: #A49D91; --ink-4: #7A7468;
+      --accent: #9DBC92; --accent-soft: #223020; --on-accent: #10160E;
+      --crit: #E8907F; --crit-soft: #3A211C; --high: #DDAA5E; --high-soft: #352916;
+      --med: #9FB3C6; --med-soft: #1E2731; --low: #A49D91; --low-soft: #26231F;
+      --nav-bg: rgba(19, 18, 16, 0.88);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #131210; --surface: #1B1916; --surface-2: #24211D;
+    --line: rgba(242, 238, 230, 0.09); --line-strong: rgba(242, 238, 230, 0.2);
+    --ink: #F2EEE6; --ink-2: #D8D2C7; --ink-3: #A49D91; --ink-4: #7A7468;
+    --accent: #9DBC92; --accent-soft: #223020; --on-accent: #10160E;
+    --crit: #E8907F; --crit-soft: #3A211C; --high: #DDAA5E; --high-soft: #352916;
+    --med: #9FB3C6; --med-soft: #1E2731; --low: #A49D91; --low-soft: #26231F;
+    --nav-bg: rgba(19, 18, 16, 0.88);
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink-2); font-family: var(--sans); font-size: 15px; line-height: 1.45; -webkit-font-smoothing: antialiased; }
+  h1, h2 { font-family: var(--serif); font-weight: 500; color: var(--ink); margin: 0; letter-spacing: -0.015em; text-wrap: balance; }
+  h1 { font-size: clamp(30px, 6vw, 50px); line-height: 1.04; }
+  h2 { font-size: clamp(22px, 3.6vw, 31px); line-height: 1.1; }
+  h3 { font-size: 15px; font-weight: 700; color: var(--ink); margin: 0; letter-spacing: -0.005em; }
+  p { margin: 0; }
+  code { font-family: var(--mono); font-size: 12px; background: var(--surface-2); color: var(--ink); padding: 2px 6px; border-radius: 6px; overflow-wrap: anywhere; }
+  a { color: var(--accent); }
+  .wrap { max-width: 1120px; margin: 0 auto; padding-inline: clamp(16px, 4vw, 36px); }
+  .eyebrow { font-size: 11px; font-weight: 800; letter-spacing: 0.11em; text-transform: uppercase; color: var(--ink-4); }
+
+  .nav { position: sticky; top: 0; z-index: 20; background: var(--nav-bg); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); border-bottom: 1px solid var(--line); }
+  .nav .wrap { display: flex; gap: 18px; align-items: center; height: 52px; overflow-x: auto; scrollbar-width: none; }
+  .nav .wrap::-webkit-scrollbar { display: none; }
+  .nav a { color: var(--ink-3); text-decoration: none; font-size: 12.5px; font-weight: 600; white-space: nowrap; }
+  .nav a:hover { color: var(--ink); }
+  .nav .mark { font-family: var(--serif); color: var(--ink); font-size: 15px; padding-right: 6px; border-right: 1px solid var(--line); margin-right: 2px; }
+
+  section { padding-block: clamp(46px, 7vw, 76px); border-top: 1px solid var(--line); }
+  section:first-of-type { border-top: 0; }
+  .head { display: flex; flex-direction: column; gap: 10px; margin-bottom: 26px; max-width: 760px; }
+  .lede { font-size: clamp(16px, 2.2vw, 19px); color: var(--ink-3); line-height: 1.4; }
+
+  /* big number strip */
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 20px; overflow: hidden; }
+  .stat { background: var(--surface); padding: 20px 18px 18px; display: flex; flex-direction: column; gap: 5px; }
+  .stat b { font-family: var(--serif); font-weight: 500; font-size: clamp(34px, 5.4vw, 52px); line-height: 0.95; color: var(--ink); letter-spacing: -0.03em; }
+  .stat span { font-size: 12.5px; color: var(--ink-3); line-height: 1.3; }
+  .stat.bad b { color: var(--crit); }
+  .stat.good b { color: var(--accent); }
+
+  .grid { display: grid; gap: 12px; }
+  .g2 { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+  .g3 { grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
+  .g4 { grid-template-columns: repeat(auto-fit, minmax(185px, 1fr)); }
+
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 20px; padding: 18px; }
+  .card.flat { background: var(--surface-2); border-color: transparent; }
+
+  /* one line tiles */
+  .tiles { display: flex; flex-direction: column; gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 18px; overflow: hidden; }
+  .tile { background: var(--surface); display: grid; grid-template-columns: 74px 1fr auto; gap: 12px; align-items: center; padding: 11px 14px; font-size: 13.5px; }
+  .tile .k { font-family: var(--mono); font-size: 11px; color: var(--ink-4); letter-spacing: 0.02em; }
+  .tile .v { color: var(--ink); line-height: 1.3; }
+  .tile .v em { font-style: normal; color: var(--ink-3); }
+  .tile.dim { background: var(--surface-2); }
+  @media (max-width: 620px) {
+    .tile { grid-template-columns: 1fr auto; }
+    .tile .k { grid-column: 1 / -1; }
+  }
+
+  .chip { font-size: 10.5px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; padding: 3px 8px; border-radius: 999px; white-space: nowrap; }
+  .c-live { background: var(--accent-soft); color: var(--accent); }
+  .c-gap { background: var(--crit-soft); color: var(--crit); }
+  .c-prd { background: var(--high-soft); color: var(--high); }
+  .c-new { background: var(--med-soft); color: var(--med); }
+  .c-info { background: var(--low-soft); color: var(--low); }
+
+  figure { margin: 0; }
+  figure svg { display: block; width: 100%; height: auto; }
+  figcaption { font-size: 12.5px; color: var(--ink-4); margin-top: 10px; }
+
+  .note { border-left: 3px solid var(--accent); padding: 2px 0 2px 14px; color: var(--ink-2); font-size: 14.5px; }
+  .note.warn { border-color: var(--crit); }
+
+  .kv { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-size: 13.5px; align-items: baseline; }
+  .kv dt { font-family: var(--mono); font-size: 11.5px; color: var(--ink-4); white-space: nowrap; }
+  .kv dd { margin: 0; color: var(--ink); }
+
+  .phone { background: var(--surface-2); border: 1px solid var(--line); border-radius: 18px; padding: 13px 15px; display: flex; flex-direction: column; gap: 3px; }
+  .phone .app { font-size: 10.5px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-4); }
+  .phone .t { font-size: 14px; font-weight: 700; color: var(--ink); line-height: 1.25; }
+  .phone .b { font-size: 13px; color: var(--ink-3); line-height: 1.3; }
+
+  footer { padding-block: 44px 64px; border-top: 1px solid var(--line); color: var(--ink-4); font-size: 12.5px; }
+  footer a { color: var(--ink-3); }
+  .srcs { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 10px; }
+</style>
+
+<nav class="nav"><div class="wrap">
+  <span class="mark">Murmur</span>
+  <a href="#now">Today</a>
+  <a href="#wall">The wall</a>
+  <a href="#cliff">The cliff</a>
+  <a href="#catalog">Full catalog</a>
+  <a href="#engine">The engine</a>
+  <a href="#governor">The governor</a>
+  <a href="#money">The money</a>
+  <a href="#build">Build order</a>
+</div></nav>
+
+<main>
+
+<!-- ─────────────────────────── HERO ─────────────────────────── -->
+<section id="now"><div class="wrap">
+  <div class="head">
+    <p class="eyebrow">Notification system, 360 review &middot; 19 September 2026</p>
+    <h1>Murmur computes a full financial brain.<br>It is allowed to say five things.</h1>
+    <p class="lede">Every number below was read out of the repository, not estimated.</p>
+  </div>
+
+  <div class="stats">
+    <div class="stat good"><b>5</b><span>messages the app can send, in total</span></div>
+    <div class="stat bad"><b>32</b><span>messages it should send and cannot</span></div>
+    <div class="stat bad"><b>0</b><span>server sent notifications, ever</span></div>
+    <div class="stat bad"><b>0</b><span>notifications on web and desktop</span></div>
+    <div class="stat bad"><b>7</b><span>days of silence, then permanent silence</span></div>
+    <div class="stat bad"><b>3</b><span>notification promises in the PRD, none built</span></div>
+  </div>
+
+  <div class="grid g3" style="margin-top:14px">
+    <div class="card">
+      <h3 style="color:var(--crit)">Remote push is switched off at the build level</h3>
+      <p style="font-size:13.5px;color:var(--ink-3);margin-top:7px"><code>apps/mobile/plugins/withoutRemotePush.js</code> deletes the <code>aps&#8209;environment</code> entitlement from every iOS build. The app physically cannot receive a push from our servers.</p>
+    </div>
+    <div class="card">
+      <h3 style="color:var(--crit)">Nothing is stored to push to</h3>
+      <p style="font-size:13.5px;color:var(--ink-3);margin-top:7px">No push token table, no APNs key, no FCM key, no notification preferences, no send log. Zero rows of notification infrastructure in 34 migrations.</p>
+    </div>
+    <div class="card">
+      <h3 style="color:var(--accent)">The hard part is already written</h3>
+      <p style="font-size:13.5px;color:var(--ink-3);margin-top:7px">Seven insight types, a budget engine, a forecaster and a recurrence calendar already run as pure shared functions. They just have no way to reach a phone.</p>
+    </div>
+  </div>
+</div></section>
+
+<!-- ─────────────────────────── THE WALL ─────────────────────────── -->
+<section id="wall"><div class="wrap">
+  <div class="head">
+    <p class="eyebrow">Finding 1</p>
+    <h2>Murmur knows twelve things. It is permitted to say two of them.</h2>
+    <p class="lede">Everything on the left is already computed, tested and shipped. All of it is trapped behind one condition: the user has to open the app first.</p>
+  </div>
+
+  <figure>
+  <svg viewBox="0 0 1120 560" role="img" aria-label="Diagram: twelve computed signals blocked by an in-app-only wall, only two reach the phone">
+    <defs>
+      <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker>
+      <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="var(--accent)"/></marker>
+    </defs>
+
+    <text x="0" y="16" font-size="11" font-weight="800" letter-spacing="1.2" fill="var(--ink-4)" font-family="var(--sans)">WHAT MURMUR ALREADY COMPUTES</text>
+    <text x="440" y="16" font-size="11" font-weight="800" letter-spacing="1.2" fill="var(--crit)" font-family="var(--sans)">THE WALL</text>
+    <text x="800" y="16" font-size="11" font-weight="800" letter-spacing="1.2" fill="var(--ink-4)" font-family="var(--sans)">WHAT REACHES THE PHONE</text>
+
+    <g font-family="var(--sans)" font-size="12.5" fill="var(--ink)">
+      <g>
+        <rect x="0" y="36" width="330" height="32" rx="10" fill="var(--surface)" stroke="var(--line-strong)"/><text x="14" y="56">Bill due in the next 7 days</text>
+        <rect x="0" y="76" width="330" height="32" rx="10" fill="var(--surface)" stroke="var(--line-strong)"/><text x="14" y="96">Budget pace: over, tight, on track</text>
+        <rect x="0" y="116" width="330" height="32" rx="10" fill="var(--surface)" stroke="var(--line-strong)"/><text x="14" y="136">Category surge vs the usual</text>
+        <rect x="0" y="156" width="330" height="32" rx="10" fill="var(--surface)" stroke="var(--line-strong)"/><text x="14" y="176">Subscription load</text>
+        <rect x="0" y="196" width="330" height="32" rx="10" fill="var(--surface)" stroke="var(--line-strong)"/><text x="14" y="216">Month vs last month</text>
+        <rect x="0" y="236" width="330" height="32" rx="10" fill="var(--surface)" stroke="var(--line-strong)"/><text x="14" y="256">Net flow going negative</text>
+        <rect x="0" y="276" width="330" height="32" rx="10" fill="var(--surface)" stroke="var(--line-strong)"/><text x="14" y="296">A large transaction landing</text>
+        <rect x="0" y="316" width="330" height="32" rx="10" fill="var(--surface)" stroke="var(--line-strong)"/><text x="14" y="336">Month end forecast</text>
+        <rect x="0" y="356" width="330" height="32" rx="10" fill="var(--surface)" stroke="var(--line-strong)"/><text x="14" y="376">Spending patterns and heaviest day</text>
+        <rect x="0" y="396" width="330" height="32" rx="10" fill="var(--surface)" stroke="var(--line-strong)"/><text x="14" y="416">A recurring bill auto generated today</text>
+        <rect x="0" y="436" width="330" height="32" rx="10" fill="var(--surface)" stroke="var(--line-strong)"/><text x="14" y="456">Plus trial, renewal, billing failure</text>
+        <rect x="0" y="476" width="330" height="32" rx="10" fill="var(--surface)" stroke="var(--line-strong)"/><text x="14" y="496">Sync backlog and failures</text>
+      </g>
+    </g>
+
+    <g color="var(--ink-4)" stroke="currentColor" stroke-width="1.2" fill="none" opacity="0.5">
+      <path d="M334 52 H 430" marker-end="url(#ar)"/><path d="M334 92 H 430" marker-end="url(#ar)"/>
+      <path d="M334 132 H 430" marker-end="url(#ar)"/><path d="M334 172 H 430" marker-end="url(#ar)"/>
+      <path d="M334 212 H 430" marker-end="url(#ar)"/><path d="M334 252 H 430" marker-end="url(#ar)"/>
+      <path d="M334 292 H 430" marker-end="url(#ar)"/><path d="M334 332 H 430" marker-end="url(#ar)"/>
+      <path d="M334 372 H 430" marker-end="url(#ar)"/><path d="M334 412 H 430" marker-end="url(#ar)"/>
+      <path d="M334 452 H 430" marker-end="url(#ar)"/><path d="M334 492 H 430" marker-end="url(#ar)"/>
+    </g>
+
+    <rect x="440" y="36" width="56" height="472" rx="14" fill="var(--crit-soft)" stroke="var(--crit)" stroke-width="1.5"/>
+    <text transform="translate(474,272) rotate(-90)" text-anchor="middle" font-family="var(--sans)" font-size="13" font-weight="800" letter-spacing="1.4" fill="var(--crit)">IN&#8209;APP ONLY</text>
+
+    <g font-family="var(--sans)" font-size="12" fill="var(--ink-3)">
+      <text x="512" y="248">Delivered only if the user</text>
+      <text x="512" y="266">opens Murmur and taps</text>
+      <text x="512" y="284">into the right tab.</text>
+    </g>
+
+    <g color="var(--accent)" stroke="currentColor" stroke-width="2" fill="none">
+      <path d="M760 120 H 800" marker-end="url(#arw)"/>
+      <path d="M760 200 H 800" marker-end="url(#arw)"/>
+      <path d="M760 300 H 800" marker-end="url(#arw)"/>
+    </g>
+    <g font-family="var(--sans)" font-size="11.5" fill="var(--ink-4)">
+      <text x="620" y="112">Apple Pay tap</text>
+      <text x="620" y="192">Local timer</text>
+      <text x="620" y="292">Local timer</text>
+    </g>
+
+    <g font-family="var(--sans)">
+      <rect x="806" y="96" width="314" height="48" rx="12" fill="var(--accent-soft)" stroke="var(--accent)"/>
+      <text x="820" y="118" font-size="12.5" font-weight="700" fill="var(--ink)">Saved $2.11 &middot; Three Square Market</text>
+      <text x="820" y="134" font-size="11.5" fill="var(--ink-3)">Food &amp; Dining &middot; Undo / Edit</text>
+
+      <rect x="806" y="176" width="314" height="48" rx="12" fill="var(--accent-soft)" stroke="var(--accent)"/>
+      <text x="820" y="198" font-size="12.5" font-weight="700" fill="var(--ink)">Anything to add from today?</text>
+      <text x="820" y="214" font-size="11.5" fill="var(--ink-3)">Say it in one sentence. Murmur files it.</text>
+
+      <rect x="806" y="276" width="314" height="48" rx="12" fill="var(--accent-soft)" stroke="var(--accent)"/>
+      <text x="820" y="298" font-size="12.5" font-weight="700" fill="var(--ink)">A few quiet days</text>
+      <text x="820" y="314" font-size="11.5" fill="var(--ink-3)">Anything from the last few days?</text>
+
+      <text x="806" y="364" font-size="12" font-weight="700" fill="var(--crit)">Nothing else. Ever.</text>
+      <text x="806" y="384" font-size="12" fill="var(--ink-3)">No bill warning. No budget alert.</text>
+      <text x="806" y="402" font-size="12" fill="var(--ink-3)">No recap. No billing failure notice.</text>
+      <text x="806" y="420" font-size="12" fill="var(--ink-3)">No word at all on web or desktop.</text>
+    </g>
+  </svg>
+  <figcaption>Sources: <code>packages/shared/src/domain/askInsights.ts</code>, <code>budget.ts</code>, <code>forecast.ts</code>, <code>patterns.ts</code>, <code>recurrence.ts</code>. Delivery: three <code>scheduleNotificationAsync</code> call sites in the whole monorepo.</figcaption>
+  </figure>
+
+  <div class="note warn" style="margin-top:26px">The three reminders we do send all ask the user for work. Not one of the five tells the user something useful about their own money.</div>
+</div></section>
+
+<!-- ─────────────────────────── THE CLIFF ─────────────────────────── -->
+<section id="cliff"><div class="wrap">
+  <div class="head">
+    <p class="eyebrow">Finding 2</p>
+    <h2>Murmur stops talking on day 7, exactly when the user is leaving.</h2>
+    <p class="lede">Reminders are local and scheduled from the device with a seven day horizon. Day 8 with the app unopened, the queue is empty and nothing can ever refill it.</p>
+  </div>
+
+  <figure>
+  <svg viewBox="0 0 1120 300" role="img" aria-label="Timeline showing reminders on days 1 to 7 then permanent silence">
+    <g font-family="var(--sans)">
+      <rect x="0" y="196" width="1120" height="1.5" fill="var(--line-strong)"/>
+      <rect x="392" y="60" width="728" height="136" fill="var(--crit-soft)" opacity="0.55"/>
+      <text x="410" y="84" font-size="12" font-weight="800" letter-spacing="1.1" fill="var(--crit)">DEAD AIR, FOREVER</text>
+      <text x="410" y="104" font-size="12.5" fill="var(--ink-3)">The churn window. Murmur has nothing scheduled and no way to schedule anything.</text>
+
+      <g fill="var(--accent)">
+        <rect x="46" y="116" width="26" height="80" rx="5"/>
+        <rect x="96" y="116" width="26" height="80" rx="5"/>
+        <rect x="146" y="116" width="26" height="80" rx="5"/>
+        <rect x="196" y="116" width="26" height="80" rx="5"/>
+        <rect x="246" y="116" width="26" height="80" rx="5"/>
+        <rect x="296" y="116" width="26" height="80" rx="5"/>
+        <rect x="346" y="116" width="26" height="80" rx="5"/>
+      </g>
+
+      <g font-size="11.5" fill="var(--ink-4)" text-anchor="middle">
+        <text x="59" y="218">d1</text><text x="109" y="218">d2</text><text x="159" y="218">d3</text>
+        <text x="209" y="218">d4</text><text x="259" y="218">d5</text><text x="309" y="218">d6</text><text x="359" y="218">d7</text>
+        <text x="450" y="218">d10</text><text x="580" y="218">d14</text><text x="760" y="218">d30</text><text x="950" y="218">d60</text><text x="1090" y="218">d90</text>
+      </g>
+      <g stroke="var(--line-strong)" stroke-width="1"><path d="M450 196 v6"/><path d="M580 196 v6"/><path d="M760 196 v6"/><path d="M950 196 v6"/><path d="M1090 196 v6"/></g>
+
+      <text x="0" y="24" font-size="12.5" font-weight="700" fill="var(--ink)">Reminders pending, from the last time the app was opened</text>
+      <text x="0" y="44" font-size="12" fill="var(--ink-3)">Evening check&#8209;in horizon = 7 days. Quiet nudges = day 1, 3, 7. Both refill only on app foreground or a new log.</text>
+
+      <text x="400" y="262" font-size="12.5" fill="var(--ink-3)">Industry comparison: users who got at least one push in their first 90 days retained near 3x better.</text>
+      <text x="400" y="280" font-size="12.5" fill="var(--ink-3)">Murmur gives a lapsing user zero pushes after day 7, on purpose, by architecture.</text>
+    </g>
+  </svg>
+  <figcaption><code>planReminders()</code> in <code>apps/mobile/src/services/reminders.ts</code>, <code>HORIZON_DAYS = 7</code>, rescheduled from <code>useReminders</code> on log and on app foreground only.</figcaption>
+  </figure>
+
+  <div class="grid g3" style="margin-top:26px">
+    <div class="card flat"><h3>Why it cannot be patched locally</h3><p style="font-size:13.5px;color:var(--ink-3);margin-top:7px">Extending the horizon to 60 days just queues 60 stale copies of the same sentence. A message worth sending on day 21 depends on data that changes after the app closes.</p></div>
+    <div class="card flat"><h3>Why the device cannot know</h3><p style="font-size:13.5px;color:var(--ink-3);margin-top:7px">Bills generate server side at 06:00 daily. Budgets move as other devices sync. Billing state changes inside RevenueCat. None of it reaches a sleeping phone.</p></div>
+    <div class="card flat"><h3>What closes it</h3><p style="font-size:13.5px;color:var(--ink-3);margin-top:7px">One hourly server sweep that reads the same shared engines and pushes the single best thing, if there is one. Nothing else.</p></div>
+  </div>
+</div></section>
+
+<!-- ─────────────────────────── COVERAGE ─────────────────────────── -->
+<section id="coverage"><div class="wrap">
+  <div class="head">
+    <p class="eyebrow">Finding 3</p>
+    <h2>Two of four shipped platforms have never sent a notification.</h2>
+  </div>
+
+  <figure>
+  <svg viewBox="0 0 1120 300" role="img" aria-label="Coverage grid of platform by notification family">
+    <g font-family="var(--sans)" font-size="12">
+      <g fill="var(--ink-4)" font-size="11" font-weight="800" letter-spacing="0.9">
+        <text x="250" y="30" text-anchor="middle">RECEIPTS</text>
+        <text x="400" y="30" text-anchor="middle">BILLS AHEAD</text>
+        <text x="550" y="30" text-anchor="middle">BUDGET</text>
+        <text x="700" y="30" text-anchor="middle">INSIGHTS</text>
+        <text x="850" y="30" text-anchor="middle">HABIT</text>
+        <text x="1000" y="30" text-anchor="middle">BILLING</text>
+      </g>
+      <g fill="var(--ink)" font-size="13.5" font-weight="700">
+        <text x="0" y="80">iOS</text><text x="0" y="140">Android</text><text x="0" y="200">Web</text><text x="0" y="260">Desktop</text>
+      </g>
+      <g fill="var(--ink-4)" font-size="11">
+        <text x="0" y="97">App Store, live</text><text x="0" y="157">built</text><text x="0" y="217">shipped</text><text x="0" y="277">Mac + Windows, 1.0</text>
+      </g>
+
+      <!-- iOS row -->
+      <circle cx="250" cy="75" r="15" fill="var(--accent)"/><circle cx="400" cy="75" r="15" fill="none" stroke="var(--line-strong)" stroke-dasharray="3 3"/><circle cx="550" cy="75" r="15" fill="none" stroke="var(--line-strong)" stroke-dasharray="3 3"/><circle cx="700" cy="75" r="15" fill="none" stroke="var(--line-strong)" stroke-dasharray="3 3"/><circle cx="850" cy="75" r="15" fill="var(--accent)"/><circle cx="1000" cy="75" r="15" fill="none" stroke="var(--line-strong)" stroke-dasharray="3 3"/>
+      <!-- Android row -->
+      <circle cx="250" cy="135" r="15" fill="none" stroke="var(--line-strong)" stroke-dasharray="3 3"/><circle cx="400" cy="135" r="15" fill="none" stroke="var(--line-strong)" stroke-dasharray="3 3"/><circle cx="550" cy="135" r="15" fill="none" stroke="var(--line-strong)" stroke-dasharray="3 3"/><circle cx="700" cy="135" r="15" fill="none" stroke="var(--line-strong)" stroke-dasharray="3 3"/><circle cx="850" cy="135" r="15" fill="var(--accent)"/><circle cx="1000" cy="135" r="15" fill="none" stroke="var(--line-strong)" stroke-dasharray="3 3"/>
+      <!-- Web row -->
+      <circle cx="250" cy="195" r="15" fill="none" stroke="var(--line-strong)" stroke-dasharray="3 3"/><circle cx="400" cy="195" r="15" fill="none" stroke="var(--line-strong)" stroke-dasharray="3 3"/><circle cx="550" cy="195" r="15" fill="none" stroke="var(--line-strong)" stroke-dasharray="3 3"/><circle cx="700" cy="195" r="15" fill="none" stroke="var(--line-strong)" stroke-dasharray="3 3"/><circle cx="850" cy="195" r="15" fill="none" stroke="var(--line-strong)" stroke-dasharray="3 3"/><circle cx="1000" cy="195" r="15" fill="none" stroke="var(--line-strong)" stroke-dasharray="3 3"/>
+      <!-- Desktop row -->
+      <circle cx="250" cy="255" r="15" fill="none" stroke="var(--line-strong)" stroke-dasharray="3 3"/><circle cx="400" cy="255" r="15" fill="none" stroke="var(--line-strong)" stroke-dasharray="3 3"/><circle cx="550" cy="255" r="15" fill="none" stroke="var(--line-strong)" stroke-dasharray="3 3"/><circle cx="700" cy="255" r="15" fill="none" stroke="var(--line-strong)" stroke-dasharray="3 3"/><circle cx="850" cy="255" r="15" fill="none" stroke="var(--line-strong)" stroke-dasharray="3 3"/><circle cx="1000" cy="255" r="15" fill="none" stroke="var(--line-strong)" stroke-dasharray="3 3"/>
+
+      <text x="1060" y="80" font-size="11" fill="var(--ink-4)">3 of 24</text>
+      <text x="1060" y="290" font-size="11" fill="var(--ink-4)">cells filled</text>
+    </g>
+  </svg>
+  <figcaption>iOS receipts are Apple Pay capture only. Web has no service worker and no manifest, so it cannot receive web push today. Desktop is Electron with a native notification API available and unused.</figcaption>
+  </figure>
+</div></section>
+
+<!-- ─────────────────────────── CATALOG ─────────────────────────── -->
+<section id="catalog"><div class="wrap">
+  <div class="head">
+    <p class="eyebrow">The answer to "what should we send"</p>
+    <h2>Thirty seven notifications, six families, one rule each.</h2>
+    <p class="lede">Every line below is reachable from data Murmur already stores. Nothing here needs a bank connection or a new model.</p>
+  </div>
+
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px">
+    <span class="chip c-live">Live &middot; 5</span>
+    <span class="chip c-prd">Promised in PRD, never built &middot; 3</span>
+    <span class="chip c-gap">Missing, high value &middot; 17</span>
+    <span class="chip c-new">Missing, second wave &middot; 12</span>
+  </div>
+
+  <!-- A -->
+  <h3 style="margin:26px 0 10px;font-family:var(--serif);font-size:20px;font-weight:500">A &middot; Receipts. Confirm what already happened.</h3>
+  <p style="font-size:13.5px;color:var(--ink-3);margin-bottom:12px">The most trusted family. Never annoying, because the user caused it.</p>
+  <div class="tiles">
+    <div class="tile"><span class="k">A1</span><span class="v">Purchase captured from Apple Pay, with Undo and Edit <em>on the notification</em></span><span class="chip c-live">Live</span></div>
+    <div class="tile"><span class="k">A2</span><span class="v">Capture arrived without an amount, tap to fill it in <em>pay at pump</em></span><span class="chip c-live">Live</span></div>
+    <div class="tile dim"><span class="k">A3</span><span class="v">A recurring bill was auto added to your ledger <em>today the server does this silently at 06:00</em></span><span class="chip c-gap">Missing</span></div>
+    <div class="tile dim"><span class="k">A4</span><span class="v">Possible duplicate, same amount and merchant twice <em>PRD section 6</em></span><span class="chip c-prd">PRD</span></div>
+    <div class="tile dim"><span class="k">A5</span><span class="v">Your entries are not backed up, sync has been stuck for a day</span><span class="chip c-new">Missing</span></div>
+    <div class="tile dim"><span class="k">A6</span><span class="v">Your export is ready</span><span class="chip c-new">Missing</span></div>
+  </div>
+
+  <!-- B -->
+  <h3 style="margin:30px 0 10px;font-family:var(--serif);font-size:20px;font-weight:500">B &middot; Before the money moves. The family people pay for.</h3>
+  <p style="font-size:13.5px;color:var(--ink-3);margin-bottom:12px">The only notifications that can save the user real money. Murmur already has the full bill calendar.</p>
+  <div class="tiles">
+    <div class="tile dim"><span class="k">B1</span><span class="v">Rent hits tomorrow, and here is what is left after it <em>upcoming_bill + stillDue are already computed together</em></span><span class="chip c-gap">Missing</span></div>
+    <div class="tile dim"><span class="k">B2</span><span class="v">A bill was due and never showed up <em>PRD section 6, verbatim</em></span><span class="chip c-prd">PRD</span></div>
+    <div class="tile dim"><span class="k">B3</span><span class="v">A subscription charged more than it used to</span><span class="chip c-gap">Missing</span></div>
+    <div class="tile dim"><span class="k">B4</span><span class="v">Heavy week ahead, three bills between Monday and Thursday</span><span class="chip c-gap">Missing</span></div>
+    <div class="tile dim"><span class="k">B5</span><span class="v">Income you normally get by now has not arrived</span><span class="chip c-new">Missing</span></div>
+    <div class="tile dim"><span class="k">B6</span><span class="v">Bills still due are more than what is left this month <em>net_flow already detects this</em></span><span class="chip c-gap">Missing</span></div>
+  </div>
+
+  <!-- C -->
+  <h3 style="margin:30px 0 10px;font-family:var(--serif);font-size:20px;font-weight:500">C &middot; Budget guardrails. Promised on the box.</h3>
+  <p style="font-size:13.5px;color:var(--ink-3);margin-bottom:12px">The PRD promises a budget notification twice. It has never existed.</p>
+  <div class="tiles">
+    <div class="tile dim"><span class="k">C1</span><span class="v">80 percent of your budget used, with days still to go</span><span class="chip c-gap">Missing</span></div>
+    <div class="tile dim"><span class="k">C2</span><span class="v">You passed your budget <em>PRD 5.8 and PRD section 6</em></span><span class="chip c-prd">PRD</span></div>
+    <div class="tile dim"><span class="k">C3</span><span class="v">A single category budget went over <em>category budgets shipped in August</em></span><span class="chip c-gap">Missing</span></div>
+    <div class="tile dim"><span class="k">C4</span><span class="v">Pace correction, what per day keeps you inside <em>budgetStatus() already returns it</em></span><span class="chip c-gap">Missing</span></div>
+    <div class="tile dim"><span class="k">C5</span><span class="v">Safe to spend today, opt in, one line each morning</span><span class="chip c-new">Missing</span></div>
+  </div>
+
+  <!-- D -->
+  <h3 style="margin:30px 0 10px;font-family:var(--serif);font-size:20px;font-weight:500">D &middot; Moments worth knowing. The brain, delivered.</h3>
+  <p style="font-size:13.5px;color:var(--ink-3);margin-bottom:12px">Seven insight types run today and reach nobody who did not go looking.</p>
+  <div class="tiles">
+    <div class="tile dim"><span class="k">D1</span><span class="v">Weekly recap, Sunday evening, the one digest that earns its place</span><span class="chip c-gap">Missing</span></div>
+    <div class="tile dim"><span class="k">D2</span><span class="v">The month closed, here is the number and the delta <em>month_delta</em></span><span class="chip c-gap">Missing</span></div>
+    <div class="tile dim"><span class="k">D3</span><span class="v">One category is running far above your usual <em>category_surge</em></span><span class="chip c-gap">Missing</span></div>
+    <div class="tile dim"><span class="k">D4</span><span class="v">A large transaction just landed <em>large_transaction</em></span><span class="chip c-new">Missing</span></div>
+    <div class="tile dim"><span class="k">D5</span><span class="v">What your subscriptions cost per month, all in <em>subscriptions</em></span><span class="chip c-new">Missing</span></div>
+    <div class="tile dim"><span class="k">D6</span><span class="v">Good news: your lightest week yet, or first month under budget</span><span class="chip c-gap">Missing</span></div>
+    <div class="tile dim"><span class="k">D7</span><span class="v">Insights just unlocked for you <em>today this is a dot on a tab icon</em></span><span class="chip c-new">Missing</span></div>
+  </div>
+
+  <!-- E -->
+  <h3 style="margin:30px 0 10px;font-family:var(--serif);font-size:20px;font-weight:500">E &middot; Habit. Exists, and stops too early.</h3>
+  <div class="tiles">
+    <div class="tile"><span class="k">E1</span><span class="v">Evening check&#8209;in at a chosen hour, skipped on days already logged</span><span class="chip c-live">Live</span></div>
+    <div class="tile"><span class="k">E2</span><span class="v">Three quiet days</span><span class="chip c-live">Live</span></div>
+    <div class="tile"><span class="k">E3</span><span class="v">Seven quiet days, catch up on the week</span><span class="chip c-live">Live</span></div>
+    <div class="tile dim"><span class="k">E4</span><span class="v">Day 14, 30 and 60 win back <em>the cliff fix, and it must carry value not guilt</em></span><span class="chip c-gap">Missing</span></div>
+    <div class="tile dim"><span class="k">E5</span><span class="v">Milestones: 30 days logged, 100 entries, a full month closed</span><span class="chip c-new">Missing</span></div>
+    <div class="tile dim"><span class="k">E6</span><span class="v">Setup left unfinished, your budget is still not set</span><span class="chip c-new">Missing</span></div>
+  </div>
+
+  <!-- F -->
+  <h3 style="margin:30px 0 10px;font-family:var(--serif);font-size:20px;font-weight:500">F &middot; Money, account, trust. Revenue leaks silently today.</h3>
+  <div class="tiles">
+    <div class="tile dim"><span class="k">F1</span><span class="v">Your free trial ends in two days <em>the single highest value push a subscription app sends</em></span><span class="chip c-gap">Missing</span></div>
+    <div class="tile dim"><span class="k">F2</span><span class="v">Plus started, first charge, stated plainly <em>fewer refunds, fewer one star reviews</em></span><span class="chip c-gap">Missing</span></div>
+    <div class="tile dim"><span class="k">F3</span><span class="v">Payment failed, Plus is paused, fix it here <em>RevenueCat already sends us this event</em></span><span class="chip c-gap">Missing</span></div>
+    <div class="tile dim"><span class="k">F4</span><span class="v">Plus ended, here is exactly what stopped working</span><span class="chip c-gap">Missing</span></div>
+    <div class="tile dim"><span class="k">F5</span><span class="v">One win back, once, with a real number from their own data</span><span class="chip c-new">Missing</span></div>
+    <div class="tile dim"><span class="k">F6</span><span class="v">New device signed in to your account <em>security</em></span><span class="chip c-new">Missing</span></div>
+    <div class="tile dim"><span class="k">F7</span><span class="v">Account deletion scheduled and completed</span><span class="chip c-new">Missing</span></div>
+  </div>
+
+  <div class="note warn" style="margin-top:24px">F3 is the sharpest one. RevenueCat posts a billing issue to our webhook, the webhook writes <code>plus_status</code>, and the user loses Plus without a single word from us. That is paid revenue walking out in silence.</div>
+</div></section>
+
+<!-- ─────────────────────────── WHAT THEY LOOK LIKE ─────────────────────────── -->
+<section id="voice"><div class="wrap">
+  <div class="head">
+    <p class="eyebrow">Tone</p>
+    <h2>What Murmur sends now, and what it should sound like.</h2>
+    <p class="lede">Left is every word the product can currently say. Right is a notification with a number in it.</p>
+  </div>
+  <div class="grid g2">
+    <div>
+      <p class="eyebrow" style="margin-bottom:10px">Today &middot; asks the user for work</p>
+      <div class="grid" style="gap:10px">
+        <div class="phone"><span class="app">Murmur</span><span class="t">Anything to add from today?</span><span class="b">Say it in one sentence. Murmur files it.</span></div>
+        <div class="phone"><span class="app">Murmur</span><span class="t">A few quiet days</span><span class="b">Anything from the last few days? One sentence each is enough.</span></div>
+        <div class="phone"><span class="app">Murmur</span><span class="t">Your week in one minute</span><span class="b">Catch up on this week's spending while you still remember it.</span></div>
+      </div>
+    </div>
+    <div>
+      <p class="eyebrow" style="margin-bottom:10px">Proposed &middot; does work for the user</p>
+      <div class="grid" style="gap:10px">
+        <div class="phone" style="border-color:var(--accent)"><span class="app">Murmur &middot; time sensitive</span><span class="t">Rent, 1,450, hits tomorrow</span><span class="b">380 left this month after it. Two smaller bills still to come.</span></div>
+        <div class="phone" style="border-color:var(--accent)"><span class="app">Murmur</span><span class="t">80% of your budget, 11 days left</span><span class="b">21 a day keeps you inside. You are running at 34.</span></div>
+        <div class="phone" style="border-color:var(--accent)"><span class="app">Murmur</span><span class="t">Last week: 412</span><span class="b">18% under your usual. Groceries was the biggest at 96.</span></div>
+        <div class="phone" style="border-color:var(--accent)"><span class="app">Murmur</span><span class="t">Spotify went up</span><span class="b">11.99, was 9.99 since March. Still want it in your bills?</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="note" style="margin-top:22px">Murmur is a voice product. Every one of these should open straight into Ask with the answer already on screen, not onto a generic home tab.</div>
+</div></section>
+
+<!-- ─────────────────────────── ENGINE ─────────────────────────── -->
+<section id="engine"><div class="wrap">
+  <div class="head">
+    <p class="eyebrow">The build</p>
+    <h2>One sweep, one governor, six tables' worth of plumbing.</h2>
+    <p class="lede">No new intelligence has to be written. The sweep calls the same shared functions both apps already call.</p>
+  </div>
+
+  <figure>
+  <svg viewBox="0 0 1120 470" role="img" aria-label="Architecture: hourly sweep reads shared engines, governor decides, fan out to four platforms">
+    <defs><marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="var(--ink-4)"/></marker></defs>
+    <g font-family="var(--sans)">
+
+      <text x="0" y="14" font-size="11" font-weight="800" letter-spacing="1.1" fill="var(--accent)">ALREADY EXISTS</text>
+      <rect x="0" y="26" width="250" height="196" rx="16" fill="var(--accent-soft)" stroke="var(--accent)"/>
+      <g font-size="12" fill="var(--ink)">
+        <text x="16" y="52" font-weight="700">Shared engines, pure</text>
+        <text x="16" y="76">computeAskInsights() &middot; 7 types</text>
+        <text x="16" y="96">budgetStatus()</text>
+        <text x="16" y="116">forecastMonthly()</text>
+        <text x="16" y="136">occurrencesInWindow()</text>
+        <text x="16" y="156">detectRecurringPatterns()</text>
+        <text x="16" y="176" fill="var(--ink-3)">profiles.timezone, written</text>
+        <text x="16" y="194" fill="var(--ink-3)">on every launch</text>
+        <text x="16" y="212" fill="var(--ink-3)">pg_cron + Vault, proven twice</text>
+      </g>
+
+      <text x="0" y="262" font-size="11" font-weight="800" letter-spacing="1.1" fill="var(--crit)">TO BUILD</text>
+      <rect x="0" y="274" width="250" height="176" rx="16" fill="var(--surface)" stroke="var(--crit)" stroke-dasharray="4 3"/>
+      <g font-size="12" fill="var(--ink)">
+        <text x="16" y="300" font-weight="700">Four tables</text>
+        <text x="16" y="324">push_tokens</text>
+        <text x="16" y="344">notification_prefs</text>
+        <text x="16" y="364">notification_log</text>
+        <text x="16" y="384">notification_outbox</text>
+        <text x="16" y="412" fill="var(--ink-3)">plus the APNs and FCM</text>
+        <text x="16" y="430" fill="var(--ink-3)">keys, and a new EAS build</text>
+      </g>
+
+      <path d="M254 124 H 330" stroke="var(--ink-4)" fill="none" marker-end="url(#a2)"/>
+      <path d="M254 360 H 330" stroke="var(--ink-4)" fill="none" marker-end="url(#a2)"/>
+
+      <rect x="334" y="120" width="230" height="240" rx="16" fill="var(--surface)" stroke="var(--line-strong)"/>
+      <text x="350" y="148" font-size="13" font-weight="800" fill="var(--ink)">notify&#8209;sweep</text>
+      <text x="350" y="168" font-size="11.5" fill="var(--ink-3)">edge function, hourly pg_cron</text>
+      <g font-size="12" fill="var(--ink-2)">
+        <text x="350" y="198">1. who is in their evening hour</text>
+        <text x="350" y="220">2. run the shared engines</text>
+        <text x="350" y="242">3. score every candidate</text>
+        <text x="350" y="264">4. drop anything already sent</text>
+        <text x="350" y="286">5. hand the winner to the</text>
+        <text x="350" y="304">&#160;&#160;&#160;governor</text>
+        <text x="350" y="334" fill="var(--ink-4)">same Vault pattern as</text>
+        <text x="350" y="350" fill="var(--ink-4)">generate&#8209;recurring</text>
+      </g>
+
+      <path d="M568 240 H 634" stroke="var(--ink-4)" fill="none" marker-end="url(#a2)"/>
+
+      <rect x="638" y="150" width="190" height="180" rx="16" fill="var(--high-soft)" stroke="var(--high)"/>
+      <text x="654" y="178" font-size="13" font-weight="800" fill="var(--ink)">The governor</text>
+      <g font-size="12" fill="var(--ink-2)">
+        <text x="654" y="206">max 1 a day</text>
+        <text x="654" y="228">max 3 a week</text>
+        <text x="654" y="250">quiet hours, local tz</text>
+        <text x="654" y="272">priority beats recency</text>
+        <text x="654" y="294">per family opt out</text>
+        <text x="654" y="316">silence is a valid result</text>
+      </g>
+
+      <path d="M832 240 H 890" stroke="var(--ink-4)" fill="none" marker-end="url(#a2)"/>
+
+      <g>
+        <rect x="894" y="120" width="226" height="52" rx="12" fill="var(--surface)" stroke="var(--line-strong)"/>
+        <text x="910" y="144" font-size="12.5" font-weight="700" fill="var(--ink)">iOS &middot; APNs</text>
+        <text x="910" y="161" font-size="11" fill="var(--ink-3)">time sensitive for bills, actions</text>
+
+        <rect x="894" y="182" width="226" height="52" rx="12" fill="var(--surface)" stroke="var(--line-strong)"/>
+        <text x="910" y="206" font-size="12.5" font-weight="700" fill="var(--ink)">Android &middot; FCM</text>
+        <text x="910" y="223" font-size="11" fill="var(--ink-3)">one channel per family</text>
+
+        <rect x="894" y="244" width="226" height="52" rx="12" fill="var(--surface)" stroke="var(--line-strong)"/>
+        <text x="910" y="268" font-size="12.5" font-weight="700" fill="var(--ink)">Web &middot; push</text>
+        <text x="910" y="285" font-size="11" fill="var(--ink-3)">needs a service worker</text>
+
+        <rect x="894" y="306" width="226" height="52" rx="12" fill="var(--surface)" stroke="var(--line-strong)"/>
+        <text x="910" y="330" font-size="12.5" font-weight="700" fill="var(--ink)">Desktop &middot; Electron</text>
+        <text x="910" y="347" font-size="11" fill="var(--ink-3)">native, no store approval</text>
+      </g>
+
+      <rect x="894" y="382" width="226" height="68" rx="12" fill="var(--surface-2)" stroke="var(--line)"/>
+      <text x="910" y="406" font-size="12.5" font-weight="700" fill="var(--ink)">In app inbox</text>
+      <text x="910" y="424" font-size="11" fill="var(--ink-3)">every send lands here too, so a</text>
+      <text x="910" y="440" font-size="11" fill="var(--ink-3)">missed push is never lost</text>
+    </g>
+  </svg>
+  <figcaption>The local evening check&#8209;in stays exactly as it is. It works offline and needs no round trip. The sweep owns everything the device cannot know.</figcaption>
+  </figure>
+</div></section>
+
+<!-- ─────────────────────────── GOVERNOR ─────────────────────────── -->
+<section id="governor"><div class="wrap">
+  <div class="head">
+    <p class="eyebrow">The discipline</p>
+    <h2>More notifications is how you lose the user. Better ones is how you keep them.</h2>
+    <p class="lede">Building 32 new messages without a hard ceiling would be worse than shipping none.</p>
+  </div>
+
+  <div class="stats" style="margin-bottom:22px">
+    <div class="stat good"><b>3x</b><span>retention for users who got at least one push in 90 days</span></div>
+    <div class="stat bad"><b>3.4x</b><span>uninstall risk above 6 pushes a week</span></div>
+    <div class="stat"><b>46%</b><span>would switch push off at 2 to 5 a week if irrelevant</span></div>
+    <div class="stat"><b>~50%</b><span>iOS opt in for finance apps, so every send is scarce</span></div>
+  </div>
+
+  <figure>
+  <svg viewBox="0 0 1120 230" role="img" aria-label="A governed week: seven candidate notifications, three sent">
+    <g font-family="var(--sans)">
+      <text x="0" y="14" font-size="11" font-weight="800" letter-spacing="1.1" fill="var(--ink-4)">A REAL WEEK, GOVERNED</text>
+
+      <g font-size="11.5" fill="var(--ink-4)" text-anchor="middle">
+        <text x="80" y="212">Mon</text><text x="230" y="212">Tue</text><text x="380" y="212">Wed</text><text x="530" y="212">Thu</text><text x="680" y="212">Fri</text><text x="830" y="212">Sat</text><text x="980" y="212">Sun</text>
+      </g>
+
+      <!-- candidates row -->
+      <text x="0" y="46" font-size="11.5" fill="var(--ink-3)">candidates</text>
+      <g fill="var(--low-soft)" stroke="var(--line-strong)">
+        <rect x="20" y="56" width="120" height="20" rx="6"/><rect x="20" y="80" width="120" height="20" rx="6"/>
+        <rect x="170" y="56" width="120" height="20" rx="6"/>
+        <rect x="320" y="56" width="120" height="20" rx="6"/><rect x="320" y="80" width="120" height="20" rx="6"/><rect x="320" y="104" width="120" height="20" rx="6"/>
+        <rect x="470" y="56" width="120" height="20" rx="6"/>
+        <rect x="620" y="56" width="120" height="20" rx="6"/><rect x="620" y="80" width="120" height="20" rx="6"/>
+        <rect x="770" y="56" width="120" height="20" rx="6"/>
+        <rect x="920" y="56" width="120" height="20" rx="6"/><rect x="920" y="80" width="120" height="20" rx="6"/>
+      </g>
+      <g font-size="9.5" fill="var(--ink-3)">
+        <text x="26" y="70">budget 80%</text><text x="26" y="94">category surge</text>
+        <text x="176" y="70">large txn</text>
+        <text x="326" y="70">rent due tomorrow</text><text x="326" y="94">bill auto added</text><text x="326" y="118">net flow negative</text>
+        <text x="476" y="70">quiet day nudge</text>
+        <text x="626" y="70">subscription up</text><text x="626" y="94">check&#8209;in</text>
+        <text x="776" y="70">check&#8209;in</text>
+        <text x="926" y="70">weekly recap</text><text x="926" y="94">milestone</text>
+      </g>
+
+      <path d="M0 140 H 1120" stroke="var(--line)" stroke-dasharray="3 4"/>
+
+      <text x="0" y="170" font-size="11.5" fill="var(--ink-3)">sent</text>
+      <g>
+        <rect x="20" y="152" width="120" height="26" rx="8" fill="var(--accent-soft)" stroke="var(--accent)"/><text x="30" y="169" font-size="10.5" fill="var(--ink)" font-weight="700">budget 80%</text>
+        <rect x="320" y="152" width="120" height="26" rx="8" fill="var(--crit-soft)" stroke="var(--crit)"/><text x="330" y="169" font-size="10.5" fill="var(--ink)" font-weight="700">rent tomorrow</text>
+        <rect x="920" y="152" width="120" height="26" rx="8" fill="var(--accent-soft)" stroke="var(--accent)"/><text x="930" y="169" font-size="10.5" fill="var(--ink)" font-weight="700">weekly recap</text>
+      </g>
+      <g font-size="10.5" fill="var(--ink-4)">
+        <text x="176" y="169">held</text><text x="476" y="169">held, not needed</text><text x="626" y="169">held</text><text x="776" y="169">held</text>
+      </g>
+
+      <text x="0" y="205" font-size="11.5" fill="var(--ink-4)">12 candidates. 3 sent. The check&#8209;in stays local and silent on days something already landed.</text>
+    </g>
+  </svg>
+  <figcaption>Priority order: money about to move &gt; budget breach &gt; receipt &gt; insight &gt; habit &gt; milestone. Billing and security sit outside the cap and always send.</figcaption>
+  </figure>
+
+  <div class="grid g4" style="margin-top:22px">
+    <div class="card flat"><h3>Per family opt out</h3><p style="font-size:13px;color:var(--ink-3);margin-top:6px">Turning off recaps must not turn off a billing failure. Android channels do this natively, iOS needs our own settings screen.</p></div>
+    <div class="card flat"><h3>Quiet hours</h3><p style="font-size:13px;color:var(--ink-3);margin-top:6px">Nothing between 22:00 and 08:00 local. <code>profiles.timezone</code> is already written on every launch.</p></div>
+    <div class="card flat"><h3>Never repeat</h3><p style="font-size:13px;color:var(--ink-3);margin-top:6px">The log makes each claim once. The same budget threshold cannot fire twice in a period.</p></div>
+    <div class="card flat"><h3>Silence is a result</h3><p style="font-size:13px;color:var(--ink-3);margin-top:6px">A quiet week is the sweep working, not failing. Nothing is sent to fill a slot.</p></div>
+  </div>
+</div></section>
+
+<!-- ─────────────────────────── MONEY ─────────────────────────── -->
+<section id="money"><div class="wrap">
+  <div class="head">
+    <p class="eyebrow">Why this is a revenue project, not a polish project</p>
+    <h2>What each family actually buys.</h2>
+  </div>
+  <div class="tiles">
+    <div class="tile"><span class="k">F &middot; billing</span><span class="v">Recovers paid subscribers who are being lost silently right now <em>trial end, failed payment, lapse</em></span><span class="chip c-gap">Revenue, direct</span></div>
+    <div class="tile"><span class="k">B &middot; bills</span><span class="v">The reason to keep paying. A person who was warned about rent does not cancel Plus</em></span><span class="chip c-gap">Retention of payers</span></div>
+    <div class="tile"><span class="k">C &middot; budget</span><span class="v">The promise on the App Store page, finally delivered outside the app</span><span class="chip c-prd">Trust, reviews</span></div>
+    <div class="tile"><span class="k">D &middot; insights</span><span class="v">Turns a logging chore into a service that hands something back</span><span class="chip c-new">Weekly active use</span></div>
+    <div class="tile"><span class="k">E &middot; habit</span><span class="v">Closes the day 7 cliff, which is the entire current retention strategy</span><span class="chip c-gap">Survival past week 1</span></div>
+    <div class="tile"><span class="k">A &middot; receipts</span><span class="v">Proof the app is working while the user is not looking at it</span><span class="chip c-live">Confidence</span></div>
+  </div>
+
+  <div class="grid g2" style="margin-top:20px">
+    <div class="card">
+      <h3>The privacy objection, answered</h3>
+      <p style="font-size:13.5px;color:var(--ink-3);margin-top:8px">The server already holds every amount, merchant and category, because that is what sync is. A server side sweep reads what is already there. Audio and <code>raw_transcript</code> stay on device, untouched. Nothing in the privacy policy has to change, and no third party SDK enters the app.</p>
+    </div>
+    <div class="card">
+      <h3>The App Store objection, answered</h3>
+      <p style="font-size:13.5px;color:var(--ink-3);margin-top:8px">Guideline 4.5.4: push must be optional and marketing push needs consent. Every family above is either transactional or opt out, set from a real settings screen, with the permission prompt still preceded by an explanation. The pattern already passed review once in the onboarding habit step.</p>
+    </div>
+  </div>
+</div></section>
+
+<!-- ─────────────────────────── BUILD ─────────────────────────── -->
+<section id="build"><div class="wrap">
+  <div class="head">
+    <p class="eyebrow">Order of work</p>
+    <h2>Build order, by value per unit of work.</h2>
+  </div>
+
+  <div class="tiles">
+    <div class="tile"><span class="k">1</span><span class="v">Push transport: delete <code>withoutRemotePush.js</code>, token table, registration, Expo push send</span><span class="chip c-gap">Unblocks everything</span></div>
+    <div class="tile"><span class="k">2</span><span class="v">The sweep, the governor, prefs and log, plus a real notification settings screen</span><span class="chip c-gap">The spine</span></div>
+    <div class="tile"><span class="k">3</span><span class="v">Family F, billing and trial. Smallest surface, only family that pays for itself immediately</span><span class="chip c-gap">Revenue</span></div>
+    <div class="tile"><span class="k">4</span><span class="v">Family B and C, bills ahead and budget breach. Keeps the PRD promise</span><span class="chip c-prd">The product</span></div>
+    <div class="tile"><span class="k">5</span><span class="v">E4, the day 14 / 30 / 60 win back. Closes the cliff</span><span class="chip c-gap">Retention</span></div>
+    <div class="tile"><span class="k">6</span><span class="v">Family D, weekly recap first, the rest behind it</span><span class="chip c-new">Engagement</span></div>
+    <div class="tile"><span class="k">7</span><span class="v">A3 bill added, A5 sync stuck, in app inbox</span><span class="chip c-new">Confidence</span></div>
+    <div class="tile"><span class="k">8</span><span class="v">Desktop native notifications, then web push behind a service worker</span><span class="chip c-new">Two dark platforms</span></div>
+  </div>
+
+  <div class="card" style="margin-top:22px;border-color:var(--crit)">
+    <h3 style="color:var(--crit)">Needs you, and only you</h3>
+    <dl class="kv" style="margin-top:12px">
+      <dt>APNs</dt><dd>An Apple push key, and iOS credentials regenerated with the Push Notifications capability. Today's provisioning profile has it disabled.</dd>
+      <dt>EAS</dt><dd>A new build once the entitlement is back. Native change, so TestFlight then App Store.</dd>
+      <dt>FCM</dt><dd>A Firebase project and server key, for Android push.</dd>
+      <dt>Call</dt><dd>Email as a second channel for win back and billing failure, yes or no. Auth mail is all we send today.</dd>
+    </dl>
+  </div>
+</div></section>
+
+</main>
+
+<footer><div class="wrap">
+  <p>Murmur &middot; notification system review &middot; 19 September 2026. Every count read from the repository at commit <code>6213048</code>.</p>
+  <div class="srcs">
+    <a href="https://www.airship.com/resources/mobile-app-push-notification-benchmarks-2026/">Airship 2026 benchmarks</a>
+    <a href="https://www.businessofapps.com/marketplace/push-notifications/research/push-notifications-statistics/">Business of Apps</a>
+    <a href="https://pushpilot.ai/blog/push-notification-frequency-churn-data">Frequency and churn data</a>
+    <a href="https://www.shno.co/marketing-statistics/push-notification-statistics">Opt in benchmarks</a>
+    <a href="https://www.rocketmoney.com/learn/personal-finance/tracking-expenses-with-rocket-money">Rocket Money alerts</a>
+    <a href="https://support.ynab.com/en_us/managing-notifications-a-guide-HySdCwtCc">YNAB notifications</a>
+    <a href="https://help.monarch.com/hc/en-us/articles/4890751141908-Tracking-Recurring-Expenses-and-Bills">Monarch recurring alerts</a>
+  </div>
+</div></footer>
+</html>

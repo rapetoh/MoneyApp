@@ -5,10 +5,6 @@ import { cacheSet, useCachedState } from '../services/queryCache'
 import { loggedExpenseCount } from './useReminders'
 
 const KEY_DAYONE = 'dayone_skipped'
-/** '1' while the "Getting started" card should show. Set by onboarding's
- *  last step, so accounts onboarded before this card existed never get a
- *  checklist dropped on their Today screen; cleared by Hide. */
-export const KEY_CHECKLIST = 'start_checklist_active'
 /** '1' while the card is collapsed to its one-line summary. Collapsing is
  *  reversible on purpose: a mis-tap must never cost the user the card
  *  (owner review, Sep 19 2026). */
@@ -64,9 +60,17 @@ function usePersistedFlag(key: string): [boolean, boolean, (next: boolean) => vo
  * layout (the glow on the mic button it points at).
  */
 /**
- * The checklist is first-week guidance, not furniture: it retires itself
- * once the user is clearly past that stage, even with items left undone
- * (those live in Budgets and Settings anyway).
+ * Whether the "Getting started" card belongs on Today at all.
+ *
+ * Read from the account (profiles.onboarding_completed_at), never from a
+ * flag on the device (owner report, Sep 19 2026): deleting an app wipes
+ * its keychain on iOS, so a device flag disappeared on reinstall and the
+ * card never came back for an account that had just been set up. The
+ * account knows when it was onboarded; every device it signs into agrees.
+ *
+ * It is first-week guidance, not furniture, so it retires once the user is
+ * clearly past that stage, even with items left undone (those live in
+ * Budgets and Settings anyway).
  */
 export function shouldRetireChecklist(
   expenses: number,
@@ -85,23 +89,14 @@ const RETIRE_AFTER_DAYS = 14
 
 export function useFirstRun(transactions: Transaction[], onboardingCompletedAt?: string | null) {
   const [dayOneSkipped, dayOneLoaded, setDayOneSkipped] = usePersistedFlag(KEY_DAYONE)
-  const [checklistActive, checklistLoaded, setChecklistActive] = usePersistedFlag(KEY_CHECKLIST)
   const [checklistCollapsed, , setChecklistCollapsed] = usePersistedFlag(KEY_CHECKLIST_COLLAPSED)
   const expenses = loggedExpenseCount(transactions)
-
-  // Retire it for good once it has served its purpose. Done here rather
-  // than at the render site so the flag is cleared once, not re-evaluated
-  // on every screen that reads it.
-  const retired = shouldRetireChecklist(expenses, onboardingCompletedAt)
-  useEffect(() => {
-    if (retired && checklistLoaded && checklistActive) setChecklistActive(false)
-  }, [retired, checklistLoaded, checklistActive, setChecklistActive])
 
   return {
     expenses,
     dayOneActive: dayOneLoaded && !dayOneSkipped && expenses === 0,
     skipDayOne: () => setDayOneSkipped(true),
-    checklistVisible: checklistLoaded && checklistActive && !retired,
+    checklistVisible: !!onboardingCompletedAt && !shouldRetireChecklist(expenses, onboardingCompletedAt),
     checklistCollapsed,
     toggleChecklistCollapsed: () => setChecklistCollapsed(!checklistCollapsed),
   }
