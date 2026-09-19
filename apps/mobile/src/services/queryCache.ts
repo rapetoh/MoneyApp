@@ -27,6 +27,11 @@ export function cacheHas(key: string): boolean {
   return values.has(key)
 }
 
+/** Current value for a key, or undefined when nothing is cached. */
+export function cacheGet<T>(key: string): T | undefined {
+  return values.get(key) as T | undefined
+}
+
 export function cacheSet<T>(key: string, value: T): void {
   values.set(key, value)
   listeners.get(key)?.forEach((fn) => fn())

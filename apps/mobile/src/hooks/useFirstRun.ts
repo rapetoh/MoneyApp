@@ -1,7 +1,7 @@
 import { useCallback, useEffect } from 'react'
 import * as SecureStore from 'expo-secure-store'
 import type { Transaction } from '@voice-expense/shared'
-import { useCachedState } from '../services/queryCache'
+import { cacheSet, useCachedState } from '../services/queryCache'
 import { loggedExpenseCount } from './useReminders'
 
 const KEY_DAYONE = 'dayone_skipped'
@@ -13,10 +13,28 @@ export const KEY_CHECKLIST = 'start_checklist_active'
 export const KEY_ONBOARDING_FOLLOWUP = 'onboarding_followup'
 export type OnboardingFollowup = 'plus' | 'applepay'
 
+const cacheKey = (key: string) => `firstrun:${key}`
+
+/**
+ * Set a first-run flag from outside a component (onboarding's last step).
+ *
+ * It must write through the shared cache, not only to SecureStore: the
+ * Today screen mounts for a moment at launch, before the routing gate
+ * sends a new user into onboarding, and that mount caches "not set". The
+ * hook below never re-reads a key the cache already holds, so a plain
+ * SecureStore write stayed invisible until the next cold start, which is
+ * how the "Getting started" card went missing on the first run.
+ */
+export function setFirstRunFlag(key: string, value: boolean): Promise<void> {
+  cacheSet(cacheKey(key), value)
+  const write = value ? SecureStore.setItemAsync(key, '1') : SecureStore.deleteItemAsync(key)
+  return write.catch(() => {})
+}
+
 /** A persisted boolean shared by every mounted screen (queryCache), so the
  *  Today screen and the tabs layout's mic button agree on the same frame. */
 function usePersistedFlag(key: string): [boolean, boolean, (next: boolean) => void] {
-  const [value, setValue, has] = useCachedState<boolean>(`firstrun:${key}`, false)
+  const [value, setValue, has] = useCachedState<boolean>(cacheKey(key), false)
   useEffect(() => {
     if (has) return
     SecureStore.getItemAsync(key)
@@ -25,11 +43,9 @@ function usePersistedFlag(key: string): [boolean, boolean, (next: boolean) => vo
   }, [has, key, setValue])
   const set = useCallback(
     (next: boolean) => {
-      setValue(next)
-      const write = next ? SecureStore.setItemAsync(key, '1') : SecureStore.deleteItemAsync(key)
-      write.catch(() => {})
+      void setFirstRunFlag(key, next)
     },
-    [key, setValue],
+    [key],
   )
   return [value, has, set]
 }
