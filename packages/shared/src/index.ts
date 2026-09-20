@@ -57,3 +57,6 @@ export * from './plus'
 export * from './askStorage'
 // Ask Murmur entry insights — deterministic, runs on the client (docs/ask-murmur/SPEC.md §3.3).
 export * from './domain/askInsights'
+// Notification engine (Sep 19 2026): what Murmur may say and when. Shared
+// so the Edge Function sweep and the apps agree on every claim.
+export * from './domain/notifications'

@@ -2,14 +2,14 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import {
   ActivityIndicator,
   Animated,
-  KeyboardAvoidingView,
+  Keyboard,
   Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
+  type KeyboardEvent,
   useWindowDimensions,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -48,6 +48,11 @@ export interface CenterModalProps {
  * Motion mirrors BottomSheet's: the dim fades while the card rises a few
  * points and settles from 96%, and the Modal stays mounted until the exit
  * finishes. Reduce Motion gets the fade alone.
+ *
+ * The keyboard is handled by centring the card in the space that is left
+ * above it, never by KeyboardAvoidingView's padding, which shoved the card
+ * up under the status bar the moment a number pad appeared (owner report,
+ * Sep 19 2026).
  */
 export function CenterModal({
   visible,
@@ -66,6 +71,7 @@ export function CenterModal({
   const { height: windowHeight } = useWindowDimensions()
   const reduceMotion = useReduceMotion()
   const [mounted, setMounted] = useState(visible)
+  const [keyboardHeight, setKeyboardHeight] = useState(0)
   const dim = useRef(new Animated.Value(0)).current
   const card = useRef(new Animated.Value(0)).current
 
@@ -107,6 +113,22 @@ export function CenterModal({
     })
   }, [visible, mounted, dim, card, reduceMotion])
 
+  useEffect(() => {
+    if (!mounted) return
+    const onShow = (e: KeyboardEvent) => setKeyboardHeight(e.endCoordinates?.height ?? 0)
+    const onHide = () => setKeyboardHeight(0)
+    const show = Keyboard.addListener('keyboardWillShow', onShow)
+    const showDid = Keyboard.addListener('keyboardDidShow', onShow)
+    const hide = Keyboard.addListener('keyboardWillHide', onHide)
+    const hideDid = Keyboard.addListener('keyboardDidHide', onHide)
+    return () => {
+      show.remove()
+      showDid.remove()
+      hide.remove()
+      hideDid.remove()
+    }
+  }, [mounted])
+
   if (!mounted) return null
 
   const requestClose = () => {
@@ -127,9 +149,10 @@ export function CenterModal({
           <Pressable style={StyleSheet.absoluteFill} onPress={requestClose} accessibilityElementsHidden />
         </Animated.View>
 
-        <KeyboardAvoidingView
-          style={styles.center}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        {/* The visible area is the screen minus the keyboard; the card is
+            centred inside it, with the top inset as a hard floor. */}
+        <View
+          style={[styles.center, { paddingTop: insets.top + 12, paddingBottom: keyboardHeight + 12 }]}
           pointerEvents="box-none"
         >
           <Animated.View
@@ -137,7 +160,12 @@ export function CenterModal({
               styles.card,
               // Never taller than the screen minus its insets; the body
               // scrolls inside instead.
-              { maxHeight: windowHeight - insets.top - insets.bottom - 48, opacity: card, transform },
+              {
+                maxHeight:
+                  windowHeight - insets.top - Math.max(keyboardHeight, insets.bottom) - 48,
+                opacity: card,
+                transform,
+              },
             ]}
             accessibilityViewIsModal
             testID={testID}
@@ -194,7 +222,7 @@ export function CenterModal({
               </View>
             )}
           </Animated.View>
-        </KeyboardAvoidingView>
+        </View>
       </View>
     </Modal>
   )

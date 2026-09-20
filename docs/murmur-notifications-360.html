@@ -80,7 +80,7 @@
     <div class="stat good"><b>5</b><span>messages we can send</span></div>
     <div class="stat bad"><b>32</b><span>we should and cannot</span></div>
     <div class="stat bad"><b>0</b><span>ever sent from a server</span></div>
-    <div class="stat bad"><b>0</b><span>on web and desktop</span></div>
+    <div class="stat bad"><b>0</b><span>that tell you about your money</span></div>
     <div class="stat bad"><b>7d</b><span>then silent forever</span></div>
   </div>
 
@@ -263,10 +263,10 @@
       </g>
       <path d="M824 110 H 882" stroke="var(--ink-4)" fill="none" marker-end="url(#c)"/>
       <g>
-        <rect x="888" y="40" width="192" height="30" rx="9" fill="var(--surface)" stroke="var(--line-strong)"/><text x="902" y="60" font-size="11.5" fill="var(--ink)">iOS, needs APNs key</text>
-        <rect x="888" y="76" width="192" height="30" rx="9" fill="var(--surface)" stroke="var(--line-strong)"/><text x="902" y="96" font-size="11.5" fill="var(--ink)">Android, needs FCM</text>
-        <rect x="888" y="112" width="192" height="30" rx="9" fill="var(--surface)" stroke="var(--line-strong)"/><text x="902" y="132" font-size="11.5" fill="var(--ink)">Desktop, free today</text>
-        <rect x="888" y="148" width="192" height="30" rx="9" fill="var(--surface)" stroke="var(--line-strong)"/><text x="902" y="168" font-size="11.5" fill="var(--ink)">Web, needs a worker</text>
+        <rect x="888" y="40" width="192" height="38" rx="9" fill="var(--accent-soft)" stroke="var(--accent)"/><text x="902" y="58" font-size="11.5" font-weight="700" fill="var(--ink)">iPhone</text><text x="902" y="72" font-size="10.5" fill="var(--ink-3)">the whole job, for now</text>
+        <rect x="888" y="86" width="192" height="30" rx="9" fill="var(--surface)" stroke="var(--line-strong)"/><text x="902" y="106" font-size="11.5" fill="var(--ink-3)">Desktop, later</text>
+        <rect x="888" y="124" width="192" height="30" rx="9" fill="var(--surface)" stroke="var(--line-strong)"/><text x="902" y="144" font-size="11.5" fill="var(--ink-3)">Android, later</text>
+        <rect x="888" y="162" width="192" height="30" rx="9" fill="var(--surface)" stroke="var(--line-strong)"/><text x="902" y="182" font-size="11.5" fill="var(--ink-3)">Web, later</text>
       </g>
       <text x="0" y="216" font-size="11.5" fill="var(--ink-3)">No new intelligence gets written. The sweep calls the functions both apps already call.</text>
       <text x="0" y="236" font-size="11.5" fill="var(--ink-3)">Above 6 pushes a week, uninstalls go up 3.4x. The governor is not optional.</text>
@@ -274,15 +274,26 @@
   </svg></figure>
   </div>
 
-  <!-- 5. NEEDS YOU -->
+  <!-- 5. WHAT IT COSTS YOU -->
   <div class="block">
-  <p class="eyebrow">5 &middot; Needs you, everything else is mine</p>
-  <div class="you">
-    <div class="yb"><b>APNs key</b><span>plus iOS credentials regenerated with Push turned on</span></div>
-    <div class="yb"><b>New EAS build</b><span>native change, so TestFlight then App Store</span></div>
-    <div class="yb"><b>FCM key</b><span>Firebase project, for Android</span></div>
-    <div class="yb"><b>One call</b><span>email as a second channel for win back, yes or no</span></div>
-  </div>
+  <p class="eyebrow">5 &middot; What this costs you</p>
+  <figure><svg viewBox="0 0 1080 150" role="img" aria-label="Local notifications need nothing; push needs an entitlement and a key, both handled by EAS">
+    <g font-family="var(--sans)">
+      <rect x="0" y="24" width="525" height="112" rx="14" fill="var(--surface)" stroke="var(--line-strong)"/>
+      <text x="18" y="16" font-size="10.5" font-weight="800" letter-spacing="1" fill="var(--ink-4)">WHAT WE SEND TODAY</text>
+      <text x="18" y="52" font-size="13" font-weight="700" fill="var(--ink)">Local &middot; the phone's own alarm clock</text>
+      <text x="18" y="76" font-size="11.5" fill="var(--ink-3)">No server. No key. No internet.</text>
+      <text x="18" y="96" font-size="11.5" fill="var(--ink-3)">Can only repeat what the app knew last time it was open.</text>
+      <text x="18" y="120" font-size="11.5" font-weight="700" fill="var(--crit)">That is why we can never warn anyone about anything.</text>
+
+      <rect x="555" y="24" width="525" height="112" rx="14" fill="var(--accent-soft)" stroke="var(--accent)"/>
+      <text x="573" y="16" font-size="10.5" font-weight="800" letter-spacing="1" fill="var(--accent)">WHAT WE NEED</text>
+      <text x="573" y="52" font-size="13" font-weight="700" fill="var(--ink)">Push &middot; our server, to Apple, to the phone</text>
+      <text x="573" y="76" font-size="11.5" fill="var(--ink-3)">1. Delete the plugin that strips the push entitlement. Mine.</text>
+      <text x="573" y="96" font-size="11.5" fill="var(--ink-3)">2. An APNs key, so our server can prove it is us to Apple.</text>
+      <text x="573" y="120" font-size="11.5" font-weight="700" fill="var(--accent)">EAS generates the key on the next build. You approve a login.</text>
+    </g>
+  </svg></figure>
   </div>
 
   <footer>Read from the repo at <code>6213048</code>. Long version of the reasoning lives in the git history of this file.</footer>

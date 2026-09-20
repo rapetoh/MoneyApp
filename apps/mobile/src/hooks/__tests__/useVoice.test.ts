@@ -26,6 +26,7 @@ const listeners = vi.hoisted(() => new Map<string, (event: unknown) => void>())
 const mocks = vi.hoisted(() => ({
   parseExpense: vi.fn(async () => ({ amount: 5, merchant: 'Lidl' }) as unknown as ParsedExpense),
   start: vi.fn(),
+  stop: vi.fn(),
 }))
 
 vi.mock('react-native', () => ({
@@ -41,7 +42,7 @@ vi.mock('expo-speech-recognition', () => ({
     getPermissionsAsync: async () => ({ granted: true, canAskAgain: true }),
     requestPermissionsAsync: async () => ({ granted: true, canAskAgain: true }),
     start: mocks.start,
-    stop: () => {},
+    stop: mocks.stop,
     abort: () => {},
   },
   useSpeechRecognitionEvent: (name: string, cb: (event: unknown) => void) => {
@@ -140,5 +141,48 @@ describe('useVoice: a silent capture never replays the previous one', () => {
     await flush()
     expect(mocks.parseExpense).not.toHaveBeenCalled()
     expect(api.parsedExpense).toMatchObject({ merchant: 'Chipotle' })
+  })
+})
+
+describe('useVoice: the silence watchdog', () => {
+  it('gives the user time to think, then stops on its own', async () => {
+    vi.useFakeTimers()
+    try {
+      await act(async () => {
+        await api.startListening('fr-FR')
+      })
+      // Still listening while they decide what to say.
+      act(() => {
+        vi.advanceTimersByTime(4000)
+      })
+      expect(mocks.stop).not.toHaveBeenCalled()
+      // Long silence: capture closes itself rather than hanging open.
+      act(() => {
+        vi.advanceTimersByTime(6000)
+      })
+      expect(mocks.stop).toHaveBeenCalledTimes(1)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('once words are heard, a short pause ends the capture', async () => {
+    vi.useFakeTimers()
+    try {
+      await act(async () => {
+        await api.startListening('fr-FR')
+      })
+      act(() => interim('cinq mille à Lidl'))
+      act(() => {
+        vi.advanceTimersByTime(1500)
+      })
+      expect(mocks.stop).not.toHaveBeenCalled()
+      act(() => {
+        vi.advanceTimersByTime(1500)
+      })
+      expect(mocks.stop).toHaveBeenCalledTimes(1)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

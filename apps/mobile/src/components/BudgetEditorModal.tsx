@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
 import { CenterModal } from './CenterModal'
-import { Colors, Typography, Hairline } from '../theme'
+import { Colors, Typography, Hairline, Motion } from '../theme'
 import { t, currencySymbolFor, merchantColor, type Locale } from '@voice-expense/shared'
 import type { BudgetPeriod, Category } from '@voice-expense/shared'
 
@@ -76,6 +76,16 @@ export function BudgetEditorModal({
     }
   }, [visible, initialAmount, initialPeriod, initialCategoryId])
 
+  // Focus once the dialog has finished arriving: focusing on mount opens
+  // the keyboard mid-animation, which made the card jump (owner report,
+  // Sep 19 2026).
+  const amountRef = useRef<TextInput>(null)
+  useEffect(() => {
+    if (!visible) return
+    const id = setTimeout(() => amountRef.current?.focus(), Motion.enterMs + 80)
+    return () => clearTimeout(id)
+  }, [visible])
+
   const parsed = parseFloat(amount.replace(',', '.'))
   const valid = Number.isFinite(parsed) && parsed > 0
 
@@ -110,13 +120,13 @@ export function BudgetEditorModal({
       <View style={styles.amountCard}>
         <Text style={styles.currency}>{currencySymbolFor(currency)}</Text>
         <TextInput
+          ref={amountRef}
           style={styles.amountInput}
           value={amount}
           onChangeText={setAmount}
           placeholder="0"
           placeholderTextColor={Colors.ink4}
           keyboardType="decimal-pad"
-          autoFocus
           returnKeyType="done"
           onSubmitEditing={handleSave}
           maxLength={12}

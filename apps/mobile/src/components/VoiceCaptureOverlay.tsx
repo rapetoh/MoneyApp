@@ -149,18 +149,47 @@ export function VoiceCaptureOverlay({
   const detectedAmount = useMemo(() => extractAmount(transcript), [transcript])
   const timer = `${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, '0')}`
 
-  // Every error the capture loop can hit, in the user's language (first-run
-  // audit C2: raw English recognizer text used to be shown as-is).
-  const ERROR_COPY: Record<string, string> = {
-    'no-transcript': 'voice.no_transcript',
-    'mic-denied': 'voice.mic_denied',
-    'recognizer-error': 'voice.recognizer_error',
-    'parse-failed': 'voice.parse_failed',
+  // Every way capture can stop without a result, described in one place:
+  // an icon, a title, a line of help, and the one action that moves the
+  // user forward. "We heard nothing" is not an error and no longer reads
+  // like one (owner review, Sep 19 2026); only a real failure is tinted.
+  const micDenied = errorMessage === 'mic-denied'
+  const stopped = {
+    'no-transcript': {
+      icon: 'mic-outline' as const,
+      title: t('voice.nothing_heard_title', locale),
+      body: t('voice.nothing_heard_body', locale).replace('{example}', t('welcome.demo_transcript', locale)),
+      action: t('common.retry', locale),
+      tone: 'calm' as const,
+    },
+    'mic-denied': {
+      icon: 'lock-closed-outline' as const,
+      title: t('voice.mic_off_title', locale),
+      body: t('voice.mic_denied', locale),
+      action: t('common.open_settings', locale),
+      tone: 'warn' as const,
+    },
+    'recognizer-error': {
+      icon: 'ear-outline' as const,
+      title: t('voice.recognizer_error_title', locale),
+      body: t('voice.recognizer_error', locale),
+      action: t('common.retry', locale),
+      tone: 'calm' as const,
+    },
+    'parse-failed': {
+      icon: 'cloud-offline-outline' as const,
+      title: t('voice.parse_failed_title', locale),
+      body: t('voice.parse_failed', locale),
+      action: t('common.retry', locale),
+      tone: 'warn' as const,
+    },
+  }[errorMessage ?? 'no-transcript'] ?? {
+    icon: 'alert-circle-outline' as const,
+    title: t('common.error', locale),
+    body: '',
+    action: t('common.retry', locale),
+    tone: 'warn' as const,
   }
-  const errorCopy = t(ERROR_COPY[errorMessage ?? ''] ?? 'common.error', locale)
-  // With the mic off in iOS Settings, retrying can never work: the way
-  // forward is Settings, or typing.
-  const micDenied = phase === 'error' && errorMessage === 'mic-denied'
 
   return (
     <View style={styles.root}>
@@ -184,53 +213,57 @@ export function VoiceCaptureOverlay({
           { opacity: presence, transform: [{ translateY: rise }] },
         ]}
       >
-        {/* Status pill */}
-        <View style={styles.statusRow}>
-          <View style={styles.statusPill}>
-            {phase === 'error' ? (
-              <Ionicons name="alert-circle" size={14} color={Colors.destructive} />
-            ) : (
+        {/* Status pill — only while something is actually happening. */}
+        {phase !== 'error' && (
+          <View style={styles.statusRow}>
+            <View style={styles.statusPill}>
               <PulsingDot />
-            )}
-            <Text style={styles.statusLabel}>
-              {phase === 'error'
-                ? t('common.error', locale)
-                : listening
-                  ? t('listening.eyebrow', locale)
-                  : t('listening.processing', locale)}
-            </Text>
-            {listening && (
-              <>
-                <View style={styles.statusDivider} />
-                <Text style={styles.statusTimer}>{timer}</Text>
-              </>
-            )}
+              <Text style={styles.statusLabel}>
+                {listening ? t('listening.eyebrow', locale) : t('listening.processing', locale)}
+              </Text>
+              {listening && (
+                <>
+                  <View style={styles.statusDivider} />
+                  <Text style={styles.statusTimer}>{timer}</Text>
+                </>
+              )}
+            </View>
           </View>
-        </View>
+        )}
 
         {/* Live transcript — the hero */}
         <View style={styles.transcriptWrap}>
           {phase === 'error' ? (
-            <View>
-              <Text style={styles.errorText}>{errorCopy}</Text>
-              {micDenied && (
-                <View style={styles.deniedActions}>
-                  <Pressable
-                    onPress={() => Linking.openSettings()}
-                    style={({ pressed }) => [styles.deniedPrimary, pressed && styles.pressed]}
-                    accessibilityRole="button"
-                  >
-                    <Text style={styles.deniedPrimaryText}>{t('common.open_settings', locale)}</Text>
-                  </Pressable>
-                  <Pressable
-                    onPress={onKeyboard}
-                    style={({ pressed }) => [styles.deniedSecondary, pressed && styles.pressed]}
-                    accessibilityRole="button"
-                  >
-                    <Text style={styles.deniedSecondaryText}>{t('voice.type_instead', locale)}</Text>
-                  </Pressable>
-                </View>
-              )}
+            <View style={styles.stopped}>
+              <View style={[styles.stoppedIcon, stopped.tone === 'warn' && styles.stoppedIconWarn]}>
+                <Ionicons
+                  name={stopped.icon}
+                  size={26}
+                  color={stopped.tone === 'warn' ? Colors.destructive : Colors.accent}
+                />
+              </View>
+              <Text style={styles.stoppedTitle}>{stopped.title}</Text>
+              {stopped.body ? <Text style={styles.stoppedBody}>{stopped.body}</Text> : null}
+              <Pressable
+                onPress={() => (micDenied ? Linking.openSettings() : onRetry())}
+                style={({ pressed }) => [styles.stoppedPrimary, pressed && styles.pressed]}
+                accessibilityRole="button"
+              >
+                <Ionicons
+                  name={micDenied ? 'settings-outline' : 'mic'}
+                  size={17}
+                  color={Colors.white}
+                />
+                <Text style={styles.stoppedPrimaryText}>{stopped.action}</Text>
+              </Pressable>
+              <Pressable
+                onPress={onKeyboard}
+                style={({ pressed }) => [styles.stoppedSecondary, pressed && styles.pressed]}
+                accessibilityRole="button"
+                hitSlop={8}
+              >
+                <Text style={styles.stoppedSecondaryText}>{t('voice.type_instead', locale)}</Text>
+              </Pressable>
             </View>
           ) : (
             <Text style={styles.transcriptText}>
@@ -258,7 +291,8 @@ export function VoiceCaptureOverlay({
           {phase !== 'error' && <LiveWaveform level={volumeLevel} active={listening} />}
         </View>
 
-        {/* Controls — cancel · stop/retry · keyboard */}
+        {/* Controls — cancel · stop · keyboard. In the stopped state the
+            actions live in the block above, so only Cancel remains. */}
         <View style={styles.controlsRow}>
           <Pressable
             style={({ pressed }) => [styles.sideBtn, pressed && styles.pressed]}
@@ -270,27 +304,7 @@ export function VoiceCaptureOverlay({
             <Ionicons name="close" size={20} color={Colors.ink2} />
           </Pressable>
 
-          {micDenied ? (
-            <Pressable
-              style={({ pressed }) => [styles.stopBtn, pressed && styles.pressed]}
-              onPress={() => Linking.openSettings()}
-              hitSlop={12}
-              accessibilityRole="button"
-              accessibilityLabel={t('common.open_settings', locale)}
-            >
-              <Ionicons name="settings-outline" size={28} color={Colors.white} />
-            </Pressable>
-          ) : phase === 'error' ? (
-            <Pressable
-              style={({ pressed }) => [styles.stopBtn, pressed && styles.pressed]}
-              onPress={onRetry}
-              hitSlop={12}
-              accessibilityRole="button"
-              accessibilityLabel={t('common.retry', locale)}
-            >
-              <Ionicons name="mic" size={30} color={Colors.white} />
-            </Pressable>
-          ) : (
+          {phase !== 'error' && (
             <Pressable
               style={({ pressed }) => [styles.stopBtn, pressed && styles.pressed]}
               onPress={onStop}
@@ -307,15 +321,19 @@ export function VoiceCaptureOverlay({
             </Pressable>
           )}
 
-          <Pressable
-            style={({ pressed }) => [styles.sideBtn, pressed && styles.pressed]}
-            onPress={onKeyboard}
-            hitSlop={8}
-            accessibilityRole="button"
-            accessibilityLabel={t('voice.type_instead', locale)}
-          >
-            <Ionicons name="keypad-outline" size={20} color={Colors.ink2} />
-          </Pressable>
+          {phase !== 'error' ? (
+            <Pressable
+              style={({ pressed }) => [styles.sideBtn, pressed && styles.pressed]}
+              onPress={onKeyboard}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel={t('voice.type_instead', locale)}
+            >
+              <Ionicons name="keypad-outline" size={20} color={Colors.ink2} />
+            </Pressable>
+          ) : (
+            <View style={styles.sideBtnSpacer} />
+          )}
         </View>
 
         {/* Privacy footer — the audio itself never leaves the device */}
@@ -396,18 +414,59 @@ const styles = StyleSheet.create({
   transcriptPlaceholder: {
     color: Colors.ink4,
   },
-  deniedActions: { marginTop: 22, gap: 10, alignItems: 'flex-start' },
-  deniedPrimary: {
-    height: 46,
-    paddingHorizontal: 22,
-    borderRadius: 23,
-    backgroundColor: Colors.ink,
+  // The stopped state: icon, what happened, what to do next.
+  stopped: { alignItems: 'center', paddingHorizontal: 8 },
+  stoppedIcon: {
+    width: 62,
+    height: 62,
+    borderRadius: 20,
+    backgroundColor: Colors.accentSoft,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  deniedPrimaryText: { color: Colors.white, fontSize: 15, fontFamily: Typography.fontFamily.sansSemiBold, fontWeight: '600' },
-  deniedSecondary: { height: 40, justifyContent: 'center' },
-  deniedSecondaryText: { color: Colors.accent, fontSize: 15, fontFamily: Typography.fontFamily.sansSemiBold, fontWeight: '600' },
+  stoppedIconWarn: { backgroundColor: Colors.destructiveLight },
+  stoppedTitle: {
+    marginTop: 18,
+    fontFamily: Typography.fontFamily.serif,
+    fontSize: 27,
+    lineHeight: 33,
+    fontWeight: '500',
+    color: Colors.ink,
+    textAlign: 'center',
+  },
+  stoppedBody: {
+    marginTop: 10,
+    fontSize: 15,
+    lineHeight: 22,
+    color: Colors.ink3,
+    textAlign: 'center',
+    fontFamily: Typography.fontFamily.sans,
+    maxWidth: 320,
+  },
+  stoppedPrimary: {
+    marginTop: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    height: 52,
+    paddingHorizontal: 26,
+    borderRadius: 26,
+    backgroundColor: Colors.ink,
+  },
+  stoppedPrimaryText: {
+    color: Colors.white,
+    fontSize: 16,
+    fontWeight: '600',
+    fontFamily: Typography.fontFamily.sansSemiBold,
+  },
+  stoppedSecondary: { marginTop: 12, paddingVertical: 8, paddingHorizontal: 12 },
+  stoppedSecondaryText: {
+    color: Colors.accent,
+    fontSize: 15,
+    fontWeight: '600',
+    fontFamily: Typography.fontFamily.sansSemiBold,
+  },
+  sideBtnSpacer: { width: 44, height: 44 },
   errorText: {
     fontFamily: Typography.fontFamily.sans,
     fontSize: 16,

@@ -161,10 +161,11 @@ export function GettingStartedCard({
           <Pressable
             key={item.key}
             onPress={item.onPress}
-            disabled={item.done}
             style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
             accessibilityRole="button"
-            accessibilityState={{ checked: item.done, disabled: item.done }}
+            // Done is not dead: tapping "Set a monthly budget" again opens
+            // the editor on the budget you set (owner report, Sep 19 2026).
+            accessibilityState={{ checked: item.done }}
           >
             <Ionicons
               name={item.done ? 'checkmark-circle' : 'ellipse-outline'}
@@ -172,7 +173,7 @@ export function GettingStartedCard({
               color={item.done ? Colors.accent : Colors.ink4}
             />
             <Text style={[styles.label, item.done && styles.labelDone]}>{t(`start.${item.key}`, locale)}</Text>
-            {!item.done && <Ionicons name="chevron-forward" size={15} color={Colors.ink4} />}
+            <Ionicons name="chevron-forward" size={15} color={item.done ? Colors.ink4 : Colors.ink3} />
           </Pressable>
         ))}
     </View>

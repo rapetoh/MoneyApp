@@ -14,6 +14,18 @@ import type { ParsedExpense } from '@voice-expense/shared'
 
 export type VoiceState = 'idle' | 'listening' | 'processing' | 'done' | 'error'
 
+/**
+ * How long the recogniser keeps listening in silence (owner report, Sep 19
+ * 2026: "the time I'm allowed to think before talking is too short").
+ * iOS ends its own task after about two seconds of silence, which cut
+ * people off while they were still deciding what to say, so capture runs
+ * in continuous mode and these two timers decide when to stop:
+ *   - BEFORE a word is heard, the user is thinking: give them time.
+ *   - AFTER the last word, a short pause means they have finished.
+ */
+const SILENCE_BEFORE_SPEECH_MS = 9000
+const SILENCE_AFTER_SPEECH_MS = 2600
+
 export interface UseVoiceReturn {
   state: VoiceState
   transcript: string
@@ -67,6 +79,30 @@ export function useVoice(
   // Set when an inject aborts an in-progress recognition — tells the
   // end/error handlers to swallow that session instead of parsing it.
   const discardRecognitionRef = useRef(false)
+  // Silence watchdog (see the constants above).
+  const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const heardSomethingRef = useRef(false)
+
+  const clearSilenceTimer = useCallback(() => {
+    if (silenceTimerRef.current) {
+      clearTimeout(silenceTimerRef.current)
+      silenceTimerRef.current = null
+    }
+  }, [])
+
+  /** (Re)start the watchdog; called on start and on every word heard. */
+  const armSilenceTimer = useCallback(() => {
+    clearSilenceTimer()
+    silenceTimerRef.current = setTimeout(
+      () => {
+        silenceTimerRef.current = null
+        if (recognizerActiveRef.current) ExpoSpeechRecognitionModule.stop()
+      },
+      heardSomethingRef.current ? SILENCE_AFTER_SPEECH_MS : SILENCE_BEFORE_SPEECH_MS,
+    )
+  }, [clearSilenceTimer])
+
+  useEffect(() => clearSilenceTimer, [clearSilenceTimer])
 
   // Use refs so the speech-end callback always reads the latest values
   const categoriesRef = useRef(userCategories)
@@ -84,6 +120,10 @@ export function useVoice(
     if (!results?.length) return
 
     const best = results[0] as any
+    if (best.transcript) {
+      heardSomethingRef.current = true
+      armSilenceTimer()
+    }
     if (best.isFinal) {
       finalTranscriptRef.current = best.transcript
       lastInterimRef.current = ''
@@ -104,6 +144,7 @@ export function useVoice(
   useSpeechRecognitionEvent('end', () => {
     volumeLevel.setValue(0)
     recognizerActiveRef.current = false
+    clearSilenceTimer()
     if (discardRecognitionRef.current) {
       discardRecognitionRef.current = false
       return
@@ -130,6 +171,7 @@ export function useVoice(
 
   useSpeechRecognitionEvent('error', (event) => {
     recognizerActiveRef.current = false
+    clearSilenceTimer()
     if (discardRecognitionRef.current) {
       // Deliberately aborted by an inject — not an error the user sees.
       // The matching 'end' event clears the flag.
@@ -226,9 +268,13 @@ export function useVoice(
     setState('listening')
 
     recognizerActiveRef.current = true
+    heardSomethingRef.current = false
+    armSilenceTimer()
     ExpoSpeechRecognitionModule.start({
       lang: locale,
-      continuous: false,
+      // Continuous, so the recogniser does not hang up on its own after a
+      // couple of seconds of silence; the watchdog above decides instead.
+      continuous: true,
       interimResults: true,
       maxAlternatives: 1,
       // Privacy screen promise: audio is transcribed on the phone and
@@ -245,11 +291,13 @@ export function useVoice(
 
   const stopListening = useCallback(() => {
     haptic.tap()
+    clearSilenceTimer()
     ExpoSpeechRecognitionModule.stop()
   }, [])
 
   const reset = useCallback(() => {
     sessionGenRef.current++
+    clearSilenceTimer()
     if (recognizerActiveRef.current) {
       discardRecognitionRef.current = true
       ExpoSpeechRecognitionModule.abort()
@@ -271,6 +319,7 @@ export function useVoice(
    * presents the shared result sheet.
    */
   const injectParsed = useCallback((parsed: ParsedExpense) => {
+    clearSilenceTimer()
     // Supersede any in-flight session: bump the generation (stale parse
     // completions drop themselves) and abort an active recognizer so its
     // end-of-speech parse can't overwrite this injected result.

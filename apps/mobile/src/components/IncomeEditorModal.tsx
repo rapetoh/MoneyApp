@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { StyleSheet, Text, TextInput, View } from 'react-native'
 import { CenterModal } from './CenterModal'
-import { Colors, Typography, Hairline } from '../theme'
+import { Colors, Typography, Hairline, Motion } from '../theme'
 import { t, currencySymbolFor, type Locale } from '@voice-expense/shared'
 
 interface Props {
@@ -49,6 +49,16 @@ export function IncomeEditorModal({
     }
   }, [visible, initialAmount, initialSource])
 
+  // Focus once the dialog has finished arriving: focusing on mount opens
+  // the keyboard mid-animation, which made the card jump (owner report,
+  // Sep 19 2026).
+  const amountRef = useRef<TextInput>(null)
+  useEffect(() => {
+    if (!visible) return
+    const id = setTimeout(() => amountRef.current?.focus(), Motion.enterMs + 80)
+    return () => clearTimeout(id)
+  }, [visible])
+
   const parsed = parseFloat(amount)
   const valid = Number.isFinite(parsed) && parsed > 0
 
@@ -75,6 +85,7 @@ export function IncomeEditorModal({
       <View style={styles.amountCard}>
         <Text style={styles.currency}>{currencySymbolFor(currency)}</Text>
         <TextInput
+          ref={amountRef}
           value={amount}
           onChangeText={(v) => setAmount(v.replace(/[^\d.]/g, ''))}
           placeholder="0"
@@ -82,7 +93,6 @@ export function IncomeEditorModal({
           keyboardType="decimal-pad"
           style={styles.amountInput}
           maxLength={12}
-          autoFocus
           accessibilityLabel={t('settings.income_amount', locale)}
         />
       </View>

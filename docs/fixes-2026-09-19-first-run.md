@@ -81,3 +81,22 @@ Reduce Motion honoured. The budget period became a chip row instead of a
 five-row list so the dialog stays one glance tall. Used by the Budgets
 tab, Settings, and the Today checklist, which now opens the budget dialog
 in place instead of sending the user to another tab.
+
+## Capture and dialog polish (owner testing, Sep 19 2026 evening)
+
+- **The dialog jumped under the status bar** when the number pad opened:
+  `KeyboardAvoidingView`'s padding shrank the centred container. `CenterModal`
+  now measures the keyboard and centres the card in the space above it, with
+  the top inset as a floor, and the editors focus their input only after the
+  entrance animation lands.
+- **A finished checklist row did nothing.** "Set a monthly budget" is tappable
+  when done too, and reopens the editor on the budget you set.
+- **Two or three seconds of silence ended the recording.** iOS closes its own
+  task after a short pause, so capture runs continuous with our own watchdog:
+  9s of patience before the first word, 2.6s after the last one. Tested with
+  fake timers in `__tests__/useVoice.test.ts`.
+- **"Nothing heard" looked like a crash**: red text alone in the middle of the
+  screen. It is now a proper state: icon, title, one line of help with a real
+  example in the user's language, a primary action (Retry, or Open Settings
+  when the mic is off) and "Type instead" underneath. Only real failures are
+  tinted; hearing nothing is calm.
