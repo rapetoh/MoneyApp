@@ -472,6 +472,15 @@ build them.
   today?", "A few quiet days", "Your week in one minute"). With the
   check-in off, quiet nudges 1, 3 and 7 days after the last log. Never a
   cold permission alert: an explanation always comes first.
+- **Server-sent notifications** (Sep 19 2026, docs/notifications.md): the
+  local reminders above can only repeat a sentence fixed days in advance,
+  so they can never carry a figure. Everything that can ("Rent, 1,450,
+  lands tomorrow. 380 left after it.") is sent by an hourly server sweep
+  running the same budget / insight / recurrence engines the screens
+  render from. Six families, one governor: at most one a day, three a
+  week, quiet hours in the user's own zone, every family muteable except
+  billing. Silence is a correct outcome. This is also what closes the
+  day-7 cliff, where a lapsing user previously heard nothing ever again.
 - **Day-3 insights unlock** — the Insights tab gets a small badge when
   the user has 3+ entries. First-time tap shows a 1-screen welcome.
 - **Recurring detection** kicks in after 2–3 occurrences of a merchant
