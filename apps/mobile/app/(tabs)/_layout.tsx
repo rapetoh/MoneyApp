@@ -9,6 +9,7 @@ import { useProfile } from '../../src/hooks/useProfile'
 import { useTransactions } from '../../src/hooks/useTransactions'
 import { useInsightsUnlock } from '../../src/hooks/useInsightsUnlock'
 import { useReminders } from '../../src/hooks/useReminders'
+import { usePushRegistration } from '../../src/hooks/usePushRegistration'
 import { useFirstRun, takeOnboardingFollowup } from '../../src/hooks/useFirstRun'
 import { usePlusStatus } from '../../src/hooks/usePlusStatus'
 import { useReduceMotion } from '../../src/hooks/useReduceMotion'
@@ -107,6 +108,13 @@ export default function TabsLayout() {
   // without each save call site having to remember to schedule.
   // Reminders + the one-time notification prime (first-run audit C4/M4/M6).
   const { primeVisible, acceptPrime, declinePrime } = useReminders(locale, transactions)
+
+  // Remote push (Sep 19 2026). The local reminders above fire from the
+  // phone's own clock and can only repeat a sentence fixed days earlier;
+  // everything with a figure in it comes from notify-sweep and needs a
+  // token to arrive at. Registration never prompts: the permission is
+  // asked for by the habit step or the prime sheet, which explain first.
+  usePushRegistration(user?.id, locale)
   const { dayOneActive } = useFirstRun(transactions)
 
   // One-shot follow-up handed over by onboarding's last step: the Apple Pay

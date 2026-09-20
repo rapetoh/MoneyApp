@@ -12,11 +12,14 @@
     "test": "turbo test",
     "typecheck": "turbo typecheck",
     "format": "prettier --write \"**/*.{ts,tsx,md,json}\"",
-    "knip": "knip"
+    "knip": "knip",
+    "build:shared-deno": "node scripts/build-shared-deno.mjs",
+    "check:shared-deno": "node scripts/build-shared-deno.mjs --check"
   },
   "devDependencies": {
     "@next/eslint-plugin-next": "^16.3.0",
     "@vitest/coverage-v8": "^4.1.10",
+    "esbuild": "^0.28.2",
     "eslint": "^10.8.1",
     "eslint-plugin-react-hooks": "^7.1.1",
     "globals": "^17.9.0",

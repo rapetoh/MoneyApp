@@ -1,5 +1,5 @@
 /**
- * The notification engine — what Murmur is allowed to say, and when.
+ * The notification engine: what Murmur is allowed to say, and when.
  *
  * Why this lives in `packages/shared` and not in the Edge Function.
  * Everything worth notifying about is a claim about the user's money:
@@ -471,7 +471,11 @@ export function planNotifications(input: NotificationPlanInput): NotificationCan
   // ── insights: the brain, finally delivered ─────────────────────────────
 
   const local = localParts(nowUtc, tz)
-  const weekday = new Date(Date.parse(nowUtc)).getUTCDay()
+  // The user's own weekday, not UTC's. At 22:00 UTC on a Sunday it is
+  // already Monday in Auckland, so a UTC weekday delivers "last week"
+  // recaps on a Monday for every zone east of UTC. `weekdayIndex` is
+  // period.ts's local weekday, Monday = 0 … Sunday = 6.
+  const isSunday = local.weekdayIndex === 6
 
   // Reuse the shipped insight engine rather than inventing parallel
   // thresholds: whatever Ask would show, a notification can quote.
@@ -524,7 +528,7 @@ export function planNotifications(input: NotificationPlanInput): NotificationCan
 
   // Weekly recap: Sunday, and only for someone with a real week behind
   // them. A recap of two transactions is not a recap.
-  if (weekday === 0) {
+  if (isSunday) {
     const weekStart = nowMs - 7 * DAY_MS
     const weekTxns = input.transactions.filter(
       (tx) => tx.direction === 'debit' && Date.parse(tx.transacted_at) >= weekStart && amountOf(tx) !== null,

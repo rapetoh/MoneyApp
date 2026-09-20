@@ -5,6 +5,13 @@
 //
 // Deploy: supabase functions deploy generate-recurring
 //
+// Recurrence logic comes from `../_shared/generated/shared.ts`, the
+// generated Deno build of `@voice-expense/shared` (scripts/build-shared-deno.mjs).
+// It replaced a hand-ported `_shared/recurrence.ts` on Sep 19 2026; the two
+// were proven identical across 207,360 rule/timezone/anchor combinations
+// before the swap. Never hand-port shared logic in here again: change
+// packages/shared and run `npm run build:shared-deno`.
+//
 // Scheduling lives in supabase/migrations/015_cron_schedule_vault.sql — do
 // not hand-create the cron job. The scheduled command reads the secret key
 // from Supabase Vault at call time (vault.decrypted_secrets, name
@@ -25,7 +32,7 @@
 // the insert below rather than deploying against a stale schema.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { occurrencesDue } from '../_shared/recurrence.ts'
+import { occurrencesDue } from '../_shared/generated/shared.ts'
 import type { Database } from '../_shared/database.types.ts'
 
 // Typed client (fix-plan 1.2): `.from('transactions').insert({...})` below

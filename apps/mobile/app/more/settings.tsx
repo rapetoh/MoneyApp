@@ -26,6 +26,7 @@ import { ExpoSpeechRecognitionModule } from 'expo-speech-recognition'
 import { useApiUrl } from '../../src/hooks/useApiUrl'
 import { changeCurrency } from '../../src/services/profileCurrency'
 import { SetGroup, SetRow } from '../../src/components/SettingsList'
+import { useNotificationPrefs } from '../../src/hooks/useNotificationPrefs'
 import { manageSubscription } from '../../src/services/purchases'
 import { BudgetEditorModal } from '../../src/components/BudgetEditorModal'
 import { IncomeEditorModal } from '../../src/components/IncomeEditorModal'
@@ -457,6 +458,12 @@ export default function SettingsScreen() {
   // second native subscription competes with the root layout's real one.
   const { permissionGranted, recheckPermission, requestPermission } = useNotificationListener()
 
+  // Server-side notification preferences (Sep 19 2026). The local
+  // reminders below are scheduled by the phone; everything with a figure
+  // in it is sent by notify-sweep, which is asleep-phone-proof and so
+  // reads its consent from the database rather than from this device.
+  const notifPrefs = useNotificationPrefs(user?.id)
+
   const handleNotificationToggle = useCallback(async () => {
     if (permissionGranted) {
       Alert.alert(
@@ -632,6 +639,51 @@ export default function SettingsScreen() {
             last
           />
         </SetGroup>
+
+        {/* What Murmur may send (Sep 19 2026 notification review). One
+            switch per family. Billing and account has no switch on
+            purpose: it is transactional, and someone who muted weekly
+            recaps has not asked to be kept in the dark about a failed
+            payment. */}
+        <SetGroup label={t('notifsettings.title', locale)}>
+          <SetRow
+            label={t('notifsettings.family_money', locale)}
+            detail={t('notifsettings.always_on', locale)}
+            chevron={false}
+          />
+          <SetRow
+            label={t('notifsettings.family_bills', locale)}
+            toggle
+            value={notifPrefs.prefs.bills}
+            onToggle={(next) => void notifPrefs.update({ bills: next })}
+          />
+          <SetRow
+            label={t('notifsettings.family_budget', locale)}
+            toggle
+            value={notifPrefs.prefs.budget}
+            onToggle={(next) => void notifPrefs.update({ budget: next })}
+          />
+          <SetRow
+            label={t('notifsettings.family_receipts', locale)}
+            toggle
+            value={notifPrefs.prefs.receipts}
+            onToggle={(next) => void notifPrefs.update({ receipts: next })}
+          />
+          <SetRow
+            label={t('notifsettings.family_insights', locale)}
+            toggle
+            value={notifPrefs.prefs.insights}
+            onToggle={(next) => void notifPrefs.update({ insights: next })}
+          />
+          <SetRow
+            label={t('notifsettings.family_habit', locale)}
+            toggle
+            value={notifPrefs.prefs.habit}
+            onToggle={(next) => void notifPrefs.update({ habit: next })}
+            last
+          />
+        </SetGroup>
+        <Text style={styles.notifHint}>{t('notifsettings.hint', locale)}</Text>
 
         {/* Reminders (first-run audit C4/M6): evening check-in with its
             hour, and quiet nudges for when the check-in is off. */}
@@ -1093,6 +1145,15 @@ const styles = StyleSheet.create({
   hourChipText: { fontSize: 13, color: Colors.ink2, fontFamily: Typography.fontFamily.sansSemiBold, fontWeight: '600' },
   hourChipTextOn: { color: Colors.white },
   notifNote: { marginHorizontal: 20, marginTop: -8, marginBottom: 16 },
+  notifHint: {
+    marginHorizontal: 20,
+    marginTop: -8,
+    marginBottom: 20,
+    fontSize: 12.5,
+    lineHeight: 18,
+    color: Colors.ink3,
+    fontFamily: Typography.fontFamily.sans,
+  },
   notifNoteText: { fontSize: 12.5, lineHeight: 18, color: Colors.ink3, fontFamily: Typography.fontFamily.sans },
   notifNoteLink: { color: Colors.accent, fontFamily: Typography.fontFamily.sansSemiBold, fontWeight: '600' },
   safe: { flex: 1, backgroundColor: Colors.background },

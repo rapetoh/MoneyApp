@@ -75,13 +75,6 @@ module.exports = {
       package: 'com.voiceexpense.app',
     },
     plugins: [
-      // First in the list so its entitlements mod runs LAST (plugins
-      // wrap like middleware — last-registered runs first): it must
-      // delete the remote-push entitlement AFTER expo-notifications
-      // adds it. Murmur is local-notifications-only; the ad-hoc
-      // provisioning profile has no Push Notifications capability and
-      // builds fail if the entitlement survives.
-      './plugins/withoutRemotePush.js',
       // "Log Expense in Murmur" App Intent — Apple Pay capture runs in the
       // background via a Wallet automation (native/ios/WalletCapture.swift).
       './plugins/withWalletCapture.js',
@@ -119,9 +112,22 @@ module.exports = {
       'expo-apple-authentication',
       'expo-web-browser',
       'expo-sqlite',
-      // Day-2 dunning local notification (Phase H). Local-only — no remote
-      // push infrastructure needed. Notifications fire even when the app is
-      // fully closed. Color is the Murmur sage accent.
+      // Local reminders AND remote push (Sep 19 2026).
+      //
+      // Until this build a sibling plugin, withoutRemotePush.js, deleted
+      // the `aps-environment` entitlement that expo-notifications adds,
+      // because Murmur had no server able to send anything and the old
+      // ad-hoc provisioning profile carried no Push capability. Both
+      // reasons are gone: distribution is TestFlight and App Store only,
+      // and supabase/functions/notify-sweep now sends. The entitlement
+      // stays, EAS syncs the Push Notifications capability onto the App
+      // ID at build time and provisions the APNs key.
+      //
+      // Local scheduling is still how the evening check-in works, because
+      // it must fire with no network and no server round trip. Remote push
+      // carries everything the phone cannot know by itself: a bill landing
+      // tomorrow, a budget crossed on another device, a failed payment.
+      // Color is the Murmur sage accent.
       [
         'expo-notifications',
         {

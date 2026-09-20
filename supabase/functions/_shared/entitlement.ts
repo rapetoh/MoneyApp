@@ -59,6 +59,17 @@ export interface PlusEntitlementColumns {
   plus_will_renew: boolean | null
   plus_store: string | null
   plus_is_sandbox: boolean | null
+  /** `subscriptions[].billing_issues_detected_at`. Kept separate from
+   *  `plus_will_renew` because that flag folds a failed payment and a
+   *  deliberate cancellation into one `false`, and the two need opposite
+   *  messages: "your card bounced, here is how to fix it" versus "your
+   *  subscription ends on the 4th". Telling someone who chose to cancel
+   *  that their payment failed is worse than saying nothing. */
+  plus_billing_issue_at: string | null
+  /** `entitlements[].grace_period_expires_date`. While the store retries
+   *  the card, Plus keeps working until this instant. It is the deadline
+   *  the billing-issue notification quotes. */
+  plus_grace_until: string | null
 }
 
 export const PLUS_ENTITLEMENT_ID = 'plus'
@@ -117,6 +128,8 @@ export function resolveEntitlement(
       plus_will_renew: sub ? !sub.unsubscribe_detected_at && !sub.billing_issues_detected_at : null,
       plus_store: sub?.store ?? null,
       plus_is_sandbox: sub?.is_sandbox ?? null,
+      plus_billing_issue_at: sub?.billing_issues_detected_at ?? null,
+      plus_grace_until: ent.grace_period_expires_date ?? null,
     }
   }
 
@@ -130,6 +143,8 @@ export function resolveEntitlement(
       plus_will_renew: null,
       plus_store: null,
       plus_is_sandbox: null,
+      plus_billing_issue_at: null,
+      plus_grace_until: null,
     }
   }
 
@@ -144,6 +159,8 @@ export function resolveEntitlement(
     plus_will_renew: false,
     plus_store: last?.sub?.store ?? null,
     plus_is_sandbox: last?.sub?.is_sandbox ?? null,
+    plus_billing_issue_at: last?.sub?.billing_issues_detected_at ?? null,
+    plus_grace_until: ent?.grace_period_expires_date ?? null,
   }
 }
 

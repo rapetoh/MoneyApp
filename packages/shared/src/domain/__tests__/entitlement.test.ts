@@ -3,7 +3,7 @@
  *
  * `supabase/functions/_shared/entitlement.ts` is pure TypeScript with no
  * Deno imports precisely so it can be exercised here (same pattern as
- * recurrence.vendored.test.ts). These cases are the contract every
+ * sharedDenoBundle.test.ts). These cases are the contract every
  * RevenueCat webhook event and every post-purchase sync is judged by.
  */
 import { describe, expect, it } from 'vitest'
@@ -36,6 +36,8 @@ describe('resolveEntitlement', () => {
       plus_will_renew: null,
       plus_store: null,
       plus_is_sandbox: null,
+      plus_billing_issue_at: null,
+      plus_grace_until: null,
     })
   })
 
@@ -64,6 +66,8 @@ describe('resolveEntitlement', () => {
       plus_will_renew: true,
       plus_store: 'app_store',
       plus_is_sandbox: true,
+      plus_billing_issue_at: null,
+      plus_grace_until: null,
     })
   })
 
@@ -259,5 +263,57 @@ describe('describePlus / planFromProductId', () => {
       plus_synced_at: '2026-08-16T20:00:00Z',
     })
     expect(d.kind === 'active' && d.storeBacked).toBe(true)
+  })
+})
+
+/**
+ * Sep 19 2026, notification 360 review. `plus_will_renew: false` folds a
+ * failed card and a deliberate cancellation into one flag, and the two
+ * need opposite messages. RevenueCat reports them separately; so do we now.
+ */
+describe('billing issue is distinguishable from cancellation', () => {
+  it('surfaces billing_issues_detected_at and the grace deadline', () => {
+    const r = resolveEntitlement(
+      subscriber(
+        { plus: { product_identifier: PLUS_PRODUCTS.monthly, expires_date: PAST, grace_period_expires_date: FUTURE } },
+        {
+          [PLUS_PRODUCTS.monthly]: {
+            expires_date: PAST,
+            grace_period_expires_date: FUTURE,
+            billing_issues_detected_at: '2026-08-15T10:00:00Z',
+            period_type: 'normal',
+            store: 'app_store',
+            is_sandbox: false,
+          },
+        } as RcSubscriber['subscriptions'],
+      ),
+      NOW,
+    )
+    // Grace keeps the entitlement alive, which is what makes warning useful.
+    expect(r.plus_status).toBe('active')
+    expect(r.plus_billing_issue_at).toBe('2026-08-15T10:00:00Z')
+    expect(r.plus_grace_until).toBe(FUTURE)
+    expect(r.plus_will_renew).toBe(false)
+  })
+
+  it('leaves the billing signal null when the user simply cancelled', () => {
+    const r = resolveEntitlement(
+      subscriber(
+        { plus: { product_identifier: PLUS_PRODUCTS.monthly, expires_date: FUTURE } },
+        {
+          [PLUS_PRODUCTS.monthly]: {
+            expires_date: FUTURE,
+            unsubscribe_detected_at: '2026-08-14T10:00:00Z',
+            period_type: 'normal',
+            store: 'app_store',
+            is_sandbox: false,
+          },
+        } as RcSubscriber['subscriptions'],
+      ),
+      NOW,
+    )
+    expect(r.plus_will_renew).toBe(false)
+    // The whole point: nothing here may say "your payment failed".
+    expect(r.plus_billing_issue_at).toBeNull()
   })
 })
