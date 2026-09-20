@@ -192,24 +192,67 @@ rule/timezone/anchor/now combinations and agreed on every one.
 **When you change `packages/shared`, run `npm run build:shared-deno`.**
 The test fails if you forget.
 
+Two things keep the bundle small, because it is parsed on every cold start
+of the isolate:
+
+- It is built from `packages/shared/src/edge.ts`, not `index.ts`. That file
+  is the explicit list of what the server may depend on. To let a function
+  use something new, export it there first.
+- The i18n table is trimmed to the prefixes the server actually renders
+  (`notif.`, `ask.`), which took the bundle from 223 kB to 82 kB. Prefixes
+  rather than an exact key list, because the engine builds some keys at
+  runtime. The generator fails the build if a literal `t()` key in the
+  bundled code falls outside them, so trimming can never silently ship a
+  notification body reading `notif.bill_tomorrow_body`.
+
+Minification was tried and reverted: it returned 15%, because the bundle is
+mostly string data.
+
 ---
 
-## 9. Deploy order
+## 9. Deploy state
 
-Strictly this order. Each step assumes the previous one.
+| # | Step | Status (Sep 20 2026) |
+|---|---|---|
+| 1 | Migration 036: tables + billing columns | **done, in production** |
+| 2 | Vault secret `notify_sweep_key` | **done, in production** |
+| 3 | Regenerate DB types | blocked, see below |
+| 4 | `supabase functions deploy notify-sweep` | blocked, see below |
+| 5 | Migration 037: the hourly schedule | held deliberately |
+| 6 | New EAS build | after 4 |
 
-1. `node scripts/apply-sql.mjs supabase/migrations/036_notifications.sql`
-2. Regenerate DB types: `packages/shared/scripts/gen-db-types.sh`, then
-   drop the hand-update note for 036/037 from the file header.
-3. `supabase functions deploy notify-sweep`
-4. Provision the cron credential, once:
-   `select vault.create_secret('<service key>', 'notify_sweep_key');`
-5. `node scripts/apply-sql.mjs supabase/migrations/037_notify_sweep_cron.sql`
-6. New EAS build. The push entitlement is compiled into the binary, so no
-   existing TestFlight build can receive anything.
+Steps 1 and 2 were safe to run early and are verified live: the three
+tables exist, `profiles` carries `plus_billing_issue_at` and
+`plus_grace_until`, and the Vault secret is present. Nothing sends,
+because no device has registered a token and the cron job does not exist.
 
-Steps 1 to 5 are safe before the build ships: with no `push_tokens` rows,
-every sweep finds nobody and returns `{considered: 0}`.
+**Step 5 is held on purpose.** Scheduling an hourly call to a function
+that has not been deployed just writes a failure into `cron.job_run_details`
+every hour. Apply 037 immediately after step 4, not before.
+
+**Steps 3 and 4 are blocked on a Supabase access token.** Every token on
+this machine returns `Unauthorized`: the one in the root `.env`, the one
+in `.claude/settings.local.json`, and the one the CLI stored in the macOS
+keychain. Both actions go through the Management API, which is the only
+thing that token authenticates. Note this is NOT the database password
+(which works, which is how 036 was applied) and NOT the service-role key
+(which also works). It is the personal access token from
+https://supabase.com/dashboard/account/tokens.
+
+Once a working token exists:
+
+```bash
+# 3. types
+SUPABASE_ACCESS_TOKEN=<token> packages/shared/scripts/gen-db-types.sh
+# 4. the function
+SUPABASE_ACCESS_TOKEN=<token> npx supabase@2 functions deploy notify-sweep --no-verify-jwt
+# 5. the schedule
+node scripts/apply-sql.mjs supabase/migrations/037_notify_sweep_cron.sql
+```
+
+The DB types were hand-written against migration 036 and verified column
+for column against the live schema, so nothing is blocked on step 3; it
+only removes the hand-update note from the generated file's header.
 
 ### Pausing everything, without a deploy
 

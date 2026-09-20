@@ -28,17 +28,53 @@
  */
 import { build } from 'esbuild'
 import { readFile, writeFile, mkdir } from 'node:fs/promises'
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
-const ENTRY = path.join(root, 'packages/shared/src/index.ts')
+const ENTRY = path.join(root, 'packages/shared/src/edge.ts')
 const OUT = path.join(root, 'supabase/functions/_shared/generated/shared.ts')
+
+/**
+ * The i18n keys the Edge surface can ask for, by prefix.
+ *
+ * The full string table is four locales of roughly 750 keys each and is the
+ * overwhelming majority of the bundle's weight, almost all of it screen copy
+ * no server ever renders. The sweep renders exactly two things: the
+ * notification catalogue (`notif.*`) and the Ask insight lines it quotes
+ * verbatim (`ask.*`).
+ *
+ * Prefixes, not an exact key list, because the engine builds some keys at
+ * runtime (`t(\`notif.${kind}_title\`)`), which no static scan can see. The
+ * check below turns a key that escapes these prefixes into a build failure,
+ * so the trimming can never silently start returning raw key names to a
+ * user's lock screen.
+ */
+const I18N_PREFIXES = ['notif.', 'ask.']
+
+/** esbuild plugin: serve the locale JSON trimmed to I18N_PREFIXES. */
+function trimLocales(stats) {
+  return {
+    name: 'trim-locales',
+    setup(b) {
+      b.onLoad({ filter: /src[\\/]i18n[\\/]locales[\\/][a-z]{2}\.json$/ }, (args) => {
+        const full = JSON.parse(readFileSync(args.path, 'utf8'))
+        const kept = {}
+        for (const [k, v] of Object.entries(full)) {
+          if (I18N_PREFIXES.some((prefix) => k.startsWith(prefix))) kept[k] = v
+        }
+        stats.before += Object.keys(full).length
+        stats.after += Object.keys(kept).length
+        return { contents: JSON.stringify(kept), loader: 'json' }
+      })
+    },
+  }
+}
 
 const BANNER = `// GENERATED FILE - DO NOT EDIT.
 //
-// Source:    packages/shared/src/index.ts (the real @voice-expense/shared)
+// Source:    packages/shared/src/edge.ts (the Edge surface of @voice-expense/shared)
 // Generator: scripts/build-shared-deno.mjs
 // Regenerate: npm run build:shared-deno
 //
@@ -47,12 +83,19 @@ const BANNER = `// GENERATED FILE - DO NOT EDIT.
 // file by hand is always wrong: the next regeneration silently discards
 // the edit. Change packages/shared and regenerate.
 //
+// Built from src/edge.ts, not src/index.ts: the apps' entry point exports
+// the whole library, and shipping the unused half to a cold-starting Deno
+// isolate costs every invocation. To let a function use something new,
+// export it from src/edge.ts first.
+//
 // deno-lint-ignore-file
 // @ts-nocheck
 `
 
 async function generate() {
+  const localeStats = { before: 0, after: 0 }
   const result = await build({
+    plugins: [trimLocales(localeStats)],
     entryPoints: [ENTRY],
     bundle: true,
     format: 'esm',
@@ -60,8 +103,11 @@ async function generate() {
     // to run on Deno, where neither is guaranteed.
     platform: 'neutral',
     target: 'es2022',
-    // Readability matters here - this file gets read when a notification
-    // says something wrong and someone needs to see which branch produced it.
+    // Not minified. It was tried (Sep 20 2026) and returned 15%: the bundle
+    // is mostly the i18n string table, which does not compress by renaming.
+    // Paying that little to make the deployed artifact unreadable, and to
+    // break the export assertion in sharedDenoBundle.test.ts, is a bad
+    // trade.
     minify: false,
     write: false,
     loader: { '.json': 'json' },
@@ -72,6 +118,20 @@ async function generate() {
     throw new Error(`expected one output file, got ${result.outputFiles.length}`)
   }
   const code = result.outputFiles[0].text
+
+  // Every literal key the bundled code asks `t()` for must have survived the
+  // trim. A miss here would ship a notification whose body reads
+  // "notif.bill_tomorrow_body".
+  const asked = new Set()
+  for (const m of code.matchAll(/\bt\(\s*"([a-z0-9_]+\.[a-z0-9_]+)"/gi)) asked.add(m[1])
+  const escaped = [...asked].filter((k) => !I18N_PREFIXES.some((p) => k.startsWith(p)))
+  if (escaped.length) {
+    throw new Error(
+      `these i18n keys are used by the Edge surface but fall outside I18N_PREFIXES, so they were trimmed out of the bundle:\n  ` +
+        escaped.join('\n  ') +
+        `\nAdd the prefix to I18N_PREFIXES in scripts/build-shared-deno.mjs.`,
+    )
+  }
 
   // A stray `import`/`require` would fail at deploy time rather than here,
   // where the message can say what to do about it.
