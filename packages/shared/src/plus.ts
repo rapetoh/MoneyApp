@@ -24,10 +24,41 @@
  *  the same way. Structurally typed so we don't force a Profile
  *  import on every consumer. */
 export function isPlusFromProfile(
-  profile: { plus_status?: 'active' | 'lapsed' | 'free' | null } | null | undefined,
+  profile:
+    | { plus_status?: 'active' | 'lapsed' | 'free' | null; trial_ends_at?: string | null }
+    | null
+    | undefined,
+  now: Date = new Date(),
 ): boolean {
-  return profile?.plus_status === 'active'
+  if (profile?.plus_status === 'active') return true
+  return isTrialActive(profile, now)
 }
+
+/**
+ * The reverse trial (migration 038): every new account gets the full Plus
+ * product for seven days without a card, then drops to the free tier.
+ * `trial_ends_at` is server-written; a real subscription always wins.
+ */
+export function isTrialActive(
+  profile: { trial_ends_at?: string | null } | null | undefined,
+  now: Date = new Date(),
+): boolean {
+  const ends = profile?.trial_ends_at ? Date.parse(profile.trial_ends_at) : NaN
+  return Number.isFinite(ends) && ends > now.getTime()
+}
+
+/** Whole days left in the reverse trial, 0 once it has run out. */
+export function trialDaysLeft(
+  profile: { trial_ends_at?: string | null } | null | undefined,
+  now: Date = new Date(),
+): number {
+  const ends = profile?.trial_ends_at ? Date.parse(profile.trial_ends_at) : NaN
+  if (!Number.isFinite(ends)) return 0
+  return Math.max(0, Math.ceil((ends - now.getTime()) / 86_400_000))
+}
+
+/** How many Ask Murmur questions a free account gets each calendar month. */
+export const FREE_ASK_QUESTIONS_PER_MONTH = 3
 
 // ── Payments (Aug 16, 2026 owner decision) ─────────────────────────────────
 //
@@ -99,6 +130,7 @@ export function describePlus(
         plus_expires_at?: string | null
         plus_will_renew?: boolean | null
         plus_synced_at?: string | null
+        trial_ends_at?: string | null
       }
     | null
     | undefined,
@@ -127,6 +159,16 @@ export function describePlus(
       }
     }
     return { kind: 'active', plan, endsAt: profile.plus_expires_at ?? null, willRenew, storeBacked }
+  }
+  // No store subscription: the reverse trial is the other way to hold Plus.
+  if (isTrialActive(profile)) {
+    return {
+      kind: 'trial',
+      plan: null,
+      endsAt: profile.trial_ends_at ?? null,
+      willRenew: false,
+      storeBacked: false,
+    }
   }
   if (profile.plus_status === 'lapsed') {
     return { kind: 'lapsed', plan, endedAt: profile.plus_expires_at ?? null }

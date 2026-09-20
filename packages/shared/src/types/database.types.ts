@@ -13,6 +13,12 @@
 // fx_rate_date} (fix-plan 2.1's FX snapshot columns). Re-run the
 // generator once 025 is applied and drop this note.
 //
+// Also hand-updated (not yet regenerated) for migrations 036 and 037:
+// public.push_tokens, public.notification_prefs, public.notification_log,
+// and profiles.{plus_billing_issue_at,plus_grace_until} (the notification
+// system, Sep 19 2026). Re-run the generator once 036 is applied and drop
+// this note.
+//
 // Also hand-updated (not yet regenerated) for migration 026:
 // transactions.snapshot_currency and profiles.monthly_income_currency
 // (fix-plan 2.7's re-denomination columns). Re-run the generator once
@@ -339,6 +345,123 @@ export type Database = {
         }
         Relationships: []
       }
+      notification_log: {
+        Row: {
+          body: string
+          data: Json
+          dedupe_key: string
+          family: string
+          id: number
+          kind: string
+          opened_at: string | null
+          sent_at: string
+          title: string
+          user_id: string
+        }
+        Insert: {
+          body: string
+          data?: Json
+          dedupe_key: string
+          family: string
+          id?: never
+          kind: string
+          opened_at?: string | null
+          sent_at?: string
+          title: string
+          user_id: string
+        }
+        Update: {
+          body?: string
+          data?: Json
+          dedupe_key?: string
+          family?: string
+          id?: never
+          kind?: string
+          opened_at?: string | null
+          sent_at?: string
+          title?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      notification_prefs: {
+        Row: {
+          bills: boolean
+          budget: boolean
+          habit: boolean
+          insights: boolean
+          max_per_week: number
+          quiet_end: number
+          quiet_start: number
+          receipts: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          bills?: boolean
+          budget?: boolean
+          habit?: boolean
+          insights?: boolean
+          max_per_week?: number
+          quiet_end?: number
+          quiet_start?: number
+          receipts?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          bills?: boolean
+          budget?: boolean
+          habit?: boolean
+          insights?: boolean
+          max_per_week?: number
+          quiet_end?: number
+          quiet_start?: number
+          receipts?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      push_tokens: {
+        Row: {
+          app_version: string | null
+          created_at: string
+          disabled_at: string | null
+          disabled_reason: string | null
+          id: string
+          last_seen_at: string
+          locale: string | null
+          platform: string
+          token: string
+          user_id: string
+        }
+        Insert: {
+          app_version?: string | null
+          created_at?: string
+          disabled_at?: string | null
+          disabled_reason?: string | null
+          id?: string
+          last_seen_at?: string
+          locale?: string | null
+          platform: string
+          token: string
+          user_id: string
+        }
+        Update: {
+          app_version?: string | null
+          created_at?: string
+          disabled_at?: string | null
+          disabled_reason?: string | null
+          id?: string
+          last_seen_at?: string
+          locale?: string | null
+          platform?: string
+          token?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       devices: {
         Row: {
           device_name: string | null
@@ -380,10 +503,13 @@ export type Database = {
           monthly_income_source: string | null
           onboarding_completed_at: string | null
           start_checklist_dismissed_at: string | null
+          trial_ends_at: string | null
           plus_status: string | null
           plus_product_id: string | null
           plus_period_type: string | null
+          plus_billing_issue_at: string | null
           plus_expires_at: string | null
+          plus_grace_until: string | null
           plus_will_renew: boolean | null
           plus_store: string | null
           plus_is_sandbox: boolean | null
@@ -405,10 +531,13 @@ export type Database = {
           monthly_income_source?: string | null
           onboarding_completed_at?: string | null
           start_checklist_dismissed_at?: string | null
+          trial_ends_at?: string | null
           plus_status?: string | null
           plus_product_id?: string | null
           plus_period_type?: string | null
+          plus_billing_issue_at?: string | null
           plus_expires_at?: string | null
+          plus_grace_until?: string | null
           plus_will_renew?: boolean | null
           plus_store?: string | null
           plus_is_sandbox?: boolean | null
@@ -430,10 +559,13 @@ export type Database = {
           monthly_income_source?: string | null
           onboarding_completed_at?: string | null
           start_checklist_dismissed_at?: string | null
+          trial_ends_at?: string | null
           plus_status?: string | null
           plus_product_id?: string | null
           plus_period_type?: string | null
+          plus_billing_issue_at?: string | null
           plus_expires_at?: string | null
+          plus_grace_until?: string | null
           plus_will_renew?: boolean | null
           plus_store?: string | null
           plus_is_sandbox?: boolean | null

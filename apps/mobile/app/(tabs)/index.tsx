@@ -20,6 +20,7 @@ import { Money, MoneyLabel } from '../../src/components/Money'
 import { MiniBars } from '../../src/components/MiniBars'
 import { DayOneFirstLog } from '../../src/components/DayOneFirstLog'
 import { GettingStartedCard, type StartItem } from '../../src/components/GettingStartedCard'
+import { TrialBanner } from '../../src/components/TrialBanner'
 import { IncomeEditorModal } from '../../src/components/IncomeEditorModal'
 import { BudgetEditorModal } from '../../src/components/BudgetEditorModal'
 import { useFirstRun } from '../../src/hooks/useFirstRun'
@@ -399,6 +400,9 @@ export default function TodayScreen() {
             onAccept={acceptPattern}
           />
         )}
+
+        {/* The reverse trial's two moments: ending soon, and just ended. */}
+        <TrialBanner profile={profile} locale={locale} />
 
         {firstRun.checklistVisible && (
           <GettingStartedCard

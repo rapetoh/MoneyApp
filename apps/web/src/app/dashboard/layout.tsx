@@ -6,6 +6,7 @@ import { colors } from '../../lib/theme'
 import { PlusProvider } from '../../lib/plus'
 import { resolvePlusStatus } from '../../lib/plus.server'
 import { TimezoneSync } from '../../components/TimezoneSync'
+import { DesktopPlusGate } from '../../components/DesktopPlusGate'
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient()
@@ -85,7 +86,11 @@ export default async function DashboardLayout({ children }: { children: React.Re
             minWidth: 0,
           }}
         >
-          {children}
+          {/* The desktop app is a Plus feature (pricing model, Sep 20
+              2026); Settings stays open so any account can be managed and
+              deleted from here. New accounts hold Plus for 7 days, so this
+              gate only appears once a trial has ended. */}
+          <DesktopPlusGate isPlus={isPlus}>{children}</DesktopPlusGate>
         </main>
       </div>
     </PlusProvider>

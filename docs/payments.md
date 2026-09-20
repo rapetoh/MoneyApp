@@ -19,6 +19,19 @@ safe.
 | Prices in code | **Never.** Paywall reads plans, prices and trial length from the store offering | Change trial/price in App Store Connect + RevenueCat, every installed app follows — no App Store review cycle |
 | Roadmap after launch | Free taste of Ask Murmur (e.g. 3 questions/month) for free users; then experiments: 7 vs 14 days → yearly-only trial → price | Ask is the hero; a taste converts better than a wall. Experiments only at ≥ ~200 trial starts — below that it is noise |
 
+## Pricing model, Sep 20 2026 (supersedes the trial row above)
+
+One page, with the numbers behind it: [murmur-pricing-model.html](./murmur-pricing-model.html).
+
+| Question | Decision | Why |
+|---|---|---|
+| Model | **Reverse trial.** Every new account holds full Plus for 7 days, no card (migration 038, `profiles.trial_ends_at`), then drops to Free | Hard paywalls convert 5x better than freemium (10.7% vs 2.1% D35, RevenueCat 2026) but kill the reach we need with no ad budget; reverse trials lift conversion 10 to 40% over freemium because the decision comes after living with the product. MonAi, the category leader, has no free tier at all and charges from day 8 |
+| Free tier | Unlimited capture (voice, typed, scan, Apple Pay), budgets, reminders, history list, **this month's** insights, 3 Ask questions a month, full data export | Capture is the habit and the word of mouth, and it costs fractions of a cent per expense. Ask is the one genuinely expensive call we make, so it is the one thing metered |
+| Plus | Ask unlimited, desktop/web app, auto-recurring detection, full history + forecast, formatted CSV/PDF reports, Family Sharing | "Writing it down is free, understanding it is paid" |
+| Price | **$4.99 / month, $29.99 / year** (50% off), Family Sharing on, lower tiers in low-income markets | Market medians: $7.99 to $9.99 monthly, $34.80 annual. We stay under both; the yearly anchor matches MonAi exactly |
+| Conversion trigger | Trial end, the 3-question cap, and the recurring-subscriptions headline ("we found 6 costing you X") | Their own numbers, at the moment they care. Never "unlock premium features" |
+| Enforcement | Server-side: entitlement in `packages/shared/src/plus.ts` (`isPlusFromProfile` = active subscription OR unexpired trial); Ask quota counted in the turn route from `ask_messages`; desktop gated in the dashboard layout | A client flag is not a business model |
+
 ## Architecture
 
 ```

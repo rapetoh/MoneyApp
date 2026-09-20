@@ -15,6 +15,8 @@ import { useInsightsUnlock } from '../../src/hooks/useInsightsUnlock'
 import { syncManager } from '../../src/services/sync/SyncManager'
 import { Money } from '../../src/components/Money'
 import { HistoryHeatmap } from '../../src/components/HistoryHeatmap'
+import { PlusLock } from '../../src/components/PlusLock'
+import { usePlusStatus } from '../../src/hooks/usePlusStatus'
 import { BottomSheet } from '../../src/components/BottomSheet'
 import { AskInsightCard, performAskAction } from '../../src/components/AskInsightCard'
 import { buildAskData } from '../../src/services/askMurmurClient'
@@ -230,6 +232,10 @@ export default function InsightsScreen() {
 
   const [selectedMonthKey, setSelectedMonthKey] = useState<string>(currentMonthKey)
   const [monthPickerOpen, setMonthPickerOpen] = useState(false)
+  // Free tier (pricing model, Sep 20 2026): this month is free, the year
+  // and the forecast are what Plus adds. Everything stays visible as a
+  // preview; nothing is hidden behind a blank screen.
+  const { isPlus } = usePlusStatus()
 
   const isCurrentMonth = selectedMonthKey === currentMonthKey
   const { y: selY, m: selM } = splitMonthKey(selectedMonthKey)
@@ -630,7 +636,18 @@ export default function InsightsScreen() {
             `forecastMonthly` reports enough history to be confident
             (fix-plan 2.11 — this used to render from a single day-old
             account with no gate at all). */}
-        {showForecast && (
+        {showForecast && !isPlus && (
+          <View style={styles.forecastWrap}>
+            <PlusLock
+              icon="trending-up"
+              title={t('insights.locked_forecast_title', locale)}
+              body={t('insights.locked_forecast_body', locale)}
+              locale={locale}
+              origin="insights_forecast"
+            />
+          </View>
+        )}
+        {showForecast && isPlus && (
           <View style={styles.forecastWrap}>
             <View style={styles.forecastCard}>
               <View style={styles.forecastEyebrowRow}>
@@ -667,7 +684,17 @@ export default function InsightsScreen() {
             drills into /more/transactions scoped to that month. */}
         <View style={styles.historyWrap}>
           <Text style={styles.historySectionLabel}>{t('insights.history', locale)}</Text>
-          <HistoryHeatmap transactions={transactions} locale={locale} currencyCode={currency} tz={tz} />
+          {isPlus ? (
+            <HistoryHeatmap transactions={transactions} locale={locale} currencyCode={currency} tz={tz} />
+          ) : (
+            <PlusLock
+              icon="calendar-outline"
+              title={t('insights.locked_history_title', locale)}
+              body={t('insights.locked_history_body', locale)}
+              locale={locale}
+              origin="insights_history"
+            />
+          )}
         </View>
       </ScrollView>
 
@@ -685,19 +712,29 @@ export default function InsightsScreen() {
         contentContainerStyle={styles.monthSheetContent}
         testID="insights-month-sheet"
       >
-        {monthOptions.map((key) => {
+        {monthOptions.map((key, i) => {
           const active = key === selectedMonthKey
           const { y, m } = splitMonthKey(key)
+          // Free accounts keep the current month (the first option); the
+          // rest open the paywall rather than silently doing nothing.
+          const locked = !isPlus && i > 0
           return (
             <Pressable
               key={key}
-              style={[styles.monthOption, active && styles.monthOptionActive]}
+              style={[styles.monthOption, active && styles.monthOptionActive, locked && styles.monthOptionLocked]}
               onPress={() => {
-                setSelectedMonthKey(key)
                 setMonthPickerOpen(false)
+                if (locked) {
+                  router.push({ pathname: '/more/paywall', params: { origin: 'insights_month' } })
+                  return
+                }
+                setSelectedMonthKey(key)
               }}
             >
-              <Text style={[styles.monthOptionText, active && styles.monthOptionTextActive]}>
+              {locked && (
+                <Ionicons name="lock-closed" size={13} color={Colors.ink4} style={{ marginRight: 8 }} />
+              )}
+              <Text style={[styles.monthOptionText, active && styles.monthOptionTextActive, locked && styles.monthOptionTextLocked]}>
                 {monthLabel(y, m, tz, locale, { month: 'long', year: 'numeric' })}
               </Text>
               {active && (
@@ -999,6 +1036,8 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     gap: 8,
   },
+  monthOptionLocked: { opacity: 0.85 },
+  monthOptionTextLocked: { color: Colors.ink3 },
   monthOption: {
     flexDirection: 'row',
     alignItems: 'center',

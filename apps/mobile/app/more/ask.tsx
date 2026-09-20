@@ -40,6 +40,7 @@ import {
   type AskConversationRow,
   type AskMessageRow,
   type Locale,
+  FREE_ASK_QUESTIONS_PER_MONTH,
 } from '@voice-expense/shared'
 import type { AskAction, AskInsight, AskReply } from '@voice-expense/shared'
 import { AskTurnError, buildAskData, buildAskTurnRequest, postAskTurn } from '../../src/services/askMurmurClient'
@@ -172,14 +173,14 @@ export default function AskMurmurScreen() {
   }, [user?.id])
 
   const anyPending = messages.some((m) => m.role === 'pending')
+  // Free accounts get FREE_ASK_QUESTIONS_PER_MONTH questions a month
+  // (pricing model, Sep 20 2026). The server owns the count; this is only
+  // what it told us after the last answer.
+  const [freeAsksLeft, setFreeAsksLeft] = useState<number | null>(null)
 
   async function send(text: string, seed: AskInsight | null = null) {
     const trimmed = text.trim()
     if (!trimmed || anyPending) return
-    if (!isPlus) {
-      router.push('/more/paywall')
-      return
-    }
     setDraft('')
     const userMsgId = nextId('u')
     const pendingId = nextId('p')
@@ -201,6 +202,7 @@ export default function AskMurmurScreen() {
         data: dataRef.current,
       })
       const res = await postAskTurn({ apiBaseUrl, authToken, request })
+      if (typeof res.free_asks_left === 'number') setFreeAsksLeft(res.free_asks_left)
       if (res.conversation_id) setConversationId(res.conversation_id)
       setMessages((prev) =>
         prev.map((m) => {
@@ -384,6 +386,28 @@ export default function AskMurmurScreen() {
               })
             )}
           </ScrollView>
+
+          {/* Free accounts see what they have left, and the way to more
+              (pricing model, Sep 20 2026). Plus and trial users see nothing. */}
+          {!isPlus && (
+            <Pressable
+              onPress={() => router.push('/more/paywall')}
+              style={({ pressed }) => [styles.quotaRow, pressed && { opacity: 0.6 }]}
+              accessibilityRole="button"
+            >
+              <Ionicons name="sparkles" size={13} color={Colors.accent} />
+              <Text style={styles.quotaText}>
+                {freeAsksLeft === null
+                  ? t('ask.free_quota', locale).replace('{count}', String(FREE_ASK_QUESTIONS_PER_MONTH))
+                  : freeAsksLeft <= 0
+                    ? t('ask.free_quota_none', locale)
+                    : freeAsksLeft === 1
+                      ? t('ask.free_quota_one', locale)
+                      : t('ask.free_quota', locale).replace('{count}', String(freeAsksLeft))}
+              </Text>
+              <Text style={styles.quotaCta}>{t('ask.get_plus', locale)}</Text>
+            </Pressable>
+          )}
 
           {/* Composer — the one input for the whole conversation. */}
           <View style={styles.inputWrap}>
@@ -638,6 +662,15 @@ function formatWhen(iso: string, locale: string): string {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
+  quotaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 20,
+    paddingBottom: 6,
+  },
+  quotaText: { flex: 1, fontSize: 12.5, color: Colors.ink3, fontFamily: Typography.fontFamily.sans },
+  quotaCta: { fontSize: 12.5, color: Colors.accent, fontFamily: Typography.fontFamily.sansSemiBold, fontWeight: '700' },
   safe: { flex: 1, backgroundColor: Colors.background },
   headerRow: {
     paddingHorizontal: Spacing.lg,

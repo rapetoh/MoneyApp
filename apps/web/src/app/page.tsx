@@ -658,26 +658,27 @@ export default async function RootPage() {
         <div className="lp-plus-head">
           <div className="lp-kicker">Murmur Plus</div>
           <h2 className="lp-h2">The whole picture, one subscription.</h2>
-          <p className="lp-p" style={{ maxWidth: 520, margin: '10px auto 0' }}>
-            Ask Murmur, automatic recurring detection, full export and the desktop &amp; web
-            dashboard. Subscribe on your iPhone; your account unlocks everywhere.
+          <p className="lp-p" style={{ maxWidth: 560, margin: '10px auto 0' }}>
+            Every new account starts with a week of Plus, no card: Ask Murmur, automatic recurring
+            detection, the reports and this dashboard. After that, logging stays free forever and
+            Plus is there when you want the whole picture.
           </p>
         </div>
         <div className="lp-prices">
           <div className="lp-price">
             <div className="lp-price-name">Monthly</div>
             <div className="lp-price-amt">
-              $3.99<span> / month</span>
+              $4.99<span> / month</span>
             </div>
-            <div className="lp-price-trial">7 days free</div>
+            <div className="lp-price-trial">Week of Plus included</div>
           </div>
           <div className="lp-price lp-price-hero">
-            <div className="lp-price-flag">Best value · Save 37%</div>
+            <div className="lp-price-flag">Best value · Save 50%</div>
             <div className="lp-price-name">Yearly</div>
             <div className="lp-price-amt">
               $29.99<span> / year</span>
             </div>
-            <div className="lp-price-trial">7 days free · $2.49 a month</div>
+            <div className="lp-price-trial">Week of Plus included · $2.50 a month</div>
           </div>
         </div>
         <p className="lp-fineprint">

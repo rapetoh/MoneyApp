@@ -22,6 +22,7 @@ import {
   appendUserMessage,
   createConversation,
   isPlusFromProfile,
+  FREE_ASK_QUESTIONS_PER_MONTH,
   replyFromStored,
   type AskConversationRow,
   type AskMessageRow,
@@ -112,18 +113,49 @@ export async function POST(req: NextRequest) {
     auth: { persistSession: false, autoRefreshToken: false },
   })
 
-  // Plus gate — server-side, one source of truth (profiles.plus_status).
+  // Entitlement gate — server-side, one source of truth: an active
+  // subscription, or the reverse trial (profiles.trial_ends_at).
   const { data: profile, error: profileErr } = await supabase
     .from('profiles')
-    .select('plus_status')
+    .select('plus_status, trial_ends_at')
     .eq('id', userId)
     .maybeSingle()
   if (profileErr) {
     console.error(`[ask-turn] profile read failed: ${profileErr.message}`)
     return Response.json({ error: 'profile unavailable' }, { status: 503 })
   }
-  if (!isPlusFromProfile(profile as { plus_status?: 'active' | 'lapsed' | 'free' | null } | null)) {
-    return Response.json({ error: 'plus_required' }, { status: 402 })
+  const entitled = isPlusFromProfile(
+    profile as { plus_status?: 'active' | 'lapsed' | 'free' | null; trial_ends_at?: string | null } | null,
+  )
+
+  // Free accounts get a taste rather than a wall (pricing model, Sep 20
+  // 2026): FREE_ASK_QUESTIONS_PER_MONTH questions per calendar month,
+  // counted here from their own messages so no client can inflate it.
+  // Ask is the one genuinely expensive feature we run, so the cap is both
+  // the product decision and the cost ceiling.
+  let freeAsksLeft: number | null = null
+  if (!entitled) {
+    const monthStart = new Date()
+    monthStart.setUTCDate(1)
+    monthStart.setUTCHours(0, 0, 0, 0)
+    const { count, error: countErr } = await supabase
+      .from('ask_messages')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('role', 'user')
+      .gte('created_at', monthStart.toISOString())
+    if (countErr) {
+      console.error(`[ask-turn] quota read failed: ${countErr.message}`)
+      return Response.json({ error: 'profile unavailable' }, { status: 503 })
+    }
+    const used = count ?? 0
+    if (used >= FREE_ASK_QUESTIONS_PER_MONTH) {
+      return Response.json(
+        { error: 'plus_required', reason: 'free_quota_spent', free_asks_left: 0 },
+        { status: 402 },
+      )
+    }
+    freeAsksLeft = FREE_ASK_QUESTIONS_PER_MONTH - used - 1
   }
 
   // Data payload (same trust boundary as before: normalized, capped).
@@ -308,6 +340,7 @@ export async function POST(req: NextRequest) {
     conversation_id: convId ?? '',
     user_message_id: userMessageId,
     message: { id: assistantMessageId, reply: finalReply, created_at: createdAt },
+    free_asks_left: freeAsksLeft,
   }
   return Response.json(res)
 }

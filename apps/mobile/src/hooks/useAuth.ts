@@ -7,6 +7,7 @@ import { syncManager } from '../services/sync/SyncManager'
 import { wipeLocalDatabase } from '../services/sync/localDb'
 import { setCurrentProfileCurrency } from '../services/profileCurrency'
 import { cancelAllReminders, REMINDER_SECURE_KEYS } from '../services/reminders'
+import { unregisterPushToken } from '../services/pushTokens'
 import { clearParseCache } from '@voice-expense/ai'
 import { cacheClear } from '../services/queryCache'
 
@@ -23,6 +24,7 @@ const PER_USER_SECURE_KEYS = [
   'start_checklist_collapsed', // src/hooks/useFirstRun.ts
   'onboarding_followup', // app/(onboarding)/habit.tsx
   'analytics_install_id', // src/services/analytics.ts
+  'trial_ended_seen', // src/components/TrialBanner.tsx
   ...REMINDER_SECURE_KEYS, // src/services/reminders.ts
 ]
 
@@ -35,7 +37,8 @@ const PER_USER_SECURE_KEYS = [
  * when `signOut`'s own network call goes on to succeed. Afterwards
  * nothing the signed-out account left on the device is readable: SQLite
  * rows, queued sync operations, the in-memory profile-currency cache,
- * the pending day-2 notification, and the per-user SecureStore keys.
+ * the pending local reminders, this device's remote-push registration,
+ * and the per-user SecureStore keys.
  */
 export async function resetLocalState(): Promise<void> {
   // Stop first: bumps the drain epoch so an in-flight queue drain halts
@@ -56,6 +59,11 @@ export async function resetLocalState(): Promise<void> {
   // Reminders were scheduled for the old account; cancelling also drops
   // their persisted notification ids.
   await cancelAllReminders()
+  // Remote push is the other half: local reminders live on the phone, but
+  // the server will keep sending to this device's token until the row
+  // says otherwise. Without this, the next person to sign in on this
+  // phone receives the previous account's bill and budget notifications.
+  await unregisterPushToken()
   await Promise.all(PER_USER_SECURE_KEYS.map((key) => SecureStore.deleteItemAsync(key)))
   // _layout.tsx starts the SyncManager exactly once on mount, so the
   // teardown must hand back a running instance for the next sign-in.

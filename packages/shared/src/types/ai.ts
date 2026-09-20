@@ -418,6 +418,9 @@ export interface AskTurnRequest {
 }
 
 export interface AskTurnResponse {
+  /** Free accounts only: questions left this calendar month after this one
+   *  (pricing model, Sep 20 2026). `null`/absent for Plus and trial users. */
+  free_asks_left?: number | null
   conversation_id: string
   user_message_id: string | null
   message: { id: string | null; reply: AskReply; created_at: string }
