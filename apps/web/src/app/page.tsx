@@ -5,11 +5,69 @@ import { MurmurMark } from '../components/MurmurMark'
 import { colors, font } from '../lib/theme'
 import { SUPPORT_EMAIL } from '@voice-expense/shared'
 
+const SITE = 'https://itsmurmur.com'
+
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE),
   title: 'Murmur, the voice-first expense tracker',
   description:
-    'Say what you spent and Murmur files it. Apple Pay purchases capture themselves. AI answers grounded in your own numbers. No bank linking, ever.',
+    'Say what you spent and Murmur files it. Apple Pay purchases capture themselves. Free forever, with two weeks of Plus to start. No bank linking, ever.',
+  alternates: { canonical: '/' },
+  openGraph: {
+    type: 'website',
+    url: SITE,
+    siteName: 'Murmur',
+    title: 'Murmur, the voice-first expense tracker',
+    description:
+      'Say it once and it is filed. Apple Pay captures itself. Free forever, two weeks of Plus to start, no bank linking.',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Murmur, the voice-first expense tracker',
+    description: 'Say it once and it is filed. Free forever, no bank linking.',
+  },
 }
+
+/**
+ * What a visitor asks before downloading, answered on the page rather than
+ * in a support thread. Also emitted as FAQPage structured data: Google and
+ * the AI answer engines quote structured facts far more reliably than
+ * prose, and this is the cheapest organic reach a one-person app can buy.
+ */
+const FAQ: { q: string; a: string }[] = [
+  {
+    q: 'Is Murmur free?',
+    a: 'Yes. Logging expenses by voice, by hand or from a receipt is free forever, with no limit and no ads. Every new account also starts with 14 days of Murmur Plus, with no card, and keeps the free app afterwards.',
+  },
+  {
+    q: 'What does Murmur Plus add?',
+    a: 'Ask Murmur, the assistant that answers questions about your own numbers; the desktop and web app; automatic detection of recurring bills and subscriptions; your full history with trends and a forecast; and CSV or PDF reports. It is $4.99 a month or $29.99 a year, and it can be shared with up to five family members.',
+  },
+  {
+    q: 'Do I have to connect my bank?',
+    a: 'No, and you cannot. Murmur has no bank integration at all. Everything in it is something you said, typed, scanned or captured from Apple Pay on your own phone.',
+  },
+  {
+    q: 'Does it work in my language and currency?',
+    a: 'Murmur speaks English, French, Spanish and Portuguese, and picks your language, currency and speech recognition from your phone when you first sign in. Amounts are shown in your own currency, including CFA francs, naira and cedi.',
+  },
+  {
+    q: 'How does Apple Pay capture work?',
+    a: 'You set up one Shortcuts automation, which Murmur walks you through. After that, every purchase you make with your iPhone wallet logs itself with the amount, the merchant and a category, and a quiet notification lets you correct it in one tap.',
+  },
+  {
+    q: 'What happens to my voice?',
+    a: 'Your speech is turned into text on your phone whenever the device supports it, and the audio is never stored, by us or anyone else. Only the resulting text is used to file the expense.',
+  },
+  {
+    q: 'Can I get my data out, or delete everything?',
+    a: 'Any time, yourself, from Settings. Export gives you a complete file of your own data, and deleting your account removes everything from our servers for good. No email to support required.',
+  },
+  {
+    q: 'Does it work offline?',
+    a: 'Yes. Expenses are saved on the phone first and sync when you are back online, so a tunnel or a bad signal never costs you an entry.',
+  },
+]
 
 /**
  * Public landing page at itsmurmur.com. Rebuilt Aug 28, 2026 after the
@@ -166,11 +224,11 @@ export default async function RootPage() {
                 </svg>
                 Download on the App Store
               </a>
-              <a href={MAC_DMG_ARM} className="lp-btn-secondary">
+              <a href={MAC_DMG_ARM} className="lp-btn-secondary" title="The desktop app is part of Murmur Plus">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden>
                   <path d="M12 3v12m0 0 5-5m-5 5-5-5M4 21h16" stroke="#1B1915" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
-                Download for Mac
+                Mac app · Plus
               </a>
               <Link href={appHref} className="lp-badge-soon">
                 Web dashboard →
@@ -178,6 +236,14 @@ export default async function RootPage() {
             </div>
             <div className="lp-hero-dlnote lp-rise" style={{ animationDelay: '.32s' }}>
               iPhone · Mac (Apple Silicon, signed &amp; notarized) · <a href={MAC_DMG_INTEL}>Intel Mac</a> · <a href={WIN_EXE}>Windows</a>
+            </div>
+            {/* The offer, in the place a visitor decides: free tier first,
+                then the trial. Research on app landing pages is consistent
+                that the proof and the terms have to sit above the fold,
+                where the sceptics are, not below it. */}
+            <div className="lp-offer lp-rise" style={{ animationDelay: '.34s' }}>
+              <strong>Free forever.</strong> Unlimited logging, budgets, this month&rsquo;s
+              insights. Every new account starts with <strong>14 days of Plus</strong>, no card.
             </div>
             <div className="lp-trust lp-rise" style={{ animationDelay: '.36s' }}>
               No bank linking · Speech stays on your phone · Export or erase everything, anytime
@@ -659,10 +725,33 @@ export default async function RootPage() {
           <div className="lp-kicker">Murmur Plus</div>
           <h2 className="lp-h2">The whole picture, one subscription.</h2>
           <p className="lp-p" style={{ maxWidth: 560, margin: '10px auto 0' }}>
-            Every new account starts with a week of Plus, no card: Ask Murmur, automatic recurring
-            detection, the reports and this dashboard. After that, logging stays free forever and
-            Plus is there when you want the whole picture.
+            Writing it down is free, forever. Understanding it is what Plus adds. Every new account
+            starts with two weeks of Plus, no card and nothing to cancel.
           </p>
+        </div>
+        <div className="lp-tiers">
+          <div className="lp-tier">
+            <div className="lp-tier-name">Murmur Free</div>
+            <ul className="lp-tier-list">
+              <li>Unlimited voice, typed and receipt logging</li>
+              <li>Apple Pay purchases captured for you</li>
+              <li>Budgets, reminders, full history and search</li>
+              <li>This month&rsquo;s insights, by category</li>
+              <li>3 Ask Murmur questions a month</li>
+              <li>Export everything, delete everything</li>
+            </ul>
+          </div>
+          <div className="lp-tier lp-tier-plus">
+            <div className="lp-tier-name">Murmur Plus</div>
+            <ul className="lp-tier-list">
+              <li>Ask Murmur, unlimited</li>
+              <li>The desktop and web app</li>
+              <li>Subscriptions and bills found automatically</li>
+              <li>Your whole year: trends and forecast</li>
+              <li>CSV and PDF reports</li>
+              <li>Shared with up to 5 family members</li>
+            </ul>
+          </div>
         </div>
         <div className="lp-prices">
           <div className="lp-price">
@@ -670,7 +759,7 @@ export default async function RootPage() {
             <div className="lp-price-amt">
               $4.99<span> / month</span>
             </div>
-            <div className="lp-price-trial">Week of Plus included</div>
+            <div className="lp-price-trial">Two weeks of Plus included</div>
           </div>
           <div className="lp-price lp-price-hero">
             <div className="lp-price-flag">Best value · Save 50%</div>
@@ -678,13 +767,87 @@ export default async function RootPage() {
             <div className="lp-price-amt">
               $29.99<span> / year</span>
             </div>
-            <div className="lp-price-trial">Week of Plus included · $2.50 a month</div>
+            <div className="lp-price-trial">Two weeks of Plus included · $2.50 a month</div>
           </div>
         </div>
         <p className="lp-fineprint">
           Renews automatically until cancelled in your Apple ID settings. Cancel anytime.
         </p>
       </section>
+
+      {/* ── FAQ ─────────────────────────────────────────────────────── */}
+      <section id="faq" className="lp-shell lp-faq">
+        <div className="lp-plus-head">
+          <div className="lp-kicker">Questions</div>
+          <h2 className="lp-h2">Before you download.</h2>
+        </div>
+        <div className="lp-faq-grid">
+          {FAQ.map((item) => (
+            <div key={item.q} className="lp-faq-item">
+              <h3 className="lp-faq-q">{item.q}</h3>
+              <p className="lp-faq-a">{item.a}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ── Closing call to action ──────────────────────────────────── */}
+      <section className="lp-shell lp-close">
+        <h2 className="lp-h2">Say it once. It is filed.</h2>
+        <p className="lp-p" style={{ maxWidth: 460, margin: '10px auto 0' }}>
+          Free forever, and two weeks of Plus to start. No bank linking, no card.
+        </p>
+        <a href={APP_STORE_URL} className="lp-btn-primary lp-close-cta" rel="noreferrer">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="#FBFAF7" aria-hidden>
+            <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z" />
+          </svg>
+          Download on the App Store
+        </a>
+      </section>
+
+      {/* Structured data. Search engines and the AI answer engines quote
+          structured facts far more reliably than prose, and this page is
+          the only place Murmur exists outside the App Store. */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            '@context': 'https://schema.org',
+            '@graph': [
+              {
+                '@type': 'SoftwareApplication',
+                name: 'Murmur',
+                applicationCategory: 'FinanceApplication',
+                operatingSystem: 'iOS, macOS, Windows, Web',
+                description:
+                  'Voice-first expense tracker. Say what you spent and it is filed, with no bank linking. Free forever, with 14 days of Murmur Plus for every new account.',
+                url: SITE,
+                downloadUrl: APP_STORE_URL,
+                inLanguage: ['en', 'fr', 'es', 'pt'],
+                offers: [
+                  { '@type': 'Offer', price: '0', priceCurrency: 'USD', name: 'Murmur Free' },
+                  { '@type': 'Offer', price: '4.99', priceCurrency: 'USD', name: 'Murmur Plus, monthly' },
+                  { '@type': 'Offer', price: '29.99', priceCurrency: 'USD', name: 'Murmur Plus, yearly' },
+                ],
+              },
+              {
+                '@type': 'Organization',
+                name: 'Murmur',
+                url: SITE,
+                email: SUPPORT_EMAIL,
+              },
+              {
+                '@type': 'FAQPage',
+                mainEntity: FAQ.map((item) => ({
+                  '@type': 'Question',
+                  name: item.q,
+                  acceptedAnswer: { '@type': 'Answer', text: item.a },
+                })),
+              },
+            ],
+          }),
+        }}
+      />
 
       {/* ── Footer ──────────────────────────────────────────────────── */}
       <footer className="lp-footer">
@@ -791,6 +954,23 @@ export default async function RootPage() {
         .lp-stat { text-align: center; padding: 10px; }
         .lp-stat-n { font-family: ${lpSerif}; font-size: 44px; letter-spacing: -1px; color: #3F5A3E; }
         .lp-stat-label { font-size: 13px; color: #6C675E; margin-top: 4px; line-height: 1.45; }
+        .lp-offer { margin-top: 18px; font-size: 15px; line-height: 1.55; color: #3A3630; max-width: 460px; }
+        .lp-offer strong { color: #1B1915; font-weight: 700; }
+        .lp-tiers { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 28px auto 0; max-width: 760px; text-align: left; }
+        .lp-tier { background: #FFFFFF; border: 1px solid rgba(40,36,28,0.08); border-radius: 22px; padding: 22px 24px; }
+        .lp-tier-plus { border-color: #3F5A3E; }
+        .lp-tier-name { font-family: ${lpSerif}; font-size: 21px; color: #1B1915; }
+        .lp-tier-list { margin: 12px 0 0; padding-left: 18px; display: grid; gap: 6px; font-size: 14px; color: #3A3630; line-height: 1.5; }
+        .lp-faq { padding-block: 72px 8px; }
+        .lp-faq-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 22px 40px; margin-top: 28px; text-align: left; }
+        .lp-faq-q { font-size: 16px; font-weight: 700; color: #1B1915; margin: 0; }
+        .lp-faq-a { font-size: 14.5px; line-height: 1.6; color: #3A3630; margin: 6px 0 0; }
+        .lp-close { text-align: center; padding-block: 72px 24px; }
+        .lp-close-cta { margin-top: 22px; display: inline-flex; }
+        @media (max-width: 760px) {
+          .lp-tiers { grid-template-columns: 1fr; }
+          .lp-faq-grid { grid-template-columns: 1fr; gap: 20px; }
+        }
 
         .lp-map { display: grid; grid-template-columns: 0.9fr 1.1fr; gap: 40px; align-items: center; padding-top: 88px; }
         .lp-map-stage { background: #FFFFFF; border: 0.5px solid rgba(40,36,28,0.08); border-radius: 28px; padding: 18px; box-shadow: 0 24px 60px rgba(27,25,21,0.07); }
