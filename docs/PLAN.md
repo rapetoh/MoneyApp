@@ -6737,4 +6737,19 @@ lint` — 0 errors repo-wide, including the newly-flipped `local/mobile-
 i18n-restrictions` gate; remaining warnings are pre-existing "unused
 eslint-disable directive" notices on files this pass didn't touch.
 
+## Website redesigned around the download (Sep 20, 2026)
+
+The owner could not find the Windows build on his own Windows machine and
+said the previous pass had inserted text instead of owning the design. The
+landing page now leads to one decision: a platform-aware hero, the offer as
+three checked lines, a "how it works" walk-through, the six shipped App
+Store screenshots, a folding FAQ, a dark "Get Murmur" band with a real card
+per platform (iPhone, Mac arm64/Intel, Windows with its unsigned-installer
+warning, Web), a sticky bar on phones, and an `og:image` so shared links
+stop previewing as bare URLs. Desktop download URLs now derive from one
+`DESKTOP_VERSION` constant, and `apps/web/scripts/build-site-assets.mjs`
+rebuilds the screenshots and the share card. Full record, including what is
+still missing (proof, measurement, languages, more than one page):
+`docs/website-2026-09-20.md`.
+
 *End of Plan*

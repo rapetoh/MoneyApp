@@ -2,10 +2,17 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { createClient } from '../lib/supabase/server'
 import { MurmurMark } from '../components/MurmurMark'
+import { HeroDownloads } from '../components/HeroDownloads'
 import { colors, font } from '../lib/theme'
 import { SUPPORT_EMAIL } from '@voice-expense/shared'
 
 const SITE = 'https://itsmurmur.com'
+
+// Every share of this link used to render as a bare URL. The card is the
+// site's own hero at 1200x630, rebuilt by `npm run assets` (see
+// scripts/build-site-assets.mjs), so the preview and the page cannot drift
+// apart: change the hero, re-run it, and the card follows.
+const OG_ALT = 'Murmur: speak your spending. The Today screen with an Apple Pay purchase capturing itself.'
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE),
@@ -20,11 +27,13 @@ export const metadata: Metadata = {
     title: 'Murmur, the voice-first expense tracker',
     description:
       'Say it once and it is filed. Apple Pay captures itself. Free forever, two weeks of Plus to start, no bank linking.',
+    images: [{ url: '/og.png', width: 1200, height: 630, alt: OG_ALT }],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'Murmur, the voice-first expense tracker',
     description: 'Say it once and it is filed. Free forever, no bank linking.',
+    images: [{ url: '/og.png', alt: OG_ALT }],
   },
 }
 
@@ -94,9 +103,15 @@ const FAQ: { q: string; a: string }[] = [
 // canonical link: Apple resolves it to the localised store page, so it
 // cannot rot if the listing title ever changes.
 const APP_STORE_URL = 'https://apps.apple.com/app/id6799316747'
-const MAC_DMG_ARM = 'https://github.com/rapetoh/murmur-releases/releases/latest/download/Murmur-1.0.0-arm64.dmg'
-const MAC_DMG_INTEL = 'https://github.com/rapetoh/murmur-releases/releases/latest/download/Murmur-1.0.0.dmg'
-const WIN_EXE = 'https://github.com/rapetoh/murmur-releases/releases/latest/download/Murmur-Setup-1.0.0.exe'
+// GitHub's /releases/latest/download/ path takes an exact file name, and
+// electron-builder stamps the version into it, so this constant has to move
+// with every desktop release or all three buttons 404. It is one edit, and
+// the desktop release runbook (docs/payments.md) names it.
+const DESKTOP_VERSION = '1.0.0'
+const REL = 'https://github.com/rapetoh/murmur-releases/releases/latest/download/'
+const MAC_DMG_ARM = `${REL}Murmur-${DESKTOP_VERSION}-arm64.dmg`
+const MAC_DMG_INTEL = `${REL}Murmur-${DESKTOP_VERSION}.dmg`
+const WIN_EXE = `${REL}Murmur-Setup-${DESKTOP_VERSION}.exe`
 
 const lpSerif = 'var(--font-fraunces), "New York", "Iowan Old Style", Georgia, serif'
 
@@ -159,6 +174,20 @@ const MARQUEE = [
   'kroger.com',
 ]
 
+/**
+ * The shipped App Store screenshots, resized for the web. They carry
+ * their own captions, so the page shows them whole rather than
+ * re-describing them underneath.
+ */
+const SHOTS = [
+  { src: '/shots/voice.webp', alt: 'Murmur listening and writing out "Twelve forty at Starbucks for coffee" as it is spoken' },
+  { src: '/shots/confirm.webp', alt: 'The confirmation card: $12.40 at Starbucks, filed under Coffee & tea, with one-tap corrections and an undo' },
+  { src: '/shots/insights.webp', alt: 'Insights: $1,330.00 spent this month, 12% below March, broken down by category' },
+  { src: '/shots/applepay.webp', alt: 'An Apple Pay purchase capturing itself: Starbucks, $6.40, Coffee & tea' },
+  { src: '/shots/recurring.webp', alt: 'Recurring: $291.40 a month of bills and subscriptions, $3,497 a year, each with its next due date' },
+  { src: '/shots/ask.webp', alt: 'Ask Murmur answering "Can I afford a trip to Lisbon?" from the user\'s own spending' },
+]
+
 export default async function RootPage() {
   const supabase = await createClient()
   const {
@@ -175,19 +204,25 @@ export default async function RootPage() {
             <MurmurMark size={30} variant="sage" rounded />
             <span style={{ fontWeight: 700, fontSize: 17, letterSpacing: -0.2 }}>Murmur</span>
           </div>
-          <nav style={{ display: 'flex', alignItems: 'center', gap: 24, fontSize: 14 }}>
+          <nav className="lp-nav-links">
+            <a href="#how" className="lp-navlink">
+              How it works
+            </a>
             <a href="#features" className="lp-navlink">
               Features
             </a>
             <a href="#plus" className="lp-navlink">
-              Plus
+              Pricing
             </a>
-            <Link href="/privacy" className="lp-navlink">
-              Privacy
+            <a href="#faq" className="lp-navlink">
+              FAQ
+            </a>
+            <Link href={appHref} className="lp-navlink lp-navlink-keep">
+              {user ? 'Dashboard' : 'Log in'}
             </Link>
-            <Link href={appHref} className="lp-cta-pill">
-              {user ? 'Open dashboard' : 'Log in'}
-            </Link>
+            <a href="#get" className="lp-cta-pill">
+              Get Murmur
+            </a>
           </nav>
         </div>
       </header>
@@ -217,37 +252,35 @@ export default async function RootPage() {
             {/* iPhone leads now that the app is live: Murmur is a
                 speak-it-and-it-is-filed tool, and the phone is where that
                 happens. Mac keeps a button, just the quieter one. */}
-            <div className="lp-hero-ctas lp-rise" style={{ animationDelay: '.28s' }}>
-              <a href={APP_STORE_URL} className="lp-btn-primary" rel="noreferrer">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="#FBFAF7" aria-hidden>
-                  <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z" />
-                </svg>
-                Download on the App Store
-              </a>
-              <a href={MAC_DMG_ARM} className="lp-btn-secondary" title="The desktop app is part of Murmur Plus">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden>
-                  <path d="M12 3v12m0 0 5-5m-5 5-5-5M4 21h16" stroke="#1B1915" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-                Mac app · Plus
-              </a>
-              <Link href={appHref} className="lp-badge-soon">
-                Web dashboard →
-              </Link>
+            <div className="lp-rise" style={{ animationDelay: '.28s' }}>
+              <HeroDownloads
+                appStoreUrl={APP_STORE_URL}
+                macUrl={MAC_DMG_ARM}
+                winUrl={WIN_EXE}
+                appHref={appHref}
+              />
             </div>
-            <div className="lp-hero-dlnote lp-rise" style={{ animationDelay: '.32s' }}>
-              iPhone · Mac (Apple Silicon, signed &amp; notarized) · <a href={MAC_DMG_INTEL}>Intel Mac</a> · <a href={WIN_EXE}>Windows</a>
-            </div>
-            {/* The offer, in the place a visitor decides: free tier first,
-                then the trial. Research on app landing pages is consistent
-                that the proof and the terms have to sit above the fold,
-                where the sceptics are, not below it. */}
-            <div className="lp-offer lp-rise" style={{ animationDelay: '.34s' }}>
-              <strong>Free forever.</strong> Unlimited logging, budgets, this month&rsquo;s
-              insights. Every new account starts with <strong>14 days of Plus</strong>, no card.
-            </div>
-            <div className="lp-trust lp-rise" style={{ animationDelay: '.36s' }}>
-              No bank linking · Speech stays on your phone · Export or erase everything, anytime
-            </div>
+            {/* The offer as three things a sceptic can check in a glance,
+                not a paragraph they have to parse. Landing-page research
+                is consistent that price, catch and risk belong above the
+                fold, where the doubt is, and that scannable beats prose. */}
+            <ul className="lp-proof lp-rise" style={{ animationDelay: '.34s' }}>
+              {[
+                ['Free forever', 'Unlimited logging, budgets, this month'],
+                ['14 days of Plus', 'On every new account. No card.'],
+                ['No bank linking', 'There is no integration to trust.'],
+              ].map(([head, sub]) => (
+                <li key={head} className="lp-proof-item">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden>
+                    <path d="M4 12.5 9.5 18 20 6.5" stroke="#3F5A3E" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  <div>
+                    <strong>{head}</strong>
+                    <span>{sub}</span>
+                  </div>
+                </li>
+              ))}
+            </ul>
           </div>
 
           {/* Product, in situ: hand-built phone showing Today */}
@@ -282,7 +315,6 @@ export default async function RootPage() {
                 </div>
               </div>
               <div aria-hidden className="lp-branch-node lp-branch-leaf lp-branch-leaf2">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={logo('starbucks.com')}
                   alt=""
@@ -311,7 +343,6 @@ export default async function RootPage() {
                 <div className="lp-rows">
                   {HERO_ROWS.map((r) => (
                     <div key={r.d} className="lp-row">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={logo(r.d)} alt="" width={34} height={34} className="lp-row-logo" />
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div className="lp-row-name">{r.name}</div>
@@ -348,7 +379,6 @@ export default async function RootPage() {
         <div className="lp-marquee">
           <div className="lp-marquee-track">
             {[...MARQUEE, ...MARQUEE, ...MARQUEE, ...MARQUEE].map((d, i) => (
-              // eslint-disable-next-line @next/next/no-img-element
               <img
                 key={d + i}
                 src={logo(d)}
@@ -359,6 +389,69 @@ export default async function RootPage() {
               />
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* ── How it works ───────────────────────────────────────────── */}
+      {/* The page had no explanation of the actual loop, only claims about
+          it. Every app landing page that converts walks the visitor through
+          input, action and result before asking for the download; three
+          steps is the form that pattern takes. */}
+      <section id="how" className="lp-shell lp-how">
+        <div className="lp-sec-head">
+          <div className="lp-kicker">How it works</div>
+          <h2 className="lp-h2">Three seconds, start to filed.</h2>
+        </div>
+        <ol className="lp-steps">
+          {[
+            {
+              n: '1',
+              t: 'Say it',
+              p: '“Twelve forty at Starbucks for coffee.” No form, no category to pick, no screen to find first. Typing and receipt photos work too.',
+            },
+            {
+              n: '2',
+              t: 'Murmur files it',
+              p: 'It hears the amount, the merchant and the category, shows you the card, and saves with an undo. Tap-to-pay purchases skip even this: they file themselves.',
+            },
+            {
+              n: '3',
+              t: 'You see where it goes',
+              p: 'Today, your budgets, the categories behind them and a month-end forecast, current without a spreadsheet and without a bank login.',
+            },
+          ].map((step) => (
+            <li key={step.n} className="lp-step">
+              <span className="lp-step-n">{step.n}</span>
+              <h3 className="lp-step-t">{step.t}</h3>
+              <p className="lp-p">{step.p}</p>
+            </li>
+          ))}
+        </ol>
+      </section>
+
+      {/* ── The app itself ─────────────────────────────────────────── */}
+      {/* Real screens, shipped ones, in the order a new user meets them.
+          Hand-drawn CSS mockups sell the idea; only the actual product
+          sells the product. These are the App Store screenshots, so the
+          site and the listing now say the same thing. */}
+      <section className="lp-shots-wrap" aria-label="Screens from the Murmur app">
+        <div className="lp-shell lp-sec-head">
+          <div className="lp-kicker">The app itself</div>
+          <h2 className="lp-h2">Not a mockup.</h2>
+        </div>
+        <div className="lp-shots" tabIndex={0} role="group" aria-label="App screens, scroll sideways">
+          {SHOTS.map((shot) => (
+            <img
+              key={shot.src}
+              src={shot.src}
+              alt={shot.alt}
+              width={560}
+              height={1211}
+              loading="lazy"
+              decoding="async"
+              className="lp-shot"
+            />
+          ))}
         </div>
       </section>
 
@@ -553,7 +646,6 @@ export default async function RootPage() {
           {/* Photo: Unsplash (Nathan Dumlao), Unsplash License: free commercial
               use, no attribution required. Self-hosted for CSP. */}
           <div className="lp-pay-photo">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/img/apple-pay-tap.jpg"
               alt="A hand paying with Apple Pay on an iPhone at a card terminal"
@@ -721,7 +813,7 @@ export default async function RootPage() {
 
       {/* ── Plus ────────────────────────────────────────────────────── */}
       <section id="plus" className="lp-shell lp-plus">
-        <div className="lp-plus-head">
+        <div className="lp-sec-head">
           <div className="lp-kicker">Murmur Plus</div>
           <h2 className="lp-h2">The whole picture, one subscription.</h2>
           <p className="lp-p" style={{ maxWidth: 560, margin: '10px auto 0' }}>
@@ -776,33 +868,122 @@ export default async function RootPage() {
       </section>
 
       {/* ── FAQ ─────────────────────────────────────────────────────── */}
+      {/* Folded by default, opened one at a time: eight answers as eight
+          paragraphs was a wall nobody reads. `<details>` does this with no
+          JavaScript, keeps the text in the DOM for search engines and the
+          FAQPage data below, and is keyboard accessible for free. */}
       <section id="faq" className="lp-shell lp-faq">
-        <div className="lp-plus-head">
+        <div className="lp-sec-head">
           <div className="lp-kicker">Questions</div>
           <h2 className="lp-h2">Before you download.</h2>
         </div>
-        <div className="lp-faq-grid">
-          {FAQ.map((item) => (
-            <div key={item.q} className="lp-faq-item">
-              <h3 className="lp-faq-q">{item.q}</h3>
+        <div className="lp-faq-list">
+          {FAQ.map((item, i) => (
+            <details key={item.q} className="lp-faq-item" open={i === 0}>
+              <summary className="lp-faq-q">
+                {item.q}
+                <span aria-hidden className="lp-faq-mark">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                    <path d="m5 9 7 7 7-7" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </span>
+              </summary>
               <p className="lp-faq-a">{item.a}</p>
-            </div>
+            </details>
           ))}
         </div>
       </section>
 
-      {/* ── Closing call to action ──────────────────────────────────── */}
-      <section className="lp-shell lp-close">
-        <h2 className="lp-h2">Say it once. It is filed.</h2>
-        <p className="lp-p" style={{ maxWidth: 460, margin: '10px auto 0' }}>
-          Free forever, and two weeks of Plus to start. No bank linking, no card.
-        </p>
-        <a href={APP_STORE_URL} className="lp-btn-primary lp-close-cta" rel="noreferrer">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="#FBFAF7" aria-hidden>
-            <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z" />
-          </svg>
-          Download on the App Store
-        </a>
+      {/* ── Get Murmur ─────────────────────────────────────────────── */}
+      {/* Every platform, as a card, in one place. The previous version hid
+          Mac Intel and Windows in an 11px grey line under the hero, which
+          is the same as not shipping them. */}
+      <section id="get" className="lp-getwrap">
+        <div className="lp-shell">
+          <div className="lp-sec-head lp-sec-head-light">
+            <div className="lp-kicker lp-kicker-light">Get Murmur</div>
+            <h2 className="lp-h2 lp-h2-light">Say it once. It is filed.</h2>
+            <p className="lp-p lp-p-light" style={{ maxWidth: 480, margin: '12px auto 0' }}>
+              Free forever on iPhone. One account, every screen, and two weeks of Plus the
+              moment you sign in. No card, nothing to cancel.
+            </p>
+          </div>
+
+          <div className="lp-get-grid">
+            <div className="lp-get-card lp-get-card-lead">
+              <div className="lp-get-icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="#1B1915" aria-hidden>
+                  <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z" />
+                </svg>
+              </div>
+              <h3 className="lp-get-name">iPhone</h3>
+              <p className="lp-get-sub">
+                The whole app: voice, Apple Pay capture, budgets, receipts. Free forever.
+              </p>
+              <a href={APP_STORE_URL} className="lp-btn-primary lp-get-btn" rel="noreferrer">
+                Download on the App Store
+              </a>
+              <div className="lp-get-note">iPhone, iOS 15.1 or later</div>
+            </div>
+
+            <div className="lp-get-card">
+              <div className="lp-get-icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
+                  <rect x="2.5" y="4" width="19" height="12.5" rx="2" stroke="#1B1915" strokeWidth="1.9" />
+                  <path d="M1 19.5h22" stroke="#1B1915" strokeWidth="1.9" strokeLinecap="round" />
+                </svg>
+              </div>
+              <h3 className="lp-get-name">Mac</h3>
+              <p className="lp-get-sub">The month as a mind map, reports, and Ask on a big screen.</p>
+              <div className="lp-get-pair">
+                <a href={MAC_DMG_ARM} className="lp-btn-secondary lp-get-btn">
+                  Apple Silicon
+                </a>
+                <a href={MAC_DMG_INTEL} className="lp-btn-secondary lp-get-btn">
+                  Intel
+                </a>
+              </div>
+              <div className="lp-get-note">Signed and notarized by Apple · part of Plus</div>
+            </div>
+
+            <div className="lp-get-card">
+              <div className="lp-get-icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="#1B1915" aria-hidden>
+                  <path d="M3 5.8 10.4 4.7v6.6H3V5.8Zm8.6-1.2L21 3.2v8.1h-9.4V4.6ZM3 12.7h7.4v6.6L3 18.2v-5.5Zm8.6 0H21v8.1l-9.4-1.4v-6.7Z" />
+                </svg>
+              </div>
+              <h3 className="lp-get-name">Windows</h3>
+              <p className="lp-get-sub">The same dashboard, on the machine you actually work on.</p>
+              <a href={WIN_EXE} className="lp-btn-secondary lp-get-btn">
+                Download for Windows
+              </a>
+              <div className="lp-get-note">
+                Unsigned for now, so Windows asks once before it runs · part of Plus
+              </div>
+            </div>
+
+            <div className="lp-get-card">
+              <div className="lp-get-icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
+                  <circle cx="12" cy="12" r="9" stroke="#1B1915" strokeWidth="1.9" />
+                  <path d="M3 12h18M12 3c2.6 2.6 2.6 15.4 0 18M12 3c-2.6 2.6-2.6 15.4 0 18" stroke="#1B1915" strokeWidth="1.6" />
+                </svg>
+              </div>
+              <h3 className="lp-get-name">Web</h3>
+              <p className="lp-get-sub">Nothing to install. Your numbers in any browser, on any machine.</p>
+              <Link href={appHref} className="lp-btn-secondary lp-get-btn">
+                {user ? 'Open your dashboard' : 'Open the web app'}
+              </Link>
+              <div className="lp-get-note">Same account, same data · part of Plus</div>
+            </div>
+          </div>
+
+          <p className="lp-get-foot">
+            Logging is free forever on iPhone. The big screens, unlimited Ask, your full history
+            and automatic subscription detection are Murmur Plus, $4.99 a month or $29.99 a year,
+            shareable with five family members.
+          </p>
+        </div>
       </section>
 
       {/* Structured data. Search engines and the AI answer engines quote
@@ -849,6 +1030,20 @@ export default async function RootPage() {
         }}
       />
 
+      {/* Phone visitors scroll a long way from the hero button, and most
+          of this page's traffic is a phone. The bar keeps the one action
+          in reach without covering anything: it only exists under 760px,
+          and the page reserves its height at the bottom. */}
+      <div className="lp-sticky">
+        <div className="lp-sticky-copy">
+          <strong>Free forever</strong>
+          <span>14 days of Plus, no card</span>
+        </div>
+        <a href={APP_STORE_URL} className="lp-sticky-btn" rel="noreferrer">
+          Get Murmur
+        </a>
+      </div>
+
       {/* ── Footer ──────────────────────────────────────────────────── */}
       <footer className="lp-footer">
         <div className="lp-shell">
@@ -878,6 +1073,7 @@ export default async function RootPage() {
 
       <style>{`
         .lp { overflow-x: hidden; }
+        .lp [id] { scroll-margin-top: 84px; }
         .lp-shell { max-width: 1120px; margin: 0 auto; padding: 0 28px; }
         .lp a { text-decoration: none; }
 
@@ -899,14 +1095,9 @@ export default async function RootPage() {
         .lp-sub { font-size: 18px; line-height: 1.65; color: #3A3630; max-width: 470px; margin: 24px 0 0; }
         .lp-hero-ctas { display: flex; align-items: center; gap: 12px; margin-top: 34px; flex-wrap: wrap; }
         .lp-btn-primary { display: inline-flex; align-items: center; gap: 9px; background: #3F5A3E; color: #fff; font-weight: 600; font-size: 14px; padding: 13px 24px; border-radius: 999px; transition: transform .15s, box-shadow .15s; }
-        .lp-hero-dlnote { margin-top: 14px; font-size: 12px; color: #9C9589; }
-        .lp-hero-dlnote a { color: #3F5A3E; font-weight: 600; }
-        .lp-hero-dlnote a:hover { text-decoration: underline; }
         .lp-btn-primary:hover { transform: translateY(-1px); box-shadow: 0 10px 26px rgba(63,90,62,0.3); }
         .lp-btn-secondary { display: inline-flex; align-items: center; gap: 9px; background: #F5F2EB; color: #1B1915; font-weight: 600; font-size: 14px; padding: 13px 22px; border-radius: 999px; transition: transform .15s, box-shadow .15s; }
         .lp-btn-secondary:hover { transform: translateY(-1px); box-shadow: 0 8px 20px rgba(27,25,21,0.12); }
-        .lp-badge-soon { font-size: 13px; font-weight: 600; color: #6C675E; background: #F5F2EB; padding: 13px 20px; border-radius: 999px; }
-        .lp-trust { margin-top: 26px; font-size: 12.5px; color: #9C9589; letter-spacing: 0.2px; }
 
         .lp-phone-stage { position: relative; display: flex; justify-content: center; }
         .lp-phone-wrap { position: relative; }
@@ -954,22 +1145,13 @@ export default async function RootPage() {
         .lp-stat { text-align: center; padding: 10px; }
         .lp-stat-n { font-family: ${lpSerif}; font-size: 44px; letter-spacing: -1px; color: #3F5A3E; }
         .lp-stat-label { font-size: 13px; color: #6C675E; margin-top: 4px; line-height: 1.45; }
-        .lp-offer { margin-top: 18px; font-size: 15px; line-height: 1.55; color: #3A3630; max-width: 460px; }
-        .lp-offer strong { color: #1B1915; font-weight: 700; }
         .lp-tiers { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 28px auto 0; max-width: 760px; text-align: left; }
         .lp-tier { background: #FFFFFF; border: 1px solid rgba(40,36,28,0.08); border-radius: 22px; padding: 22px 24px; }
         .lp-tier-plus { border-color: #3F5A3E; }
         .lp-tier-name { font-family: ${lpSerif}; font-size: 21px; color: #1B1915; }
         .lp-tier-list { margin: 12px 0 0; padding-left: 18px; display: grid; gap: 6px; font-size: 14px; color: #3A3630; line-height: 1.5; }
-        .lp-faq { padding-block: 72px 8px; }
-        .lp-faq-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 22px 40px; margin-top: 28px; text-align: left; }
-        .lp-faq-q { font-size: 16px; font-weight: 700; color: #1B1915; margin: 0; }
-        .lp-faq-a { font-size: 14.5px; line-height: 1.6; color: #3A3630; margin: 6px 0 0; }
-        .lp-close { text-align: center; padding-block: 72px 24px; }
-        .lp-close-cta { margin-top: 22px; display: inline-flex; }
         @media (max-width: 760px) {
           .lp-tiers { grid-template-columns: 1fr; }
-          .lp-faq-grid { grid-template-columns: 1fr; gap: 20px; }
         }
 
         .lp-map { display: grid; grid-template-columns: 0.9fr 1.1fr; gap: 40px; align-items: center; padding-top: 88px; }
@@ -1039,6 +1221,88 @@ export default async function RootPage() {
         .lp-footer-word { font-family: ${lpSerif}; font-size: clamp(90px, 16vw, 200px); line-height: 1; letter-spacing: -0.04em; color: #3F5A3E; opacity: 0.07; text-align: center; margin: 10px 0 0; user-select: none; }
         .lp-footer-bottom { text-align: center; font-size: 12.5px; color: #9C9589; margin-top: 6px; }
 
+        /* Nav */
+        .lp-nav-links { display: flex; align-items: center; gap: 22px; font-size: 14px; }
+
+        /* Hero proof */
+        .lp-btn-ghost { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; font-size: 14px; color: #6C675E; padding: 13px 8px; }
+        .lp-btn-ghost:hover { color: #1B1915; }
+        .lp-proof { list-style: none; margin: 30px 0 0; padding: 0; display: grid; gap: 12px; max-width: 470px; }
+        .lp-proof-item { display: flex; align-items: flex-start; gap: 9px; }
+        .lp-proof-item svg { flex: none; margin-top: 3px; }
+        .lp-proof-item strong { display: block; font-size: 14px; font-weight: 700; color: #1B1915; }
+        .lp-proof-item span { display: block; font-size: 12.5px; color: #6C675E; margin-top: 1px; }
+
+        /* Section heads */
+        .lp-sec-head { text-align: center; max-width: 620px; margin: 0 auto; }
+        .lp-sec-head-light .lp-h2 { color: #FBFAF7; }
+        .lp-h2-light { color: #FBFAF7; }
+
+        /* How it works */
+        .lp-how { padding-top: 88px; }
+        .lp-steps { list-style: none; margin: 34px 0 0; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; counter-reset: lp-step; }
+        .lp-step { position: relative; background: #FFFFFF; border: 0.5px solid rgba(40,36,28,0.08); border-radius: 24px; padding: 26px 26px 28px; }
+        .lp-step::after { content: ''; position: absolute; top: 46px; right: -14px; width: 14px; border-top: 1.5px dashed rgba(63,90,62,0.4); }
+        .lp-step:last-child::after { display: none; }
+        .lp-step-n { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 50%; background: #E8EDE3; color: #3F5A3E; font-family: ${lpSerif}; font-size: 16px; }
+        .lp-step-t { font-family: ${lpSerif}; font-weight: 500; font-size: 22px; letter-spacing: -0.3px; margin: 14px 0 0; }
+
+        /* Real screens */
+        .lp-shots-wrap { padding-top: 88px; }
+        .lp-shots { display: flex; gap: 16px; overflow-x: auto; scroll-snap-type: x mandatory; padding: 28px 28px 34px; scrollbar-width: none; -webkit-mask-image: linear-gradient(90deg, transparent, #000 4%, #000 96%, transparent); mask-image: linear-gradient(90deg, transparent, #000 4%, #000 96%, transparent); }
+        .lp-shots::-webkit-scrollbar { display: none; }
+        .lp-shots:focus-visible { outline: 2px solid #3F5A3E; outline-offset: -6px; border-radius: 28px; }
+        .lp-shot { flex: none; width: 262px; height: auto; border-radius: 22px; border: 0.5px solid rgba(40,36,28,0.1); box-shadow: 0 18px 44px rgba(27,25,21,0.1); scroll-snap-align: center; background: #FFFFFF; }
+        @media (min-width: 1180px) { .lp-shots { justify-content: center; } }
+
+        /* FAQ */
+        .lp-faq { padding-block: 88px 8px; }
+        .lp-faq-list { max-width: 760px; margin: 28px auto 0; border-top: 0.5px solid rgba(40,36,28,0.12); }
+        .lp-faq-item { border-bottom: 0.5px solid rgba(40,36,28,0.12); }
+        .lp-faq-q { display: flex; align-items: center; justify-content: space-between; gap: 18px; list-style: none; cursor: pointer; font-size: 16.5px; font-weight: 700; color: #1B1915; padding: 20px 2px; transition: color .15s; }
+        .lp-faq-q::-webkit-details-marker { display: none; }
+        .lp-faq-q:hover { color: #3F5A3E; }
+        .lp-faq-mark { flex: none; display: inline-flex; width: 28px; height: 28px; border-radius: 50%; background: #F0EDE5; color: #3F5A3E; align-items: center; justify-content: center; transition: transform .22s ease, background .22s ease; }
+        .lp-faq-item[open] .lp-faq-mark { transform: rotate(180deg); background: #E8EDE3; }
+        .lp-faq-a { font-size: 15px; line-height: 1.68; color: #3A3630; margin: 0 0 22px; max-width: 660px; }
+
+        /* Get Murmur */
+        .lp-getwrap { background: #1B1915; color: #FBFAF7; padding: 84px 0 88px; margin-top: 88px; }
+        .lp-get-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-top: 40px; align-items: stretch; }
+        .lp-get-card { display: flex; flex-direction: column; background: #FBFAF7; color: #1B1915; border-radius: 24px; padding: 26px 24px 24px; }
+        .lp-get-card-lead { outline: 2px solid #9DBB9C; outline-offset: -2px; }
+        .lp-get-icon { width: 44px; height: 44px; border-radius: 14px; background: #EFEBE2; display: flex; align-items: center; justify-content: center; }
+        .lp-get-name { font-family: ${lpSerif}; font-weight: 500; font-size: 24px; letter-spacing: -0.4px; margin: 16px 0 0; }
+        .lp-get-sub { font-size: 13.5px; line-height: 1.55; color: #3A3630; margin: 8px 0 0; }
+        .lp-get-btn { margin-top: 18px; justify-content: center; text-align: center; font-size: 12.5px; padding: 12px 14px; white-space: nowrap; }
+        .lp-get-card > .lp-get-btn, .lp-get-pair { margin-top: auto; }
+        .lp-get-pair { display: grid; gap: 8px; }
+        .lp-get-pair .lp-get-btn:first-child { margin-top: 18px; }
+        .lp-get-pair .lp-get-btn + .lp-get-btn { margin-top: 0; }
+        .lp-get-note { font-size: 11.5px; line-height: 1.45; color: #6C675E; margin-top: 10px; }
+        .lp-get-foot { max-width: 620px; margin: 34px auto 0; text-align: center; font-size: 13px; line-height: 1.6; color: rgba(251,250,247,0.6); }
+
+        /* Sticky phone bar */
+        .lp-sticky { display: none; position: fixed; left: 0; right: 0; bottom: 0; z-index: 60; align-items: center; justify-content: space-between; gap: 14px; padding: 11px 16px calc(11px + env(safe-area-inset-bottom)); background: rgba(251,250,247,0.94); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-top: 0.5px solid rgba(40,36,28,0.1); }
+        .lp-sticky-copy strong { display: block; font-size: 13.5px; font-weight: 700; color: #1B1915; }
+        .lp-sticky-copy span { display: block; font-size: 11.5px; color: #6C675E; }
+        .lp-sticky-btn { flex: none; background: #3F5A3E; color: #fff; font-weight: 700; font-size: 14px; padding: 12px 22px; border-radius: 999px; }
+
+        @media (max-width: 920px) {
+          .lp-steps { grid-template-columns: 1fr; gap: 12px; }
+          .lp-step::after { display: none; }
+          .lp-get-grid { grid-template-columns: 1fr 1fr; }
+        }
+        @media (max-width: 760px) {
+          .lp-sticky { display: flex; }
+          .lp { padding-bottom: 72px; }
+          .lp-getwrap { padding: 64px 0 68px; margin-top: 64px; }
+          .lp-get-grid { grid-template-columns: 1fr; }
+          .lp-shots { padding-inline: 20px; }
+          .lp-shot { width: 214px; }
+          .lp-how, .lp-shots-wrap, .lp-faq { padding-top: 64px; }
+        }
+
         @keyframes lp-rise { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: translateY(0); } }
         .lp-rise { opacity: 0; animation: lp-rise .7s cubic-bezier(.2,.7,.3,1) forwards; }
         @keyframes lp-float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
@@ -1062,7 +1326,7 @@ export default async function RootPage() {
           .lp-card-pay { grid-template-columns: 1fr; }
           .lp-pay-photo { margin: 0 -28px -28px; min-height: 230px; }
           .lp-pay-photo img { -webkit-mask-image: linear-gradient(180deg, transparent, #000 22%); mask-image: linear-gradient(180deg, transparent, #000 22%); }
-          .lp-navlink:not(.lp-cta-pill) { display: none; }
+          .lp-navlink:not(.lp-navlink-keep) { display: none; }
         }
         @media (prefers-reduced-motion: reduce) {
           .lp-rise { animation: none; opacity: 1; }

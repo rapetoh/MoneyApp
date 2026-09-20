@@ -449,7 +449,10 @@ page. What was done, end to end:
   restart prompt when ready. Feed = the GitHub release's latest-mac.yml.
   Shipping an update = bump version, rebuild (signing + notarization run
   automatically), `gh release create vX.Y.Z` with the new artifacts, and
-  update the two versioned download URLs in `apps/web/src/app/page.tsx`.
+  bump `DESKTOP_VERSION` in `apps/web/src/app/page.tsx` (Sep 20, 2026: the
+  three download URLs are now built from that one constant; GitHub's
+  `releases/latest/download/` path needs the exact file name, so forgetting
+  it 404s the Mac and Windows buttons).
 - *Landing page:* hero primary is now "Download for Mac" (arm64) with an
   "Intel Mac version" note line and a footer link; App Store stays
   "soon". Screenshot-verified at 1440 and 390 before push.
