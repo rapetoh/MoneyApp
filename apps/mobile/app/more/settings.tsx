@@ -810,9 +810,9 @@ export default function SettingsScreen() {
         <SafeAreaView style={styles.modal} edges={['top', 'bottom', 'left', 'right']}>
           <View style={styles.modalHeader}>
             <Pressable onPress={() => setExportPickerOpen(false)}>
-              <Text style={styles.modalCancel}>{t('common.cancel', locale)}</Text>
+              <Text style={styles.modalCancel} numberOfLines={1}>{t('common.cancel', locale)}</Text>
             </Pressable>
-            <Text style={styles.modalTitle}>{t('export.picker_title', locale)}</Text>
+            <Text style={styles.modalTitle} numberOfLines={1}>{t('export.picker_title', locale)}</Text>
             <View style={{ width: 60 }} />
           </View>
           {(['csv', 'json', 'pdf'] as ExportFormat[]).map((fmt, i) => {
@@ -855,7 +855,7 @@ export default function SettingsScreen() {
                 {t('common.cancel', locale)}
               </Text>
             </Pressable>
-            <Text style={styles.modalTitle}>{t('settings.currency', locale)}</Text>
+            <Text style={styles.modalTitle} numberOfLines={1}>{t('settings.currency', locale)}</Text>
             <View style={{ width: 60 }} />
           </View>
           {currencyConverting ? (
@@ -894,9 +894,9 @@ export default function SettingsScreen() {
         <View style={styles.modal}>
           <View style={styles.modalHeader}>
             <Pressable onPress={() => setLocaleModal(false)}>
-              <Text style={styles.modalCancel}>{t('common.cancel', locale)}</Text>
+              <Text style={styles.modalCancel} numberOfLines={1}>{t('common.cancel', locale)}</Text>
             </Pressable>
-            <Text style={styles.modalTitle}>{t('settings.language', locale)}</Text>
+            <Text style={styles.modalTitle} numberOfLines={1}>{t('settings.language', locale)}</Text>
             <View style={{ width: 60 }} />
           </View>
           {LOCALES.map((l, i) => (
@@ -933,9 +933,9 @@ export default function SettingsScreen() {
           <View style={styles.modal}>
             <View style={styles.modalHeader}>
               <Pressable onPress={() => setApiUrlModal(false)}>
-                <Text style={styles.modalCancel}>{t('common.cancel', locale)}</Text>
+                <Text style={styles.modalCancel} numberOfLines={1}>{t('common.cancel', locale)}</Text>
               </Pressable>
-              <Text style={styles.modalTitle}>{t('settings.ai_server_url', locale)}</Text>
+              <Text style={styles.modalTitle} numberOfLines={1}>{t('settings.ai_server_url', locale)}</Text>
               <Pressable
                 onPress={async () => {
                   await setApiUrl(apiUrlInput)
@@ -992,9 +992,9 @@ export default function SettingsScreen() {
         <View style={styles.modal}>
           <View style={styles.modalHeader}>
             <Pressable onPress={() => setNameModal(false)}>
-              <Text style={styles.modalCancel}>{t('common.cancel', locale)}</Text>
+              <Text style={styles.modalCancel} numberOfLines={1}>{t('common.cancel', locale)}</Text>
             </Pressable>
-            <Text style={styles.modalTitle}>{t('settings.display_name', locale)}</Text>
+            <Text style={styles.modalTitle} numberOfLines={1}>{t('settings.display_name', locale)}</Text>
             <Pressable onPress={handleSaveName}>
               <Text style={styles.modalDone}>{t('common.save', locale)}</Text>
             </Pressable>
@@ -1027,9 +1027,9 @@ export default function SettingsScreen() {
         <View style={styles.modal}>
           <View style={styles.modalHeader}>
             <Pressable onPress={() => setSyncIssuesModal(false)}>
-              <Text style={styles.modalCancel}>{t('common.cancel', locale)}</Text>
+              <Text style={styles.modalCancel} numberOfLines={1}>{t('common.cancel', locale)}</Text>
             </Pressable>
-            <Text style={styles.modalTitle}>{t('settings.sync_issues', locale)}</Text>
+            <Text style={styles.modalTitle} numberOfLines={1}>{t('settings.sync_issues', locale)}</Text>
             <View style={{ width: 60 }} />
           </View>
           <ScrollView
@@ -1184,6 +1184,8 @@ const styles = StyleSheet.create({
     borderBottomColor: Hairline.color,
   },
   modalTitle: {
+    flexShrink: 1,
+    marginHorizontal: 10,
     fontFamily: Typography.fontFamily.sansBold,
     fontSize: 17,
     fontWeight: '700',

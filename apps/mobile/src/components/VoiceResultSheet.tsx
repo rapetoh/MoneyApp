@@ -404,13 +404,13 @@ export function VoiceResultSheet({
           <View style={{ flex: 1 }}>
             <View style={styles.editHeader}>
               <Pressable onPress={() => exitEdit(true)} hitSlop={10} accessibilityRole="button">
-                <Text style={styles.editHeaderCancel}>{t('common.cancel', locale)}</Text>
+                <Text style={styles.editHeaderCancel} numberOfLines={1}>{t('common.cancel', locale)}</Text>
               </Pressable>
-              <Text style={styles.editHeaderTitle}>
+              <Text style={styles.editHeaderTitle} numberOfLines={1}>
                 {t(direction === 'credit' ? 'voice.edit_income' : 'voice.edit_expense', locale)}
               </Text>
               <Pressable onPress={() => exitEdit(false)} hitSlop={10} accessibilityRole="button">
-                <Text style={styles.editHeaderDone}>{t('common.done', locale)}</Text>
+                <Text style={styles.editHeaderDone} numberOfLines={1}>{t('common.done', locale)}</Text>
               </Pressable>
             </View>
 
@@ -870,6 +870,10 @@ const styles = StyleSheet.create({
     color: Colors.ink3,
   },
   editHeaderTitle: {
+    // The centre label is what shrinks when a translation runs long; the
+    // two actions keep their natural width (owner report, Sep 19 2026).
+    flexShrink: 1,
+    marginHorizontal: 10,
     fontSize: 15.5,
     fontWeight: '700',
     fontFamily: Typography.fontFamily.sansBold,

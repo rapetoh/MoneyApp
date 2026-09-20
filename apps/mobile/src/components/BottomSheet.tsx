@@ -291,13 +291,15 @@ export function BottomSheet({
 
             {(title || headerRight) && (
               <View style={styles.header}>
-                <Pressable onPress={onClose} hitSlop={10}>
-                  <Text style={styles.navText}>{cancelLabel}</Text>
+                <Pressable onPress={onClose} hitSlop={10} style={styles.headerSide}>
+                  <Text style={styles.navText} numberOfLines={1}>
+                    {cancelLabel}
+                  </Text>
                 </Pressable>
                 <Text style={styles.title} numberOfLines={1}>
                   {title}
                 </Text>
-                <View style={styles.headerRightSlot}>{headerRight}</View>
+                <View style={[styles.headerSide, styles.headerRightSlot]}>{headerRight}</View>
               </View>
             )}
 
@@ -375,6 +377,7 @@ const styles = StyleSheet.create({
   },
   title: {
     flex: 1,
+    flexShrink: 1,
     textAlign: 'center',
     fontSize: 15,
     fontFamily: Typography.fontFamily.sansSemiBold,
@@ -382,6 +385,11 @@ const styles = StyleSheet.create({
     color: Colors.ink,
     marginHorizontal: 8,
   },
+  // Side slots keep their natural width; the centre title is what gives
+  // way. Before this the title's `flex: 1` squeezed them, so a longer
+  // translation of Save ("Sauvegarder") wrapped onto two lines (owner
+  // report, Sep 19 2026).
+  headerSide: { flexShrink: 0 },
   headerRightSlot: {
     minWidth: 44,
     alignItems: 'flex-end',

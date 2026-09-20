@@ -64,3 +64,20 @@ Builds: 49 and 51 carry the first two bugs, 52 fixes them, 53 adds the
 collapsible checklist. Local archives (`eas build --local`) because the
 Expo free plan's cloud builds are used up until Oct 1; Xcode 27.0 GA on
 this Mac is store-safe, the beta that caused "Invalid Binary" is not.
+
+## Budget and income as centred dialogs (owner review, Sep 19 2026)
+
+"Sauvegarder" wrapped onto two lines in the budget sheet header: the
+centre title's `flex: 1` squeezed the side slots. Fixed at the source in
+`BottomSheet` (side slots keep their natural width, the title gives way)
+and swept through the other custom headers (VoiceResultSheet's edit
+header, CategoryPicker, Settings' pickers), each label now one line.
+
+The budget and income editors moved from full sheets to a new
+`CenterModal`: a card over the screen you came from, two actions side by
+side at the bottom (where a long translation cannot clip them), body
+scrolls, keyboard shrinks the card instead of pushing it off-screen,
+Reduce Motion honoured. The budget period became a chip row instead of a
+five-row list so the dialog stays one glance tall. Used by the Budgets
+tab, Settings, and the Today checklist, which now opens the budget dialog
+in place instead of sending the user to another tab.

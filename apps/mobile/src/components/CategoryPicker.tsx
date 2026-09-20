@@ -87,9 +87,9 @@ export function CategoryPicker({ categories, selectedId, onSelect, onCreateCateg
       >
         <View style={styles.modal}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>{t('voice.category', locale)}</Text>
+            <Text style={styles.modalTitle} numberOfLines={1}>{t('voice.category', locale)}</Text>
             <Pressable onPress={() => setModalVisible(false)}>
-              <Text style={styles.modalClose}>{t('common.done', locale)}</Text>
+              <Text style={styles.modalClose} numberOfLines={1}>{t('common.done', locale)}</Text>
             </Pressable>
           </View>
 
@@ -212,6 +212,8 @@ const styles = StyleSheet.create({
     borderBottomColor: Colors.border,
   },
   modalTitle: {
+    flexShrink: 1,
+    marginRight: 10,
     fontFamily: Typography.fontFamily.sansBold,
     // Explicit fontWeight pairing so the title survives a fallback where
     // the named face doesn't resolve — see

@@ -21,6 +21,7 @@ import { MiniBars } from '../../src/components/MiniBars'
 import { DayOneFirstLog } from '../../src/components/DayOneFirstLog'
 import { GettingStartedCard, type StartItem } from '../../src/components/GettingStartedCard'
 import { IncomeEditorModal } from '../../src/components/IncomeEditorModal'
+import { BudgetEditorModal } from '../../src/components/BudgetEditorModal'
 import { useFirstRun } from '../../src/hooks/useFirstRun'
 import { useVoiceSession } from '../../src/hooks/useVoiceSession'
 import { addMonthlyIncome } from '../../src/services/monthlyIncome'
@@ -163,7 +164,7 @@ export default function TodayScreen() {
   const { transactions, loading, error: transactionsError, createTransaction } = useTransactions(user?.id)
   const { categoryMap } = useCategories(user?.id)
   const { profile, updateProfile } = useProfile(user?.id)
-  const { budget, error: budgetError, refetch: refetchBudget } = useActiveBudget(user?.id)
+  const { budget, error: budgetError, setBudget, refetch: refetchBudget } = useActiveBudget(user?.id)
   const { rules: recurringRules, createRule, updateRule } = useRecurringRules(user?.id)
   const { refreshing, onRefresh } = useManualRefresh(user?.id, [refetchBudget])
   const router = useRouter()
@@ -266,6 +267,10 @@ export default function TodayScreen() {
   const showDayOne = !loading && !transactionsError && firstRun.dayOneActive
   const { openVoice } = useVoiceSession()
   const [incomeModal, setIncomeModal] = useState(false)
+  // Both live on Today as centred dialogs (owner review, Sep 19 2026):
+  // setting a budget from the checklist should not throw the user into
+  // another tab, and a short form has no business taking the whole screen.
+  const [budgetModal, setBudgetModal] = useState(false)
 
   // "Getting started" (audit M2, H3): income and Apple Pay capture moved
   // here from onboarding / Settings, each done-state read from real data.
@@ -275,7 +280,7 @@ export default function TodayScreen() {
     transactions.some((x) => !x.is_deleted && x.direction === 'credit' && x.is_recurring)
   const startItems: StartItem[] = [
     { key: 'first_expense', done: firstRun.expenses > 0, onPress: openVoice },
-    { key: 'budget', done: budget != null, onPress: () => router.push('/(tabs)/budgets') },
+    { key: 'budget', done: budget != null, onPress: () => setBudgetModal(true) },
     { key: 'income', done: hasIncome, onPress: () => setIncomeModal(true) },
     ...(Platform.OS === 'ios'
       ? [
@@ -480,6 +485,15 @@ export default function TodayScreen() {
           employer name; the record and the logo want it. Renaming the
           rule flows through migration 032 into Settings' Monthly Income
           source. */}
+      <BudgetEditorModal
+        visible={budgetModal}
+        initialAmount={budget?.amount ?? null}
+        initialPeriod={budget?.period ?? null}
+        currency={currency}
+        locale={locale}
+        onSave={(amount, period) => setBudget(amount, period, currency, tz)}
+        onClose={() => setBudgetModal(false)}
+      />
       <IncomeEditorModal
         visible={incomeModal}
         initialAmount={null}
