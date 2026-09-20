@@ -1215,7 +1215,7 @@ export default async function RootPage() {
 
         .lp-footer { border-top: 0.5px solid rgba(40,36,28,0.08); padding: 36px 0 28px; }
         .lp-footer-top { display: flex; justify-content: space-between; align-items: center; gap: 18px; flex-wrap: wrap; }
-        .lp-footer-links { display: flex; gap: 22px; font-size: 13.5px; }
+        .lp-footer-links { display: flex; flex-wrap: wrap; gap: 10px 22px; font-size: 13.5px; }
         .lp-footer-links a { color: #6C675E; }
         .lp-footer-links a:hover { color: #1B1915; }
         .lp-footer-word { font-family: ${lpSerif}; font-size: clamp(90px, 16vw, 200px); line-height: 1; letter-spacing: -0.04em; color: #3F5A3E; opacity: 0.07; text-align: center; margin: 10px 0 0; user-select: none; }
