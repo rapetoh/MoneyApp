@@ -90,13 +90,13 @@ export default function SetupScreen() {
       changed_currency: currency !== deviceCurrency,
     })
     setSaving(false)
-    router.push('/(onboarding)/first-log')
+    router.push('/(onboarding)/goal')
   }
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom', 'left', 'right']}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <StepDots step={0} total={3} />
+        <StepDots step={0} total={4} />
         <Text style={styles.headline}>{t('onboarding.setup.headline', locale)}</Text>
         <Text style={styles.lead}>{t('onboarding.setup.lead', locale)}</Text>
 

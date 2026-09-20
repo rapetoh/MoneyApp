@@ -60,6 +60,18 @@ export function trialDaysLeft(
 /** How many Ask Murmur questions a free account gets each calendar month. */
 export const FREE_ASK_QUESTIONS_PER_MONTH = 3
 
+/** Length of the reverse trial, for copy. The grant itself is server-side
+ *  (migration 039): 14 days, because trials of a fortnight and longer
+ *  convert at roughly twice the rate of 3-to-7-day ones (RevenueCat 2026),
+ *  and an expense tracker needs more than a week of its own history before
+ *  the paid half is worth anything. */
+export const TRIAL_DAYS = 14
+
+/** What the user said they came for, asked once during onboarding. Not
+ *  decoration: it orders the Today checklist and is quoted on the paywall. */
+export const PRIMARY_GOALS = ['clarity', 'budget', 'subscriptions', 'simple'] as const
+export type PrimaryGoal = (typeof PRIMARY_GOALS)[number]
+
 // ── Payments (Aug 16, 2026 owner decision) ─────────────────────────────────
 //
 // Murmur Plus is an iOS auto-renewable subscription sold through

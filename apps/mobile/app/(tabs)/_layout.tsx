@@ -130,8 +130,9 @@ export default function TabsLayout() {
     takeOnboardingFollowup().then((f) => {
       if (!alive || !f) return
       setTimeout(() => {
+        // Only the Apple Pay walkthrough is queued from onboarding now.
+        // Selling happens near the end of the trial, not on day zero.
         if (f === 'applepay') router.push('/more/apple-pay-setup')
-        else if (purchasesEnabled && !isPlus) router.push({ pathname: '/more/paywall', params: { origin: 'onboarding' } })
       }, 700)
     })
     return () => {

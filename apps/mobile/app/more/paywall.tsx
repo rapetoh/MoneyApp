@@ -208,7 +208,14 @@ export default function PaywallScreen() {
                 <Text style={styles.topPillText}>{t('paywall.eyebrow', locale)}</Text>
               </View>
               <Text style={styles.headline}>{t('paywall.headline', locale)}</Text>
-              <Text style={styles.body}>{t('paywall.body', locale)}</Text>
+              {/* What they said they came for, quoted back (onboarding's
+                  goal step). Research on paywalls is consistent that this
+                  beats most layout tweaks; it also just reads as honest. */}
+              <Text style={styles.body}>
+                {profile?.primary_goal
+                  ? t(`paywall.goal_${profile.primary_goal}`, locale)
+                  : t('paywall.body', locale)}
+              </Text>
             </View>
 
             <View style={styles.features}>

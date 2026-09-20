@@ -81,7 +81,7 @@ export default function FirstLogScreen() {
     return (
       <SafeAreaView style={styles.safe} edges={['top', 'bottom', 'left', 'right']}>
         <View style={styles.content}>
-          <StepDots step={1} total={3} />
+          <StepDots step={2} total={4} />
           <View style={styles.filedWrap}>
             <Animated.View style={[styles.check, { transform: [{ scale: pop }] }]}>
               <Ionicons name="checkmark" size={40} color={Colors.white} />
@@ -118,7 +118,7 @@ export default function FirstLogScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom', 'left', 'right']}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <StepDots step={1} total={3} />
+        <StepDots step={2} total={4} />
         <Text style={styles.headline}>{t('onboarding.first_log.headline', locale)}</Text>
         <Text style={styles.lead}>{t('onboarding.first_log.lead', locale)}</Text>
 

@@ -57,16 +57,19 @@ export default function HabitScreen() {
       return
     }
     track('habit_done', { checkin: checkIn, hour, notifications, applepay_next: applePayNext })
-    const followup: OnboardingFollowup = applePayNext ? 'applepay' : 'plus'
+    // The price screen no longer follows onboarding: everyone already has
+    // Plus for a fortnight, so the next screen tells them that instead of
+    // selling it. Only the Apple Pay setup is still handed over.
+    const followup: OnboardingFollowup = applePayNext ? 'applepay' : 'none'
     await SecureStore.setItemAsync(KEY_ONBOARDING_FOLLOWUP, followup).catch(() => {})
     setSaving(false)
-    router.replace('/(tabs)')
+    router.replace('/(onboarding)/plus')
   }
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom', 'left', 'right']}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <StepDots step={2} total={3} />
+        <StepDots step={3} total={4} />
         <Text style={styles.headline}>{t('onboarding.habit.headline', locale)}</Text>
         <Text style={styles.lead}>{t('onboarding.habit.lead', locale)}</Text>
 

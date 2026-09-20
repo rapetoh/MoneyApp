@@ -20,6 +20,8 @@ import { supabase } from '../lib/supabase'
 
 export type AnalyticsEvent =
   | 'onboarding_setup_done'
+  | 'onboarding_goal'
+  | 'onboarding_plus_shown'
   | 'mic_permission'
   | 'first_log_saved'
   | 'first_log_skipped'

@@ -504,6 +504,7 @@ export type Database = {
           onboarding_completed_at: string | null
           start_checklist_dismissed_at: string | null
           trial_ends_at: string | null
+          primary_goal: string | null
           plus_status: string | null
           plus_product_id: string | null
           plus_period_type: string | null
@@ -532,6 +533,7 @@ export type Database = {
           onboarding_completed_at?: string | null
           start_checklist_dismissed_at?: string | null
           trial_ends_at?: string | null
+          primary_goal?: string | null
           plus_status?: string | null
           plus_product_id?: string | null
           plus_period_type?: string | null
@@ -560,6 +562,7 @@ export type Database = {
           onboarding_completed_at?: string | null
           start_checklist_dismissed_at?: string | null
           trial_ends_at?: string | null
+          primary_goal?: string | null
           plus_status?: string | null
           plus_product_id?: string | null
           plus_period_type?: string | null

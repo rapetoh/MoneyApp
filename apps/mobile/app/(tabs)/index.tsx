@@ -20,6 +20,7 @@ import { Money, MoneyLabel } from '../../src/components/Money'
 import { MiniBars } from '../../src/components/MiniBars'
 import { DayOneFirstLog } from '../../src/components/DayOneFirstLog'
 import { GettingStartedCard, type StartItem } from '../../src/components/GettingStartedCard'
+import { orderStartItems } from '../../src/services/startChecklist'
 import { TrialBanner } from '../../src/components/TrialBanner'
 import { IncomeEditorModal } from '../../src/components/IncomeEditorModal'
 import { BudgetEditorModal } from '../../src/components/BudgetEditorModal'
@@ -34,6 +35,8 @@ import {
   formatMoney,
   localParts,
   localDay,
+  isTrialActive,
+  trialDaysLeft,
   monthBounds,
   monthIso,
   daysBetween,
@@ -279,20 +282,35 @@ export default function TodayScreen() {
     (profile?.monthly_income ?? 0) > 0 ||
     recurringRules.some((r) => r.direction === 'credit' && r.is_active) ||
     transactions.some((x) => !x.is_deleted && x.direction === 'credit' && x.is_recurring)
-  const startItems: StartItem[] = [
-    { key: 'first_expense', done: firstRun.expenses > 0, onPress: openVoice },
-    { key: 'budget', done: budget != null, onPress: () => setBudgetModal(true) },
-    { key: 'income', done: hasIncome, onPress: () => setIncomeModal(true) },
-    ...(Platform.OS === 'ios'
-      ? [
-          {
-            key: 'applepay' as const,
-            done: transactions.some((x) => !x.is_deleted && x.source === 'shortcut'),
-            onPress: () => router.push('/more/apple-pay-setup'),
-          },
-        ]
-      : []),
-  ]
+  // Order follows what the user said they came for (onboarding's goal
+  // step); during the trial an "Ask Murmur" row is added, because a
+  // reverse trial only converts if the paid half actually gets used.
+  const startItems: StartItem[] = orderStartItems(
+    [
+      { key: 'first_expense', done: firstRun.expenses > 0, onPress: openVoice },
+      { key: 'budget', done: budget != null, onPress: () => setBudgetModal(true) },
+      { key: 'income', done: hasIncome, onPress: () => setIncomeModal(true) },
+      ...(isTrialActive(profile)
+        ? [
+            {
+              key: 'ask' as const,
+              done: false,
+              onPress: () => router.push('/more/ask'),
+            },
+          ]
+        : []),
+      ...(Platform.OS === 'ios'
+        ? [
+            {
+              key: 'applepay' as const,
+              done: transactions.some((x) => !x.is_deleted && x.source === 'shortcut'),
+              onPress: () => router.push('/more/apple-pay-setup'),
+            },
+          ]
+        : []),
+    ],
+    profile?.primary_goal,
+  )
   const tapStart = (item: StartItem) => () => {
     track('getting_started_tap', { item: item.key })
     item.onPress()
@@ -328,6 +346,18 @@ export default function TodayScreen() {
             <Text style={styles.title}>{t('transactions.today', locale)}</Text>
           </View>
           <View style={styles.headerActions}>
+            {isTrialActive(profile) && (
+              <Pressable
+                onPress={() => router.push({ pathname: '/more/paywall', params: { origin: 'trial_chip' } })}
+                style={({ pressed }) => [styles.trialChip, pressed && { opacity: 0.7 }]}
+                accessibilityRole="button"
+              >
+                <Ionicons name="sparkles" size={11} color={Colors.accent} />
+                <Text style={styles.trialChipText}>
+                  {t('trial.chip', locale).replace('{days}', String(trialDaysLeft(profile)))}
+                </Text>
+              </Pressable>
+            )}
             <Pressable
               style={({ pressed }) => [styles.headerIconBtn, pressed && styles.headerIconBtnPressed]}
               onPress={() => router.push('/transaction/new')}
@@ -579,6 +609,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     marginTop: 4,
+  },
+  trialChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    height: 28,
+    paddingHorizontal: 10,
+    borderRadius: 14,
+    backgroundColor: Colors.accentSoft,
+    marginRight: 2,
+  },
+  trialChipText: {
+    fontSize: 11.5,
+    color: Colors.accent,
+    fontFamily: Typography.fontFamily.sansBold,
+    fontWeight: '700',
   },
   headerIconBtn: {
     width: 36,

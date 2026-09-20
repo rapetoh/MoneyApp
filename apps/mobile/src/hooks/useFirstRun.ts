@@ -11,7 +11,7 @@ const KEY_DAYONE = 'dayone_skipped'
 export const KEY_CHECKLIST_COLLAPSED = 'start_checklist_collapsed'
 /** Written by onboarding's last step, consumed once by the tabs layout. */
 export const KEY_ONBOARDING_FOLLOWUP = 'onboarding_followup'
-export type OnboardingFollowup = 'plus' | 'applepay'
+export type OnboardingFollowup = 'none' | 'applepay'
 
 const cacheKey = (key: string) => `firstrun:${key}`
 
@@ -116,7 +116,7 @@ export async function takeOnboardingFollowup(): Promise<OnboardingFollowup | nul
     const v = await SecureStore.getItemAsync(KEY_ONBOARDING_FOLLOWUP)
     if (!v) return null
     await SecureStore.deleteItemAsync(KEY_ONBOARDING_FOLLOWUP)
-    return v === 'applepay' ? 'applepay' : 'plus'
+    return v === 'applepay' ? 'applepay' : 'none'
   } catch {
     return null
   }

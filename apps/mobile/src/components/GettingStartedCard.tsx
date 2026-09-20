@@ -6,7 +6,7 @@ import { useReduceMotion } from '../hooks/useReduceMotion'
 import { Colors, Typography, Hairline, Motion } from '../theme'
 import { t, type Locale } from '@voice-expense/shared'
 
-export type StartItemKey = 'first_expense' | 'budget' | 'income' | 'applepay'
+export type StartItemKey = 'first_expense' | 'budget' | 'income' | 'ask' | 'applepay'
 
 export interface StartItem {
   key: StartItemKey
