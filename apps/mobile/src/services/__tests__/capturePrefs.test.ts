@@ -29,17 +29,28 @@ vi.mock('expo-file-system', () => {
 
 import { rememberCapturePrefs, readCapturePrefs, clearCapturePrefs } from '../capturePrefs'
 
+const CATS = [
+  { id: 'c1', name: 'Groceries' },
+  { id: 'c2', name: 'Transport' },
+] as unknown as Parameters<typeof rememberCapturePrefs>[0]['categories']
+
 beforeEach(() => {
   store = null
 })
 
 describe('capturePrefs', () => {
   it('remembers what a later cold start will need', () => {
-    rememberCapturePrefs({ currency: 'XOF', locale: 'fr', timezone: 'Africa/Abidjan' })
+    rememberCapturePrefs({
+      currency: 'XOF',
+      locale: 'fr',
+      timezone: 'Africa/Abidjan',
+      categories: CATS,
+    })
     expect(readCapturePrefs()).toEqual({
       currency: 'XOF',
       locale: 'fr',
       timezone: 'Africa/Abidjan',
+      categories: CATS,
     })
   })
 
@@ -56,17 +67,38 @@ describe('capturePrefs', () => {
 
   it('fills in a missing timezone rather than returning nothing', () => {
     store = JSON.stringify({ currency: 'EUR' })
-    expect(readCapturePrefs()).toEqual({ currency: 'EUR', locale: 'en', timezone: 'UTC' })
+    expect(readCapturePrefs()).toEqual({
+      currency: 'EUR',
+      locale: 'en',
+      timezone: 'UTC',
+      categories: [],
+    })
   })
 
   it('refuses to store an empty currency', () => {
-    rememberCapturePrefs({ currency: '', locale: 'en', timezone: 'UTC' })
+    rememberCapturePrefs({ currency: '', locale: 'en', timezone: 'UTC', categories: CATS })
     expect(readCapturePrefs()).toBeNull()
   })
 
   it('forgets on sign-out, so the next account starts clean', () => {
-    rememberCapturePrefs({ currency: 'GBP', locale: 'en', timezone: 'Europe/London' })
+    rememberCapturePrefs({ currency: 'GBP', locale: 'en', timezone: 'Europe/London', categories: CATS })
     clearCapturePrefs()
     expect(readCapturePrefs()).toBeNull()
+  })
+
+  it('keeps the categories a cold capture needs to file under', () => {
+    // Without these, every Siri entry made while the app was closed saved
+    // uncategorised: categories are fetched, never stored locally.
+    rememberCapturePrefs({ currency: 'USD', locale: 'en', timezone: 'UTC', categories: CATS })
+    expect(readCapturePrefs()?.categories).toHaveLength(2)
+    // A renamed category is worth a rewrite; the same list is not.
+    const renamed = [{ id: 'c1', name: 'Food' }, { id: 'c2', name: 'Transport' }] as typeof CATS
+    rememberCapturePrefs({ currency: 'USD', locale: 'en', timezone: 'UTC', categories: renamed })
+    expect(readCapturePrefs()?.categories[0].name).toBe('Food')
+  })
+
+  it('drops junk entries in a hand-edited file', () => {
+    store = JSON.stringify({ currency: 'USD', categories: [{ id: 'c1', name: 'Groceries' }, { id: 7 }, null] })
+    expect(readCapturePrefs()?.categories).toEqual([{ id: 'c1', name: 'Groceries' }])
   })
 })

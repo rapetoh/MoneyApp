@@ -1,5 +1,5 @@
 import { File, Paths } from 'expo-file-system'
-import type { Locale } from '@voice-expense/shared'
+import type { Category, Locale } from '@voice-expense/shared'
 
 /**
  * The three profile fields a background capture cannot do without,
@@ -16,14 +16,30 @@ import type { Locale } from '@voice-expense/shared'
  * So the drain remembers the profile whenever it does have one, and reads
  * it back when it does not. A file, not SecureStore: none of this is
  * secret, and it sits beside the capture queue it serves.
+ *
+ * The category list is here for the same reason. It is fetched, not
+ * stored locally, so a cold capture had none to resolve the parser's
+ * suggestion against and every background entry saved uncategorised: the
+ * row was right and the chip was missing, on the entries the user never
+ * sees being made.
  */
 export interface CapturePrefs {
   currency: string
   locale: Locale
   timezone: string
+  /** The user's categories, so a cold capture can still be filed under
+   *  one. Empty when nothing has been cached yet. */
+  categories: Category[]
 }
 
 const FILE = 'capture-prefs.json'
+
+/** Ids and names only: a colour change is not worth a disk write, and a
+ *  rename or a new category is exactly what the capture needs to know. */
+function sameCategories(a: Category[], b: Category[]): boolean {
+  if (a.length !== b.length) return false
+  return a.every((c, i) => c.id === b[i].id && c.name === b[i].name)
+}
 
 function prefsFile(): File {
   return new File(Paths.document, FILE)
@@ -38,7 +54,8 @@ export function rememberCapturePrefs(next: CapturePrefs): void {
     current &&
     current.currency === next.currency &&
     current.locale === next.locale &&
-    current.timezone === next.timezone
+    current.timezone === next.timezone &&
+    sameCategories(current.categories, next.categories)
   ) {
     return
   }
@@ -60,6 +77,9 @@ export function readCapturePrefs(): CapturePrefs | null {
       currency: raw.currency,
       locale: (typeof raw.locale === 'string' ? raw.locale : 'en') as Locale,
       timezone: typeof raw.timezone === 'string' && raw.timezone ? raw.timezone : 'UTC',
+      categories: Array.isArray(raw.categories)
+        ? (raw.categories as Category[]).filter((c) => c && typeof c.id === 'string' && typeof c.name === 'string')
+        : [],
     }
   } catch {
     return null

@@ -54,6 +54,7 @@ import {
   resolveCategorySuggestion,
   guessCategoryFromMerchant,
   brandDomainForMerchant,
+  type Category,
   type Locale,
 } from '@voice-expense/shared'
 
@@ -84,13 +85,14 @@ export function WalletCaptureDrain() {
   // where the in-memory profile cache is empty and the network may not
   // have answered yet.
   useEffect(() => {
-    if (!profile?.currency_code) return
+    if (!profile?.currency_code || categories.length === 0) return
     rememberCapturePrefs({
       currency: profile.currency_code,
       locale: (profile.locale ?? 'en') as Locale,
       timezone: profile.timezone || 'UTC',
+      categories,
     })
-  }, [profile?.currency_code, profile?.locale, profile?.timezone])
+  }, [profile?.currency_code, profile?.locale, profile?.timezone, categories])
   const draining = useRef(false)
   const seen = useRef(new Set<string>())
 
@@ -127,20 +129,28 @@ export function WalletCaptureDrain() {
      * precisely when the app was not running, so "not loaded" is the
      * normal case, not the edge case.
      */
-    const prefs = (): { currency: string; locale: Locale; tz: string } => {
-      const { profile } = ref.current
-      const stored = profile?.currency_code ? null : readCapturePrefs()
+    const prefs = (): {
+      currency: string
+      locale: Locale
+      tz: string
+      categories: Category[]
+    } => {
+      const { profile, categories } = ref.current
+      // One read, whenever either half is missing: both are fetched and
+      // both are empty on a background launch.
+      const stored = profile?.currency_code && categories.length > 0 ? null : readCapturePrefs()
       return {
         currency: profile?.currency_code || stored?.currency || 'USD',
         locale: ((profile?.locale || stored?.locale) ?? 'en') as Locale,
         tz: profile?.timezone || stored?.timezone || 'UTC',
+        categories: categories.length > 0 ? categories : (stored?.categories ?? []),
       }
     }
 
     const saveOne = async (entry: WalletCaptureEntry) => {
-      const { categories, createTransaction, showUndo, userId } = ref.current
+      const { createTransaction, showUndo, userId } = ref.current
       if (!userId) return
-      const { currency, locale, tz } = prefs()
+      const { currency, locale, tz, categories } = prefs()
       const n = normaliseCapture(entry, currency)
       if (!n) {
         // Missing amount (pay-at-pump pre-auth, Aug 24 2026): park it until
@@ -251,9 +261,9 @@ export function WalletCaptureDrain() {
      * it, which costs four seconds and no cleanup.
      */
     const saveSpoken = async (entry: WalletCaptureEntry): Promise<string | null> => {
-      const { categories, createTransaction, showUndo, userId } = ref.current
+      const { createTransaction, showUndo, userId } = ref.current
       if (!userId) return null
-      const { currency: profileCurrency, locale, tz } = prefs()
+      const { currency: profileCurrency, locale, tz, categories } = prefs()
 
       let parsed: Awaited<ReturnType<typeof parseExpense>> | null = null
       try {
