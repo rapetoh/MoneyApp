@@ -587,12 +587,22 @@ export default function SettingsScreen() {
             chevron={false}
           />
           {Platform.OS === 'ios' ? (
-            <SetRow
-              label={t('settings.apple_pay_capture', locale)}
-              detail={t('settings.apple_pay_capture_detail', locale)}
-              onPress={() => router.push('/more/apple-pay-setup' as never)}
-              last
-            />
+            <>
+              <SetRow
+                label={t('settings.apple_pay_capture', locale)}
+                detail={t('settings.apple_pay_capture_detail', locale)}
+                onPress={() => router.push('/more/apple-pay-setup' as never)}
+              />
+              {/* Siri (Sep 20, 2026). The App Shortcut works the moment
+                  the app is installed; what nobody can guess is the exact
+                  phrase, which is all this screen exists to show. */}
+              <SetRow
+                label={t('settings.siri', locale)}
+                detail={t('settings.siri_detail', locale)}
+                onPress={() => router.push('/more/siri' as never)}
+                last
+              />
+            </>
           ) : (
             <SetRow
               label={t('settings.payment_notifications', locale)}

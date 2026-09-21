@@ -25,6 +25,18 @@ export const WALLET_QUEUE_FILE = 'wallet-capture-queue.jsonl'
 
 export interface WalletCaptureEntry {
   id: string
+  /**
+   * What produced this entry (Sep 20, 2026):
+   *  - 'wallet' — an Apple Pay tap or the deep link: amount and merchant
+   *    already separated by the card network, nothing to interpret.
+   *  - 'phrase' — Siri heard a sentence ("five dollars at Walmart") and
+   *    it still has to go through the parser, exactly like the mic does.
+   * Absent on entries written by builds before this, which were all
+   * Wallet captures; `takeQueuedCaptures` defaults them accordingly.
+   */
+  kind: 'wallet' | 'phrase'
+  /** The spoken sentence, for `kind: 'phrase'`. Empty otherwise. */
+  phrase: string
   /** Formatted or bare amount as Wallet handed it over — "$2.11", "2,11 €". */
   amount: string
   merchant: string
@@ -61,10 +73,17 @@ export function takeQueuedCaptures(): WalletCaptureEntry[] {
     if (!t) continue
     try {
       const e = JSON.parse(t) as Partial<WalletCaptureEntry>
-      if (typeof e.amount === 'string' && typeof e.id === 'string') {
+      const phrase = typeof e.phrase === 'string' ? e.phrase : ''
+      const kind: WalletCaptureEntry['kind'] = e.kind === 'phrase' ? 'phrase' : 'wallet'
+      // A spoken entry carries no amount field worth reading; a Wallet one
+      // must have it (even empty) or the line is not one of ours.
+      const usable = typeof e.id === 'string' && (kind === 'phrase' ? phrase !== '' : typeof e.amount === 'string')
+      if (usable) {
         out.push({
-          id: e.id,
-          amount: e.amount,
+          id: e.id as string,
+          kind,
+          phrase,
+          amount: typeof e.amount === 'string' ? e.amount : '',
           merchant: typeof e.merchant === 'string' ? e.merchant : '',
           currency: typeof e.currency === 'string' ? e.currency : '',
           source: 'shortcut',
@@ -80,12 +99,15 @@ export function takeQueuedCaptures(): WalletCaptureEntry[] {
 
 /** Append an entry (JS producer — the deep-link route) and poke the drain. */
 export function enqueueWalletCapture(
-  entry: Omit<WalletCaptureEntry, 'id' | 'source' | 'captured_at'>,
+  entry: Partial<Pick<WalletCaptureEntry, 'kind' | 'phrase'>> &
+    Omit<WalletCaptureEntry, 'id' | 'source' | 'captured_at' | 'kind' | 'phrase'>,
 ): void {
   const full: WalletCaptureEntry = {
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
     source: 'shortcut',
     captured_at: new Date().toISOString(),
+    kind: 'wallet',
+    phrase: '',
     ...entry,
   }
   const f = queueFile()
@@ -188,6 +210,47 @@ export interface NormalisedCapture {
   currency: string
   merchant: string | null
   capturedAt: string
+}
+
+/** What the parser gives back, narrowed to the fields a spoken entry
+ *  needs. Kept structural so the test does not have to build a whole
+ *  `ParsedExpense`. */
+export interface SpokenParse {
+  amount?: number | null
+  currency?: string | null
+  merchant?: string | null
+  transacted_at?: string | null
+}
+
+export interface NormalisedSpoken {
+  amount: number
+  currency: string
+  merchant: string | null
+  transactedAt: string
+}
+
+/**
+ * A Siri sentence, reduced to the four fields the save path needs.
+ *
+ * `parsed` is null whenever the parser was unreachable or too slow for
+ * Siri's budget, and the sentence still has to become a row: the amount
+ * is then read straight out of the words. Returns null only when there is
+ * no usable amount at all, which is the one case Murmur refuses to guess.
+ */
+export function normaliseSpoken(
+  entry: WalletCaptureEntry,
+  parsed: SpokenParse | null,
+  profileCurrency: string,
+): NormalisedSpoken | null {
+  const amount = parsed?.amount ?? parseShortcutAmount(entry.phrase)
+  if (amount == null || !Number.isFinite(amount) || amount <= 0) return null
+  // `||` throughout: both the parser's currency and the symbol reading can
+  // answer with an empty string, and an empty currency_code is refused by
+  // the write validator.
+  const currency = parsed?.currency || inferShortcutCurrency(entry.phrase, '') || profileCurrency
+  const merchant = parsed?.merchant?.trim() || null
+  const transactedAt = parsed?.transacted_at || entry.captured_at
+  return { amount, currency, merchant, transactedAt }
 }
 
 /** Turn a raw entry into what `createTransaction` needs; null when the

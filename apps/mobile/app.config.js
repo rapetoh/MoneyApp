@@ -75,9 +75,11 @@ module.exports = {
       package: 'com.voiceexpense.app',
     },
     plugins: [
-      // "Log Expense in Murmur" App Intent — Apple Pay capture runs in the
-      // background via a Wallet automation (native/ios/WalletCapture.swift).
-      './plugins/withWalletCapture.js',
+      // App Intents, compiled into the app target: "Log Expense in Murmur"
+      // for the Apple Pay Wallet automation (native/ios/WalletCapture.swift)
+      // and "Log an expense" with its Siri phrases
+      // (native/ios/SiriLogExpense.swift).
+      './plugins/withMurmurIntents.js',
       // Xcode 27 deployment-target clamp for old pods (ITMS-90111 fix).
       './plugins/withPodTargetFloor.js',
       'expo-router',

@@ -38,8 +38,14 @@ public class WalletCaptureModule: Module {
     }
 
     // JS → intent: "entry <id> is handled (saved, or deliberately dropped)".
-    Function("reportDone") { (id: String) in
-      NotificationCenter.default.post(name: walletCaptureDone, object: nil, userInfo: ["id": id])
+    // `dialog` is what Siri should say about it (Sep 20, 2026): the Siri
+    // intent waits for this, so the spoken answer is the row the app
+    // actually wrote. Empty or nil for a Wallet capture, which speaks
+    // through a notification instead.
+    Function("reportDone") { (id: String, dialog: String?) in
+      var info: [String: Any] = ["id": id]
+      if let dialog, !dialog.isEmpty { info["dialog"] = dialog }
+      NotificationCenter.default.post(name: walletCaptureDone, object: nil, userInfo: info)
     }
   }
 }

@@ -6,9 +6,15 @@ import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('expo-file-system', () => ({ File: class {}, Paths: { document: '/tmp' } }))
 
-import { normaliseCapture } from '../walletCapture'
+import { normaliseCapture, normaliseSpoken } from '../walletCapture'
 
-const base = { id: 'x', source: 'shortcut' as const, captured_at: '2026-08-17T05:12:00Z' }
+const base = {
+  id: 'x',
+  kind: 'wallet' as const,
+  phrase: '',
+  source: 'shortcut' as const,
+  captured_at: '2026-08-17T05:12:00Z',
+}
 
 describe('normaliseCapture', () => {
   it("the owner's real tap: $2.11 at Three Square Market → 2.11 USD", () => {
@@ -59,5 +65,58 @@ describe('normaliseCapture', () => {
     )
     expect(n?.merchant).toBeNull()
     expect(Number.isFinite(Date.parse(n!.capturedAt))).toBe(true)
+  })
+})
+
+/**
+ * Siri's half: a sentence in, the four fields `createTransaction` needs
+ * out. The parser is mocked by hand here because the point is what
+ * happens around it, especially when it is not there at all.
+ */
+describe('normaliseSpoken', () => {
+  const spoken = (phrase: string) => ({ ...base, kind: 'phrase' as const, phrase, amount: '', merchant: '', currency: '' })
+
+  it('takes the parser at its word when it answered', () => {
+    expect(
+      normaliseSpoken(
+        spoken('five dollars at Walmart'),
+        { amount: 5, currency: 'USD', merchant: ' Walmart ', transacted_at: '2026-09-20T17:04:00Z' },
+        'EUR',
+      ),
+    ).toEqual({
+      amount: 5,
+      currency: 'USD',
+      merchant: 'Walmart',
+      transactedAt: '2026-09-20T17:04:00Z',
+    })
+  })
+
+  it('reads the amount out of the words when the parser never came back', () => {
+    // Offline at the till: the sentence still has to become a row.
+    expect(normaliseSpoken(spoken('$12.40 at Starbucks'), null, 'USD')).toEqual({
+      amount: 12.4,
+      currency: 'USD',
+      merchant: null,
+      transactedAt: base.captured_at,
+    })
+  })
+
+  it('falls back to the profile currency when nothing names one', () => {
+    // Regression: `inferShortcutCurrency` answers '' rather than null, so
+    // a `??` chain here wrote an empty currency_code and the write
+    // validator rejected the row. Every Siri entry outside the dollar and
+    // euro zones would have failed to save.
+    expect(normaliseSpoken(spoken('4000 at Ramco'), null, 'XOF')?.currency).toBe('XOF')
+    expect(normaliseSpoken(spoken('4000 at Ramco'), { amount: 4000, currency: '' }, 'XOF')?.currency).toBe('XOF')
+  })
+
+  it('keeps the symbol the speaker used over the profile currency', () => {
+    expect(normaliseSpoken(spoken('€8 at Monoprix'), null, 'USD')?.currency).toBe('EUR')
+  })
+
+  it('refuses to invent an amount', () => {
+    expect(normaliseSpoken(spoken('something at Walmart'), null, 'USD')).toBeNull()
+    expect(normaliseSpoken(spoken('zero dollars'), { amount: 0 }, 'USD')).toBeNull()
+    expect(normaliseSpoken(spoken('minus five'), { amount: -5 }, 'USD')).toBeNull()
   })
 })

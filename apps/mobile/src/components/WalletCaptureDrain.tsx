@@ -1,5 +1,15 @@
-// Apple Pay capture — the consumer (Aug 17, 2026). Mounted once in the
-// root layout, inside UndoProvider. Renders nothing.
+// Captures that arrive without the app on screen — the consumer
+// (Aug 17, 2026). Mounted once in the root layout, inside UndoProvider.
+// Renders nothing.
+//
+// Two producers, one queue (services/walletCapture.ts):
+//   'wallet' — an Apple Pay tap or the old deep link. Amount and merchant
+//              come from the card network, so there is nothing to parse.
+//   'phrase' — Siri heard a sentence (native/ios/SiriLogExpense.swift).
+//              It goes through `parseExpense`, the same parser the
+//              microphone uses, and the answer travels back to Siri so it
+//              can say the amount and merchant it actually filed
+//              (Sep 20, 2026).
 //
 // Drains the capture queue (services/walletCapture.ts) on mount, whenever
 // the app returns to the foreground, and on a poke from the deep-link
@@ -23,6 +33,7 @@ import {
   takePendingInMemory,
   onWalletCapturePoke,
   normaliseCapture,
+  normaliseSpoken,
   stashIncompleteCapture,
   pendingIncompleteCaptures,
   type WalletCaptureEntry,
@@ -46,6 +57,14 @@ import {
 } from '@voice-expense/shared'
 
 const CATEGORY_BUDGET_MS = 4000
+/** How long a Siri entry may wait on the parser. The intent gives the
+ *  whole round trip 9 s (SiriLogExpense.swift), and a cold JavaScript
+ *  start eats the rest. */
+const SIRI_PARSE_BUDGET_MS = 6000
+/** Past this, Siri has already spoken its fallback line, so the save also
+ *  posts a notification: without it a late finish would be silent. Must
+ *  match the intent's own timeout. */
+const SIRI_ANSWER_DEADLINE_MS = 9000
 
 export function WalletCaptureDrain() {
   const { user } = useAuth()
@@ -72,11 +91,15 @@ export function WalletCaptureDrain() {
         for (const entry of entries) {
           if (seen.current.has(entry.id)) continue
           seen.current.add(entry.id)
+          let dialog: string | null = null
           try {
-            await saveOne(entry)
+            if (entry.kind === 'phrase') dialog = await saveSpoken(entry)
+            else await saveOne(entry)
           } finally {
             // Release the waiting App Intent (no-op without the bridge).
-            reportCaptureDone(entry.id)
+            // Siri speaks `dialog`; a Wallet capture passes nothing and
+            // confirms with its notification instead.
+            reportCaptureDone(entry.id, dialog)
           }
         }
       } finally {
@@ -186,6 +209,119 @@ export function WalletCaptureDrain() {
         title: `${t('applepay.notif_captured', locale)} · ${money}`,
         body: `${label} · ${categoryName ?? t('applepay.uncategorised', locale)} · ${t('applepay.tap_to_edit', locale)}`,
       })
+    }
+
+    /**
+     * A sentence Siri heard, turned into a row and into the line Siri
+     * says back. Returns that line, or null when there is nothing worth
+     * saying (no signed-in user).
+     *
+     * Everything the microphone does, this does: the same parser, the
+     * same category resolution, the same offline-first write, the same
+     * undo toast. What it never does is guess. A sentence with no amount
+     * is not saved as a phantom row; Siri says so and the user repeats
+     * it, which costs four seconds and no cleanup.
+     */
+    const saveSpoken = async (entry: WalletCaptureEntry): Promise<string | null> => {
+      const { profile, categories, createTransaction, showUndo, userId } = ref.current
+      if (!userId) return null
+      const profileCurrency = profile?.currency_code ?? 'USD'
+      const locale = (profile?.locale ?? 'en') as Locale
+      const tz = profile?.timezone || 'UTC'
+
+      let parsed: Awaited<ReturnType<typeof parseExpense>> | null = null
+      try {
+        const { data } = await supabase.auth.getSession()
+        const token = data?.session?.access_token ?? ''
+        const apiBaseUrl = await getApiUrl()
+        parsed = await Promise.race([
+          parseExpense({
+            transcript: entry.phrase,
+            locale: locale as never,
+            currency: profileCurrency,
+            categories: categories.map((c) => c.name),
+            apiBaseUrl,
+            authToken: token,
+            userId,
+            todayCivilDate: localDay(new Date().toISOString(), tz),
+          }),
+          new Promise<null>((resolve) => setTimeout(() => resolve(null), SIRI_PARSE_BUDGET_MS)),
+        ])
+      } catch {
+        // Offline, a rejected parse, an expired session: fall through to
+        // the local reading below rather than losing the entry.
+        parsed = null
+      }
+
+      // Without a parser (offline, or slower than Siri's budget) the
+      // amount is read out of the words themselves: a bare amount with the
+      // sentence kept as the transcript beats losing the entry.
+      const n = normaliseSpoken(entry, parsed, profileCurrency)
+      if (!n) return t('siri.no_amount', locale)
+      const { amount, currency, merchant } = n
+      const categoryId = parsed
+        ? (resolveCategorySuggestion(parsed.category_suggestion, categories)?.category.id ?? null)
+        : (guessCategoryFromMerchant(merchant, categories)?.category.id ?? null)
+      const merchantDomain = parsed?.merchant_domain ?? brandDomainForMerchant(merchant)
+
+      const result = await createTransaction({
+        amount,
+        // The parser classifies intent and code derives the sign, so
+        // "I got paid 200" through Siri lands as income, exactly as it
+        // would through the microphone. Without a parse it is a debit.
+        direction: parsed?.direction ?? deriveDirectionFromFlowType('expense'),
+        currency_code: currency,
+        merchant,
+        note: parsed?.note ?? null,
+        category_id: categoryId,
+        merchant_domain: merchantDomain,
+        payment_method: parsed?.payment_method ?? null,
+        transacted_at: n.transactedAt,
+        // It was spoken, so it is a voice entry: it reads that way in the
+        // transaction detail and counts that way in insights.
+        source: 'voice',
+        raw_transcript: entry.phrase,
+        ai_confidence: parsed?.confidence ?? null,
+        // Never from Siri: a recurring rule the user did not confirm
+        // writes months of future rows on one unheard sentence.
+        is_recurring: false,
+      })
+      if (result.error && result.status === 'rejected') return t('siri.failed', locale)
+
+      const savedId = result.id
+      const money = formatMoney(amount, currency, locale)
+      const categoryName = categoryId
+        ? (categories.find((c) => c.id === categoryId)?.name ?? null)
+        : null
+      const label = merchant ?? categoryName ?? t('voice.expense', locale)
+      showUndo({
+        message: `${t('voice.saved', locale)} · ${label} ${money}`,
+        undoLabel: t('common.undo', locale),
+        undo: async () => {
+          if (savedId) await deleteTransactionAndEnqueue(userId, savedId)
+        },
+      })
+
+      // Siri has already answered by now if we took too long, so leave a
+      // notification behind; `notifySaved` is a no-op while the app is on
+      // screen, where the toast above is the confirmation.
+      if (Date.now() - Date.parse(entry.captured_at) > SIRI_ANSWER_DEADLINE_MS) {
+        await ensureWalletCaptureCategory({
+          undo: t('common.undo', locale),
+          edit: t('common.edit', locale),
+        })
+        await notifySaved({
+          captureId: entry.id,
+          transactionId: savedId ?? null,
+          userId,
+          title: `${t('siri.notif_title', locale)} · ${money}`,
+          body: `${label} · ${categoryName ?? t('applepay.uncategorised', locale)} · ${t('applepay.tap_to_edit', locale)}`,
+        })
+      }
+
+      return merchant
+        ? t('siri.saved', locale).replace('{money}', money).replace('{merchant}', merchant)
+        : t('siri.saved_plain', locale).replace('{money}', money)
     }
 
     const renotifyIncomplete = async () => {

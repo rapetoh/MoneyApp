@@ -17,7 +17,7 @@
 // iOS launches the app in the background to run the intent, so the JS
 // drain normally runs within seconds; worst case it runs on next open.
 //
-// Compiled into the main app target by plugins/withWalletCapture.js
+// Compiled into the main app target by plugins/withMurmurIntents.js
 // (App Intents must live in the app target for Xcode's metadata
 // extraction to see them). iOS 16+ only — @available keeps the
 // deployment target unchanged.
@@ -72,8 +72,8 @@ struct LogExpenseIntent: AppIntent {
     // without it the row was saved 20 minutes later, on next open).
     // 8 s, not 20: automations run the intent with a tight execution
     // budget, and overrunning it reads as "Automation failed" to the user.
-    let handledByJS = await WalletCaptureCoordinator.wakeAndWait(id: id, timeout: 8)
-    if handledByJS { return .result() }
+    let outcome = await WalletCaptureCoordinator.wakeAndWait(id: id, timeout: 8)
+    if outcome.handled { return .result() }
 
     // JS did not answer (app not running and iOS did not launch it, or a
     // very slow start): leave a Murmur-branded placeholder so the user
@@ -101,27 +101,43 @@ struct LogExpenseIntent: AppIntent {
 /// forwards `MurmurWalletCaptureDidAppend` to JS as an event and posts
 /// `MurmurWalletCaptureDone` when JS calls `reportDone(id)`. Both sides
 /// share only these notification names — no symbols across targets.
+///
+/// Sep 20, 2026: the hand-off carries an optional `dialog` string back, so
+/// the Siri intent (SiriLogExpense.swift) can speak what JavaScript
+/// actually saved ("Saved, $5.00 at Walmart") instead of a canned line.
+/// The Wallet intent ignores it.
 enum WalletCaptureCoordinator {
   static let didAppend = Notification.Name("MurmurWalletCaptureDidAppend")
   static let done = Notification.Name("MurmurWalletCaptureDone")
 
-  static func wakeAndWait(id: String, timeout: TimeInterval) async -> Bool {
-    await withCheckedContinuation { (cont: CheckedContinuation<Bool, Never>) in
+  struct Outcome {
+    /// JavaScript reported this entry handled before the timeout.
+    let handled: Bool
+    /// What to say out loud, when JS supplied it.
+    let dialog: String?
+  }
+
+  static func wakeAndWait(id: String, timeout: TimeInterval) async -> Outcome {
+    await withCheckedContinuation { (cont: CheckedContinuation<Outcome, Never>) in
       let lock = NSLock()
       var finished = false
       var token: NSObjectProtocol?
-      let finish: (Bool) -> Void = { ok in
+      let finish: (Outcome) -> Void = { outcome in
         lock.lock(); defer { lock.unlock() }
         if finished { return }
         finished = true
         if let t = token { NotificationCenter.default.removeObserver(t) }
-        cont.resume(returning: ok)
+        cont.resume(returning: outcome)
       }
       token = NotificationCenter.default.addObserver(forName: done, object: nil, queue: nil) { n in
-        if (n.userInfo?["id"] as? String) == id { finish(true) }
+        if (n.userInfo?["id"] as? String) == id {
+          finish(Outcome(handled: true, dialog: n.userInfo?["dialog"] as? String))
+        }
       }
       NotificationCenter.default.post(name: didAppend, object: nil, userInfo: ["id": id])
-      DispatchQueue.global().asyncAfter(deadline: .now() + timeout) { finish(false) }
+      DispatchQueue.global().asyncAfter(deadline: .now() + timeout) {
+        finish(Outcome(handled: false, dialog: nil))
+      }
     }
   }
 }

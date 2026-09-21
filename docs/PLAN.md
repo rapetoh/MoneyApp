@@ -6752,4 +6752,14 @@ rebuilds the screenshots and the share card. Full record, including what is
 still missing (proof, measurement, languages, more than one page):
 `docs/website-2026-09-20.md`.
 
+## Siri logging (Sep 20, 2026)
+
+"Hey Siri, log an expense in Murmur", answered with "What did you spend?",
+then the sentence, then a spoken confirmation of the row that was written.
+Built on App Intents only (Apple deprecated SiriKit at WWDC 2026) and on
+the Apple Pay capture queue that already existed, so there is one parser,
+one save path and one undo. Phrases ship in en, fr, es and pt. Full
+record, including why one utterance is not possible for a third-party app:
+`docs/siri-2026-09-20.md`.
+
 *End of Plan*
