@@ -1,6 +1,7 @@
 import { supabase, removePersistedAuthSession } from '../lib/supabase'
 import { useEffect, useState } from 'react'
 import * as SecureStore from 'expo-secure-store'
+import { clearCapturePrefs } from '../services/capturePrefs'
 import * as AuthSession from 'expo-auth-session'
 import type { Session, User } from '@supabase/supabase-js'
 import { syncManager } from '../services/sync/SyncManager'
@@ -56,6 +57,10 @@ export async function resetLocalState(): Promise<void> {
   // change reaches every build, and against the very first parse this
   // session having run before sign-in resolved a `userId` to key on.
   clearParseCache()
+  // The cached currency/locale/timezone a background capture reads when
+  // the profile has not loaded yet (services/capturePrefs.ts) — the next
+  // account's first Siri entry must not inherit this one's currency.
+  clearCapturePrefs()
   // Reminders were scheduled for the old account; cancelling also drops
   // their persisted notification ids.
   await cancelAllReminders()

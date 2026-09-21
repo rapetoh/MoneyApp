@@ -38,6 +38,7 @@ import {
   pendingIncompleteCaptures,
   type WalletCaptureEntry,
 } from '../services/walletCapture'
+import { rememberCapturePrefs, readCapturePrefs } from '../services/capturePrefs'
 import {
   ensureWalletCaptureCategory,
   notifySaved,
@@ -77,6 +78,19 @@ export function WalletCaptureDrain() {
   // Latest values for the async drain without re-subscribing.
   const ref = useRef({ userId, profile, categories, createTransaction, showUndo })
   ref.current = { userId, profile, categories, createTransaction, showUndo }
+
+  // Keep the on-disk copy of the three fields a background capture needs
+  // in step with the profile. Siri and Apple Pay run with the app cold,
+  // where the in-memory profile cache is empty and the network may not
+  // have answered yet.
+  useEffect(() => {
+    if (!profile?.currency_code) return
+    rememberCapturePrefs({
+      currency: profile.currency_code,
+      locale: (profile.locale ?? 'en') as Locale,
+      timezone: profile.timezone || 'UTC',
+    })
+  }, [profile?.currency_code, profile?.locale, profile?.timezone])
   const draining = useRef(false)
   const seen = useRef(new Set<string>())
 
@@ -107,12 +121,26 @@ export function WalletCaptureDrain() {
       }
     }
 
+    /**
+     * Currency, language and timezone for a capture, from the profile
+     * when it is loaded and from disk when it is not. A capture arrives
+     * precisely when the app was not running, so "not loaded" is the
+     * normal case, not the edge case.
+     */
+    const prefs = (): { currency: string; locale: Locale; tz: string } => {
+      const { profile } = ref.current
+      const stored = profile?.currency_code ? null : readCapturePrefs()
+      return {
+        currency: profile?.currency_code || stored?.currency || 'USD',
+        locale: ((profile?.locale || stored?.locale) ?? 'en') as Locale,
+        tz: profile?.timezone || stored?.timezone || 'UTC',
+      }
+    }
+
     const saveOne = async (entry: WalletCaptureEntry) => {
-      const { profile, categories, createTransaction, showUndo, userId } = ref.current
+      const { categories, createTransaction, showUndo, userId } = ref.current
       if (!userId) return
-      const currency = profile?.currency_code ?? 'USD'
-      const locale = (profile?.locale ?? 'en') as Locale
-      const tz = profile?.timezone || 'UTC'
+      const { currency, locale, tz } = prefs()
       const n = normaliseCapture(entry, currency)
       if (!n) {
         // Missing amount (pay-at-pump pre-auth, Aug 24 2026): park it until
@@ -223,11 +251,9 @@ export function WalletCaptureDrain() {
      * it, which costs four seconds and no cleanup.
      */
     const saveSpoken = async (entry: WalletCaptureEntry): Promise<string | null> => {
-      const { profile, categories, createTransaction, showUndo, userId } = ref.current
+      const { categories, createTransaction, showUndo, userId } = ref.current
       if (!userId) return null
-      const profileCurrency = profile?.currency_code ?? 'USD'
-      const locale = (profile?.locale ?? 'en') as Locale
-      const tz = profile?.timezone || 'UTC'
+      const { currency: profileCurrency, locale, tz } = prefs()
 
       let parsed: Awaited<ReturnType<typeof parseExpense>> | null = null
       try {
@@ -325,8 +351,7 @@ export function WalletCaptureDrain() {
     }
 
     const renotifyIncomplete = async () => {
-      const { profile } = ref.current
-      const locale = (profile?.locale ?? 'en') as Locale
+      const { locale } = prefs()
       for (const entry of pendingIncompleteCaptures()) {
         const merchant = entry.merchant.trim()
         await notifyIncomplete({
