@@ -295,9 +295,14 @@ export function WalletCaptureDrain() {
       const n = normaliseSpoken(entry, parsed, profileCurrency)
       if (!n) return t('siri.no_amount', locale)
       const { amount, currency, merchant } = n
-      const categoryId = parsed
-        ? (resolveCategorySuggestion(parsed.category_suggestion, categories)?.category.id ?? null)
-        : (guessCategoryFromMerchant(merchant, categories)?.category.id ?? null)
+      // The parser's suggestion first, then the local merchant table when
+      // it named a category this account does not have. Same order the
+      // Apple Pay path uses, so a Walmart run is filed the same way
+      // whichever way it was captured.
+      const categoryId =
+        (parsed
+          ? (resolveCategorySuggestion(parsed.category_suggestion, categories)?.category.id ?? null)
+          : null) ?? (guessCategoryFromMerchant(merchant, categories)?.category.id ?? null)
       const merchantDomain = parsed?.merchant_domain ?? brandDomainForMerchant(merchant)
 
       const result = await createTransaction({
