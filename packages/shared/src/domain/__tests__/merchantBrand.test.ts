@@ -4,7 +4,7 @@
  * Chase/Wallet strings.
  */
 import { describe, expect, it } from 'vitest'
-import { cleanMerchantDescriptor, brandDomainForMerchant } from '../merchantBrand'
+import { cleanMerchantDescriptor, brandDomainForMerchant, normalizeMerchantCase } from '../merchantBrand'
 
 describe('cleanMerchantDescriptor', () => {
   it.each([
@@ -43,5 +43,33 @@ describe('brandDomainForMerchant', () => {
     expect(brandDomainForMerchant('Canteen Des Moines 2')).toBeNull()
     expect(brandDomainForMerchant('Peking Buffet Inc')).toBeNull()
     expect(brandDomainForMerchant('')).toBeNull()
+  })
+})
+
+describe('normalizeMerchantCase', () => {
+  it('gives a shouted or whispered name the casing a person would write', () => {
+    // The owner's Today list, build 64: "target" from the microphone sat
+    // above "Target" from Siri, reading as two different shops.
+    expect(normalizeMerchantCase('target')).toBe('Target')
+    expect(normalizeMerchantCase('dollar tree')).toBe('Dollar Tree')
+    expect(normalizeMerchantCase('WALMART')).toBe('Walmart')
+  })
+
+  it('leaves a name that already made a choice', () => {
+    expect(normalizeMerchantCase('iPhone repair')).toBe('iPhone repair')
+    expect(normalizeMerchantCase('eBay')).toBe('eBay')
+    expect(normalizeMerchantCase("McDonald's")).toBe("McDonald's")
+  })
+
+  it('keeps short all-caps names, which are acronyms', () => {
+    expect(normalizeMerchantCase('KFC')).toBe('KFC')
+    expect(normalizeMerchantCase('IKEA')).toBe('IKEA')
+    expect(normalizeMerchantCase('BP')).toBe('BP')
+  })
+
+  it('handles nothing at all', () => {
+    expect(normalizeMerchantCase('')).toBe('')
+    expect(normalizeMerchantCase(null)).toBe('')
+    expect(normalizeMerchantCase('  spacex  ')).toBe('Spacex')
   })
 })

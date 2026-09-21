@@ -795,5 +795,8 @@
   "siri.result_label": "A Siri confirma",
   "siri.footnote": "A Apple exige o nome do app na frase: \"registrar cinco reais no Carrefour\" sozinho não chega ao Murmur. No app Atalhos você pode renomear a ação como quiser, ou colocá-la no botão de Ação.",
   "siri.open_shortcuts": "Abrir Atalhos",
-  "siri.result": "Salvo. R$ 5,00 no Carrefour."
+  "siri.result": "Salvo. R$ 5,00 no Carrefour.",
+  "siri.first_run": "Na primeira vez, o iOS pede para ativar o atalho. Toque em Ativar e diga a frase de novo.",
+  "siri.phrase_alt_label": "Ou qualquer uma destas",
+  "siri.phrase_alt": "Gasto no Murmur · Adicionar um gasto ao Murmur · Novo gasto no Murmur · Anotar uma compra no Murmur"
 }

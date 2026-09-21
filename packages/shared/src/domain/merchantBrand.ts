@@ -34,6 +34,29 @@ export function cleanMerchantDescriptor(raw: string | null | undefined): string 
   return out || s
 }
 
+/**
+ * Give a merchant the casing a person would write (Sep 21, 2026).
+ *
+ * Speech and card descriptors arrive shouting or whispering: "target",
+ * "DOLLAR TREE", "walmart". Stored verbatim, the same shop appears twice
+ * in a list with two different spellings, which looks like two shops. So a
+ * string that carries no case decision of its own gets title case.
+ *
+ * A string that already mixes cases is left exactly as it is: "iPhone",
+ * "eBay" and "McDonald's" are choices, not accidents. Short all-caps
+ * tokens stay too, because they are nearly always acronyms ("KFC", "BP",
+ * "IKEA") and "Kfc" is worse than the problem being fixed.
+ */
+export function normalizeMerchantCase(raw: string | null | undefined): string {
+  const s = (raw ?? '').trim()
+  if (!s) return ''
+  if (/\p{Ll}/u.test(s) && /\p{Lu}/u.test(s)) return s
+  return s.replace(/[\p{L}\p{N}'\u2019&.]+/gu, (word) => {
+    if (word.length <= 4 && word === word.toUpperCase() && /\p{Lu}/u.test(word)) return word
+    return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+  })
+}
+
 /** Brand table: descriptor pattern → the brand's website domain (what the
  *  favicon pipeline needs). First match wins. Patterns run against the
  *  RAW descriptor so store numbers can't break the match. */

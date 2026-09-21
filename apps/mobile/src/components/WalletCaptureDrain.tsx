@@ -292,7 +292,7 @@ export function WalletCaptureDrain() {
       // Without a parser (offline, or slower than Siri's budget) the
       // amount is read out of the words themselves: a bare amount with the
       // sentence kept as the transcript beats losing the entry.
-      const n = normaliseSpoken(entry, parsed, profileCurrency)
+      const n = normaliseSpoken(entry, parsed, profileCurrency, tz)
       if (!n) return t('siri.no_amount', locale)
       const { amount, currency, merchant } = n
       // The parser's suggestion first, then the local merchant table when

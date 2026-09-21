@@ -52,6 +52,19 @@ export default function SiriScreen() {
           ))}
         </View>
 
+        {/* The one-time step that tripped the owner up: iOS asks to
+            enable the shortcut mid-sentence, which drops the thread and
+            sends the next thing you say to plain Siri. */}
+        <View style={styles.noteCard}>
+          <Ionicons name="information-circle-outline" size={16} color={Colors.accent} />
+          <Text style={styles.noteText}>{t('siri.first_run', locale)}</Text>
+        </View>
+
+        <View style={styles.altCard}>
+          <Text style={styles.turnLabel}>{t('siri.phrase_alt_label', locale)}</Text>
+          <Text style={styles.altText}>{t('siri.phrase_alt', locale)}</Text>
+        </View>
+
         <Pressable
           onPress={() => Linking.openURL('shortcuts://')}
           style={({ pressed }) => [styles.cta, pressed && { opacity: 0.85 }]}
@@ -120,6 +133,35 @@ const styles = StyleSheet.create({
     letterSpacing: -0.2,
   },
   turnSiri: { fontFamily: Typography.fontFamily.sans, color: Colors.accent },
+  noteCard: {
+    flexDirection: 'row',
+    gap: 9,
+    alignItems: 'flex-start',
+    backgroundColor: Colors.accentSoft,
+    borderRadius: Radius.card,
+    paddingHorizontal: Spacing.base,
+    paddingVertical: 14,
+  },
+  noteText: {
+    flex: 1,
+    fontFamily: Typography.fontFamily.sans,
+    fontSize: 13.5,
+    lineHeight: 19,
+    color: Colors.ink ?? Colors.text,
+  },
+  altCard: {
+    gap: 5,
+    backgroundColor: Colors.surface ?? Colors.card,
+    borderRadius: Radius.card,
+    paddingHorizontal: Spacing.base,
+    paddingVertical: 14,
+  },
+  altText: {
+    fontFamily: Typography.fontFamily.sans,
+    fontSize: 14,
+    lineHeight: 21,
+    color: Colors.textSecondary,
+  },
   cta: {
     height: 50,
     borderRadius: 14,

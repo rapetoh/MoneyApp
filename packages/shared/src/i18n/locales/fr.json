@@ -795,5 +795,8 @@
   "siri.result_label": "Siri confirme",
   "siri.footnote": "Apple exige le nom de l'app dans la phrase : « enregistrer cinq euros chez Carrefour » seul n'arrivera pas jusqu'à Murmur. Dans l'app Raccourcis, vous pouvez renommer l'action comme vous voulez, ou la mettre sur le bouton Action.",
   "siri.open_shortcuts": "Ouvrir Raccourcis",
-  "siri.result": "Enregistré. 5,00 € chez Carrefour."
+  "siri.result": "Enregistré. 5,00 € chez Carrefour.",
+  "siri.first_run": "La première fois, iOS vous demande d'activer le raccourci. Touchez Activer, puis redites la phrase.",
+  "siri.phrase_alt_label": "Ou une de celles-ci",
+  "siri.phrase_alt": "Dépense Murmur · Ajouter une dépense à Murmur · Nouvelle dépense dans Murmur · Noter un achat dans Murmur"
 }

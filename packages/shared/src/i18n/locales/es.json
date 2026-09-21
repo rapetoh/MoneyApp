@@ -795,5 +795,8 @@
   "siri.result_label": "Siri confirma",
   "siri.footnote": "Apple exige el nombre de la app en la frase: \"registrar cinco euros en Mercadona\" por sí solo no llega a Murmur. En la app Atajos puedes renombrar la acción como quieras, o ponerla en el botón de Acción.",
   "siri.open_shortcuts": "Abrir Atajos",
-  "siri.result": "Guardado. 5,00 € en Mercadona."
+  "siri.result": "Guardado. 5,00 € en Mercadona.",
+  "siri.first_run": "La primera vez, iOS te pide que actives el atajo. Toca Activar y repite la frase.",
+  "siri.phrase_alt_label": "O cualquiera de estas",
+  "siri.phrase_alt": "Gasto en Murmur · Añadir un gasto a Murmur · Nuevo gasto en Murmur · Anotar una compra en Murmur"
 }

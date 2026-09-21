@@ -795,5 +795,8 @@
   "siri.result_label": "Siri confirms",
   "siri.footnote": "Apple requires the app name in the phrase, so \"log five dollars at Walmart\" on its own will not reach Murmur. In the Shortcuts app you can rename the action to any phrase you like, or put it on the Action button.",
   "siri.open_shortcuts": "Open Shortcuts",
-  "siri.result": "Saved. $5.00 at Walmart."
+  "siri.result": "Saved. $5.00 at Walmart.",
+  "siri.first_run": "The first time you say it, iOS asks you to turn the shortcut on. Tap Turn On, then say the phrase again.",
+  "siri.phrase_alt_label": "Or any of these",
+  "siri.phrase_alt": "Murmur expense · Add an expense to Murmur · New expense in Murmur · Log a purchase in Murmur"
 }

@@ -19,6 +19,7 @@
 // there is nothing to confirm (owner decision Aug 17 2026, matching
 // MonAi). The undo toast is the safety net.
 import { File, Paths } from 'expo-file-system'
+import { normalizeParsedTransactedAt } from '@voice-expense/shared'
 import { parseShortcutAmount, inferShortcutCurrency } from './shortcutLink'
 
 export const WALLET_QUEUE_FILE = 'wallet-capture-queue.jsonl'
@@ -241,6 +242,8 @@ export function normaliseSpoken(
   entry: WalletCaptureEntry,
   parsed: SpokenParse | null,
   profileCurrency: string,
+  timezone: string,
+  nowIso: string = new Date().toISOString(),
 ): NormalisedSpoken | null {
   const amount = parsed?.amount ?? parseShortcutAmount(entry.phrase)
   if (amount == null || !Number.isFinite(amount) || amount <= 0) return null
@@ -249,7 +252,15 @@ export function normaliseSpoken(
   // the write validator.
   const currency = parsed?.currency || inferShortcutCurrency(entry.phrase, '') || profileCurrency
   const merchant = parsed?.merchant?.trim() || null
-  const transactedAt = parsed?.transacted_at || entry.captured_at
+  // The parser answers a date with no time as midnight UTC, which is the
+  // *previous evening* anywhere west of London: the owner's first two
+  // Siri entries landed on Saturday at 7pm (build 64). The confirm sheet
+  // has repaired this since build 8; this path skipped the repair. Null
+  // back from it means "no real date in the sentence", and the moment
+  // Siri heard it is the honest answer.
+  const transactedAt =
+    normalizeParsedTransactedAt(parsed?.transacted_at ?? null, timezone, nowIso) ??
+    entry.captured_at
   return { amount, currency, merchant, transactedAt }
 }
 

@@ -98,13 +98,25 @@ struct MurmurAppShortcuts: AppShortcutsProvider {
   static var appShortcuts: [AppShortcut] {
     AppShortcut(
       intent: LogSpokenExpenseIntent(),
+      // Twelve ways of saying the same thing, because a user should not
+      // have to memorise one sentence (owner, Sep 21 2026). The app name
+      // is the only fixed part, and Apple requires it. Keep this list
+      // identical to `PHRASES.en` in native/ios/siri-phrases.js: a test
+      // (src/services/__tests__/siriPhrases.test.ts) fails if they drift,
+      // because the localisations are keyed by these exact strings.
       phrases: [
         "Log an expense in \(.applicationName)",
         "Log a purchase in \(.applicationName)",
         "Log spending in \(.applicationName)",
         "Add an expense to \(.applicationName)",
+        "Add an expense in \(.applicationName)",
         "New expense in \(.applicationName)",
         "Track an expense in \(.applicationName)",
+        "Record an expense in \(.applicationName)",
+        "Note an expense in \(.applicationName)",
+        "Start an expense in \(.applicationName)",
+        "\(.applicationName) expense",
+        "\(.applicationName) log an expense",
       ],
       shortTitle: "Log an expense",
       systemImageName: "mic.fill"

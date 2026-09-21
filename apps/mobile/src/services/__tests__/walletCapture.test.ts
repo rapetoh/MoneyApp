@@ -74,6 +74,9 @@ describe('normaliseCapture', () => {
  * happens around it, especially when it is not there at all.
  */
 describe('normaliseSpoken', () => {
+  const TZ = 'America/Chicago'
+  // Sunday 20 Sep 2026, 20:15 in Chicago.
+  const NOW = '2026-09-21T01:15:00.000Z'
   const spoken = (phrase: string) => ({ ...base, kind: 'phrase' as const, phrase, amount: '', merchant: '', currency: '' })
 
   it('takes the parser at its word when it answered', () => {
@@ -82,6 +85,8 @@ describe('normaliseSpoken', () => {
         spoken('five dollars at Walmart'),
         { amount: 5, currency: 'USD', merchant: ' Walmart ', transacted_at: '2026-09-20T17:04:00Z' },
         'EUR',
+        TZ,
+        NOW,
       ),
     ).toEqual({
       amount: 5,
@@ -93,7 +98,7 @@ describe('normaliseSpoken', () => {
 
   it('reads the amount out of the words when the parser never came back', () => {
     // Offline at the till: the sentence still has to become a row.
-    expect(normaliseSpoken(spoken('$12.40 at Starbucks'), null, 'USD')).toEqual({
+    expect(normaliseSpoken(spoken('$12.40 at Starbucks'), null, 'USD', TZ, NOW)).toEqual({
       amount: 12.4,
       currency: 'USD',
       merchant: null,
@@ -106,17 +111,40 @@ describe('normaliseSpoken', () => {
     // a `??` chain here wrote an empty currency_code and the write
     // validator rejected the row. Every Siri entry outside the dollar and
     // euro zones would have failed to save.
-    expect(normaliseSpoken(spoken('4000 at Ramco'), null, 'XOF')?.currency).toBe('XOF')
-    expect(normaliseSpoken(spoken('4000 at Ramco'), { amount: 4000, currency: '' }, 'XOF')?.currency).toBe('XOF')
+    expect(normaliseSpoken(spoken('4000 at Ramco'), null, 'XOF', TZ, NOW)?.currency).toBe('XOF')
+    expect(normaliseSpoken(spoken('4000 at Ramco'), { amount: 4000, currency: '' }, 'XOF', TZ, NOW)?.currency).toBe('XOF')
   })
 
   it('keeps the symbol the speaker used over the profile currency', () => {
-    expect(normaliseSpoken(spoken('€8 at Monoprix'), null, 'USD')?.currency).toBe('EUR')
+    expect(normaliseSpoken(spoken('€8 at Monoprix'), null, 'USD', TZ, NOW)?.currency).toBe('EUR')
   })
 
   it('refuses to invent an amount', () => {
-    expect(normaliseSpoken(spoken('something at Walmart'), null, 'USD')).toBeNull()
-    expect(normaliseSpoken(spoken('zero dollars'), { amount: 0 }, 'USD')).toBeNull()
-    expect(normaliseSpoken(spoken('minus five'), { amount: -5 }, 'USD')).toBeNull()
+    expect(normaliseSpoken(spoken('something at Walmart'), null, 'USD', TZ, NOW)).toBeNull()
+    expect(normaliseSpoken(spoken('zero dollars'), { amount: 0 }, 'USD', TZ, NOW)).toBeNull()
+    expect(normaliseSpoken(spoken('minus five'), { amount: -5 }, 'USD', TZ, NOW)).toBeNull()
+  })
+
+  it('files a dateless sentence at the moment Siri heard it', () => {
+    // Build 64, on the owner's phone: the parser answers "today" as
+    // midnight UTC, which renders as the previous evening in Chicago, so
+    // both Siri entries landed on Saturday at 7pm. Null back from the
+    // repair means "no real date was said".
+    const entry = { ...spoken('five dollars at Target'), captured_at: NOW }
+    const out = normaliseSpoken(entry, { amount: 5, transacted_at: '2026-09-20T00:00:00Z' }, 'USD', TZ, NOW)
+    expect(out?.transactedAt).toBe(NOW)
+  })
+
+  it('keeps a date the speaker actually named, at midday local', () => {
+    const entry = { ...spoken('forty dollars at Shell on Friday'), captured_at: NOW }
+    const out = normaliseSpoken(entry, { amount: 40, transacted_at: '2026-09-18T00:00:00Z' }, 'USD', TZ, NOW)
+    // Midday in Chicago, not midnight UTC: the row lands on Friday.
+    expect(out?.transactedAt).toBe('2026-09-18T17:00:00.000Z')
+  })
+
+  it('keeps a full instant untouched', () => {
+    const entry = { ...spoken('nine dollars at Dunkin'), captured_at: NOW }
+    const out = normaliseSpoken(entry, { amount: 9, transacted_at: '2026-09-19T14:32:00.000Z' }, 'USD', TZ, NOW)
+    expect(out?.transactedAt).toBe('2026-09-19T14:32:00.000Z')
   })
 })

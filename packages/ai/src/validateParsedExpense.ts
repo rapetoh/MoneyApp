@@ -29,6 +29,7 @@ import type {
   RecurringFrequency,
   TransactionDirection,
 } from '@voice-expense/shared'
+import { normalizeMerchantCase } from '@voice-expense/shared'
 
 export interface ValidateParsedExpenseOptions {
   /** Overrides the default note-length cap (characters). Exposed for tests;
@@ -307,7 +308,12 @@ export function validateParsedExpense(
   const rawNote = trimmedStringOrNull(r.note)
   const note = rawNote ? rawNote.slice(0, maxNoteLength) : null
 
-  const merchant = trimmedStringOrNull(r.merchant)
+  // Casing is normalised here, at the one boundary every parsed expense
+  // crosses (voice, Siri, receipt scan, the Android notification
+  // listener), so "target" and "Target" cannot become two shops in the
+  // same list. A merchant the user types by hand is left alone: that is a
+  // choice, not a transcription artefact.
+  const merchant = normalizeMerchantCase(trimmedStringOrNull(r.merchant)) || null
   const merchantDomain = trimmedStringOrNull(r.merchant_domain)
   const categorySuggestion = trimmedStringOrNull(r.category_suggestion)
   const needsClarification = r.needs_clarification === true
