@@ -273,7 +273,7 @@ export function useTransactions(userId: string | undefined) {
 
   async function editTransaction(
     id: string,
-    fields: Partial<Pick<Transaction, 'amount' | 'merchant' | 'note' | 'category_id' | 'payment_method' | 'direction' | 'is_recurring' | 'recurring_frequency'>>,
+    fields: Partial<Pick<Transaction, 'amount' | 'transacted_at' | 'merchant' | 'note' | 'category_id' | 'payment_method' | 'direction' | 'is_recurring' | 'recurring_frequency'>>,
   ): Promise<MutationResult> {
     if (!userId) return { id, status: 'rejected', error: 'Not authenticated' }
 
@@ -294,6 +294,28 @@ export function useTransactions(userId: string | undefined) {
           id,
           Math.round(fields.amount * row.fx_rate_to_profile * 100) / 100,
         )
+      }
+    }
+
+    // The date moved, and the FX rate was dated to the old one. For a row
+    // in the profile's own currency there is nothing to redo; for a
+    // foreign-currency row the rate belongs to a day that is no longer
+    // this transaction's, so it is re-snapshotted against the new date.
+    // Offline, the snapshot is left as it was rather than guessed at; the
+    // backfill sweep owns rows whose rate is missing.
+    if (fields.transacted_at != null) {
+      const store = await import('../services/sync/transactionStore')
+      const row = await store.getTransactionById(id)
+      const profileCurrency = getCurrentProfileCurrency()
+      if (row && row.currency_code !== profileCurrency) {
+        const fx = await snapshotFx(
+          fields.transacted_at,
+          row.currency_code,
+          profileCurrency,
+          fields.amount ?? row.amount,
+          getDeviceTimeZone(),
+        )
+        if (fx) await store.updateFxSnapshot(id, fx)
       }
     }
 

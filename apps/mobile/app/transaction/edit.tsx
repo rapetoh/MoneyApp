@@ -20,6 +20,7 @@ import { useTransactions } from '../../src/hooks/useTransactions'
 import { useRecurringRules } from '../../src/hooks/useRecurringRules'
 import { getTransactionById } from '../../src/services/sync/transactionStore'
 import { CategoryPicker } from '../../src/components/CategoryPicker'
+import { DateTimeField } from '../../src/components/DateTimeField'
 import { RecurringToggle } from '../../src/components/RecurringToggle'
 import { NumericAccessory, NUMERIC_ACCESSORY_ID } from '../../src/components/NumericAccessory'
 import { useKeyboardLift } from '../../src/hooks/useKeyboardLift'
@@ -51,6 +52,9 @@ export default function EditTransactionScreen() {
   const [txn, setTxn] = useState<Transaction | null>(null)
 
   const [amount, setAmount] = useState('')
+  // When it happened, editable (Sep 21, 2026). It also anchors the
+  // recurring rule this transaction may own, so it is not cosmetic.
+  const [transactedAt, setTransactedAt] = useState<string>(() => new Date().toISOString())
   const [merchant, setMerchant] = useState('')
   const [note, setNote] = useState('')
   const [categoryId, setCategoryId] = useState<string | null>(null)
@@ -84,6 +88,7 @@ export default function EditTransactionScreen() {
       if (data) {
         setTxn(data)
         setAmount(String(data.amount))
+        setTransactedAt(data.transacted_at)
         setMerchant(data.merchant ?? '')
         setNote(data.note ?? '')
         setCategoryId(data.category_id)
@@ -156,8 +161,11 @@ export default function EditTransactionScreen() {
     }
 
     setSaving(true)
+    const dateChanged = transactedAt !== txn.transacted_at
+
     const { error } = await editTransaction(txn.id, {
       amount: parsedAmount,
+      ...(dateChanged ? { transacted_at: transactedAt } : {}),
       direction,
       merchant: merchant.trim() || null,
       note: note.trim() || null,
@@ -185,6 +193,12 @@ export default function EditTransactionScreen() {
         payment_method: paymentMethod,
         note: note.trim() || null,
         frequency,
+        // Moving the date of the entry that defines a schedule moves the
+        // schedule: a phone bill corrected from the 21st to the 14th is
+        // due on the 14th from now on. `updateRule` re-anchors the day,
+        // weekday and time and clears `last_generated`, so the new date
+        // is the next occurrence rather than one cadence past it.
+        ...(dateChanged ? { starts_at: transactedAt } : {}),
       })
     }
 
@@ -285,6 +299,13 @@ export default function EditTransactionScreen() {
                 placeholder={t('voice.note_placeholder', locale)}
                 placeholderTextColor={Colors.textMuted}
               />
+            </View>
+
+            {/* When it happened. Above payment on purpose: a date the user
+                came here to correct should not sit below a chip row they
+                have to scroll past. */}
+            <View style={styles.field}>
+              <DateTimeField value={transactedAt} onChange={setTransactedAt} locale={locale} />
             </View>
 
             <View style={styles.field}>

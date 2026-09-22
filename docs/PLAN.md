@@ -6762,4 +6762,14 @@ one save path and one undo. Phrases ship in en, fr, es and pt. Full
 record, including why one utterance is not possible for a third-party app:
 `docs/siri-2026-09-20.md`.
 
+## Editable dates (Sep 21, 2026)
+
+The date a transaction carries is now a field, not a fact handed down by
+the parser: Apple's compact date and time controls in both the confirm
+sheet and the edit screen, `transacted_at` updatable, the FX snapshot
+re-dated when a foreign-currency row moves, and a recurring rule
+re-anchored when the entry that defines it moves. Semi-monthly ("the 7th
+and the 21st") remains unsupported and is written up as its own piece.
+Record: `docs/dates-2026-09-21.md`.
+
 *End of Plan*

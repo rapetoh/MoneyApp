@@ -13,6 +13,7 @@ import {
   useWindowDimensions,
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
+import { DateTimeField } from './DateTimeField'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Money } from './Money'
 import { MerchantAvatar } from './MerchantAvatar'
@@ -191,6 +192,14 @@ export function VoiceResultSheet({
     [parsed.transacted_at, timezone],
   )
 
+  // The date the row will carry, and now something the user can change
+  // before saving (Sep 21, 2026). It starts at what was heard, or now
+  // when nothing was; `touched` keeps an untouched sheet writing null, so
+  // `createTransaction` still stamps the real save moment rather than the
+  // instant this sheet happened to open.
+  const [transactedAt, setTransactedAt] = useState<string | null>(null)
+  const chosenTransactedAt = transactedAt ?? normalizedTransactedAt
+
   // One save per sheet, ever — a double Save tap must not write two rows
   // (the row is created locally *before* the server answers, so
   // double-submit means duplicates).
@@ -216,7 +225,7 @@ export function VoiceResultSheet({
       isRecurring,
       recurringFrequency,
       paymentMethod,
-      transactedAt: normalizedTransactedAt,
+      transactedAt: chosenTransactedAt,
     })
   }
 
@@ -230,7 +239,7 @@ export function VoiceResultSheet({
 
   const whenLabel = useMemo(() => {
     const nowIso = new Date().toISOString()
-    const iso = normalizedTransactedAt ?? nowIso
+    const iso = chosenTransactedAt ?? nowIso
     const sameDay = localDay(iso, timezone) === localDay(nowIso, timezone)
     const d = new Date(iso)
     const day = sameDay
@@ -238,10 +247,14 @@ export function VoiceResultSheet({
       : d.toLocaleDateString(locale, { month: 'short', day: 'numeric', timeZone: timezone })
     const time = d.toLocaleTimeString(locale, { hour: 'numeric', minute: '2-digit', timeZone: timezone })
     // A repaired date-only parse has no honest time of day — show just the
-    // day for it rather than a fabricated noon.
-    const dateOnly = normalizedTransactedAt != null && parsed.transacted_at !== normalizedTransactedAt
+    // day for it rather than a fabricated noon. Once the user has picked a
+    // time themselves, it is honest and it shows.
+    const dateOnly =
+      transactedAt == null &&
+      normalizedTransactedAt != null &&
+      parsed.transacted_at !== normalizedTransactedAt
     return dateOnly ? day : `${day} · ${time}`
-  }, [normalizedTransactedAt, parsed.transacted_at, timezone, locale])
+  }, [chosenTransactedAt, transactedAt, normalizedTransactedAt, parsed.transacted_at, timezone, locale])
 
   const directionKey = direction === 'credit' ? 'voice.income_label' : 'voice.expense'
   const clarify = parsed.needs_clarification && parsed.clarifying_question ? parsed.clarifying_question : null
@@ -520,12 +533,18 @@ export function VoiceResultSheet({
                 )}
               </View>
 
-              {/* Date & time — read-only. The parse's own date (or now); a
-                  date picker is deliberately out of scope for this pass. */}
+              {/* Date & time. Heard from the sentence ("on the 14th", "last
+                  Friday") and correctable here: an expense is entered on
+                  the day you think of it, not always the day it happened,
+                  and this same date anchors the recurring rule a flagged
+                  entry creates. */}
               <View style={styles.rowCard}>
                 <View style={styles.rowItem}>
-                  <Text style={styles.rowLabel}>{t('voice.date_time', locale)}</Text>
-                  <Text style={styles.rowValue}>{whenLabel}</Text>
+                  <DateTimeField
+                    value={chosenTransactedAt ?? new Date().toISOString()}
+                    onChange={setTransactedAt}
+                    locale={locale}
+                  />
                 </View>
               </View>
 

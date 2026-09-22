@@ -194,6 +194,10 @@ export async function softDeleteTransaction(id: string): Promise<void> {
  */
 const UPDATABLE_TRANSACTION_FIELDS = new Set<string>([
   'amount',
+  // Sep 21, 2026: money is recorded on the day you think of it, not the
+  // day it moved. `local_day` and `occurrence_date` are derived from this
+  // column on read and on push, so both follow it without a migration.
+  'transacted_at',
   'merchant',
   'note',
   'category_id',
@@ -209,6 +213,7 @@ export async function updateTransactionFields(
     Pick<
       Transaction,
       | 'amount'
+      | 'transacted_at'
       | 'merchant'
       | 'note'
       | 'category_id'
@@ -258,6 +263,23 @@ export async function updateAmountSnapshot(
     amountInProfileCurrency,
     id,
   ])
+}
+
+/**
+ * Re-date a foreign-currency row's conversion after its date is edited
+ * (Sep 21, 2026). The rate belongs to the day the money moved, so moving
+ * the day moves the rate; a row in the profile's own currency never gets
+ * here, and an offline edit leaves the old snapshot rather than guessing.
+ */
+export async function updateFxSnapshot(
+  id: string,
+  fx: { amount_in_profile_currency: number; fx_rate_to_profile: number; fx_rate_date: string },
+): Promise<void> {
+  const db = await getDb()
+  await db.runAsync(
+    'UPDATE transactions SET amount_in_profile_currency = ?, fx_rate_to_profile = ?, fx_rate_date = ? WHERE id = ?',
+    [fx.amount_in_profile_currency, fx.fx_rate_to_profile, fx.fx_rate_date, id],
+  )
 }
 
 export async function getTransactionById(id: string): Promise<Transaction | null> {
