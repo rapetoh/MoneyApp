@@ -798,5 +798,9 @@
   "siri.result": "Enregistré. 5,00 € chez Carrefour.",
   "siri.first_run": "La première fois, iOS vous demande d'activer le raccourci. Touchez Activer, puis redites la phrase.",
   "siri.phrase_alt_label": "Ou une de celles-ci",
-  "siri.phrase_alt": "Dépense Murmur · Ajouter une dépense à Murmur · Nouvelle dépense dans Murmur · Noter un achat dans Murmur"
+  "siri.phrase_alt": "Dépense Murmur · Ajouter une dépense à Murmur · Nouvelle dépense dans Murmur · Noter un achat dans Murmur",
+  "siri.received": "Enregistré. {money} de {merchant}.",
+  "siri.received_plain": "Enregistré. {money} reçus.",
+  "siri.income_label": "Pour l'argent qui rentre",
+  "siri.income_phrase": "Dis Siri, enregistrer un revenu dans Murmur"
 }

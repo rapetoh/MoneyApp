@@ -6,12 +6,13 @@ import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('expo-file-system', () => ({ File: class {}, Paths: { document: '/tmp' } }))
 
-import { normaliseCapture, normaliseSpoken } from '../walletCapture'
+import { normaliseCapture, normaliseSpoken, spokenTranscript } from '../walletCapture'
 
 const base = {
   id: 'x',
   kind: 'wallet' as const,
   phrase: '',
+  hint: '' as const,
   source: 'shortcut' as const,
   captured_at: '2026-08-17T05:12:00Z',
 }
@@ -77,7 +78,15 @@ describe('normaliseSpoken', () => {
   const TZ = 'America/Chicago'
   // Sunday 20 Sep 2026, 20:15 in Chicago.
   const NOW = '2026-09-21T01:15:00.000Z'
-  const spoken = (phrase: string) => ({ ...base, kind: 'phrase' as const, phrase, amount: '', merchant: '', currency: '' })
+  const spoken = (phrase: string, hint: 'expense' | 'income' = 'expense') => ({
+    ...base,
+    kind: 'phrase' as const,
+    phrase,
+    hint,
+    amount: '',
+    merchant: '',
+    currency: '',
+  })
 
   it('takes the parser at its word when it answered', () => {
     expect(
@@ -146,5 +155,22 @@ describe('normaliseSpoken', () => {
     const entry = { ...spoken('nine dollars at Dunkin'), captured_at: NOW }
     const out = normaliseSpoken(entry, { amount: 9, transacted_at: '2026-09-19T14:32:00.000Z' }, 'USD', TZ, NOW)
     expect(out?.transactedAt).toBe('2026-09-19T14:32:00.000Z')
+  })
+
+  it('tells the parser which door the sentence came through', () => {
+    // "Two hundred from Acme" is income or a payment out depending on
+    // which Siri phrase was used; the words alone cannot say.
+    expect(spokenTranscript(spoken('two hundred from Acme', 'income'), 'en')).toBe(
+      'Income received: two hundred from Acme',
+    )
+    expect(spokenTranscript(spoken('two hundred from Acme', 'income'), 'fr')).toBe(
+      'Revenu reçu : two hundred from Acme',
+    )
+    // An expense, a Wallet capture and an unknown locale all pass through.
+    expect(spokenTranscript(spoken('five at Target'), 'en')).toBe('five at Target')
+    expect(spokenTranscript({ ...base, amount: '$2.11', merchant: 'Shell', currency: '' }, 'en')).toBe('')
+    expect(spokenTranscript(spoken('two hundred from Acme', 'income'), 'de')).toBe(
+      'Income received: two hundred from Acme',
+    )
   })
 })

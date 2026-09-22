@@ -798,5 +798,9 @@
   "siri.result": "Saved. $5.00 at Walmart.",
   "siri.first_run": "The first time you say it, iOS asks you to turn the shortcut on. Tap Turn On, then say the phrase again.",
   "siri.phrase_alt_label": "Or any of these",
-  "siri.phrase_alt": "Murmur expense · Add an expense to Murmur · New expense in Murmur · Log a purchase in Murmur"
+  "siri.phrase_alt": "Murmur expense · Add an expense to Murmur · New expense in Murmur · Log a purchase in Murmur",
+  "siri.received": "Saved. {money} from {merchant}.",
+  "siri.received_plain": "Saved. {money} in.",
+  "siri.income_label": "For money coming in",
+  "siri.income_phrase": "Hey Siri, log income in Murmur"
 }

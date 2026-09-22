@@ -65,6 +65,13 @@ export default function SiriScreen() {
           <Text style={styles.altText}>{t('siri.phrase_alt', locale)}</Text>
         </View>
 
+        {/* Money coming in has its own door: Murmur is one capture flow
+            and Siri should not be expenses only. */}
+        <View style={styles.altCard}>
+          <Text style={styles.turnLabel}>{t('siri.income_label', locale)}</Text>
+          <Text style={[styles.turnLine, styles.turnMine]}>{t('siri.income_phrase', locale)}</Text>
+        </View>
+
         <Pressable
           onPress={() => Linking.openURL('shortcuts://')}
           style={({ pressed }) => [styles.cta, pressed && { opacity: 0.85 }]}

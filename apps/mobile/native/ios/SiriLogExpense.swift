@@ -67,6 +67,10 @@ struct LogSpokenExpenseIntent: AppIntent {
       "id": id,
       "kind": "phrase",
       "phrase": phrase,
+      // Which door the user came through. The parser still decides the
+      // sign from the words; this only tells it which way to lean when a
+      // sentence like "two hundred from Acme" could go either way.
+      "hint": "expense",
       // The Apple Pay fields stay present and empty: one queue, one
       // reader, and an older build of the app can still parse the line.
       "amount": "",
@@ -81,6 +85,58 @@ struct LogSpokenExpenseIntent: AppIntent {
     // start plus one parse call. Past it, Siri answers honestly that the
     // sentence is queued rather than claiming a save that has not
     // happened; the drain files it on the next launch or foreground.
+    let outcome = await WalletCaptureCoordinator.wakeAndWait(id: id, timeout: 9)
+    if let dialog = outcome.dialog, !dialog.isEmpty {
+      return .result(dialog: IntentDialog(stringLiteral: dialog))
+    }
+    return .result(dialog: IntentDialog(stringLiteral: SiriCopy.queued))
+  }
+}
+
+/// Money coming in, through its own door (Sep 21, 2026).
+///
+/// Murmur has always been one capture flow with the AI deciding income or
+/// expense, and the first Siri build broke that: every phrase said
+/// "expense", so "log a source of income in Murmur" got "I can't help you
+/// with that". The two intents differ only in the question Siri asks and
+/// the hint they queue; the sentence goes through the same parser and the
+/// same save.
+@available(iOS 16.0, *)
+struct LogSpokenIncomeIntent: AppIntent {
+  static var title: LocalizedStringResource = "Log income"
+  static var description = IntentDescription(
+    "Say what came in and Murmur files it: the amount and where it came from."
+  )
+  static var openAppWhenRun: Bool = false
+
+  @Parameter(
+    title: "What came in?",
+    description: "Say it the way you would to a person: two hundred from Acme.",
+    requestValueDialog: IntentDialog("What came in?")
+  )
+  var received: String
+
+  static var parameterSummary: some ParameterSummary {
+    Summary("Log \(\.$received) in Murmur")
+  }
+
+  func perform() async throws -> some IntentResult & ProvidesDialog {
+    let phrase = received.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !phrase.isEmpty else {
+      return .result(dialog: IntentDialog(stringLiteral: SiriCopy.nothingHeard))
+    }
+    let id = UUID().uuidString
+    try WalletCaptureQueue.append([
+      "id": id,
+      "kind": "phrase",
+      "phrase": phrase,
+      "hint": "income",
+      "amount": "",
+      "merchant": "",
+      "currency": "",
+      "source": "shortcut",
+      "captured_at": ISO8601DateFormatter().string(from: Date()),
+    ])
     let outcome = await WalletCaptureCoordinator.wakeAndWait(id: id, timeout: 9)
     if let dialog = outcome.dialog, !dialog.isEmpty {
       return .result(dialog: IntentDialog(stringLiteral: dialog))
@@ -120,6 +176,21 @@ struct MurmurAppShortcuts: AppShortcutsProvider {
       ],
       shortTitle: "Log an expense",
       systemImageName: "mic.fill"
+    )
+    AppShortcut(
+      intent: LogSpokenIncomeIntent(),
+      phrases: [
+        "Log income in \(.applicationName)",
+        "Log a payment in \(.applicationName)",
+        "Add income to \(.applicationName)",
+        "Record income in \(.applicationName)",
+        "New income in \(.applicationName)",
+        "Log a deposit in \(.applicationName)",
+        "\(.applicationName) income",
+        "\(.applicationName) log income",
+      ],
+      shortTitle: "Log income",
+      systemImageName: "arrow.down.circle"
     )
   }
 }

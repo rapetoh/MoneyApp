@@ -38,6 +38,13 @@ export interface WalletCaptureEntry {
   kind: 'wallet' | 'phrase'
   /** The spoken sentence, for `kind: 'phrase'`. Empty otherwise. */
   phrase: string
+  /**
+   * Which Siri door the sentence came through (Sep 21, 2026). Murmur has
+   * one capture flow and the parser decides the sign from the words; this
+   * only leans it the right way when a sentence could go either way
+   * ("two hundred from Acme"). Empty on a Wallet capture.
+   */
+  hint: 'expense' | 'income' | ''
   /** Formatted or bare amount as Wallet handed it over — "$2.11", "2,11 €". */
   amount: string
   merchant: string
@@ -76,6 +83,8 @@ export function takeQueuedCaptures(): WalletCaptureEntry[] {
       const e = JSON.parse(t) as Partial<WalletCaptureEntry>
       const phrase = typeof e.phrase === 'string' ? e.phrase : ''
       const kind: WalletCaptureEntry['kind'] = e.kind === 'phrase' ? 'phrase' : 'wallet'
+      const hint: WalletCaptureEntry['hint'] =
+        e.hint === 'income' ? 'income' : e.hint === 'expense' ? 'expense' : ''
       // A spoken entry carries no amount field worth reading; a Wallet one
       // must have it (even empty) or the line is not one of ours.
       const usable = typeof e.id === 'string' && (kind === 'phrase' ? phrase !== '' : typeof e.amount === 'string')
@@ -84,6 +93,7 @@ export function takeQueuedCaptures(): WalletCaptureEntry[] {
           id: e.id as string,
           kind,
           phrase,
+          hint,
           amount: typeof e.amount === 'string' ? e.amount : '',
           merchant: typeof e.merchant === 'string' ? e.merchant : '',
           currency: typeof e.currency === 'string' ? e.currency : '',
@@ -100,8 +110,8 @@ export function takeQueuedCaptures(): WalletCaptureEntry[] {
 
 /** Append an entry (JS producer — the deep-link route) and poke the drain. */
 export function enqueueWalletCapture(
-  entry: Partial<Pick<WalletCaptureEntry, 'kind' | 'phrase'>> &
-    Omit<WalletCaptureEntry, 'id' | 'source' | 'captured_at' | 'kind' | 'phrase'>,
+  entry: Partial<Pick<WalletCaptureEntry, 'kind' | 'phrase' | 'hint'>> &
+    Omit<WalletCaptureEntry, 'id' | 'source' | 'captured_at' | 'kind' | 'phrase' | 'hint'>,
 ): void {
   const full: WalletCaptureEntry = {
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
@@ -109,6 +119,7 @@ export function enqueueWalletCapture(
     captured_at: new Date().toISOString(),
     kind: 'wallet',
     phrase: '',
+    hint: '',
     ...entry,
   }
   const f = queueFile()
@@ -211,6 +222,27 @@ export interface NormalisedCapture {
   currency: string
   merchant: string | null
   capturedAt: string
+}
+
+/**
+ * The sentence as the parser should read it.
+ *
+ * "Two hundred from Acme" said to the income door is income; said to the
+ * expense door it is a payment out. The words alone cannot tell, so the
+ * door is added to the front of the sentence in the user's own language
+ * and the parser classifies from there. What gets stored as the
+ * transcript is always what the person actually said.
+ */
+const INCOME_LEAD: Record<string, string> = {
+  en: 'Income received:',
+  fr: 'Revenu reçu :',
+  es: 'Ingreso recibido:',
+  pt: 'Receita recebida:',
+}
+
+export function spokenTranscript(entry: WalletCaptureEntry, locale: string): string {
+  if (entry.hint !== 'income') return entry.phrase
+  return `${INCOME_LEAD[locale] ?? INCOME_LEAD.en} ${entry.phrase}`
 }
 
 /** What the parser gives back, narrowed to the fields a spoken entry

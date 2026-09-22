@@ -35,10 +35,11 @@ const stringsFile = (pairs) =>
 function localizationFiles() {
   const out = []
   for (const lang of LOCALES) {
-    out.push([
-      `${lang}.lproj/AppShortcuts.strings`,
-      stringsFile(PHRASES.en.map((en, i) => [en, PHRASES[lang][i]])),
-    ])
+    const pairs = []
+    for (const kind of ['expense', 'income']) {
+      PHRASES.en[kind].forEach((en, i) => pairs.push([en, PHRASES[lang][kind][i]]))
+    }
+    out.push([`${lang}.lproj/AppShortcuts.strings`, stringsFile(pairs)])
     const intent = INTENT_STRINGS[lang]
     if (intent) {
       out.push([

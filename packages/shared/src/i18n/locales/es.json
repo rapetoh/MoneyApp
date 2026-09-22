@@ -798,5 +798,9 @@
   "siri.result": "Guardado. 5,00 € en Mercadona.",
   "siri.first_run": "La primera vez, iOS te pide que actives el atajo. Toca Activar y repite la frase.",
   "siri.phrase_alt_label": "O cualquiera de estas",
-  "siri.phrase_alt": "Gasto en Murmur · Añadir un gasto a Murmur · Nuevo gasto en Murmur · Anotar una compra en Murmur"
+  "siri.phrase_alt": "Gasto en Murmur · Añadir un gasto a Murmur · Nuevo gasto en Murmur · Anotar una compra en Murmur",
+  "siri.received": "Guardado. {money} de {merchant}.",
+  "siri.received_plain": "Guardado. {money} recibidos.",
+  "siri.income_label": "Para el dinero que entra",
+  "siri.income_phrase": "Oye Siri, registrar un ingreso en Murmur"
 }

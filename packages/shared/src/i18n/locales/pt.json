@@ -798,5 +798,9 @@
   "siri.result": "Salvo. R$ 5,00 no Carrefour.",
   "siri.first_run": "Na primeira vez, o iOS pede para ativar o atalho. Toque em Ativar e diga a frase de novo.",
   "siri.phrase_alt_label": "Ou qualquer uma destas",
-  "siri.phrase_alt": "Gasto no Murmur · Adicionar um gasto ao Murmur · Novo gasto no Murmur · Anotar uma compra no Murmur"
+  "siri.phrase_alt": "Gasto no Murmur · Adicionar um gasto ao Murmur · Novo gasto no Murmur · Anotar uma compra no Murmur",
+  "siri.received": "Salvo. {money} de {merchant}.",
+  "siri.received_plain": "Salvo. {money} recebidos.",
+  "siri.income_label": "Para o dinheiro que entra",
+  "siri.income_phrase": "E aí Siri, registrar uma receita no Murmur"
 }

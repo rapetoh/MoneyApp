@@ -34,6 +34,7 @@ import {
   onWalletCapturePoke,
   normaliseCapture,
   normaliseSpoken,
+  spokenTranscript,
   stashIncompleteCapture,
   pendingIncompleteCaptures,
   type WalletCaptureEntry,
@@ -272,7 +273,9 @@ export function WalletCaptureDrain() {
         const apiBaseUrl = await getApiUrl()
         parsed = await Promise.race([
           parseExpense({
-            transcript: entry.phrase,
+            // The Siri door the sentence came through leads the transcript
+            // (income vs expense); the stored transcript stays verbatim.
+            transcript: spokenTranscript(entry, locale),
             locale: locale as never,
             currency: profileCurrency,
             categories: categories.map((c) => c.name),
@@ -305,12 +308,17 @@ export function WalletCaptureDrain() {
           : null) ?? (guessCategoryFromMerchant(merchant, categories)?.category.id ?? null)
       const merchantDomain = parsed?.merchant_domain ?? brandDomainForMerchant(merchant)
 
+      // The parser classifies intent and code derives the sign, so "I got
+      // paid 200" lands as income exactly as it would through the
+      // microphone. With no parse at all, the door the user chose decides.
+      const direction =
+        parsed?.direction ??
+        deriveDirectionFromFlowType(entry.hint === 'income' ? 'income' : 'expense')
+      const isIncome = direction === 'credit'
+
       const result = await createTransaction({
         amount,
-        // The parser classifies intent and code derives the sign, so
-        // "I got paid 200" through Siri lands as income, exactly as it
-        // would through the microphone. Without a parse it is a debit.
-        direction: parsed?.direction ?? deriveDirectionFromFlowType('expense'),
+        direction,
         currency_code: currency,
         merchant,
         note: parsed?.note ?? null,
@@ -334,7 +342,10 @@ export function WalletCaptureDrain() {
       const categoryName = categoryId
         ? (categories.find((c) => c.id === categoryId)?.name ?? null)
         : null
-      const label = merchant ?? categoryName ?? t('voice.expense', locale)
+      const label =
+        merchant ??
+        categoryName ??
+        t(isIncome ? 'voice.income_label' : 'voice.expense', locale)
       showUndo({
         message: `${t('voice.saved', locale)} · ${label} ${money}`,
         undoLabel: t('common.undo', locale),
@@ -343,26 +354,27 @@ export function WalletCaptureDrain() {
         },
       })
 
-      // Siri has already answered by now if we took too long, so leave a
-      // notification behind; `notifySaved` is a no-op while the app is on
-      // screen, where the toast above is the confirmation.
-      if (Date.now() - Date.parse(entry.captured_at) > SIRI_ANSWER_DEADLINE_MS) {
-        await ensureWalletCaptureCategory({
-          undo: t('common.undo', locale),
-          edit: t('common.edit', locale),
-        })
-        await notifySaved({
-          captureId: entry.id,
-          transactionId: savedId ?? null,
-          userId,
-          title: `${t('siri.notif_title', locale)} · ${money}`,
-          body: `${label} · ${categoryName ?? t('applepay.uncategorised', locale)} · ${t('applepay.tap_to_edit', locale)}`,
-        })
-      }
+      // A banner for every Siri save (owner, Sep 21 2026): the spoken
+      // confirmation is gone the moment Siri stops talking, and it cannot
+      // carry Undo or Edit. Something happened in the app while the app
+      // was closed, so the app says so. `notifySaved` is a no-op while
+      // Murmur is on screen, where the toast above is the confirmation.
+      await ensureWalletCaptureCategory({
+        undo: t('common.undo', locale),
+        edit: t('common.edit', locale),
+      })
+      await notifySaved({
+        captureId: entry.id,
+        transactionId: savedId ?? null,
+        userId,
+        title: `${t('siri.notif_title', locale)} · ${money}`,
+        body: `${label} · ${categoryName ?? t('applepay.uncategorised', locale)} · ${t('applepay.tap_to_edit', locale)}`,
+      })
 
+      const said = isIncome ? 'siri.received' : 'siri.saved'
       return merchant
-        ? t('siri.saved', locale).replace('{money}', money).replace('{merchant}', merchant)
-        : t('siri.saved_plain', locale).replace('{money}', money)
+        ? t(said, locale).replace('{money}', money).replace('{merchant}', merchant)
+        : t(`${said}_plain`, locale).replace('{money}', money)
     }
 
     const renotifyIncomplete = async () => {
