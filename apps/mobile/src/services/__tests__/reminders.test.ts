@@ -19,6 +19,10 @@ const state = vi.hoisted(() => ({
   scheduled: new Set<string>(),
   nextId: 0,
   permission: 'granted' as 'granted' | 'undetermined',
+  // Counts every scheduleNotificationAsync call, including ones that
+  // replace a pending request. `scheduled.size` alone cannot tell a
+  // replacement from a duplicate; this can.
+  scheduleCalls: 0,
 }))
 
 function tick(ms = 1) {
@@ -51,15 +55,24 @@ vi.mock('expo-notifications', () => ({
     state.permission = 'granted'
     return { granted: true, ios: {} }
   },
-  scheduleNotificationAsync: async () => {
+  scheduleNotificationAsync: async (req: { identifier?: string }) => {
     await tick()
-    const id = `notif-${state.nextId++}`
+    state.scheduleCalls++
+    // iOS keys pending notifications by identifier: requesting one that is
+    // already pending replaces it rather than adding a second. A Set keyed
+    // on the identifier models exactly that. Without an identifier the OS
+    // mints a random one, which is how the duplicate bug was possible.
+    const id = req?.identifier ?? `notif-${state.nextId++}`
     state.scheduled.add(id)
     return id
   },
   cancelScheduledNotificationAsync: async (id: string) => {
     await tick()
     state.scheduled.delete(id)
+  },
+  cancelAllScheduledNotificationsAsync: async () => {
+    await tick()
+    state.scheduled.clear()
   },
   SchedulableTriggerInputTypes: { DATE: 'date' },
   IosAuthorizationStatus: { PROVISIONAL: 3 },
@@ -80,6 +93,7 @@ beforeEach(() => {
   state.store.clear()
   state.scheduled.clear()
   state.nextId = 0
+  state.scheduleCalls = 0
   state.permission = 'granted'
 })
 
@@ -170,5 +184,73 @@ describe('enableCheckIn and the prime sheet', () => {
     expect(result).toBe('granted')
     expect(state.scheduled.size).toBeGreaterThanOrEqual(6)
     expect(await shouldOfferPrime()).toBe(false)
+  })
+})
+
+/**
+ * Sep 22 2026. The owner's lock screen showed "Anything to add from
+ * today?" twice, same wording, same minute.
+ *
+ * Cause: ids were minted by the OS and written to SecureStore once, after
+ * the whole seven-notification loop. An app backgrounded mid-loop left
+ * notifications live on the system whose ids were never recorded, so every
+ * later cancel missed them, and the next reschedule stacked a second full
+ * set on top. Both sets then fired together, every evening, forever.
+ */
+describe('duplicate banners (Sep 22 2026)', () => {
+  // Quiet nudges (1, 3 and 7 days out) need a last-logged time to hang off.
+  const lastLog = new Date(Date.now() - 3_600_000)
+
+  it('a run interrupted mid-loop cannot leave a twin behind', async () => {
+    // Schedule three of the seven, then "kill" the app: no SecureStore
+    // write reaches the end of the loop under the old code.
+    let calls = 0
+    const realSet = state.store.set.bind(state.store)
+    state.store.set = ((key: string, value: string) => {
+      if (key === 'reminders_scheduled_ids' && ++calls === 3) throw new Error('app backgrounded')
+      return realSet(key, value)
+    }) as typeof state.store.set
+    await rescheduleReminders('en', lastLog).catch(() => {})
+    state.store.set = realSet
+
+    const orphans = state.scheduled.size
+    expect(orphans).toBeGreaterThan(0)
+
+    // The next foreground reschedules. The evening that was already
+    // pending must be replaced, never twinned.
+    await rescheduleReminders('en', lastLog)
+
+    // The invariant the bug broke: the OS holds exactly what we recorded,
+    // nothing more. Orphans make the pending set larger than the list.
+    const ids = [...state.scheduled]
+    expect(ids.sort()).toEqual(persistedIds().sort())
+    expect(ids.every((id) => id.startsWith('murmur-reminder-'))).toBe(true)
+    // And one slot per civil day, so no evening can be twinned.
+    const days = ids.map((id) => id.replace('murmur-reminder-', ''))
+    expect(new Set(days).size).toBe(days.length)
+  })
+
+  it('repeated foregrounds never grow the pending set', async () => {
+    await rescheduleReminders('en', lastLog)
+    const afterFirst = state.scheduled.size
+    expect(afterFirst).toBeGreaterThan(0)
+    for (let i = 0; i < 5; i++) await rescheduleReminders('en')
+    expect(state.scheduled.size).toBe(afterFirst)
+  })
+
+  it('clears orphans left by the previous build, which carry unknown ids', async () => {
+    // A notification the old code scheduled and never recorded.
+    state.scheduled.add('notif-orphan-from-old-build')
+    await rescheduleReminders('en', lastLog)
+    expect([...state.scheduled]).not.toContain('notif-orphan-from-old-build')
+    expect([...state.scheduled].every((id) => id.startsWith('murmur-reminder-'))).toBe(true)
+  })
+
+  it('gives every reminder a stable id, so the same evening is one slot', async () => {
+    await rescheduleReminders('en', lastLog)
+    const first = [...state.scheduled].sort()
+    expect(first.length).toBeGreaterThan(0)
+    await rescheduleReminders('en')
+    expect([...state.scheduled].sort()).toEqual(first)
   })
 })

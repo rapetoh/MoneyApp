@@ -66,6 +66,39 @@ screen it opens. So `planNotifications` runs the same `budgetStatus`,
 `computeAskInsights` and `recurrence` the two apps render from. Anything
 resembling a threshold inside `notify-sweep/index.ts` is a bug.
 
+### Duplicate banners, and why scheduling is idempotent now
+
+Sep 22 2026: the owner's lock screen showed "Anything to add from today?"
+twice, same wording, same minute.
+
+The scheduler let iOS mint a random id per request and wrote the resulting
+list to SecureStore **once, after the whole seven-notification loop**. An
+app backgrounded mid-loop left notifications live on the system whose ids
+were never recorded, unreachable by every later cancel. The next
+reschedule, which runs on every foreground, then stacked a second full set
+on top. Both fired together, every evening, from then on.
+
+Two changes, either of which would have prevented it, both kept:
+
+- **Deterministic identifiers.** `murmur-reminder-<YYYY-MM-DD>`, one slot
+  per civil day in the phone's zone. iOS replaces a pending request that
+  reuses an identifier instead of adding a second, so scheduling the same
+  evening twice is now a no-op rather than a twin.
+- **Cancel what the OS holds, not what we remembered.**
+  `cancelAllScheduledNotificationsAsync()` instead of replaying a stored
+  id list. This is the half that repairs phones already carrying orphans,
+  whose ids exist in no list we kept. Safe because reminders are the only
+  notifications Murmur schedules for the future: Apple Pay capture posts
+  with `trigger: null`.
+
+The id list is still persisted, now after every single schedule rather
+than once at the end, and `reminders.test.ts` asserts the invariant the
+bug broke: the OS holds exactly what we recorded, nothing more.
+
+**This ships in the app binary.** A phone running an older build keeps its
+duplicates until it updates, at which point the first reschedule clears
+them.
+
 ### Local notifications did not go away
 
 `src/services/reminders.ts` still owns the evening check-in and the quiet

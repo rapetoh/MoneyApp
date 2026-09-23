@@ -65,6 +65,32 @@ export interface PlannedReminder {
 const DAY_MS = 86_400_000
 const HORIZON_DAYS = 7
 
+/**
+ * Identifier prefix for every reminder this module schedules.
+ *
+ * iOS keys pending notifications by identifier: requesting one that is
+ * already pending REPLACES it rather than adding a second. Deriving the
+ * identifier from the reminder itself therefore makes scheduling
+ * idempotent, which is what actually closes the duplicate-banner bug
+ * (Sep 22 2026, owner screenshot: the same "Anything to add from today?"
+ * delivered twice in the same minute).
+ *
+ * The old code let the OS mint a random id per request and remembered the
+ * ids in SecureStore so the next run could cancel them. That list was
+ * written once, AFTER the whole seven-notification loop. Background the
+ * app mid-loop and the notifications already scheduled were live on the
+ * system with their ids never persisted: unreachable by every later
+ * cancel. The next reschedule then added a second full set on top, and
+ * the two sets fired together forever after.
+ */
+const ID_PREFIX = 'murmur-reminder-'
+
+/** `murmur-reminder-2026-09-22` — one slot per civil day in `tz`, so two
+ *  runs that plan the same evening collide on purpose. */
+function reminderId(at: Date, tz: string): string {
+  return `${ID_PREFIX}${localDay(at.toISOString(), tz)}`
+}
+
 /** The phone's own zone: a check-in fires on the phone's clock. */
 function deviceTimeZone(): string {
   try {
@@ -225,6 +251,25 @@ async function readLastLog(): Promise<Date | null> {
 }
 
 async function cancelAllUnsafe(): Promise<void> {
+  // Ask the system what is pending rather than trusting our own record of
+  // it. This is the half that repairs phones already carrying orphans:
+  // those have random ids from the previous build and appear in no list we
+  // kept, so an id-based cancel can never reach them, but they are right
+  // here in the OS's own queue.
+  //
+  // Safe to cancel everything pending: reminders are the only notifications
+  // Murmur schedules for the future. Apple Pay capture posts with
+  // `trigger: null` (walletCaptureNotifications.ts), which delivers
+  // immediately and is never pending.
+  try {
+    await Notifications.cancelAllScheduledNotificationsAsync()
+  } catch {
+    // Fall through to the id-based sweep below.
+  }
+
+  // The legacy path, kept so an install upgrading from the old module also
+  // clears its stored ids. Harmless once the call above has already
+  // emptied the queue.
   let ids: string[] = []
   const raw = await SecureStore.getItemAsync(KEY_IDS)
   if (raw) {
@@ -256,16 +301,22 @@ async function rescheduleUnsafe(locale: Locale, lastLogAt: Date | null | undefin
   if (Platform.OS === 'web') return
   if ((await getPermissionStatus()) !== 'granted') return
 
+  const tz = deviceTimeZone()
   const plan = planReminders({
     now: new Date(),
     checkIn: await getCheckIn(),
     quietNudges: !(await isQuietNudgesOptedOut()),
     lastLogAt: lastLogAt === undefined ? await readLastLog() : lastLogAt,
-    tz: deviceTimeZone(),
+    tz,
   })
   const ids: string[] = []
   for (const r of plan) {
-    const id = await Notifications.scheduleNotificationAsync({
+    const id = reminderId(r.at, tz)
+    await Notifications.scheduleNotificationAsync({
+      // Supplying the identifier is what makes this idempotent: a second
+      // run planning the same evening replaces that request instead of
+      // adding a twin.
+      identifier: id,
       content: {
         title: t(`reminders.${r.kind}_title`, locale),
         body: t(`reminders.${r.kind}_body`, locale),
@@ -273,8 +324,14 @@ async function rescheduleUnsafe(locale: Locale, lastLogAt: Date | null | undefin
       trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: r.at },
     })
     ids.push(id)
+    // Persisted after EVERY schedule, not once at the end. The old code
+    // wrote this list only after the loop finished, so a run killed
+    // mid-loop left live notifications no later cancel could name. The
+    // deterministic id above already makes duplicates impossible; this
+    // keeps the record honest even so.
+    await SecureStore.setItemAsync(KEY_IDS, JSON.stringify(ids))
   }
-  await SecureStore.setItemAsync(KEY_IDS, JSON.stringify(ids))
+  if (!plan.length) await SecureStore.deleteItemAsync(KEY_IDS)
 }
 
 /**
