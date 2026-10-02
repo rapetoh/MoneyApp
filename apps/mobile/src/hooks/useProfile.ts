@@ -67,11 +67,19 @@ export function useProfile(userId: string | undefined) {
 
   const fetch = useCallback(async () => {
     if (!userId) return
-    const { data } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single()
+    // A throw here used to leave `loading` true forever, and the root layout
+    // gates the splash on `!profileLoading` (Oct 2 2026, same launch-hang
+    // family as useAuth's missing catch). supabase-js reports most failures
+    // in the result rather than throwing, but a transport-level error does
+    // throw, and that path must still end with the splash lifting.
+    let data: unknown = null
+    try {
+      ;({ data } = await supabase.from('profiles').select('*').eq('id', userId).single())
+    } catch (err) {
+      console.warn('[profile] fetch threw; continuing without it', err)
+      setLoading(false)
+      return
+    }
 
     if (data) {
       setProfile(data as Profile)

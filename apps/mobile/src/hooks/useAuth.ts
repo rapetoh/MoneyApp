@@ -109,11 +109,35 @@ export function useAuth() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session)
-      setUser(session?.user ?? null)
-      setLoading(false)
-    })
+    supabase.auth
+      .getSession()
+      .then(({ data: { session } }) => {
+        setSession(session)
+        setUser(session?.user ?? null)
+        setLoading(false)
+      })
+      .catch((err) => {
+        // A session we cannot read is a session we do not have.
+        //
+        // Oct 2 2026: this `.then` had no `.catch`. `getSession()` reads the
+        // stored session through SecureStore, and when that read rejects
+        // (keychain unavailable, the stored item unreadable after an OS
+        // update, entitlements wrong) `setLoading(false)` never ran. The
+        // root layout gates the splash on `!loading`, so the app sat on the
+        // launch mark forever, with no error, no retry and no way out. The
+        // owner reported it as "the app is crashing"; reproduced in the
+        // simulator, where a build without keychain entitlements hangs on
+        // the splash indefinitely.
+        //
+        // Falling through to a null session sends the user to sign-in, which
+        // is recoverable: signing in writes a fresh session over the
+        // unreadable one. `onAuthStateChange` below still fires if the read
+        // later succeeds, so a merely slow keychain heals itself.
+        console.warn('[auth] could not restore the stored session', err)
+        setSession(null)
+        setUser(null)
+        setLoading(false)
+      })
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session)

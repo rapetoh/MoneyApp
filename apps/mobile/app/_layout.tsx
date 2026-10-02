@@ -38,6 +38,28 @@ installCrashReporting()
 /** Longest the splash waits on the network half of the data preload. */
 const PRELOAD_NETWORK_BUDGET_MS = 2500
 
+/**
+ * The hard ceiling on the splash, in ms.
+ *
+ * `ready` below is an AND of several independent waits. Three of them had
+ * no bound at all: session restore, the profile read and the SQLite
+ * transaction read. Any one of them failing to settle left the launch mark
+ * on screen forever, which is what the owner hit on Oct 2 2026 and reported
+ * as a crash. The individual causes are fixed at their source (useAuth and
+ * useProfile now catch), but "every future launch dependency remembers to
+ * resolve" is not something a codebase can promise. This is the backstop
+ * that makes the promise structural: past this point the app boots with
+ * whatever it has.
+ *
+ * Booting early is safe because the preload is an optimisation, not a
+ * precondition: every screen already renders its own loading and empty
+ * states, and `onAuthStateChange` re-routes if a slow session lands after
+ * the fact. Eight seconds is far longer than a healthy cold start (about a
+ * second) so a working launch never reaches it, and far shorter than the
+ * forever it replaces.
+ */
+const LAUNCH_CEILING_MS = 8000
+
 // Registers every face named by `Typography.fontFamily` (src/theme/typography.ts).
 // Keys here ARE the `fontFamily` strings used app-wide — expo-font maps this
 // key, not the font's internal PostScript name, to the loaded asset, so it
@@ -95,7 +117,16 @@ export default function RootLayout() {
   const networkPreloaded = (!catLoading && !budgetLoading && !rulesLoading) || preloadTimedOut
   const dataReady = !session || (!txLoading && networkPreloaded)
 
-  const ready = fontsReady && !loading && (!session || !profileLoading) && dataReady
+  // The backstop described at LAUNCH_CEILING_MS: it starts on mount and is
+  // never reset, so it bounds the whole launch rather than any one wait.
+  const [launchCeilingHit, setLaunchCeilingHit] = useState(false)
+  useEffect(() => {
+    const timer = setTimeout(() => setLaunchCeilingHit(true), LAUNCH_CEILING_MS)
+    return () => clearTimeout(timer)
+  }, [])
+
+  const readyByData = fontsReady && !loading && (!session || !profileLoading) && dataReady
+  const ready = readyByData || launchCeilingHit
 
   // True once <LaunchScreen> has finished dissolving into the app; the
   // veil unmounts then. Separate from `ready` so the navigator mounts (and
