@@ -248,7 +248,7 @@ mostly string data.
 | # | Step | Status (Sep 20 2026) |
 |---|---|---|
 | 1 | Migration 036: tables + billing columns | **done, in production** |
-| 2 | Vault secret `notify_sweep_key` | **done, in production** |
+| 2 | Vault secret `notify_sweep_key` | **redo**: holds the legacy service-role key, disabled since 2026-04-11 |
 | 3 | Regenerate DB types | blocked, see below |
 | 4 | `supabase functions deploy notify-sweep` | blocked, see below |
 | 5 | Migration 037: the hourly schedule | held deliberately |
@@ -258,6 +258,11 @@ Steps 1 and 2 were safe to run early and are verified live: the three
 tables exist, `profiles` carries `plus_billing_issue_at` and
 `plus_grace_until`, and the Vault secret is present. Nothing sends,
 because no device has registered a token and the cron job does not exist.
+
+**Step 2 must be redone (found Oct 3 2026).** The Vault secret was set from
+`SUPABASE_SERVICE_ROLE_KEY` in the root `.env`, which is a legacy JWT key, and
+Supabase disabled legacy keys on 2026-04-11. Replace it with the project's
+new `sb_secret_` key before applying 037, or every hourly sweep returns 401.
 
 **Step 5 is held on purpose.** Scheduling an hourly call to a function
 that has not been deployed just writes a failure into `cron.job_run_details`
