@@ -82,6 +82,10 @@ module.exports = {
       './plugins/withMurmurIntents.js',
       // Xcode 27 deployment-target clamp for old pods (ITMS-90111 fix).
       './plugins/withPodTargetFloor.js',
+      // UIScene lifecycle (Oct 3 2026): iOS 27 terminates apps that have not
+      // adopted it, at launch, before any JavaScript runs. The SDK 54
+      // template does not. See the plugin header for the deep-link details.
+      './plugins/withSceneLifecycle.js',
       'expo-router',
       // Purpose strings (App Store 5.1.1, Sep 8 2026 rejection): every
       // NS*UsageDescription says what Murmur does with the resource and
