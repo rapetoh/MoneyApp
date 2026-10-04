@@ -575,3 +575,9 @@ Shipped alongside launch:
 - **No hand-granted Plus remains.** The Aug 15 blanket
   `plus_status = 'active'` is fully unwound; a live read shows five null
   and one lapsed, zero active. Nothing to re-lock.
+
+**Oct 3 2026 - App Store Connect brought in line with the Sep 20 pricing model (owner-approved, done via Claude in Chrome, docs/claude-in-chrome-brief-4-2026-10-03.md):**
+- Monthly Plus **$3.99 -> $4.99**, effective **Oct 5 2026**, Apple auto-equivalents in 173 of 175 storefronts (2 unidentified, see "All Prices and Currencies" on the monthly page). **Existing subscribers keep their price.** Yearly untouched at $29.99.
+- Apple recalculated every storefront from the new base, so some moved more than the US: eurozone EUR 3.99 -> 5.99, Australia A$5.99 -> 7.99, Albania/Armenia $4.99 -> 5.99. Those are Apple's standard equivalents of $4.99 (VAT-inclusive), not a mistake.
+- **Family Sharing ON** for monthly and yearly. Irreversible by Apple's design.
+- Still open from the model: lower tiers in low-income markets (not set).
