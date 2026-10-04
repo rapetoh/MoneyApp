@@ -581,3 +581,5 @@ Shipped alongside launch:
 - Apple recalculated every storefront from the new base, so some moved more than the US: eurozone EUR 3.99 -> 5.99, Australia A$5.99 -> 7.99, Albania/Armenia $4.99 -> 5.99. Those are Apple's standard equivalents of $4.99 (VAT-inclusive), not a mistake.
 - **Family Sharing ON** for monthly and yearly. Irreversible by Apple's design.
 - Still open from the model: lower tiers in low-income markets (not set).
+
+**Oct 4 2026 - 1.0.1 (69) submitted for App Review**, status "Waiting for Review", automatic release, all users at once. Carries the iOS 27 launch fix (UIScene), the infinite-splash fix, the reinstall notification-permission repair, push-registration reporting, and the 14-day trial listing. Build 68 went to TestFlight only.
