@@ -47,7 +47,6 @@ Privacy Policy: https://itsmurmur.com/privacy
 ----
 Murmur now opens on iOS 27, and starts reliably every time.
 New accounts get 14 days of Murmur Plus, no card needed.
-Notifications that tell you something useful: a bill landing tomorrow, a budget crossed, your weekly recap.
 ----
 
 3. APP PRIVACY. Apps > Murmur > App Privacy > Edit. Add two data types, keeping everything already declared:
