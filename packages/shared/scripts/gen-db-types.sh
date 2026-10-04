@@ -31,9 +31,9 @@ npx --yes supabase@2 gen types typescript \
 // GENERATED FILE — do not hand-edit.
 //
 // Produced by `supabase gen types typescript` against the live schema
-// (project ohaqhwampmyoeaopdybd), which matches supabase/migrations/
-// 001-016 exactly (verified via `list_migrations` at generation time —
-// no drift between the repo's migration files and what's applied).
+// (project ohaqhwampmyoeaopdybd). It reflects whatever is applied in
+// production at generation time, so regenerate after applying any
+// migration in supabase/migrations/.
 //
 // Regenerate with `packages/shared/scripts/gen-db-types.sh` (needs the
 // `supabase` CLI + a `SUPABASE_ACCESS_TOKEN`, never the anon/service key)

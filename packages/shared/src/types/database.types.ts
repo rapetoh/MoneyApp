@@ -2,27 +2,9 @@
 // GENERATED FILE — do not hand-edit.
 //
 // Produced by `supabase gen types typescript` against the live schema
-// (project ohaqhwampmyoeaopdybd), which matches supabase/migrations/
-// 001-023 exactly (regenerated 2026-08-09 immediately after applying
-// migrations 017-023 to production: local_day, sync contract +
-// sync_upsert_transaction RPC, realtime publication, recurrence anchors +
-// occurrence_date, currency_code CHECK, categories.kind, fx-backfill cron).
-//
-// Hand-updated (not yet regenerated against production) for migration
-// 025: recurring_rules.{amount_in_profile_currency,fx_rate_to_profile,
-// fx_rate_date} (fix-plan 2.1's FX snapshot columns). Re-run the
-// generator once 025 is applied and drop this note.
-//
-// Also hand-updated (not yet regenerated) for migrations 036 and 037:
-// public.push_tokens, public.notification_prefs, public.notification_log,
-// and profiles.{plus_billing_issue_at,plus_grace_until} (the notification
-// system, Sep 19 2026). Re-run the generator once 036 is applied and drop
-// this note.
-//
-// Also hand-updated (not yet regenerated) for migration 026:
-// transactions.snapshot_currency and profiles.monthly_income_currency
-// (fix-plan 2.7's re-denomination columns). Re-run the generator once
-// 026 is applied and drop this note too.
+// (project ohaqhwampmyoeaopdybd). It reflects whatever is applied in
+// production at generation time, so regenerate after applying any
+// migration in supabase/migrations/.
 //
 // Regenerate with `packages/shared/scripts/gen-db-types.sh` (needs the
 // `supabase` CLI + a `SUPABASE_ACCESS_TOKEN`, never the anon/service key)
@@ -36,6 +18,9 @@
 // profile.ts, category.ts, budget.ts, recurring.ts) are now derived from
 // here — narrowing the CHECK-constrained `string` columns (codegen can't
 // see CHECK constraints, only column types) to the app's literal unions.
+// Renaming or removing a column here without updating those files, or any
+// query that names it, is a compile error — see
+// packages/shared/src/types/__tests__/database.types.test.ts.
 // ============================================================
 
 export type Json =
@@ -212,7 +197,7 @@ export type Database = {
         Insert: {
           amount: number
           category_id?: string | null
-          client_id: string
+          client_id?: string
           created_at?: string
           currency_code?: string
           deleted_at?: string | null
@@ -273,7 +258,7 @@ export type Database = {
           version: number
         }
         Insert: {
-          client_id: string
+          client_id?: string
           color?: string | null
           created_at?: string
           deleted_at?: string | null
@@ -342,6 +327,33 @@ export type Database = {
           kind?: string
           name?: string
           sort_order?: number
+        }
+        Relationships: []
+      }
+      devices: {
+        Row: {
+          device_name: string | null
+          id: string
+          last_seen_at: string
+          last_synced_at: string | null
+          platform: string
+          user_id: string
+        }
+        Insert: {
+          device_name?: string | null
+          id: string
+          last_seen_at?: string
+          last_synced_at?: string | null
+          platform: string
+          user_id: string
+        }
+        Update: {
+          device_name?: string | null
+          id?: string
+          last_seen_at?: string
+          last_synced_at?: string | null
+          platform?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -423,6 +435,96 @@ export type Database = {
         }
         Relationships: []
       }
+      profiles: {
+        Row: {
+          analytics_opt_in: boolean
+          crash_reports_opt_in: boolean
+          created_at: string
+          currency_code: string
+          display_name: string | null
+          id: string
+          locale: string
+          monthly_income: number | null
+          monthly_income_currency: string | null
+          monthly_income_source: string | null
+          onboarding_completed_at: string | null
+          plus_billing_issue_at: string | null
+          plus_expires_at: string | null
+          plus_grace_until: string | null
+          plus_is_sandbox: boolean | null
+          plus_period_type: string | null
+          plus_product_id: string | null
+          plus_status: string | null
+          plus_store: string | null
+          plus_synced_at: string | null
+          plus_will_renew: boolean | null
+          primary_goal: string | null
+          start_checklist_dismissed_at: string | null
+          timezone: string
+          trial_ends_at: string | null
+          updated_at: string
+          voice_language: string
+        }
+        Insert: {
+          analytics_opt_in?: boolean
+          crash_reports_opt_in?: boolean
+          created_at?: string
+          currency_code?: string
+          display_name?: string | null
+          id: string
+          locale?: string
+          monthly_income?: number | null
+          monthly_income_currency?: string | null
+          monthly_income_source?: string | null
+          onboarding_completed_at?: string | null
+          plus_billing_issue_at?: string | null
+          plus_expires_at?: string | null
+          plus_grace_until?: string | null
+          plus_is_sandbox?: boolean | null
+          plus_period_type?: string | null
+          plus_product_id?: string | null
+          plus_status?: string | null
+          plus_store?: string | null
+          plus_synced_at?: string | null
+          plus_will_renew?: boolean | null
+          primary_goal?: string | null
+          start_checklist_dismissed_at?: string | null
+          timezone?: string
+          trial_ends_at?: string | null
+          updated_at?: string
+          voice_language?: string
+        }
+        Update: {
+          analytics_opt_in?: boolean
+          crash_reports_opt_in?: boolean
+          created_at?: string
+          currency_code?: string
+          display_name?: string | null
+          id?: string
+          locale?: string
+          monthly_income?: number | null
+          monthly_income_currency?: string | null
+          monthly_income_source?: string | null
+          onboarding_completed_at?: string | null
+          plus_billing_issue_at?: string | null
+          plus_expires_at?: string | null
+          plus_grace_until?: string | null
+          plus_is_sandbox?: boolean | null
+          plus_period_type?: string | null
+          plus_product_id?: string | null
+          plus_status?: string | null
+          plus_store?: string | null
+          plus_synced_at?: string | null
+          plus_will_renew?: boolean | null
+          primary_goal?: string | null
+          start_checklist_dismissed_at?: string | null
+          timezone?: string
+          trial_ends_at?: string | null
+          updated_at?: string
+          voice_language?: string
+        }
+        Relationships: []
+      }
       push_tokens: {
         Row: {
           app_version: string | null
@@ -459,123 +561,6 @@ export type Database = {
           platform?: string
           token?: string
           user_id?: string
-        }
-        Relationships: []
-      }
-      devices: {
-        Row: {
-          device_name: string | null
-          id: string
-          last_seen_at: string
-          last_synced_at: string | null
-          platform: string
-          user_id: string
-        }
-        Insert: {
-          device_name?: string | null
-          id: string
-          last_seen_at?: string
-          last_synced_at?: string | null
-          platform: string
-          user_id: string
-        }
-        Update: {
-          device_name?: string | null
-          id?: string
-          last_seen_at?: string
-          last_synced_at?: string | null
-          platform?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
-      profiles: {
-        Row: {
-          analytics_opt_in: boolean
-          crash_reports_opt_in: boolean
-          created_at: string
-          currency_code: string
-          display_name: string | null
-          id: string
-          locale: string
-          monthly_income: number | null
-          monthly_income_currency: string | null
-          monthly_income_source: string | null
-          onboarding_completed_at: string | null
-          start_checklist_dismissed_at: string | null
-          trial_ends_at: string | null
-          primary_goal: string | null
-          plus_status: string | null
-          plus_product_id: string | null
-          plus_period_type: string | null
-          plus_billing_issue_at: string | null
-          plus_expires_at: string | null
-          plus_grace_until: string | null
-          plus_will_renew: boolean | null
-          plus_store: string | null
-          plus_is_sandbox: boolean | null
-          plus_synced_at: string | null
-          timezone: string
-          updated_at: string
-          voice_language: string
-        }
-        Insert: {
-          analytics_opt_in?: boolean
-          crash_reports_opt_in?: boolean
-          created_at?: string
-          currency_code?: string
-          display_name?: string | null
-          id: string
-          locale?: string
-          monthly_income?: number | null
-          monthly_income_currency?: string | null
-          monthly_income_source?: string | null
-          onboarding_completed_at?: string | null
-          start_checklist_dismissed_at?: string | null
-          trial_ends_at?: string | null
-          primary_goal?: string | null
-          plus_status?: string | null
-          plus_product_id?: string | null
-          plus_period_type?: string | null
-          plus_billing_issue_at?: string | null
-          plus_expires_at?: string | null
-          plus_grace_until?: string | null
-          plus_will_renew?: boolean | null
-          plus_store?: string | null
-          plus_is_sandbox?: boolean | null
-          plus_synced_at?: string | null
-          timezone?: string
-          updated_at?: string
-          voice_language?: string
-        }
-        Update: {
-          analytics_opt_in?: boolean
-          crash_reports_opt_in?: boolean
-          created_at?: string
-          currency_code?: string
-          display_name?: string | null
-          id?: string
-          locale?: string
-          monthly_income?: number | null
-          monthly_income_currency?: string | null
-          monthly_income_source?: string | null
-          onboarding_completed_at?: string | null
-          start_checklist_dismissed_at?: string | null
-          trial_ends_at?: string | null
-          primary_goal?: string | null
-          plus_status?: string | null
-          plus_product_id?: string | null
-          plus_period_type?: string | null
-          plus_billing_issue_at?: string | null
-          plus_expires_at?: string | null
-          plus_grace_until?: string | null
-          plus_will_renew?: boolean | null
-          plus_store?: string | null
-          plus_is_sandbox?: boolean | null
-          plus_synced_at?: string | null
-          timezone?: string
-          updated_at?: string
-          voice_language?: string
         }
         Relationships: []
       }
@@ -618,7 +603,7 @@ export type Database = {
           anchor_time?: string | null
           anchor_weekday?: number | null
           category_id?: string | null
-          client_id: string
+          client_id?: string
           created_at?: string
           currency_code?: string
           deleted_at?: string | null
@@ -854,6 +839,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      recompute_monthly_income: { Args: { p_user: string }; Returns: undefined }
       sync_upsert_transaction: {
         Args: { payload: Json }
         Returns: {
@@ -914,12 +900,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -943,11 +929,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -968,11 +954,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -993,11 +979,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1010,11 +996,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }

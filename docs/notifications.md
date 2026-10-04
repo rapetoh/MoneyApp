@@ -245,52 +245,20 @@ mostly string data.
 
 ## 9. Deploy state
 
-| # | Step | Status (Sep 20 2026) |
+**Live since Oct 4 2026.** Everything below is done and verified in production.
+
+| # | Step | Status |
 |---|---|---|
-| 1 | Migration 036: tables + billing columns | **done, in production** |
-| 2 | Vault secret `notify_sweep_key` | **redo**: holds the legacy service-role key, disabled since 2026-04-11 |
-| 3 | Regenerate DB types | blocked, see below |
-| 4 | `supabase functions deploy notify-sweep` | blocked, see below |
-| 5 | Migration 037: the hourly schedule | held deliberately |
-| 6 | New EAS build | after 4 |
+| 1 | Migration 036: tables + billing columns | done Sep 20 |
+| 2 | Vault secret `notify_sweep_key` | done Oct 4: copied in-database from `generate_recurring_key`, the credential the daily bill generator already authenticates with. The Sep 20 value was the legacy service-role JWT, disabled by Supabase on 2026-04-11 |
+| 3 | DB types regenerated from production | done Oct 4 |
+| 4 | `notify-sweep` deployed (`--no-verify-jwt`, it checks the key itself) | done Oct 4 |
+| 5 | Migration 037: `notify-sweep-hourly`, `10 * * * *` | done Oct 4, after a manual run through the same Vault path returned HTTP 200 `{"considered":1,"sent":0,"reasons":{"quiet_hours":1}}` |
+| 6 | App build with push registration | build 68 (TestFlight Oct 3) |
 
-Steps 1 and 2 were safe to run early and are verified live: the three
-tables exist, `profiles` carries `plus_billing_issue_at` and
-`plus_grace_until`, and the Vault secret is present. Nothing sends,
-because no device has registered a token and the cron job does not exist.
+A device only receives once it has opened build 68 or later, which registers its push token.
 
-**Step 2 must be redone (found Oct 3 2026).** The Vault secret was set from
-`SUPABASE_SERVICE_ROLE_KEY` in the root `.env`, which is a legacy JWT key, and
-Supabase disabled legacy keys on 2026-04-11. Replace it with the project's
-new `sb_secret_` key before applying 037, or every hourly sweep returns 401.
-
-**Step 5 is held on purpose.** Scheduling an hourly call to a function
-that has not been deployed just writes a failure into `cron.job_run_details`
-every hour. Apply 037 immediately after step 4, not before.
-
-**Steps 3 and 4 are blocked on a Supabase access token.** Every token on
-this machine returns `Unauthorized`: the one in the root `.env`, the one
-in `.claude/settings.local.json`, and the one the CLI stored in the macOS
-keychain. Both actions go through the Management API, which is the only
-thing that token authenticates. Note this is NOT the database password
-(which works, which is how 036 was applied) and NOT the service-role key
-(which also works). It is the personal access token from
-https://supabase.com/dashboard/account/tokens.
-
-Once a working token exists:
-
-```bash
-# 3. types
-SUPABASE_ACCESS_TOKEN=<token> packages/shared/scripts/gen-db-types.sh
-# 4. the function
-SUPABASE_ACCESS_TOKEN=<token> npx supabase@2 functions deploy notify-sweep --no-verify-jwt
-# 5. the schedule
-node scripts/apply-sql.mjs supabase/migrations/037_notify_sweep_cron.sql
-```
-
-The DB types were hand-written against migration 036 and verified column
-for column against the live schema, so nothing is blocked on step 3; it
-only removes the hand-update note from the generated file's header.
+The Supabase personal access token (root `.env`, `SUPABASE_ACCESS_TOKEN`) was renamed and reissued Oct 4 after the old "Murmur CLI" token expired; it is scoped to this project. It is needed for `supabase functions deploy` and `gen-db-types.sh`, nothing at runtime.
 
 ### Pausing everything, without a deploy
 
