@@ -316,3 +316,27 @@ Still open, in rough value order:
 | `apps/mobile/src/hooks/usePushRegistration.ts` | keeps the token current |
 | `apps/mobile/src/hooks/useNotificationPrefs.ts` | per-family switches |
 | `apps/mobile/src/services/reminders.ts` | local check-in, unchanged |
+
+## Reinstall left notifications silently off (Oct 4 2026)
+
+After the owner reinstalled, the phone never re-registered for push
+(`push_tokens.last_seen_at` frozen at Sep 30) even though Settings showed the
+evening check-in on. Cause: our "already asked" flag and the check-in setting
+live in SecureStore, which on iOS is the keychain and survives deleting the
+app; iOS's notification permission does not. The app believed it had asked,
+iOS said "undetermined", and nothing ever asked again, so local reminders
+stopped too.
+
+Fix: the OS permission is the source of truth. `shouldOfferPrime` no longer
+reads the "asked" flag; `needsPermissionRepair` (check-in on, permission
+undetermined) raises the explanation sheet at launch and on foreground, once
+per session. Proven on the iOS 27 simulator: enable check-in, allow, delete
+the app, reinstall, the sheet appears at launch, Allow, registration `ok`.
+
+Registration now reports its outcome as an anonymous `push_registration`
+event (`ok`, `no_permission` + the permission state, `token_error`,
+`token_timeout`, `upsert_error` + message), once per distinct outcome per
+launch. Before this, every failure was a console.warn nobody could see on a
+release build. Read them with:
+
+    select created_at, props from app_events where event = 'push_registration' order by created_at desc;

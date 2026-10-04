@@ -223,19 +223,44 @@ export async function setQuietNudgesOptedOut(optedOut: boolean): Promise<void> {
 }
 
 /**
- * The one-time prime sheet is for accounts that were never asked (they
- * finished onboarding before the habit step existed): permission still
- * undetermined, never asked, no check-in chosen, sheet not dismissed.
+ * Whether to show the prime sheet (the explanation that precedes the iOS
+ * notification alert).
+ *
+ * The operating system's permission state is the source of truth for
+ * "has this install been asked", not our own flags. Oct 4 2026: our flags
+ * live in SecureStore, which on iOS is the keychain, and the keychain
+ * survives deleting the app; iOS's notification permission does not. After
+ * the owner reinstalled, the app still believed it had asked (and showed
+ * the evening check-in as on, read from the same keychain), iOS reported
+ * "undetermined", and nothing ever asked again. Reminders silently stopped
+ * and the device never registered for push.
+ *
+ *   - Check-in already chosen + permission undetermined: offer again. The
+ *     user said yes to reminders; this install simply never got the grant
+ *     (reinstall, restore to a new phone, permissions reset).
+ *   - Nothing chosen yet: offer once, unless dismissed.
+ *   - Any decided permission (granted or denied): never; a denial is the
+ *     user's answer and only Settings can change it.
  */
 export async function shouldOfferPrime(): Promise<boolean> {
   if (Platform.OS === 'web') return false
-  const [asked, dismissed, checkIn, status] = await Promise.all([
-    SecureStore.getItemAsync(KEY_ASKED),
+  const [dismissed, checkIn, status] = await Promise.all([
     SecureStore.getItemAsync(KEY_PRIME_DISMISSED),
     getCheckIn(),
     getPermissionStatus(),
   ])
-  return asked !== '1' && dismissed !== '1' && checkIn == null && status === 'undetermined'
+  if (status !== 'undetermined') return false
+  if (checkIn?.enabled) return true
+  return checkIn == null && dismissed !== '1'
+}
+
+/** True when the user has the check-in on but this install has never been
+ *  granted notifications: the reinstall case above. Unlike the first-time
+ *  offer, this does not wait for a save, because the user already chose. */
+export async function needsPermissionRepair(): Promise<boolean> {
+  if (Platform.OS === 'web') return false
+  const checkIn = await getCheckIn()
+  return !!checkIn?.enabled && (await getPermissionStatus()) === 'undetermined'
 }
 
 export async function dismissPrime(): Promise<void> {

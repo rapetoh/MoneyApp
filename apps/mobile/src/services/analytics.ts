@@ -29,6 +29,7 @@ export type AnalyticsEvent =
   | 'paywall_viewed'
   | 'purchase_done'
   | 'getting_started_tap'
+  | 'push_registration'
   | 'js_error'
 
 type Props = Record<string, string | number | boolean | null>

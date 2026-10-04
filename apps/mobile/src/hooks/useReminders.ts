@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AppState } from 'react-native'
 import type { Locale, Transaction } from '@voice-expense/shared'
-import { dismissPrime, enableCheckIn, rescheduleReminders, shouldOfferPrime } from '../services/reminders'
+import { dismissPrime, enableCheckIn, needsPermissionRepair, rescheduleReminders, shouldOfferPrime } from '../services/reminders'
 
 /** When the user last logged something themselves (auto-generated
  *  recurring rows don't count: they happen without the user). */
@@ -73,6 +73,35 @@ export function useReminders(locale: Locale, transactions: Transaction[]) {
       clearTimeout(timer)
     }
   }, [count])
+
+  // Reinstall repair (Oct 4 2026): the check-in is on (read from the
+  // keychain, which outlives the app) but iOS has never granted this install
+  // notifications. Offer the explanation at launch and on return to the
+  // foreground, once per session, instead of waiting for a save.
+  const repairOffered = useRef(false)
+  useEffect(() => {
+    let alive = true
+    const check = () => {
+      if (repairOffered.current) return
+      needsPermissionRepair()
+        .then((needed) => {
+          if (alive && needed && !repairOffered.current) {
+            repairOffered.current = true
+            setPrimeVisible(true)
+          }
+        })
+        .catch(() => {})
+    }
+    const timer = setTimeout(check, PRIME_DELAY_MS)
+    const sub = AppState.addEventListener('change', (s) => {
+      if (s === 'active') check()
+    })
+    return () => {
+      alive = false
+      clearTimeout(timer)
+      sub.remove()
+    }
+  }, [])
 
   const acceptPrime = useCallback(async () => {
     setPrimeVisible(false)

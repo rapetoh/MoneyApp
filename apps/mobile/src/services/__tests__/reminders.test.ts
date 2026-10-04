@@ -82,7 +82,7 @@ vi.mock('react-native', () => ({ Platform: { OS: 'ios' } }))
 vi.mock('expo-localization', () => ({ getCalendars: () => [{ timeZone: 'UTC' }] }))
 
 const reminders = await import('../reminders')
-const { planReminders, rescheduleReminders, cancelAllReminders, enableCheckIn, shouldOfferPrime } = reminders
+const { planReminders, rescheduleReminders, cancelAllReminders, enableCheckIn, shouldOfferPrime, needsPermissionRepair } = reminders
 
 function persistedIds(): string[] {
   const raw = state.store.get('reminders_scheduled_ids')
@@ -254,3 +254,47 @@ describe('duplicate banners (Sep 22 2026)', () => {
     expect([...state.scheduled].sort()).toEqual(first)
   })
 })
+
+/**
+ * Oct 4 2026. The owner reinstalled; iOS forgot the notification grant but
+ * the keychain kept our "asked" flag and the check-in setting. The app never
+ * asked again, so reminders stopped and the phone never registered for push.
+ * The OS permission is the source of truth, not our flags.
+ */
+describe('reinstall: keychain remembers, iOS forgot', () => {
+  it('offers the prime again when the check-in is on but permission is undetermined', async () => {
+    state.permission = 'undetermined'
+    state.store.set('day_two_permission_asked', '1') // survived the reinstall
+    state.store.set('reminders_checkin', JSON.stringify({ enabled: true, hour: 20, minute: 0 }))
+    expect(await needsPermissionRepair()).toBe(true)
+    expect(await shouldOfferPrime()).toBe(true)
+  })
+
+  it('offers even if the prime was dismissed on a previous install, because the user chose reminders', async () => {
+    state.permission = 'undetermined'
+    state.store.set('reminders_prime_dismissed', '1')
+    state.store.set('reminders_checkin', JSON.stringify({ enabled: true, hour: 20, minute: 0 }))
+    expect(await shouldOfferPrime()).toBe(true)
+  })
+
+  it('never re-asks once iOS has an answer', async () => {
+    state.permission = 'granted'
+    state.store.set('reminders_checkin', JSON.stringify({ enabled: true, hour: 20, minute: 0 }))
+    expect(await needsPermissionRepair()).toBe(false)
+    expect(await shouldOfferPrime()).toBe(false)
+  })
+
+  it('does not nag someone who turned the check-in off', async () => {
+    state.permission = 'undetermined'
+    state.store.set('reminders_checkin', JSON.stringify({ enabled: false, hour: 20, minute: 0 }))
+    expect(await needsPermissionRepair()).toBe(false)
+    expect(await shouldOfferPrime()).toBe(false)
+  })
+
+  it('first-time offer still respects a dismissal when nothing was ever chosen', async () => {
+    state.permission = 'undetermined'
+    state.store.set('reminders_prime_dismissed', '1')
+    expect(await shouldOfferPrime()).toBe(false)
+  })
+})
+

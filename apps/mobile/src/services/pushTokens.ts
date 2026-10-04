@@ -25,6 +25,39 @@ import Constants from 'expo-constants'
 import { Platform } from 'react-native'
 import { supabase } from '../lib/supabase'
 import { getPermissionStatus } from './reminders'
+import { track } from './analytics'
+
+/**
+ * Why the last registration attempt ended the way it did.
+ *
+ * Oct 4 2026: on build 68 the owner's phone, notifications on, never wrote
+ * its token (push_tokens.last_seen_at stayed at Sep 30 across several
+ * launches) and every failure path here was a console.warn, which a
+ * release build on a phone nobody can attach to does not surface. So each
+ * attempt now reports its outcome, once per distinct outcome per launch,
+ * as an anonymous `push_registration` event (subject to the same consent
+ * as every other event). "It silently didn't work" becomes a row that
+ * says which step failed and with what message.
+ */
+type RegistrationOutcome = 'ok' | 'no_permission' | 'token_error' | 'token_timeout' | 'upsert_error'
+let lastReported: string | null = null
+
+function report(outcome: RegistrationOutcome, detail: string | null = null, permission: string | null = null) {
+  const key = `${outcome}:${detail ?? ''}`
+  if (key === lastReported) return
+  lastReported = key
+  track('push_registration', {
+    outcome,
+    detail: detail ? detail.slice(0, 200) : null,
+    permission,
+    platform: Platform.OS,
+  })
+}
+
+/** getExpoPushTokenAsync waits on APNs calling the app delegate back. If that
+ *  callback never arrives the promise never settles, which is the one failure
+ *  mode that leaves no error at all. Bounded so it is reported as such. */
+const TOKEN_TIMEOUT_MS = 20_000
 
 /** Cached for the session so a re-render or a second foreground does not
  *  re-hit Expo's token endpoint. */
@@ -80,21 +113,37 @@ export async function registerPushToken(
   userId: string,
   opts: { locale?: string; appVersion?: string; channelLabels?: Record<string, string> } = {},
 ): Promise<string | null> {
+  let step: 'permission' | 'token' | 'upsert' = 'permission'
   try {
     if (Platform.OS === 'web') return null
     // Never prompts. An account that declined notifications simply has no
     // row, and the sweep skips it for free.
-    if ((await getPermissionStatus()) !== 'granted') return null
+    const permission = await getPermissionStatus()
+    if (permission !== 'granted') {
+      report('no_permission', null, permission)
+      return null
+    }
 
     await ensureChannels(opts.channelLabels ?? {})
 
+    step = 'token'
     if (!cachedToken) {
       const pid = projectId()
-      const res = await Notifications.getExpoPushTokenAsync(pid ? { projectId: pid } : undefined)
+      let timer: ReturnType<typeof setTimeout> | undefined
+      const res = await Promise.race([
+        Notifications.getExpoPushTokenAsync(pid ? { projectId: pid } : undefined),
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(() => reject(new Error('__token_timeout__')), TOKEN_TIMEOUT_MS)
+        }),
+      ]).finally(() => clearTimeout(timer))
       cachedToken = res.data
     }
-    if (!cachedToken) return null
+    if (!cachedToken) {
+      report('token_error', 'empty token')
+      return null
+    }
 
+    step = 'upsert'
     const { error } = await supabase.from('push_tokens').upsert(
       {
         user_id: userId,
@@ -112,8 +161,10 @@ export async function registerPushToken(
     )
     if (error) {
       console.warn('[push] token upsert failed', error.message)
+      report('upsert_error', `${error.code ?? ''} ${error.message}`.trim())
       return null
     }
+    report('ok')
     return cachedToken
   } catch (err) {
     // The expected failure is a simulator, which has no APNs registration
@@ -121,19 +172,14 @@ export async function registerPushToken(
     // physical device up front would mean adding a native module for one
     // boolean; the catch costs nothing and covers every other cause too
     // (no network at launch, Expo's endpoint down, a revoked key).
-    console.warn('[push] registration skipped', err instanceof Error ? err.message : String(err))
+    const message = err instanceof Error ? err.message : String(err)
+    console.warn('[push] registration skipped', message)
+    if (message === '__token_timeout__') report('token_timeout')
+    else report(step === 'upsert' ? 'upsert_error' : 'token_error', message)
     return null
   }
 }
 
-/**
- * Retire this device's token at sign-out.
- *
- * Not a delete: the row is the only thing standing between the next person
- * to sign in on this phone and someone else's notifications, and the
- * upsert above rebinds it by `token`. Marking it disabled stops delivery
- * immediately while keeping that rebinding intact.
- */
 export async function unregisterPushToken(): Promise<void> {
   if (!cachedToken) return
   try {
