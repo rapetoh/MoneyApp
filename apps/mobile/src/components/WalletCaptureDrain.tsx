@@ -246,7 +246,8 @@ export function WalletCaptureDrain() {
         // Mockup copy (docs/money-app/project): "Captured from Apple Pay"
         // / "Merchant · Category · just now".
         title: `${t('applepay.notif_captured', locale)} · ${money}`,
-        body: `${label} · ${categoryName ?? t('applepay.uncategorised', locale)} · ${t('applepay.tap_to_edit', locale)}`,
+        body: `${label} · ${categoryName ?? t('applepay.uncategorised', locale)} · ${t('applepay.tap_to_edit', locale)}`,        merchant: n.merchant,
+        merchantDomain,
       })
     }
 
@@ -368,7 +369,8 @@ export function WalletCaptureDrain() {
         transactionId: savedId ?? null,
         userId,
         title: `${t('siri.notif_title', locale)} · ${money}`,
-        body: `${label} · ${categoryName ?? t('applepay.uncategorised', locale)} · ${t('applepay.tap_to_edit', locale)}`,
+        body: `${label} · ${categoryName ?? t('applepay.uncategorised', locale)} · ${t('applepay.tap_to_edit', locale)}`,        merchant,
+        merchantDomain,
       })
 
       const said = isIncome ? 'siri.received' : 'siri.saved'

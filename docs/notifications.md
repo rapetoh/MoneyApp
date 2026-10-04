@@ -340,3 +340,20 @@ launch. Before this, every failure was a console.warn nobody could see on a
 release build. Read them with:
 
     select created_at, props from app_events where event = 'push_registration' order by created_at desc;
+
+## Merchant logo on saved-expense banners (Oct 4 2026)
+
+Owner request: banners about a saved expense should carry the merchant's logo
+on the right, the way messaging apps show a photo. Every saved-expense banner
+(Apple Pay capture, Siri) now attaches the same logo the transaction row
+shows, from `merchantLogoUrl`, as an iOS notification attachment
+(`notifySaved` in `src/services/walletCaptureNotifications.ts`).
+
+- iOS needs a local file and moves it into its own store, so each banner gets
+  a uniquely named copy in the cache directory.
+- No known logo (the favicon service answers 404), a slow network (3 s cap) or
+  any error: the banner posts without an image. Never a placeholder, since the
+  app icon is already on the left, and never a delayed confirmation.
+- Not on the evening reminder (it is about no one expense) or the server
+  notifications yet. Bill notifications could carry the biller's logo but
+  need a Notification Service Extension; deferred.

@@ -15,7 +15,9 @@
 import * as Notifications from 'expo-notifications'
 import { AppState, Platform } from 'react-native'
 import { router } from 'expo-router'
+import { File, Paths } from 'expo-file-system'
 import { deleteTransactionAndEnqueue } from '../hooks/useTransactions'
+import { merchantLogoUrl } from './merchantLogo'
 
 export const WALLET_CAPTURE_CATEGORY = 'wallet-capture'
 const ACTION_UNDO = 'undo'
@@ -67,6 +69,53 @@ export interface SavedCaptureNotice {
   userId: string
   title: string // "Saved $2.11 · Three Square Market"
   body: string // "Food & Dining · Tap to edit"
+  /** For the logo thumbnail on the right of the banner. */
+  merchant?: string | null
+  merchantDomain?: string | null
+}
+
+/** How long a save waits for its logo before posting without one. The
+ *  banner is the confirmation that the money was recorded; a picture is
+ *  never worth delaying that by more than a beat. */
+const LOGO_TIMEOUT_MS = 3000
+
+/**
+ * The merchant's logo as a notification attachment: the thumbnail iOS shows
+ * on the right of the banner, the way messaging apps show a photo (owner
+ * request, Oct 4 2026). Same image the transaction row shows in the app,
+ * from the same `merchantLogoUrl`, so the banner and the list agree.
+ *
+ * iOS needs a local file and MOVES it into its own store when the
+ * notification is added, so each banner gets its own uniquely named copy
+ * in the cache directory. A merchant with no known logo (the favicon
+ * service answers 404, which is also what makes the in-app row fall back to
+ * its letter tile), a slow network or any error means no attachment, never
+ * a missing banner and never a generic placeholder: the app icon is already
+ * on the left.
+ */
+async function logoAttachment(
+  merchant: string | null | undefined,
+  merchantDomain: string | null | undefined,
+): Promise<Notifications.NotificationContentAttachmentIos | null> {
+  if (Platform.OS !== 'ios') return null
+  const url = merchantLogoUrl(merchant, merchantDomain)
+  if (!url) return null
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), LOGO_TIMEOUT_MS)
+  try {
+    const res = await fetch(url, { signal: controller.signal })
+    if (!res.ok) return null
+    const bytes = new Uint8Array(await res.arrayBuffer())
+    if (bytes.length < 64) return null
+    const file = new File(Paths.cache, `notif-logo-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.png`)
+    file.create()
+    file.write(bytes)
+    return { identifier: 'merchant-logo', url: file.uri, type: null, typeHint: 'public.png' }
+  } catch {
+    return null
+  } finally {
+    clearTimeout(timer)
+  }
 }
 
 /** Post (or replace) the saved-purchase notification. No-op while the app
@@ -88,6 +137,7 @@ export async function notifySaved(n: SavedCaptureNotice): Promise<void> {
     // request reuses its identifier, but on the owner's iPhone (build 33)
     // both the native placeholder and the final one stayed. Remove the
     // placeholder explicitly first — one banner, always.
+    const logo = await logoAttachment(n.merchant, n.merchantDomain)
     await Notifications.dismissNotificationAsync(identifier).catch(() => undefined)
     await Notifications.scheduleNotificationAsync({
       identifier,
@@ -95,6 +145,7 @@ export async function notifySaved(n: SavedCaptureNotice): Promise<void> {
         title: n.title,
         body: n.body,
         sound: false,
+        ...(logo ? { attachments: [logo] } : {}),
         categoryIdentifier: WALLET_CAPTURE_CATEGORY,
         data: { transactionId: n.transactionId, userId: n.userId, kind: 'wallet-capture' },
         ...(Platform.OS === 'ios' ? { threadIdentifier: 'wallet-capture' } : {}),
