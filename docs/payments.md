@@ -583,3 +583,5 @@ Shipped alongside launch:
 - Still open from the model: lower tiers in low-income markets (not set).
 
 **Oct 4 2026 - 1.0.1 (69) submitted for App Review**, status "Waiting for Review", automatic release, all users at once. Carries the iOS 27 launch fix (UIScene), the infinite-splash fix, the reinstall notification-permission repair, push-registration reporting, and the 14-day trial listing. Build 68 went to TestFlight only.
+
+**Oct 5 2026 - 1.0.1 (69) APPROVED, Ready for Distribution (live on the App Store, auto-release).** iOS 27 users can open Murmur again. Not in 69, queued for 1.0.2: merchant logos on banners (70/71), Apple Watch app (75 to 77), midnight rollover fix (77), "Plus trial" wording.
