@@ -41,6 +41,7 @@ import {
   type Locale,
 } from '@voice-expense/shared'
 import type { AskInsight, Transaction } from '@voice-expense/shared'
+import { useNowInstant } from '../../src/hooks/useNowInstant'
 
 function pad2(n: number): string {
   return String(n).padStart(2, '0')
@@ -226,7 +227,7 @@ export default function InsightsScreen() {
     return out
   }, [categoryMap])
 
-  const nowInstant = useMemo(() => new Date().toISOString(), [])
+  const nowInstant = useNowInstant(tz)
   const nowParts = useMemo(() => localParts(nowInstant, tz), [nowInstant, tz])
   const currentMonthKey = monthKey(nowParts.y, nowParts.m)
 

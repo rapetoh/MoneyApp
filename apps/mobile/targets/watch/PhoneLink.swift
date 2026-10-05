@@ -1,3 +1,4 @@
+import Combine
 import Foundation
 import WatchConnectivity
 
@@ -12,8 +13,12 @@ import WatchConnectivity
 ///   - Not reachable: `transferUserInfo`, which the system delivers when the
 ///     two are back in range. Nothing is lost; the watch says so honestly
 ///     rather than claiming a save that has not happened.
-final class PhoneLink: NSObject, WCSessionDelegate {
+final class PhoneLink: NSObject, ObservableObject, WCSessionDelegate {
   static let shared = PhoneLink()
+
+  /// The last outcome, shown on the watch screen, including when the save
+  /// came from Siri rather than a tap.
+  @Published var lastStatus: String?
 
   private var activation: [CheckedContinuation<Void, Never>] = []
   private let lock = NSLock()
@@ -57,7 +62,7 @@ final class PhoneLink: NSObject, WCSessionDelegate {
   /// Returns the sentence to show or say.
   func send(phrase: String, hint: String) async -> String {
     let trimmed = phrase.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !trimmed.isEmpty else { return WatchCopy.nothingHeard }
+    guard !trimmed.isEmpty else { return publish(WatchCopy.nothingHeard) }
     await waitUntilActive()
 
     let payload: [String: Any] = [
@@ -67,7 +72,15 @@ final class PhoneLink: NSObject, WCSessionDelegate {
       "captured_at": ISO8601DateFormatter().string(from: Date()),
     ]
     let s = WCSession.default
-    guard s.activationState == .activated else { return WatchCopy.noPhone }
+    guard s.activationState == .activated else { return publish(WatchCopy.noPhone) }
+
+    // Reachability follows the app coming to the front by a beat; give it
+    // up to 3 s before falling back to a deferred transfer.
+    var waited = 0.0
+    while !s.isReachable && waited < 3 {
+      try? await Task.sleep(nanoseconds: 200_000_000)
+      waited += 0.2
+    }
 
     if s.isReachable {
       let reply: String? = await withCheckedContinuation { (c: CheckedContinuation<String?, Never>) in
@@ -84,12 +97,18 @@ final class PhoneLink: NSObject, WCSessionDelegate {
           once.run { c.resume(returning: nil) }
         }
       }
-      if let reply, !reply.isEmpty { return reply }
-      return WatchCopy.queued
+      if let reply, !reply.isEmpty { return publish(reply) }
+      return publish(WatchCopy.queued)
     }
 
     s.transferUserInfo(payload)
-    return WatchCopy.queuedForLater
+    return publish(WatchCopy.queuedForLater)
+  }
+
+  @discardableResult
+  private func publish(_ line: String) -> String {
+    DispatchQueue.main.async { self.lastStatus = line }
+    return line
   }
 
   // MARK: WCSessionDelegate

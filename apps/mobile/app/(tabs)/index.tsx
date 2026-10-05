@@ -44,6 +44,7 @@ import {
   civilDateTimeToInstant,
 } from '@voice-expense/shared'
 import type { Locale, Transaction } from '@voice-expense/shared'
+import { useNowInstant } from '../../src/hooks/useNowInstant'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers — all civil-date math routes through packages/shared/src/utils/
@@ -207,7 +208,7 @@ export default function TodayScreen() {
   // Frozen for the life of this mount (mirrors `insights.tsx`'s own
   // `nowInstant`) rather than recomputed every render — every date-derived
   // value below stays internally consistent within one render pass.
-  const nowInstant = useMemo(() => new Date().toISOString(), [])
+  const nowInstant = useNowInstant(tz)
 
   const sections = useMemo(
     () => groupForToday(transactions, locale, nowInstant, tz),

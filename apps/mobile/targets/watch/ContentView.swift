@@ -4,6 +4,7 @@ import SwiftUI
 /// dictation is the default on the watch, then the sentence goes to the
 /// iPhone and the screen shows what was saved.
 struct ContentView: View {
+  @ObservedObject private var link = PhoneLink.shared
   @State private var status: String?
   @State private var busy = false
 
@@ -20,7 +21,7 @@ struct ContentView: View {
 
         if busy {
           ProgressView().padding(.top, 4)
-        } else if let status {
+        } else if let status = status ?? link.lastStatus {
           Text(status)
             .font(.footnote)
             .multilineTextAlignment(.center)

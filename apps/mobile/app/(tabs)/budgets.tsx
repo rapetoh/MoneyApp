@@ -16,6 +16,7 @@ import { BudgetEditorModal } from '../../src/components/BudgetEditorModal'
 import { Colors, Typography, useTabBarClearance } from '../../src/theme'
 import { t, localParts, daysBetween, formatMoney, merchantColor, categoryPalette } from '@voice-expense/shared'
 import type { Locale, Budget, BudgetPeriod } from '@voice-expense/shared'
+import { useNowInstant } from '../../src/hooks/useNowInstant'
 
 /**
  * Budgets tab. Matches `S_Budgets` in
@@ -97,6 +98,7 @@ export default function BudgetsScreen() {
   // renders comes from here, never the device's own zone, so the figure
   // and the countdown beside it always describe the same window as web.
   const tz = profile?.timezone || 'UTC'
+  const now = useNowInstant(tz)
 
   const monthLabel = useMemo(
     () => new Date().toLocaleDateString(locale, { month: 'long', timeZone: tz }).toUpperCase(),
@@ -109,12 +111,14 @@ export default function BudgetsScreen() {
   // `direction` and currency and summed only the *next* occurrence per
   // rule regardless of the budget's own period.
   const status = useMemo(
+    // `now` is in the deps so the period rolls over at midnight and at the
+    // turn of the month even if the screen stayed mounted (Oct 5 2026).
     () => budgetStatusFor(budget, transactions, recurringRules, tz),
-    [budget, transactions, recurringRules, tz],
+    [budget, transactions, recurringRules, tz, now],
   )
   const daysLeft = useMemo(
-    () => (status ? daysLeftInWindow(status.window.endExclusive, new Date().toISOString(), tz) : 0),
-    [status, tz],
+    () => (status ? daysLeftInWindow(status.window.endExclusive, now, tz) : 0),
+    [status, tz, now],
   )
 
   // Per-category statuses through the same shared computation as the hero
@@ -136,7 +140,7 @@ export default function BudgetsScreen() {
           }
         })
         .sort((a, b) => b.pct - a.pct),
-    [categoryBudgets, transactions, recurringRules, tz, categoryMap],
+    [categoryBudgets, transactions, recurringRules, tz, categoryMap, now],
   )
 
   function onCategoryRowPress(b: Budget, name: string) {

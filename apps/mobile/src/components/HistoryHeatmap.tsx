@@ -17,6 +17,7 @@ import {
   type Locale,
 } from '@voice-expense/shared'
 import type { Transaction } from '@voice-expense/shared'
+import { useNowInstant } from '../hooks/useNowInstant'
 
 // Fix-plan 1.3/2.4 — this file used to carry a file-level
 // `eslint-disable local/period-restrictions` because its whole month-grid
@@ -136,7 +137,7 @@ export function HistoryHeatmap({ transactions, locale, currencyCode, tz }: Props
   // screen's own `nowInstant` (`insights.tsx`, `(tabs)/index.tsx`) — every
   // date-derived value below stays internally consistent within one
   // render pass instead of drifting mid-calculation.
-  const nowIso = useMemo(() => new Date().toISOString(), [])
+  const nowIso = useNowInstant(tz)
   const nowParts = useMemo(() => localParts(nowIso, tz), [nowIso, tz])
   const currentMonthKey = useMemo(() => monthIso(nowIso, tz), [nowIso, tz])
 

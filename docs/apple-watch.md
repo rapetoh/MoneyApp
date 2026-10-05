@@ -52,3 +52,18 @@ ITMS-90626 "Invalid Siri Support": App Intent descriptions cannot contain
 said "files it on your iPhone". Keep device names out of every
 `IntentDescription`, `title` and parameter text; spoken dialogs at runtime
 are fine.
+
+## Siri on the watch filed late, with no banner (build 76, Oct 5 2026)
+
+From the watch, the iPhone is reachable for live messaging only while the
+watch app is in the foreground (Apple's WCSession rule). App Intents ran in
+the background (`openAppWhenRun = false`), so `isReachable` was false, the
+watch used `transferUserInfo`, and the iPhone filed the expense only when
+Murmur was next opened: in-app toast, no banner. Tapping inside the watch app
+worked because the app was in front.
+
+Fix: the watch intents set `openAppWhenRun = true`, so the watch app comes
+forward for the hand-off; `PhoneLink.send` waits up to 3 s for reachability
+before falling back; the result is published to the watch screen. The first
+Siri use also shows Apple's one-time "turn on Murmur shortcuts?" prompt,
+which is expected.

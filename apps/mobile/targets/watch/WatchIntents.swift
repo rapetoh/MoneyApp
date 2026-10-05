@@ -6,7 +6,14 @@ import AppIntents
 struct LogExpenseOnWatchIntent: AppIntent {
   static var title: LocalizedStringResource = "Log an expense"
   static var description = IntentDescription("Say what you spent and Murmur files it.")
-  static var openAppWhenRun: Bool = false
+  /// The watch app comes to the front for the moment it takes to hand the
+  /// sentence over (Oct 5 2026). Apple only lets the watch talk to the
+  /// iPhone live while the watch app is in the foreground; run in the
+  /// background, as it first was, Siri fell back to a deferred transfer, the
+  /// iPhone filed the expense only when Murmur was next opened, and no
+  /// banner ever appeared. In front, the iPhone saves within seconds, posts
+  /// the banner, and the watch shows and says what was saved.
+  static var openAppWhenRun: Bool = true
 
   @Parameter(title: "What did you spend?", requestValueDialog: IntentDialog("What did you spend?"))
   var spend: String
@@ -20,7 +27,14 @@ struct LogExpenseOnWatchIntent: AppIntent {
 struct LogIncomeOnWatchIntent: AppIntent {
   static var title: LocalizedStringResource = "Log income"
   static var description = IntentDescription("Say what came in and Murmur files it.")
-  static var openAppWhenRun: Bool = false
+  /// The watch app comes to the front for the moment it takes to hand the
+  /// sentence over (Oct 5 2026). Apple only lets the watch talk to the
+  /// iPhone live while the watch app is in the foreground; run in the
+  /// background, as it first was, Siri fell back to a deferred transfer, the
+  /// iPhone filed the expense only when Murmur was next opened, and no
+  /// banner ever appeared. In front, the iPhone saves within seconds, posts
+  /// the banner, and the watch shows and says what was saved.
+  static var openAppWhenRun: Bool = true
 
   @Parameter(title: "What came in?", requestValueDialog: IntentDialog("What came in?"))
   var received: String
