@@ -1,0 +1,139 @@
+/**
+ * Merchant enrichment: turns a card descriptor that was saved raw into the
+ * business's real name and logo domain, after the fact.
+ *
+ * Apple Pay and bank-notification captures save in under a second, so the
+ * parser that names the business ("711594-Mcgrath Volkswa" -> "McGrath
+ * Volkswagen", vw.com) sometimes answers too late, or the phone was
+ * offline. Those rows keep the cleaned descriptor and no logo. This sweep
+ * finds them on launch and on foreground, asks the same parser once per
+ * row, and writes the answer through the normal edit path (SQLite, then
+ * the sync outbox), so every surface and device sees the fix.
+ *
+ * Rules:
+ *  - Only captured rows (Apple Pay `shortcut`, Android
+ *    `notification_listener`). Voice, manual and scan rows were named by
+ *    the person or by the parser already.
+ *  - The name is replaced only while it still looks like a descriptor; a
+ *    name the person typed is kept, and only the missing logo domain is
+ *    filled.
+ *  - Each row is tried once (ids remembered on device), a few per run, so
+ *    an unknown merchant never costs a parse on every launch.
+ */
+
+import * as SecureStore from 'expo-secure-store'
+import { parseExpense } from '@voice-expense/ai'
+import {
+  cleanMerchantDescriptor,
+  normalizeMerchantCase,
+  normalizeMerchantDomain,
+  type Transaction,
+} from '@voice-expense/shared'
+import { supabase } from '../lib/supabase'
+import { getApiUrl } from '../hooks/useApiUrl'
+import { getTransactions, getTransactionById, updateTransactionFields } from './sync/transactionStore'
+import { enqueue } from './sync/syncQueue'
+import { DataEvents } from '../events/dataEvents'
+
+const ATTEMPTED_KEY = 'murmur.merchantEnrichment.attempted'
+const BATCH = 5
+const ATTEMPTED_CAP = 400
+const PARSE_BUDGET_MS = 8000
+
+let running = false
+
+/** True while the merchant still reads like a card descriptor rather
+ *  than a business name: store numbers, processor prefixes, star tails,
+ *  shouting caps, or anything the cleaner would still change. */
+export function looksLikeDescriptor(merchant: string): boolean {
+  const m = merchant.trim()
+  if (!m) return false
+  if (/[*#]/.test(m) || /\d{3,}/.test(m)) return true
+  if (m.length > 3 && m === m.toUpperCase() && /[A-Z]/.test(m)) return true
+  return normalizeMerchantCase(cleanMerchantDescriptor(m)) !== m
+}
+
+export function needsEnrichment(t: Transaction): boolean {
+  if (t.is_deleted || !t.merchant) return false
+  if (t.source !== 'shortcut' && t.source !== 'notification_listener') return false
+  return !t.merchant_domain || looksLikeDescriptor(t.merchant)
+}
+
+async function readAttempted(): Promise<string[]> {
+  try {
+    const raw = await SecureStore.getItemAsync(ATTEMPTED_KEY)
+    const ids = raw ? (JSON.parse(raw) as unknown) : []
+    return Array.isArray(ids) ? ids.filter((x): x is string => typeof x === 'string') : []
+  } catch {
+    return []
+  }
+}
+
+async function writeAttempted(ids: string[]): Promise<void> {
+  try {
+    await SecureStore.setItemAsync(ATTEMPTED_KEY, JSON.stringify(ids.slice(-ATTEMPTED_CAP)))
+  } catch {
+    /* worst case a row is tried again next launch */
+  }
+}
+
+export async function runMerchantEnrichment(userId: string): Promise<number> {
+  if (running) return 0
+  running = true
+  try {
+    const attempted = await readAttempted()
+    const tried = new Set(attempted)
+    const candidates = (await getTransactions(userId))
+      .filter((t) => !tried.has(t.id) && needsEnrichment(t))
+      .slice(0, BATCH)
+    if (!candidates.length) return 0
+
+    const { data } = await supabase.auth.getSession()
+    const token = data?.session?.access_token
+    if (!token) return 0
+    const apiBaseUrl = await getApiUrl()
+
+    let fixed = 0
+    for (const t of candidates) {
+      const parsed = await Promise.race([
+        parseExpense({
+          transcript: `${t.amount} ${t.currency_code} at ${t.merchant}`,
+          locale: 'en' as never,
+          currency: t.currency_code,
+          categories: [],
+          apiBaseUrl,
+          authToken: token,
+          userId,
+        }).catch(() => null),
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), PARSE_BUDGET_MS)),
+      ])
+      // No answer (offline, slow): not marked, so the next run retries.
+      if (!parsed) continue
+      attempted.push(t.id)
+
+      const fields: { merchant?: string; merchant_domain?: string } = {}
+      const name = parsed.merchant?.trim()
+      if (name && t.merchant && looksLikeDescriptor(t.merchant) && name !== t.merchant) {
+        fields.merchant = name
+      }
+      const domain = normalizeMerchantDomain(parsed.merchant_domain)
+      if (domain && domain !== t.merchant_domain) fields.merchant_domain = domain
+      if (!Object.keys(fields).length) continue
+
+      // Re-read: the person may have edited the row while the parse ran.
+      const current = await getTransactionById(t.id)
+      if (!current || current.is_deleted || current.merchant !== t.merchant) continue
+
+      await updateTransactionFields(t.id, fields)
+      const updated = await getTransactionById(t.id)
+      if (updated) await enqueue('update', t.id, updated, 'transaction')
+      fixed++
+    }
+
+    await writeAttempted(attempted)
+    if (fixed) DataEvents.emitTransactions(userId)
+    return fixed
+  } finally {
+    running = false
+  }
+}

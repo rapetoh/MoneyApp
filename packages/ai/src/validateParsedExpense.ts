@@ -29,7 +29,7 @@ import type {
   RecurringFrequency,
   TransactionDirection,
 } from '@voice-expense/shared'
-import { normalizeMerchantCase } from '@voice-expense/shared'
+import { normalizeMerchantCase, normalizeMerchantDomain } from '@voice-expense/shared'
 
 export interface ValidateParsedExpenseOptions {
   /** Overrides the default note-length cap (characters). Exposed for tests;
@@ -314,7 +314,7 @@ export function validateParsedExpense(
   // same list. A merchant the user types by hand is left alone: that is a
   // choice, not a transcription artefact.
   const merchant = normalizeMerchantCase(trimmedStringOrNull(r.merchant)) || null
-  const merchantDomain = trimmedStringOrNull(r.merchant_domain)
+  const merchantDomain = normalizeMerchantDomain(trimmedStringOrNull(r.merchant_domain))
   const categorySuggestion = trimmedStringOrNull(r.category_suggestion)
   const needsClarification = r.needs_clarification === true
   const clarifyingQuestion = needsClarification ? trimmedStringOrNull(r.clarifying_question) : null

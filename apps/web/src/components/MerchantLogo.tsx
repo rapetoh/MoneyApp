@@ -16,6 +16,7 @@ import {
   cleanMerchantDescriptor,
 } from '@voice-expense/shared'
 import { font } from '../lib/theme'
+import { merchantLogoSrc } from '@voice-expense/shared'
 
 export function MerchantLogo({
   name,
@@ -67,7 +68,7 @@ export function MerchantLogo({
     : null
   const logoUrl =
     domain && !logoFailed
-      ? `https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=http://${domain}&size=128`
+      ? merchantLogoSrc(domain)
       : null
 
   if (logoUrl) {

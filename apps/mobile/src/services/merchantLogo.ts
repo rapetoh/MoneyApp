@@ -1,5 +1,5 @@
 import { Image } from 'expo-image'
-import { guessDomain, brandDomainForMerchant, cleanMerchantDescriptor } from '@voice-expense/shared'
+import { guessDomain, brandDomainForMerchant, cleanMerchantDescriptor, merchantLogoSrc } from '@voice-expense/shared'
 import type { Transaction, RecurringRule } from '@voice-expense/shared'
 
 /**
@@ -19,7 +19,7 @@ export function merchantLogoUrl(
   const domain =
     merchantDomain ?? brandDomainForMerchant(name) ?? guessDomain(cleanMerchantDescriptor(name))
   if (!domain) return null
-  return `https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=http://${domain}&size=128`
+  return merchantLogoSrc(domain)
 }
 
 // URLs already handed to the cache this process — a repeat call for the

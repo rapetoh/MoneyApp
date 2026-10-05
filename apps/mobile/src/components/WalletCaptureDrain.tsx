@@ -55,6 +55,8 @@ import {
   resolveCategorySuggestion,
   guessCategoryFromMerchant,
   brandDomainForMerchant,
+  cleanMerchantDescriptor,
+  normalizeMerchantCase,
   type Category,
   type Locale,
 } from '@voice-expense/shared'
@@ -174,6 +176,15 @@ export function WalletCaptureDrain() {
       // network; the AI refinement below may override with something
       // more specific (owner remark Aug 24: Target showed a letter tile).
       let merchantDomain: string | null = brandDomainForMerchant(n.merchant)
+      // The name a person would write, never the raw card descriptor
+      // (Oct 5 2026: "711594-Mcgrath Volkswa" was saved as-is, with a "7"
+      // tile). The cleaned descriptor is the instant fallback; the parser
+      // below replaces it with the business's real name ("McGrath
+      // Volkswagen") when it answers in time, and MerchantEnrichment fixes
+      // it later when it does not.
+      let merchantName: string | null = n.merchant
+        ? normalizeMerchantCase(cleanMerchantDescriptor(n.merchant)) || n.merchant
+        : null
       if (n.merchant) {
         try {
           const { data } = await supabase.auth.getSession()
@@ -197,6 +208,7 @@ export function WalletCaptureDrain() {
               resolveCategorySuggestion(parsed.category_suggestion, categories)?.category.id ?? null
             if (refined) categoryId = refined
             merchantDomain = parsed.merchant_domain ?? merchantDomain
+            if (parsed.merchant) merchantName = parsed.merchant
           }
         } catch {
           /* uncategorised is fine */
@@ -207,7 +219,7 @@ export function WalletCaptureDrain() {
         amount: n.amount,
         direction: deriveDirectionFromFlowType('expense'),
         currency_code: n.currency,
-        merchant: n.merchant,
+        merchant: merchantName,
         note: null,
         category_id: categoryId,
         merchant_domain: merchantDomain,
@@ -220,7 +232,7 @@ export function WalletCaptureDrain() {
       if (result.error && result.status === 'rejected') return
 
       const savedId = result.id
-      const label = n.merchant ?? t('voice.expense', locale)
+      const label = merchantName ?? t('voice.expense', locale)
       const money = formatMoney(n.amount, n.currency, locale)
       showUndo({
         message: `${t('voice.saved', locale)} · ${label} ${money}`,
@@ -246,7 +258,7 @@ export function WalletCaptureDrain() {
         // Mockup copy (docs/money-app/project): "Captured from Apple Pay"
         // / "Merchant · Category · just now".
         title: `${t('applepay.notif_captured', locale)} · ${money}`,
-        body: `${label} · ${categoryName ?? t('applepay.uncategorised', locale)} · ${t('applepay.tap_to_edit', locale)}`,        merchant: n.merchant,
+        body: `${label} · ${categoryName ?? t('applepay.uncategorised', locale)} · ${t('applepay.tap_to_edit', locale)}`,        merchant: merchantName,
         merchantDomain,
       })
     }

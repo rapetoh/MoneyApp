@@ -11,11 +11,17 @@
 // merchants ("Canteen Des Moines 2") keep the letter tile — the honest
 // ceiling without a paid data feed.
 
-/** Strips store numbers and trailing location junk from a card-network
- *  descriptor: "Target T-1768" → "Target",
- *  "MAVERIK #05213 CEDAR R, Cedar Rapids, IA" → "MAVERIK".
- *  Conservative: only patterns that are unambiguously junk; when the
- *  result would be empty, the original (trimmed) string is returned. */
+/** Strips a card-network descriptor down to its name: store numbers,
+ *  payment-processor prefixes and trailing location junk.
+ *  "Target T-1768" -> "Target", "711594-Mcgrath Volkswa" -> "Mcgrath Volkswa",
+ *  "SQ *BLUE BOTTLE COFFEE" -> "BLUE BOTTLE COFFEE",
+ *  "MAVERIK #05213 CEDAR R, Cedar Rapids, IA" -> "MAVERIK".
+ *
+ *  This is the instant, offline fallback; the AI parser does the real
+ *  identification (expanding truncations, naming the brand, finding the
+ *  logo domain). It runs when the AI has not answered yet, so it only ever
+ *  removes what is unambiguously not part of a name, and returns the
+ *  original string rather than an empty one. */
 export function cleanMerchantDescriptor(raw: string | null | undefined): string {
   const s = (raw ?? '').trim()
   if (!s) return ''
@@ -23,15 +29,54 @@ export function cleanMerchantDescriptor(raw: string | null | undefined): string 
   // Trailing ", City, ST" / ", City" segments (keep the first segment).
   const firstComma = out.indexOf(',')
   if (firstComma > 0) out = out.slice(0, firstComma)
-  // Store-number tokens: "#05213", "T-1768", "No. 42", "STORE 123", "*AB12".
   out = out
-    .replace(/\*[A-Za-z0-9]+/g, ' ')
+    // Payment-processor prefixes: "SQ *", "TST*", "SP * ", "PAYPAL *",
+    // "GOOGLE *", "DD *". The business follows the star.
+    .replace(/^(?:SQ|TST|SP|PP|PY|IC|DD|PAYPAL|GOOGLE|APL)\s*\*\s*/i, '')
+    // A leading store or terminal number: "711594-Mcgrath".
+    .replace(/^\d{3,}[\s\-#*]*/, '')
+    // Reference tails after a star that carry a digit: "Mktp US*2K4L19XQ2".
+    // A star followed by a plain word is kept ("SQ *BLUE" was handled above).
+    .replace(/\*(?=[A-Za-z0-9]*\d)[A-Za-z0-9]+/g, ' ')
+    // Store-number tokens: "#05213", "T-1768", "No. 42", "STORE 123", "F12345".
     .replace(/#\s?\d+/g, ' ')
     .replace(/\b(?:T|ST|STR|NO|STORE|UNIT)[-.]?\s?\d{2,}\b/gi, ' ')
+    .replace(/\b[A-Z]{1,2}\d{4,}\b/gi, ' ')
     .replace(/\b\d{4,}\b/g, ' ')
-  // Truncated ALL-CAPS location tails after the junk strip ("MAVERIK CEDAR R").
-  out = out.replace(/\s{2,}/g, ' ').trim()
+  out = out
+    .replace(/\s{2,}/g, ' ')
+    // Separators left dangling at either end: "-Mcgrath", "Joe's -".
+    .replace(/^[\s\-\u2013\u2014#*.,:]+|[\s\-\u2013\u2014#*,:]+$/g, '')
+    .trim()
   return out || s
+}
+
+/**
+ * A merchant's website domain as the logo service needs it, or null.
+ *
+ * The parser's `merchant_domain` is model output: Oct 5 2026's eval caught
+ * it returning the string "null", and URLs, paths and "www." prefixes are
+ * all plausible. Anything that is not a bare host name is rejected rather
+ * than sent to the logo service, which would just answer with nothing.
+ */
+export function normalizeMerchantDomain(raw: string | null | undefined): string | null {
+  let d = (raw ?? '').trim().toLowerCase()
+  if (!d || d === 'null' || d === 'none' || d === 'n/a') return null
+  d = d.replace(/^[a-z]+:\/\//, '').replace(/^www\./, '').split(/[/?#]/)[0]
+  return /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(d) ? d : null
+}
+
+/**
+ * The one logo URL for a merchant domain, shared by mobile, web and
+ * notification attachments so every surface shows the same image.
+ *
+ * Asked for under "www.": measured Oct 5 2026 against 33 merchant domains,
+ * the www. form returned a logo for all of them while the bare form missed
+ * some (chick-fil-a.com: 404 bare, 200 with www.).
+ */
+export function merchantLogoSrc(domain: string): string {
+  const host = domain.startsWith('www.') ? domain : `www.${domain}`
+  return `https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=http://${host}&size=128`
 }
 
 /**

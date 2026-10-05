@@ -73,3 +73,50 @@ describe('normalizeMerchantCase', () => {
     expect(normalizeMerchantCase('  spacex  ')).toBe('Spacex')
   })
 })
+
+// Oct 5 2026: "711594-Mcgrath Volkswa" was saved as the merchant with a "7"
+// letter tile. The cleaner is the instant fallback while the AI answers.
+import { cleanMerchantDescriptor as clean, normalizeMerchantDomain, merchantLogoSrc } from '../merchantBrand'
+
+describe('card descriptors the cleaner must handle', () => {
+  it.each([
+    ['711594-Mcgrath Volkswa', 'Mcgrath Volkswa'],
+    ['SQ *BLUE BOTTLE COFFEE', 'BLUE BOTTLE COFFEE'],
+    ['TST* JOES PIZZA 4421', 'JOES PIZZA'],
+    ['AMZN Mktp US*2K4L19XQ2', 'AMZN Mktp US'],
+    ['PAYPAL *SPOTIFY', 'SPOTIFY'],
+    ['SP * GYMSHARK', 'GYMSHARK'],
+    ['CASEYS #3341 MARION IA', 'CASEYS MARION IA'],
+    ["MCDONALD'S F12345", "MCDONALD'S"],
+    ['SHELL OIL 57444091309', 'SHELL OIL'],
+    ['Target T-1768', 'Target'],
+    ['Blue Bottle Coffee', 'Blue Bottle Coffee'],
+  ])('%s -> %s', (raw, expected) => {
+    expect(clean(raw)).toBe(expected)
+  })
+
+  it('never returns an empty string for a real input', () => {
+    expect(clean('123456')).toBe('123456')
+  })
+})
+
+describe('normalizeMerchantDomain', () => {
+  it.each([
+    ['vw.com', 'vw.com'],
+    ['https://www.Chick-fil-A.com/menu', 'chick-fil-a.com'],
+    ['null', null],
+    ['None', null],
+    ['', null],
+    ['not a domain', null],
+    ['localhost', null],
+  ])('%s -> %s', (raw, expected) => {
+    expect(normalizeMerchantDomain(raw)).toBe(expected)
+  })
+})
+
+describe('merchantLogoSrc', () => {
+  it('asks for the www. host, which resolves logos the bare host misses', () => {
+    expect(merchantLogoSrc('chick-fil-a.com')).toContain('url=http://www.chick-fil-a.com')
+    expect(merchantLogoSrc('www.vw.com')).toContain('url=http://www.vw.com')
+  })
+})

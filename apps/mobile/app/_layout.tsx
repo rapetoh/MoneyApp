@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { StyleSheet, View } from 'react-native'
+import { AppState, StyleSheet, View } from 'react-native'
 import { Stack, useRouter, useSegments } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import * as SplashScreen from 'expo-splash-screen'
@@ -15,6 +15,7 @@ import { syncManager } from '../src/services/sync/SyncManager'
 import { runRecurringCatchUp } from '../src/services/recurringCatchUp'
 import { runFxBackfill } from '../src/services/fxBackfill'
 import { registerDevice } from '../src/services/sync/deviceRegistry'
+import { runMerchantEnrichment } from '../src/services/merchantEnrichment'
 import { runOncePerSession } from '../src/services/launchOnce'
 import { configurePurchases } from '../src/services/purchases'
 import { installCrashReporting } from '../src/services/analytics'
@@ -261,6 +262,15 @@ export default function RootLayout() {
     // Never written before this; the web sidebar/Settings "Synced just
     // now" string was hardcoded because there was no real row to read.
     runOncePerSession(`registerDevice:${userId}`, () => registerDevice(userId))
+
+    // Captured card descriptors ("711594-Mcgrath Volkswa") whose parse
+    // answered too late get their real business name and logo domain, on
+    // launch and every return to the foreground (src/services/merchantEnrichment.ts).
+    void runMerchantEnrichment(userId).catch(() => {})
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') void runMerchantEnrichment(userId).catch(() => {})
+    })
+    return () => sub.remove()
   }, [session?.user?.id])
 
   // Both children keep a stable key so React preserves the <LaunchScreen>

@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { Platform } from 'react-native'
 import { NativeModulesProxy, EventEmitter } from 'expo-modules-core'
 import type { ParsedExpense } from '@voice-expense/shared'
+import { cleanMerchantDescriptor, normalizeMerchantCase } from '@voice-expense/shared'
 import { validateParsedExpense, isParseRejection, deriveDirectionFromFlowType } from '@voice-expense/ai'
 
 // Local Subscription shape — expo-modules-core stopped exporting this type in
@@ -104,7 +105,12 @@ export function useNotificationListener(
         currency: payload.currency,
         direction: deriveDirectionFromFlowType('expense'),
         flow_type: 'expense',
-        merchant: payload.merchant || null,
+        // Bank notifications carry the card descriptor ("SQ *BLUE BOTTLE
+        // #12"); the readable name is saved now and MerchantEnrichment
+        // later swaps in the business's real name and logo domain.
+        merchant: payload.merchant
+          ? normalizeMerchantCase(cleanMerchantDescriptor(payload.merchant)) || payload.merchant
+          : null,
         merchant_domain: null,
         note: null,
         category_suggestion: null,

@@ -199,6 +199,9 @@ const UPDATABLE_TRANSACTION_FIELDS = new Set<string>([
   // column on read and on push, so both follow it without a migration.
   'transacted_at',
   'merchant',
+  // Oct 5, 2026: MerchantEnrichment resolves a card descriptor to the
+  // business's real name and logo domain after the row is saved.
+  'merchant_domain',
   'note',
   'category_id',
   'payment_method',
@@ -215,6 +218,7 @@ export async function updateTransactionFields(
       | 'amount'
       | 'transacted_at'
       | 'merchant'
+      | 'merchant_domain'
       | 'note'
       | 'category_id'
       | 'payment_method'
