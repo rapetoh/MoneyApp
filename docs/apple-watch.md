@@ -44,3 +44,11 @@ Compiles for watchOS and embeds in the iPhone app (`Murmur.app/Watch`),
 versions match (1.0.1), iPhone app launches clean with the bridge active on
 the iOS 27 simulator. No watchOS simulator runtime is installed on this Mac,
 so the end-to-end test is on the owner's watch via TestFlight.
+
+## App Store rule hit (build 75)
+
+ITMS-90626 "Invalid Siri Support": App Intent descriptions cannot contain
+"iPhone" (Apple rejects device names in Siri metadata). The watch intents
+said "files it on your iPhone". Keep device names out of every
+`IntentDescription`, `title` and parameter text; spoken dialogs at runtime
+are fine.

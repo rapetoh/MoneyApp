@@ -5,7 +5,7 @@ import AppIntents
 /// and the sentence goes to the iPhone, which answers with what it saved.
 struct LogExpenseOnWatchIntent: AppIntent {
   static var title: LocalizedStringResource = "Log an expense"
-  static var description = IntentDescription("Say what you spent and Murmur files it on your iPhone.")
+  static var description = IntentDescription("Say what you spent and Murmur files it.")
   static var openAppWhenRun: Bool = false
 
   @Parameter(title: "What did you spend?", requestValueDialog: IntentDialog("What did you spend?"))
@@ -19,7 +19,7 @@ struct LogExpenseOnWatchIntent: AppIntent {
 
 struct LogIncomeOnWatchIntent: AppIntent {
   static var title: LocalizedStringResource = "Log income"
-  static var description = IntentDescription("Say what came in and Murmur files it on your iPhone.")
+  static var description = IntentDescription("Say what came in and Murmur files it.")
   static var openAppWhenRun: Bool = false
 
   @Parameter(title: "What came in?", requestValueDialog: IntentDialog("What came in?"))
