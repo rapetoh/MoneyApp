@@ -62,34 +62,8 @@ struct LogSpokenExpenseIntent: AppIntent {
       return .result(dialog: IntentDialog(stringLiteral: SiriCopy.nothingHeard))
     }
 
-    let id = UUID().uuidString
-    let entry: [String: Any] = [
-      "id": id,
-      "kind": "phrase",
-      "phrase": phrase,
-      // Which door the user came through. The parser still decides the
-      // sign from the words; this only tells it which way to lean when a
-      // sentence like "two hundred from Acme" could go either way.
-      "hint": "expense",
-      // The Apple Pay fields stay present and empty: one queue, one
-      // reader, and an older build of the app can still parse the line.
-      "amount": "",
-      "merchant": "",
-      "currency": "",
-      "source": "shortcut",
-      "captured_at": ISO8601DateFormatter().string(from: Date()),
-    ]
-    try WalletCaptureQueue.append(entry)
-
-    // 9 s: Siri tolerates a short wait and the round trip is a cold JS
-    // start plus one parse call. Past it, Siri answers honestly that the
-    // sentence is queued rather than claiming a save that has not
-    // happened; the drain files it on the next launch or foreground.
-    let outcome = await WalletCaptureCoordinator.wakeAndWait(id: id, timeout: 9)
-    if let dialog = outcome.dialog, !dialog.isEmpty {
-      return .result(dialog: IntentDialog(stringLiteral: dialog))
-    }
-    return .result(dialog: IntentDialog(stringLiteral: SiriCopy.queued))
+    let line = try await SiriCapture.file(phrase: phrase, hint: "expense")
+    return .result(dialog: IntentDialog(stringLiteral: line))
   }
 }
 
@@ -125,23 +99,8 @@ struct LogSpokenIncomeIntent: AppIntent {
     guard !phrase.isEmpty else {
       return .result(dialog: IntentDialog(stringLiteral: SiriCopy.nothingHeard))
     }
-    let id = UUID().uuidString
-    try WalletCaptureQueue.append([
-      "id": id,
-      "kind": "phrase",
-      "phrase": phrase,
-      "hint": "income",
-      "amount": "",
-      "merchant": "",
-      "currency": "",
-      "source": "shortcut",
-      "captured_at": ISO8601DateFormatter().string(from: Date()),
-    ])
-    let outcome = await WalletCaptureCoordinator.wakeAndWait(id: id, timeout: 9)
-    if let dialog = outcome.dialog, !dialog.isEmpty {
-      return .result(dialog: IntentDialog(stringLiteral: dialog))
-    }
-    return .result(dialog: IntentDialog(stringLiteral: SiriCopy.queued))
+    let line = try await SiriCapture.file(phrase: phrase, hint: "income")
+    return .result(dialog: IntentDialog(stringLiteral: line))
   }
 }
 
@@ -192,6 +151,40 @@ struct MurmurAppShortcuts: AppShortcutsProvider {
       shortTitle: "Log income",
       systemImageName: "arrow.down.circle"
     )
+  }
+}
+
+/// The one way a spoken sentence becomes a saved row, whoever heard it:
+/// Siri on the iPhone (the two intents above) or the Apple Watch
+/// (WatchBridge.swift, Oct 4 2026). It queues the sentence for the app's own
+/// parser and save, wakes the JavaScript drain and waits up to 9 s for what
+/// was actually saved, so the line spoken back is the real amount and
+/// merchant. Past that it answers honestly that the sentence is queued; the
+/// drain files it on the next launch or foreground.
+enum SiriCapture {
+  static func file(phrase: String, hint: String) async throws -> String {
+    let id = UUID().uuidString
+    try WalletCaptureQueue.append([
+      "id": id,
+      "kind": "phrase",
+      "phrase": phrase,
+      // Which door the user came through. The parser still decides the
+      // sign from the words; this only tells it which way to lean when a
+      // sentence like "two hundred from Acme" could go either way.
+      "hint": hint,
+      // The Apple Pay fields stay present and empty: one queue, one
+      // reader, and an older build of the app can still parse the line.
+      "amount": "",
+      "merchant": "",
+      "currency": "",
+      "source": "shortcut",
+      "captured_at": ISO8601DateFormatter().string(from: Date()),
+    ])
+    // 9 s: Siri tolerates a short wait and the round trip is a cold JS
+    // start plus one parse call.
+    let outcome = await WalletCaptureCoordinator.wakeAndWait(id: id, timeout: 9)
+    if let dialog = outcome.dialog, !dialog.isEmpty { return dialog }
+    return SiriCopy.queued
   }
 }
 

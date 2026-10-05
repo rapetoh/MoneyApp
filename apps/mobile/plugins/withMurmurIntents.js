@@ -16,10 +16,10 @@
 // the group helper skips a file that is already present.
 const path = require('path')
 const fs = require('fs')
-const { withDangerousMod, withXcodeProject, withInfoPlist, IOSConfig } = require('expo/config-plugins')
+const { withDangerousMod, withXcodeProject, withInfoPlist, withAppDelegate, IOSConfig } = require('expo/config-plugins')
 const { PHRASES, INTENT_STRINGS, LOCALES } = require('../native/ios/siri-phrases')
 
-const FILES = ['WalletCapture.swift', 'SiriLogExpense.swift']
+const FILES = ['WalletCapture.swift', 'SiriLogExpense.swift', 'WatchBridge.swift']
 const SOURCE_DIR = path.join(__dirname, '..', 'native', 'ios')
 
 // Escape a .strings value: the format is C-like, so a literal quote or
@@ -51,7 +51,27 @@ function localizationFiles() {
   return out
 }
 
+// The Apple Watch bridge (WatchBridge.swift) has to be listening before the
+// watch's first message can arrive, including when that message is what
+// launched Murmur in the background. So it is activated from
+// didFinishLaunching, which runs for every launch, foreground or not.
+const WATCH_MARKER = 'WatchBridge.shared.activate()'
+function withWatchBridgeActivation(config) {
+  return withAppDelegate(config, (c) => {
+    let src = c.modResults.contents
+    if (src.includes(WATCH_MARKER)) return c
+    const anchor = 'return super.application(application, didFinishLaunchingWithOptions: launchOptions)'
+    if (!src.includes(anchor)) {
+      throw new Error('withMurmurIntents: AppDelegate no longer calls super.didFinishLaunching; place the WatchBridge activation by hand.')
+    }
+    src = src.replace(anchor, `// Apple Watch: listen for sentences from the watch app (WatchBridge.swift).\n    ${WATCH_MARKER}\n\n    ${anchor}`)
+    c.modResults.contents = src
+    return c
+  })
+}
+
 module.exports = function withMurmurIntents(config) {
+  config = withWatchBridgeActivation(config)
   config = withDangerousMod(config, [
     'ios',
     (c) => {

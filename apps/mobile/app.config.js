@@ -23,6 +23,9 @@ module.exports = {
     ios: {
       supportsTablet: false,
       bundleIdentifier: 'com.voiceexpense.app',
+      // Apple Team ID, needed by @bacons/apple-targets to sign the Apple
+      // Watch target the same way as the app (Oct 4 2026).
+      appleTeamId: '47WU47J52M',
       usesAppleSignIn: true,
       infoPlist: {
         // Murmur implements no encryption of its own (OS TLS + data
@@ -86,6 +89,12 @@ module.exports = {
       // adopted it, at launch, before any JavaScript runs. The SDK 54
       // template does not. See the plugin header for the deep-link details.
       './plugins/withSceneLifecycle.js',
+      // Apple Watch app (Oct 4 2026): Siri on the watch only knows apps
+      // installed on the watch. Sources in targets/watch. The version plugin
+      // is listed BEFORE apple-targets on purpose so its mod runs after the
+      // watch target exists (mods wrap like middleware).
+      './plugins/withWatchVersion.js',
+      '@bacons/apple-targets',
       'expo-router',
       // Purpose strings (App Store 5.1.1, Sep 8 2026 rejection): every
       // NS*UsageDescription says what Murmur does with the resource and
