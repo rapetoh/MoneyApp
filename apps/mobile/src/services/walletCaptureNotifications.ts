@@ -110,7 +110,19 @@ async function logoAttachment(
     const file = new File(Paths.cache, `notif-logo-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.png`)
     file.create()
     file.write(bytes)
-    return { identifier: 'merchant-logo', url: file.uri, type: null, typeHint: 'public.png' }
+    // expo-notifications' TypeScript type names the file `url`, but its iOS
+    // side reads `uri` (Records.swift: `request["uri"]`) and nothing in
+    // between maps one to the other. Sent as `url` only, iOS received an
+    // empty path and silently dropped the image: build 70 shipped with no
+    // logo on the owner's phone (Oct 4 2026). Both keys are sent so the type
+    // stays satisfied and the native side gets what it actually reads.
+    return {
+      identifier: 'merchant-logo',
+      url: file.uri,
+      uri: file.uri,
+      type: null,
+      typeHint: 'public.png',
+    } as Notifications.NotificationContentAttachmentIos
   } catch {
     return null
   } finally {
