@@ -24,6 +24,7 @@ import { Colors, Typography, Hairline } from '../src/theme'
 import { formatCurrency, monthlyEquivalent, t } from '@voice-expense/shared'
 import type { Locale } from '@voice-expense/shared'
 import type { RecurringRule, RecurringFrequency } from '@voice-expense/shared'
+import { goBack } from '../src/services/goBack'
 
 // The hand-rolled `TO_MONTHLY` table (fix-plan 2.1) is deleted — the hero
 // below now calls the shared `monthlyEquivalent`, which honours
@@ -238,7 +239,7 @@ export default function RecurringScreen() {
             (audit 01-F32); matches more/transactions.tsx's `topRow`. */}
         <View style={styles.topRow}>
           <Pressable
-            onPress={() => router.back()}
+            onPress={() => goBack(router)}
             style={({ pressed }) => [styles.backPill, pressed && styles.backPillPressed]}
             hitSlop={8}
           >

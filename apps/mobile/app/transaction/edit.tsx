@@ -29,6 +29,7 @@ import { useKeyboardLift } from '../../src/hooks/useKeyboardLift'
 import { Colors, Typography, Spacing, Radius } from '../../src/theme'
 import { t, currencySymbolFor, validateAmount, findRuleForTransaction } from '@voice-expense/shared'
 import type { Transaction, TransactionDirection, PaymentMethod, Locale, RecurringFrequency } from '@voice-expense/shared'
+import { goBack } from '../../src/services/goBack'
 
 const PAYMENT_METHODS: { value: PaymentMethod; key: string }[] = [
   { value: 'cash', key: 'payment.cash' },
@@ -220,7 +221,7 @@ export default function EditTransactionScreen() {
           durationMs: 5000,
         })
       }
-      router.back()
+      goBack(router)
     }
   }
 

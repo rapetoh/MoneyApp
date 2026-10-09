@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Alert, BackHandler } from 'react-native'
 import { getLocales } from 'expo-localization'
 import { useRouter } from 'expo-router'
@@ -65,14 +65,26 @@ export function VoiceSessionProvider({ children }: { children: ReactNode }) {
   const [source, setSource] = useState<TransactionSource>('voice')
   const [saving, setSaving] = useState(false)
 
-  const openVoice = useCallback(() => {
-    if (!user) return
-    // Ignore taps while a capture or result is already in flight.
+  // Every "start listening" (mic button, widget, Shortcut link, record
+  // route) is a request: a counter bump through a function whose identity
+  // never changes, honoured by the effect below as soon as the session and
+  // profile are loaded. Callers can hold it in a stale closure and still
+  // work (Oct 9 2026, owner: the widget's Speak opened Murmur and sat
+  // there; the record route had kept an openVoice from a cold launch, made
+  // while signed-out, and every later call was dropped).
+  const [voiceRequest, setVoiceRequest] = useState(0)
+  const handledRequest = useRef(0)
+  const openVoice = useCallback(() => setVoiceRequest((n) => n + 1), [])
+
+  useEffect(() => {
+    if (voiceRequest === handledRequest.current) return
+    if (!user || !profile) return // waits; re-runs once they load
+    handledRequest.current = voiceRequest
+    // A capture or result already in flight wins over a second request.
     if (voice.state !== 'idle') return
     setSource('voice')
     voice.startListening(speechLocale)
-     
-  }, [user, voice.state, voice.startListening, speechLocale])
+  }, [voiceRequest, user, profile, voice.state, voice.startListening, speechLocale])
 
   const presentParsed = useCallback(
     (parsed: ParsedExpense, src: TransactionSource) => {

@@ -28,6 +28,7 @@ import {
   type PlanOffer,
 } from '../../src/services/purchases'
 import { track } from '../../src/services/analytics'
+import { goBack } from '../../src/services/goBack'
 
 /**
  * Paywall — Murmur Plus (Aug 16, 2026 owner decision: iOS subscription
@@ -132,7 +133,7 @@ export default function PaywallScreen() {
     setBusy(null)
     if (outcome.kind === 'purchased') {
       track('purchase_done', { plan: current.plan, trial: !!current.trialDays, origin: origin ?? 'feature' })
-      router.back()
+      goBack(router)
     } else if (outcome.kind === 'pending') {
       Alert.alert(t('paywall.eyebrow', locale), t('paywall.pending', locale))
     } else if (outcome.kind === 'error') {
@@ -149,7 +150,7 @@ export default function PaywallScreen() {
     setBusy(null)
     if (outcome.kind === 'restored') {
       Alert.alert(t('paywall.eyebrow', locale), t('paywall.restore_done', locale), [
-        { text: t('paywall.done', locale), onPress: () => router.back() },
+        { text: t('paywall.done', locale), onPress: () => goBack(router) },
       ])
     } else if (outcome.kind === 'nothing') {
       Alert.alert(t('paywall.restore', locale), t('paywall.restore_none', locale))
@@ -188,7 +189,7 @@ export default function PaywallScreen() {
         <SafeAreaView style={styles.safe} edges={['top', 'bottom', 'left', 'right']}>
           <View style={styles.topRow}>
             <Pressable
-              onPress={() => router.back()}
+              onPress={() => goBack(router)}
               style={({ pressed }) => [styles.closeBtn, pressed && styles.closeBtnPressed]}
               hitSlop={8}
               accessibilityRole="button"
@@ -341,7 +342,7 @@ export default function PaywallScreen() {
                 )}
                 {fromOnboarding && (
                   <Pressable
-                    onPress={() => router.back()}
+                    onPress={() => goBack(router)}
                     style={({ pressed }) => [styles.notNow, pressed && styles.ctaPressed]}
                     accessibilityRole="button"
                   >

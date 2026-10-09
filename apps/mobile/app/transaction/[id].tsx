@@ -21,6 +21,7 @@ import { Money } from '../../src/components/Money'
 import { Colors, Typography, Hairline } from '../../src/theme'
 import { formatCurrency, currencySymbolFor, t, findRuleForTransaction } from '@voice-expense/shared'
 import type { Transaction, Locale } from '@voice-expense/shared'
+import { goBack } from '../../src/services/goBack'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Sub-components (match mockup: DetailRow + ActionBtn shapes)
@@ -162,7 +163,7 @@ export default function TransactionDetailScreen() {
     })
     syncManager.drainQueue()
     DataEvents.emitTransactions(snapshot.user_id)
-    router.back()
+    goBack(router)
 
     showUndo({
       message: `${t('detail.deleted', locale)} · ${merchantLabel} ${formatted}`,
@@ -253,7 +254,7 @@ export default function TransactionDetailScreen() {
             a no-op placeholder — removed per user feedback. Actions (Edit,
             Delete) live in the button row below the fields. */}
         <View style={styles.topRow}>
-          <HeaderPill onPress={() => router.back()}>
+          <HeaderPill onPress={() => goBack(router)}>
             <Ionicons name="chevron-back" size={20} color={Colors.ink2 ?? Colors.textSecondary} />
           </HeaderPill>
         </View>

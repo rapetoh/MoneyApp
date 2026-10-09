@@ -45,6 +45,7 @@ import {
 import type { AskAction, AskInsight, AskReply } from '@voice-expense/shared'
 import { AskTurnError, buildAskData, buildAskTurnRequest, postAskTurn } from '../../src/services/askMurmurClient'
 import { AskInsightCard, performAskAction } from '../../src/components/AskInsightCard'
+import { goBack } from '../../src/services/goBack'
 
 /**
  * Ask Murmur — the in-app money assistant (docs/ask-murmur/SPEC.md).
@@ -306,7 +307,7 @@ export default function AskMurmurScreen() {
         {/* Header — close · mark + title · history · new */}
         <View style={styles.headerRow}>
           <Pressable
-            onPress={() => router.back()}
+            onPress={() => goBack(router)}
             style={({ pressed }) => [styles.iconPill, pressed && styles.pressed]}
             hitSlop={8}
             accessibilityLabel={t('common.cancel', locale)}

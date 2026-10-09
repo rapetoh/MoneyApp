@@ -45,12 +45,16 @@ export default function RecordBridge() {
     useCallback(() => {
       // Shortcut params no longer land here: app/shortcut.tsx enqueues the
       // capture for WalletCaptureDrain (silent save, Aug 17 2026).
+      // Today first, then the action on top of it: Quick entry opens as
+      // its sheet over Today and Cancel returns there. Replacing straight
+      // to /transaction/new (until Oct 9 2026) made it the only screen, a
+      // full page whose Cancel had nothing to go back to (owner, widget's
+      // Type button).
+      router.replace('/(tabs)')
       if (params.tab === 'manual') {
-        router.replace('/transaction/new')
+        setTimeout(() => router.push('/transaction/new'), 0)
         return
       }
-
-      router.replace('/(tabs)')
       openVoice()
        
     }, [params.tab, params._nonce]),

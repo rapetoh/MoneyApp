@@ -44,3 +44,8 @@ capture ──► instant: cleanMerchantDescriptor  ("711594-Mcgrath Volkswa" ->
 - Logo URL always uses the `www.` host (bare `chick-fil-a.com` 404s on the favicon service).
 - Enrichment touches only `shortcut` and `notification_listener` rows, 5 per run, each row once. A name the person typed is never replaced; only a missing logo domain is filled.
 - Updates go through SQLite + the sync outbox, so web and other devices get the fix.
+
+## Oct 9 2026 additions
+
+- **Captures saved before the AI answered** are queued with the bank's original text (`queueForNaming`, `merchantEnrichment.ts`); the repair re-asks with it and replaces the fallback name unless the person renamed it. Runs 8 s after the save and on every launch/foreground. Repairs now push to the server immediately (`syncManager.drainQueue()`); before, they waited for the next unrelated write.
+- **Logos are checked before they are kept** (import endpoint): any domain the logo service has nothing for gets one more AI pass with that feedback ("albertheijn.com has no site" gives ah.nl); still failing means no domain, so the letter tile shows instead of a broken image.

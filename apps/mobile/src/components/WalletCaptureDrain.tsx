@@ -41,6 +41,7 @@ import {
 } from '../services/walletCapture'
 import { rememberCapturePrefs, readCapturePrefs } from '../services/capturePrefs'
 import { learnedCategoryId } from '../services/merchantRules'
+import { queueForNaming } from '../services/merchantEnrichment'
 import {
   ensureWalletCaptureCategory,
   notifySaved,
@@ -186,6 +187,9 @@ export function WalletCaptureDrain() {
       let merchantName: string | null = n.merchant
         ? normalizeMerchantCase(cleanMerchantDescriptor(n.merchant)) || n.merchant
         : null
+      // Whether the parser named the business in time; if not, the capture
+      // is queued for naming once saved (merchantEnrichment.queueForNaming).
+      let named = false
       if (n.merchant) {
         try {
           const { data } = await supabase.auth.getSession()
@@ -209,7 +213,10 @@ export function WalletCaptureDrain() {
               resolveCategorySuggestion(parsed.category_suggestion, categories)?.category.id ?? null
             if (refined) categoryId = refined
             merchantDomain = parsed.merchant_domain ?? merchantDomain
-            if (parsed.merchant) merchantName = parsed.merchant
+            if (parsed.merchant) {
+              merchantName = parsed.merchant
+              named = true
+            }
           }
         } catch {
           /* uncategorised is fine */
@@ -242,6 +249,7 @@ export function WalletCaptureDrain() {
       if (result.error && result.status === 'rejected') return
 
       const savedId = result.id
+      if (!named && n.merchant && savedId) void queueForNaming(userId, savedId, n.merchant, merchantName)
       const label = merchantName ?? t('voice.expense', locale)
       const money = formatMoney(n.amount, n.currency, locale)
       showUndo({

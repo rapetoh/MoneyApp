@@ -30,6 +30,7 @@ import {
   type DateOrder,
   type SignConvention,
 } from '@voice-expense/shared'
+import { goBack } from '../../src/services/goBack'
 
 /** "1 transaction" vs "{count} transactions": a `_one` key when there is one. */
 function plural(key: string, count: number, locale: Locale): string {
@@ -179,7 +180,7 @@ export default function ImportScreen() {
           {result.held > 0 && (
             <Text style={styles.body}>{plural('import.done_held', result.held, locale)}</Text>
           )}
-          <Pressable style={styles.primary} onPress={() => router.back()}>
+          <Pressable style={styles.primary} onPress={() => goBack(router)}>
             <Text style={styles.primaryText}>{t('common.done', locale)}</Text>
           </Pressable>
         </View>

@@ -35,6 +35,7 @@ import type {
   AmountValidation,
 } from '@voice-expense/shared'
 import type { RecurringFrequency } from '@voice-expense/shared'
+import { goBack } from '../../src/services/goBack'
 
 const PAYMENT_METHODS: { value: PaymentMethod; key: string }[] = [
   { value: 'cash', key: 'payment.cash' },
@@ -243,7 +244,7 @@ export default function QuickEntryScreen() {
           title optically centered. */}
       <View style={styles.header}>
         <View style={styles.headerSide}>
-          <Pressable onPress={() => router.back()} hitSlop={10} accessibilityRole="button">
+          <Pressable onPress={() => goBack(router)} hitSlop={10} accessibilityRole="button">
             <Text style={styles.headerCancel}>{t('common.cancel', userLocale)}</Text>
           </Pressable>
         </View>

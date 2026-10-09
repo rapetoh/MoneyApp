@@ -14,6 +14,7 @@ import { useDeleteAccount } from '../../src/hooks/useDeleteAccount'
 import { SetGroup, SetRow } from '../../src/components/SettingsList'
 import { Colors, Typography, Hairline } from '../../src/theme'
 import { t, LEGAL_URLS, type Locale } from '@voice-expense/shared'
+import { goBack } from '../../src/services/goBack'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Screen. Slimmed Sep 2 2026 (owner): statement + data controls + legal
@@ -63,7 +64,7 @@ export default function PrivacyScreen() {
             (audit 01-F32); matches more/transactions.tsx's `topRow`. */}
         <View style={styles.topRow}>
           <Pressable
-            onPress={() => router.back()}
+            onPress={() => goBack(router)}
             style={({ pressed }) => [styles.backPill, pressed && styles.backPillPressed]}
             hitSlop={8}
           >
