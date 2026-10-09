@@ -31,6 +31,11 @@ import {
   type SignConvention,
 } from '@voice-expense/shared'
 
+/** "1 transaction" vs "{count} transactions": a `_one` key when there is one. */
+function plural(key: string, count: number, locale: Locale): string {
+  return (count === 1 ? t(`${key}_one`, locale) : t(key, locale)).replace('{count}', String(count))
+}
+
 /** Biggest file read: a decade of daily card spending is well under this. */
 const MAX_FILE_BYTES = 5 * 1024 * 1024
 
@@ -170,9 +175,9 @@ export default function ImportScreen() {
           <View style={styles.heroIcon}>
             <Ionicons name="checkmark" size={22} color={Colors.accent} />
           </View>
-          <Text style={styles.title}>{t('import.done_title', locale).replace('{count}', String(result.count))}</Text>
+          <Text style={styles.title}>{plural('import.done_title', result.count, locale)}</Text>
           {result.held > 0 && (
-            <Text style={styles.body}>{t('import.done_held', locale).replace('{count}', String(result.held))}</Text>
+            <Text style={styles.body}>{plural('import.done_held', result.held, locale)}</Text>
           )}
           <Pressable style={styles.primary} onPress={() => router.back()}>
             <Text style={styles.primaryText}>{t('common.done', locale)}</Text>
@@ -247,7 +252,7 @@ export default function ImportScreen() {
         <View style={styles.hero}>
           <Text style={styles.fileName} numberOfLines={1}>{file.name}</Text>
           <Text style={styles.title}>
-            {t('import.found', locale).replace('{count}', String(reading.rows.length))}
+            {plural('import.found', reading.rows.length, locale)}
           </Text>
           {reading.first && (
             <Text style={styles.body}>{`${reading.first} → ${reading.last}`}</Text>
@@ -317,24 +322,24 @@ export default function ImportScreen() {
           <View style={styles.switchRow}>
             <Pressable style={{ flex: 1 }} onPress={() => setIncludeDuplicates((v) => !v)} accessibilityElementsHidden importantForAccessibility="no">
               <Text style={styles.switchText}>
-                {t('import.held', locale).replace('{count}', String(reading.held.size))}
+                {plural('import.held', reading.held.size, locale)}
               </Text>
             </Pressable>
             <Switch
               value={includeDuplicates}
               onValueChange={setIncludeDuplicates}
               trackColor={{ true: Colors.accent, false: Colors.surface2 }}
-              accessibilityLabel={t('import.held', locale).replace('{count}', String(reading.held.size))}
+              accessibilityLabel={plural('import.held', reading.held.size, locale)}
             />
           </View>
         )}
         {reading.skipped.length > 0 && (
-          <Text style={styles.note}>{t('import.skipped', locale).replace('{count}', String(reading.skipped.length))}</Text>
+          <Text style={styles.note}>{plural('import.skipped', reading.skipped.length, locale)}</Text>
         )}
 
         <Pressable style={[styles.primary, !canImport && { opacity: 0.4 }]} disabled={!canImport} onPress={run} testID="import-run">
           <Text style={styles.primaryText}>
-            {t('import.run', locale).replace('{count}', String(reading.toImport.length))}
+            {plural('import.run', reading.toImport.length, locale)}
           </Text>
         </Pressable>
         <Pressable onPress={pick} style={styles.secondary}>

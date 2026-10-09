@@ -203,7 +203,7 @@ export default function ImportPage() {
           {progress && <div style={s.progress}>{progress}…</div>}
           {result && (
             <div style={s.done}>
-              {result.count} transactions imported.{result.held > 0 ? ` ${result.held} were already in Murmur and were skipped.` : ''}{' '}
+              {result.count === 1 ? '1 transaction' : `${result.count} transactions`} imported.{result.held > 0 ? ` ${result.held === 1 ? '1 was' : `${result.held} were`} already in Murmur and skipped.` : ''}{' '}
               <Link href="/dashboard/transactions" style={{ color: colors.accent, fontWeight: 600 }}>See them</Link>
             </div>
           )}
@@ -212,7 +212,7 @@ export default function ImportPage() {
         {file && reading && m && !progress && (
           <div style={s.card}>
             <div style={s.fileName}>{file.name}</div>
-            <div style={s.title}>{reading.rows.length} transactions found</div>
+            <div style={s.title}>{reading.rows.length === 1 ? '1 transaction' : `${reading.rows.length} transactions`} found</div>
 
             <div style={s.grid}>
               {(['date', 'description', ...(pairMode ? ['debit', 'credit'] : ['amount']), 'category'] as Array<keyof ColumnMapping>).map((key) => (
@@ -263,13 +263,13 @@ export default function ImportPage() {
             {reading.held.size > 0 && (
               <label style={s.check}>
                 <input type="checkbox" checked={includeDuplicates} onChange={(e) => setIncludeDuplicates(e.target.checked)} style={{ accentColor: colors.accent }} />
-                {reading.held.size} are already in Murmur and will be skipped. Import them anyway
+                {reading.held.size === 1 ? '1 transaction is already in Murmur and will be skipped. Import it anyway' : `${reading.held.size} transactions are already in Murmur and will be skipped. Import them anyway`}
               </label>
             )}
-            {reading.skipped.length > 0 && <div style={s.note}>{reading.skipped.length} lines without a date or amount will be skipped.</div>}
+            {reading.skipped.length > 0 && <div style={s.note}>{reading.skipped.length === 1 ? '1 line' : `${reading.skipped.length} lines`} without a date or amount will be skipped.</div>}
 
             <button style={{ ...s.primary, opacity: reading.toImport.length ? 1 : 0.4 }} disabled={!reading.toImport.length} onClick={run}>
-              Import {reading.toImport.length} transactions
+              Import {reading.toImport.length === 1 ? '1 transaction' : `${reading.toImport.length} transactions`}
             </button>
           </div>
         )}

@@ -869,7 +869,7 @@
   "import.preview": "Preview",
   "import.already": "already in Murmur",
   "import.nothing": "No transactions read yet. Check the columns above.",
-  "import.held": "{count} are already in Murmur and will be skipped. Import them anyway",
+  "import.held": "{count} transactions are already in Murmur and will be skipped. Import them anyway",
   "import.skipped": "{count} lines without a date or amount will be skipped.",
   "import.run": "Import {count} transactions",
   "import.naming": "Naming merchants",
@@ -877,5 +877,11 @@
   "import.done_title": "{count} transactions imported",
   "import.done_held": "{count} were already in Murmur and were skipped.",
   "import.failed": "The import stopped. Anything already saved stays; try the file again to add the rest.",
-  "import.settings": "Import from a file"
+  "import.settings": "Import from a file",
+  "import.held_one": "1 transaction is already in Murmur and will be skipped. Import it anyway",
+  "import.done_held_one": "1 was already in Murmur and was skipped.",
+  "import.found_one": "1 transaction found",
+  "import.done_title_one": "1 transaction imported",
+  "import.run_one": "Import 1 transaction",
+  "import.skipped_one": "1 line without a date or amount will be skipped."
 }

@@ -120,3 +120,18 @@ describe('merchantLogoSrc', () => {
     expect(merchantLogoSrc('www.vw.com')).toContain('url=http://www.vw.com')
   })
 })
+
+describe('cleanMerchantDescriptor: bank transfer codes (Oct 8 2026)', () => {
+  it.each([
+    ['ACME CORP PAYROLL PPD ID: 1234', 'ACME CORP PAYROLL'],
+    ['ACME CORP DES:PAYROLL ID:XXXXX12 INDN:JANE DOE CO ID:123 PPD', 'ACME CORP'],
+    ['GUSTO PAYROLL DIR DEP 0412', 'GUSTO PAYROLL'],
+  ])('%s', (raw, expected) => {
+    expect(cleanMerchantDescriptor(raw)).toBe(expected)
+  })
+
+  it('a name that merely contains those letters is untouched', () => {
+    expect(cleanMerchantDescriptor('WEBSTER BANK')).toBe('WEBSTER BANK')
+    expect(cleanMerchantDescriptor('IDEAL MARKET')).toBe('IDEAL MARKET')
+  })
+})

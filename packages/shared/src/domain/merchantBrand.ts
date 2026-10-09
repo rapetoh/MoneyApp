@@ -29,6 +29,13 @@ export function cleanMerchantDescriptor(raw: string | null | undefined): string 
   // Trailing ", City, ST" / ", City" segments (keep the first segment).
   const firstComma = out.indexOf(',')
   if (firstComma > 0) out = out.slice(0, firstComma)
+  // Bank transfer (ACH) codes: the payer or payee comes first and the rest
+  // is routing detail. "ACME CORP PAYROLL PPD ID: 1234",
+  // "ACME CORP DES:PAYROLL ID:XXXX INDN:JANE DOE CO ID:123 PPD" (Oct 8 2026,
+  // CSV import).
+  out = out
+    .replace(/\s+(?:DES|INDN|CO ID|ID|ORIG ID|TRACE|WEB ID|PPD ID|CCD ID|TEL ID)\s*:.*$/i, '')
+    .replace(/\s+(?:PPD|CCD|WEB|TEL|ACH|ACH CREDIT|ACH DEBIT|DIR DEP|DIRECT DEP(?:OSIT)?)\b.*$/i, '')
   out = out
     // Payment-processor prefixes: "SQ *", "TST*", "SP * ", "PAYPAL *",
     // "GOOGLE *", "DD *". The business follows the star.

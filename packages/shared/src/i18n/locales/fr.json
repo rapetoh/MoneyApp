@@ -869,7 +869,7 @@
   "import.preview": "Aperçu",
   "import.already": "déjà dans Murmur",
   "import.nothing": "Aucune transaction lue. Vérifiez les colonnes ci-dessus.",
-  "import.held": "{count} sont déjà dans Murmur et seront ignorées. Les importer quand même",
+  "import.held": "{count} transactions sont déjà dans Murmur et seront ignorées. Les importer quand même",
   "import.skipped": "{count} lignes sans date ni montant seront ignorées.",
   "import.run": "Importer {count} transactions",
   "import.naming": "Identification des marchands",
@@ -877,5 +877,11 @@
   "import.done_title": "{count} transactions importées",
   "import.done_held": "{count} étaient déjà dans Murmur et ont été ignorées.",
   "import.failed": "L'import s'est arrêté. Ce qui est enregistré reste ; réimportez le fichier pour ajouter le reste.",
-  "import.settings": "Importer un fichier"
+  "import.settings": "Importer un fichier",
+  "import.held_one": "1 transaction est déjà dans Murmur et sera ignorée. L'importer quand même",
+  "import.done_held_one": "1 était déjà dans Murmur et a été ignorée.",
+  "import.found_one": "1 transaction trouvée",
+  "import.done_title_one": "1 transaction importée",
+  "import.run_one": "Importer 1 transaction",
+  "import.skipped_one": "1 ligne sans date ni montant sera ignorée."
 }

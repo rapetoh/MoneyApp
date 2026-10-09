@@ -160,7 +160,7 @@ export function GoalsPanel({ userId, currency, locale, tz }: { userId: string | 
                     : status.pace === 'overdue'
                       ? 'The date has passed. Keep going or pick a new date.'
                       : status.perMonth != null && goal.target_date
-                        ? `${fmt(status.perMonth, goal.currency_code)} a month to finish by ${goal.target_date}`
+                        ? `${fmt(status.perMonth, goal.currency_code)} a month to finish by ${monthYear(goal.target_date, locale)}`
                         : `${fmt(status.remaining, goal.currency_code)} to go`}
                 </span>
                 <span style={{ display: 'flex', gap: 6 }}>
@@ -184,6 +184,12 @@ export function GoalsPanel({ userId, currency, locale, tz }: { userId: string | 
       )}
     </div>
   )
+}
+
+/** "Apr 2027" for a stored civil day, as the phone shows it. */
+function monthYear(day: string, locale: string): string {
+  const [y, m, d] = day.split('-').map(Number)
+  return new Date(Date.UTC(y, m - 1, d, 12)).toLocaleDateString(locale, { month: 'short', year: 'numeric', timeZone: 'UTC' })
 }
 
 const s: Record<string, React.CSSProperties> = {

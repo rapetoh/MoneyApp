@@ -30,3 +30,11 @@ From the Monarch comparison (docs/monarch-vs-murmur.html): the gaps worth closin
 ## Also fixed
 
 - Quick-glance amounts read "$739.3" (compact notation keeps a decimal under 1,000). New `precision: 'whole'` ("$739") on Today, Budgets and widgets.
+- Undo snackbar allows two lines (the "learned" sentence was cut off).
+- Dialogs: a tap outside while the keyboard is up (or just closing) now only closes the keyboard; it used to close the dialog and lose what was typed (`CenterModal.tsx`).
+- Budgets scroll view uses `keyboardShouldPersistTaps="handled"`: the goal dialogs render inside it, and the default swallowed the first tap on Save.
+- Bank transfer codes (PPD, ACH, DES:, INDN:, CO ID:) stripped from descriptors; the import batch names the payer for money coming in ("ACME CORP PAYROLL PPD ID: 1234" is Acme Corp).
+
+## Verified (Oct 8 2026, iOS 27 simulator + production web)
+
+Widget gallery and home screen, Speak and Type taps (cold start), learned rule applied to a new Apple Pay capture, goal create / add money / rename, rollover on, a month carried (+$800), edit keeps the carry, CSV import of a Chase file (duplicate held back, merchants and categories named), web budgets and a web import of a European-format file.
