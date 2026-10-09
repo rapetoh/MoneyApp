@@ -464,9 +464,38 @@ function budgetStatus(budget, txns, rules, tz, atInstantIso = (/* @__PURE__ */ n
   }
   const spent = roundCents(spentCents / 100);
   const committed = roundCents((committedFromTxnsCents + committedFromRulesCents) / 100);
-  const remaining = roundCents(budget.amount - spent - committed);
-  const pct = budget.amount > 0 ? (spent + committed) / budget.amount : 0;
-  return { spent, committed, remaining, pct, window, pendingCount };
+  const carryover = budget.rollover ? roundCents((budget.rollover_carry_in ?? 0) + rolloverCarry(budget, txns, tz, anchor, window)) : 0;
+  const available = roundCents(budget.amount + carryover);
+  const remaining = roundCents(available - spent - committed);
+  const pct = available > 0 ? (spent + committed) / available : spent + committed > 0 ? 1 : 0;
+  return { spent, committed, carryover, available, remaining, pct, window, pendingCount };
+}
+var MAX_ROLLOVER_PERIODS = 240;
+function rolloverCarry(budget, txns, tz, anchor, current) {
+  const windows = [];
+  let cursor = current.start;
+  for (let i = 0; i < MAX_ROLLOVER_PERIODS; i++) {
+    const before = new Date(Date.parse(cursor) - 1).toISOString();
+    const w = periodBounds(budget.period, before, tz, anchor);
+    if (w.endExclusive <= anchor || w.start >= cursor) break;
+    windows.push(w);
+    cursor = w.start;
+  }
+  if (windows.length === 0) return 0;
+  const earliest = windows[windows.length - 1].start;
+  const spentByWindow = new Array(windows.length).fill(0);
+  for (const t2 of txns) {
+    if (t2.transacted_at < earliest || t2.transacted_at >= current.start) continue;
+    if (budget.category_id != null && t2.category_id !== budget.category_id) continue;
+    if (t2.amount_in_profile_currency == null) continue;
+    if (!isSpend(t2, resolveCategoryKind(t2.category_name, t2.category_kind))) continue;
+    const idx = windows.findIndex((w) => t2.transacted_at >= w.start && t2.transacted_at < w.endExclusive);
+    if (idx >= 0) spentByWindow[idx] += Math.round(t2.amount_in_profile_currency * 100);
+  }
+  const amountCents = Math.round(budget.amount * 100);
+  let carryCents = 0;
+  for (const spent of spentByWindow) carryCents += amountCents - spent;
+  return roundCents(carryCents / 100);
 }
 
 // packages/shared/src/domain/askInsights.ts

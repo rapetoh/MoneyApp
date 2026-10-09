@@ -1,0 +1,7 @@
+{
+  "name": "@voice-expense/murmur-widget",
+  "version": "1.0.0",
+  "description": "Hands the app's spending snapshot to the Murmur home-screen and lock-screen widgets",
+  "main": "src/index.ts",
+  "expo-module-config": "expo-module.config.json"
+}

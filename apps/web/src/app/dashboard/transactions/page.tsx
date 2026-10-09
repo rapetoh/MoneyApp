@@ -2,7 +2,7 @@
 import { useState, useMemo, useEffect, useCallback } from 'react'
 import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
-import { snapshotFx, localDay, monthBounds } from '@voice-expense/shared'
+import { snapshotFx, localDay, monthBounds, merchantKey, merchantRuleName } from '@voice-expense/shared'
 import type { Database } from '@voice-expense/shared'
 import { createClient } from '../../../lib/supabase/client'
 import { colors, font, radius } from '../../../lib/theme'
@@ -75,7 +75,7 @@ const FILTERS: Array<{ key: FilterKey; label: string }> = [
   { key: 'income', label: 'Income' },
 ]
 
-type SourceKind = 'voice' | 'shortcut' | 'notification' | 'typed' | 'scan' | 'auto'
+type SourceKind = 'voice' | 'shortcut' | 'notification' | 'typed' | 'scan' | 'auto' | 'import'
 
 /** The SOURCE column answers "how did this row get entered?" — strictly
  *  from transactions.source. Recurrence is an orthogonal flag: it renders
@@ -96,6 +96,7 @@ function classifySource(t: Txn): SourceKind {
   if (t.source === 'shortcut') return 'shortcut'
   if (t.source === 'notification_listener') return 'notification'
   if (t.source === 'recurring_generated') return 'auto'
+  if (t.source === 'import') return 'import'
   return 'typed'
 }
 
@@ -342,6 +343,17 @@ export default function TransactionsPage() {
       if (error) {
         setFormError(error.message)
         return
+      }
+      // Moving a merchant to another category teaches Murmur where it goes
+      // (migration 041): the phone files the next capture from it there.
+      const key = merchantKey(shared.merchant)
+      if (row && cat.id && cat.id !== row.category_id && key && shared.merchant) {
+        await supabase
+          .from('merchant_rules')
+          .upsert(
+            { user_id: user.id, merchant_key: key, merchant_name: merchantRuleName(shared.merchant), category_id: cat.id },
+            { onConflict: 'user_id,merchant_key' },
+          )
       }
     } else {
       const id = crypto.randomUUID()
@@ -870,6 +882,15 @@ function SourceChip({ src }: { src: SourceKind }) {
       <span style={{ ...chipStyles.base, background: '#F2E5D5', color: '#7A4A22' }}>
         <Icon.sparkle color="#7A4A22" size={11} />
         Auto
+      </span>
+    )
+  }
+  if (src === 'import') {
+    // From a CSV file (migration 043).
+    return (
+      <span style={{ ...chipStyles.base, background: colors.surface2, color: colors.ink2 }}>
+        <Icon.list color={colors.ink2} size={11} />
+        Imported
       </span>
     )
   }

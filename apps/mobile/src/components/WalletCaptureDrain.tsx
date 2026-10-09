@@ -40,6 +40,7 @@ import {
   type WalletCaptureEntry,
 } from '../services/walletCapture'
 import { rememberCapturePrefs, readCapturePrefs } from '../services/capturePrefs'
+import { learnedCategoryId } from '../services/merchantRules'
 import {
   ensureWalletCaptureCategory,
   notifySaved,
@@ -215,6 +216,15 @@ export function WalletCaptureDrain() {
         }
       }
 
+      // A category the person taught Murmur for this merchant (migration
+      // 041) beats both guesses above.
+      const learned = await learnedCategoryId(
+        userId,
+        merchantName ?? n.merchant,
+        new Set(categories.map((c) => c.id)),
+      )
+      if (learned) categoryId = learned
+
       const result = await createTransaction({
         amount: n.amount,
         direction: deriveDirectionFromFlowType('expense'),
@@ -315,7 +325,10 @@ export function WalletCaptureDrain() {
       // it named a category this account does not have. Same order the
       // Apple Pay path uses, so a Walmart run is filed the same way
       // whichever way it was captured.
+      // A category the person taught Murmur for this merchant (migration
+      // 041) comes first.
       const categoryId =
+        (await learnedCategoryId(userId, merchant, new Set(categories.map((c) => c.id)))) ??
         (parsed
           ? (resolveCategorySuggestion(parsed.category_suggestion, categories)?.category.id ?? null)
           : null) ?? (guessCategoryFromMerchant(merchant, categories)?.category.id ?? null)

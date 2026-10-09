@@ -6,7 +6,16 @@
 export { parseExpense, clearParseCache } from './parser'
 export { parseScan } from './scanParser'
 export type { ScanType, ScanOptions, ScanResult } from './scanParser'
-export { getPrompt, getScanPrompt } from './prompt'
+export { getPrompt, getScanPrompt, MERCHANT_RULE, MERCHANT_DOMAIN_RULE } from './prompt'
+export {
+  getMerchantBatchPrompt,
+  validateMerchantBatch,
+  MERCHANT_BATCH_JSON_SCHEMA,
+  MERCHANT_BATCH_MAX,
+  MERCHANT_DESCRIPTOR_MAX_LENGTH,
+} from './merchantBatch'
+export type { MerchantBatchResult } from './merchantBatch'
+export { identifyMerchants, IDENTIFY_MAX_DESCRIPTORS } from './identifyMerchants'
 
 // The typed parse boundary (fix-plan item 1.7). Client-safe — no Node-only
 // APIs — so both `apps/web`'s parse routes and the mobile-bundled

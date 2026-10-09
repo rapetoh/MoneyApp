@@ -120,7 +120,8 @@ function toAskBudget(
   const now = localParts(nowIso, tz)
   const end = localParts(status.window.endExclusive, tz)
   return {
-    amount: budget.amount,
+    // What this period has to spend, rollover included (migration 040).
+    amount: status.available,
     currency: budget.currency_code,
     period: budget.period as AskMurmurBudget['period'],
     category_name: categoryName,

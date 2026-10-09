@@ -16,6 +16,7 @@ export const DataEvents = {
   TRANSACTIONS_CHANGED: 've:transactions:changed',
   BUDGET_CHANGED: 've:budget:changed',
   PROFILE_CHANGED: 've:profile:changed',
+  MERCHANT_RULES_CHANGED: 've:merchant_rules:changed',
 
   emitTransactions: (userId: string) =>
     DeviceEventEmitter.emit(DataEvents.TRANSACTIONS_CHANGED, userId),
@@ -25,6 +26,17 @@ export const DataEvents = {
 
   emitProfile: (userId: string) =>
     DeviceEventEmitter.emit(DataEvents.PROFILE_CHANGED, userId),
+
+  emitMerchantRules: (userId: string) =>
+    DeviceEventEmitter.emit(DataEvents.MERCHANT_RULES_CHANGED, userId),
+
+  onMerchantRules: (userId: string, handler: () => void) => {
+    const sub = DeviceEventEmitter.addListener(
+      DataEvents.MERCHANT_RULES_CHANGED,
+      (uid: string) => { if (uid === userId) handler() },
+    )
+    return () => sub.remove()
+  },
 
   onTransactions: (userId: string, handler: () => void) => {
     const sub = DeviceEventEmitter.addListener(

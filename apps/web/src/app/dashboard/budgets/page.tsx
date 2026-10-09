@@ -8,6 +8,7 @@ import { Money } from '../../../components/Money'
 import { Chip } from '../../../components/Chip'
 import { Icon } from '../../../components/Icons'
 import { ErrorState } from '../../../components/ErrorState'
+import { GoalsPanel } from '../../../components/GoalsPanel'
 import { useRealtime } from '../../../lib/useRealtime'
 import type {
   BudgetPeriod,
@@ -15,7 +16,7 @@ import type {
   BudgetStatusTransaction,
   CategoryKind,
 } from '@voice-expense/shared'
-import { budgetStatus, localDay, categoryPalette } from '@voice-expense/shared'
+import { budgetStatus, inheritedCarry, localDay, categoryPalette } from '@voice-expense/shared'
 
 const PERIODS: { value: BudgetPeriod; label: string }[] = [
   { value: 'weekly', label: 'Weekly' },
@@ -42,6 +43,21 @@ type Budget = {
   currency_code: string
   starts_at: string
   is_active: boolean
+  rollover: boolean
+  rollover_carry_in: number
+}
+
+/** `budgetStatus()` input for a stored row, rollover included (migration 040). */
+function statusInput(b: Budget) {
+  return {
+    period: b.period,
+    starts_at: b.starts_at,
+    category_id: b.category_id,
+    currency_code: b.currency_code,
+    amount: b.amount,
+    rollover: b.rollover,
+    rollover_carry_in: b.rollover_carry_in,
+  }
 }
 
 export default function BudgetsPage() {
@@ -61,6 +77,7 @@ export default function BudgetsPage() {
   const [amount, setAmount] = useState(searchParams.get('amount') ?? '')
   const [period, setPeriod] = useState<BudgetPeriod>('monthly')
   const [categoryId, setCategoryId] = useState<string>('')
+  const [rollover, setRollover] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   // Read-error state, distinct from `error` above (which is the save-form's
@@ -120,6 +137,12 @@ export default function BudgetsPage() {
   useRealtime('budgets', realtimeFilter, load)
   useRealtime('recurring_rules', realtimeFilter, load)
 
+  // The rollover box starts as whatever the budget being replaced had.
+  useEffect(() => {
+    if (!showForm) return
+    setRollover(budgets.find((b) => (b.category_id ?? '') === categoryId)?.rollover ?? false)
+  }, [showForm, categoryId, budgets])
+
   async function handleSave() {
     const parsed = parseFloat(amount.replace(',', '.'))
     if (isNaN(parsed) || parsed <= 0) {
@@ -130,6 +153,11 @@ export default function BudgetsPage() {
     setError(null)
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
+
+    // Rollover (migration 040): the budget this one replaces hands over
+    // what it had carried, so an edit never drops rolled-over money.
+    const previous = budgets.find((b) => (b.category_id ?? '') === categoryId) ?? null
+    const carryIn = inheritedCarry(previous ? statusInput(previous) : null, rollover, txnsForStatus, profile?.timezone || 'UTC')
 
     // Deactivate the existing active budget in the same scope (overall,
     // or this category) — `.is('category_id', null)`, not
@@ -164,6 +192,8 @@ export default function BudgetsPage() {
       period,
       category_id: categoryId || null,
       is_active: true,
+      rollover,
+      rollover_carry_in: carryIn,
       // `profile.currency_code`, not the schema default — a EUR
       // profile's budget was silently created as `'USD'` before this,
       // so `budgetStatus()` (which scopes by currency) never matched a
@@ -182,6 +212,7 @@ export default function BudgetsPage() {
     setShowForm(false)
     setAmount('')
     setCategoryId('')
+    setRollover(false)
     await load()
   }
 
@@ -230,13 +261,7 @@ export default function BudgetsPage() {
   const overallStatus = useMemo(() => {
     if (!overall) return null
     return budgetStatus(
-      {
-        period: overall.period,
-        starts_at: overall.starts_at,
-        category_id: null,
-        currency_code: overall.currency_code,
-        amount: overall.amount,
-      },
+      { ...statusInput(overall), category_id: null },
       txnsForStatus,
       recurringRules,
       tz,
@@ -244,8 +269,11 @@ export default function BudgetsPage() {
   }, [overall, txnsForStatus, recurringRules, tz])
 
   const overallSpent = (overallStatus?.spent ?? 0) + (overallStatus?.committed ?? 0)
-  const overallPct = overall ? Math.min(overallSpent / overall.amount, 1) : 0
-  const overallRemaining = overall ? Math.max(0, overall.amount - overallSpent) : 0
+  // What this period has to spend: the amount plus any rollover carry.
+  const overallCap = overallStatus?.available ?? overall?.amount ?? 0
+  const overallOver = overall != null && overallSpent > overallCap
+  const overallPct = overall ? (overallCap > 0 ? Math.min(overallSpent / overallCap, 1) : overallSpent > 0 ? 1 : 0) : 0
+  const overallRemaining = overall ? Math.max(0, overallCap - overallSpent) : 0
 
   // Buckets by status for the per-category list
   const perCat = useMemo(() => {
@@ -257,21 +285,11 @@ export default function BudgetsPage() {
         // is the same hex the category's own row/chip renders elsewhere,
         // so the budget bar can never disagree with it.
         const cColor = b.category_id ? catMap[b.category_id]?.color ?? null : null
-        const status = budgetStatus(
-          {
-            period: b.period,
-            starts_at: b.starts_at,
-            category_id: b.category_id,
-            currency_code: b.currency_code,
-            amount: b.amount,
-          },
-          txnsForStatus,
-          recurringRules,
-          tz,
-        )
+        const status = budgetStatus(statusInput(b), txnsForStatus, recurringRules, tz)
         const spent = status.spent + status.committed
-        const pct = spent / b.amount
-        return { id: b.id, name: cName, color: cColor, period: b.period, cap: b.amount, spent, pct }
+        const cap = status.available
+        const pct = cap > 0 ? spent / cap : spent > 0 ? 2 : 0
+        return { id: b.id, name: cName, color: cColor, period: b.period, cap, spent, pct }
       })
       .sort((a, b) => b.pct - a.pct)
   }, [budgets, txnsForStatus, recurringRules, tz, catMap])
@@ -349,7 +367,13 @@ export default function BudgetsPage() {
                       · <b style={{ color: colors.ink }}>{fmtShort(overallStatus!.committed)}</b> still due
                     </>
                   )}
-                  {' '}· <b style={{ color: colors.ink }}>{fmtShort(overall.amount)}</b> cap {periodSuffix(overall.period)}.
+                  {' '}· <b style={{ color: colors.ink }}>{fmtShort(overallCap)}</b> cap {periodSuffix(overall.period)}
+                  {(overallStatus?.carryover ?? 0) !== 0 && (
+                    <>
+                      {' '}(includes <b style={{ color: colors.ink }}>{overallStatus!.carryover > 0 ? '+' : '\u2212'}{fmtShort(Math.abs(overallStatus!.carryover))}</b> rolled over)
+                    </>
+                  )}
+                  .
                 </>
               ) : (
                 <>Set a monthly budget to start tracking.</>
@@ -405,6 +429,20 @@ export default function BudgetsPage() {
                 </select>
               </div>
             </div>
+            <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, margin: '4px 0 14px', cursor: 'pointer' }}>
+              <input
+                id="budget-rollover"
+                type="checkbox"
+                checked={rollover}
+                onChange={(e) => setRollover(e.target.checked)}
+                style={{ marginTop: 3, accentColor: colors.accent }}
+              />
+              <span style={{ fontSize: 13, color: colors.ink2, lineHeight: 1.45 }}>
+                <b style={{ color: colors.ink }}>Roll over</b>
+                <br />
+                Unspent money carries into the next period. Overspending carries too.
+              </span>
+            </label>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <button
                 onClick={() => {
@@ -434,7 +472,7 @@ export default function BudgetsPage() {
                   cy="110"
                   r="88"
                   fill="none"
-                  stroke={overallPct > 1 ? '#A94646' : colors.accent}
+                  stroke={overallOver ? '#A94646' : colors.accent}
                   strokeWidth="18"
                   strokeDasharray={`${2 * Math.PI * 88 * overallPct} ${2 * Math.PI * 88 * (1 - overallPct)}`}
                   transform="rotate(-90 110 110)"
@@ -464,7 +502,7 @@ export default function BudgetsPage() {
                     {fmtShort(overallSpent)}
                   </text>
                   <text x="110" y="148" textAnchor="middle" fontSize="11" fill={colors.ink4} fontWeight="600">
-                    of {fmtShort(overall.amount)}
+                    of {fmtShort(overallCap)}
                   </text>
                 </>
               )}
@@ -477,10 +515,10 @@ export default function BudgetsPage() {
                 <span style={{ color: colors.destructive, fontWeight: 600 }}>Couldn't load your budget.</span>
               ) : overall ? (
                 <>
-                  {overallPct > 1 ? (
+                  {overallOver ? (
                     <>
                       Over by{' '}
-                      <b style={{ color: '#A94646' }}>{fmtShort(overallSpent - overall.amount)}</b>.
+                      <b style={{ color: '#A94646' }}>{fmtShort(overallSpent - overallCap)}</b>.
                     </>
                   ) : (
                     <>
@@ -571,6 +609,9 @@ export default function BudgetsPage() {
             )}
           </div>
         </div>
+
+        {/* Savings goals (migration 042), shared with the phone's Budgets tab. */}
+        <GoalsPanel userId={userId} currency={currency} locale={locale} tz={tz} />
       </div>
     </div>
   )

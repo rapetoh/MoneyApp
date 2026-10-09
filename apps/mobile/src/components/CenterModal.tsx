@@ -113,10 +113,26 @@ export function CenterModal({
     })
   }, [visible, mounted, dim, card, reduceMotion])
 
+  // When the keyboard last started closing. Tapping iOS's own "Done" on a
+  // number pad (or anywhere outside the card while typing) hides the
+  // keyboard and the same touch then landed on the dim backdrop, closing
+  // the dialog with the typed amount in it (Oct 8 2026). A backdrop tap
+  // while the keyboard is up, or within a moment of it closing, only
+  // closes the keyboard.
+  const keyboardClosedAt = useRef(0)
+  const keyboardUp = useRef(false)
+
   useEffect(() => {
     if (!mounted) return
-    const onShow = (e: KeyboardEvent) => setKeyboardHeight(e.endCoordinates?.height ?? 0)
-    const onHide = () => setKeyboardHeight(0)
+    const onShow = (e: KeyboardEvent) => {
+      keyboardUp.current = true
+      setKeyboardHeight(e.endCoordinates?.height ?? 0)
+    }
+    const onHide = () => {
+      if (keyboardUp.current) keyboardClosedAt.current = Date.now()
+      keyboardUp.current = false
+      setKeyboardHeight(0)
+    }
     const show = Keyboard.addListener('keyboardWillShow', onShow)
     const showDid = Keyboard.addListener('keyboardDidShow', onShow)
     const hide = Keyboard.addListener('keyboardWillHide', onHide)
@@ -135,6 +151,15 @@ export function CenterModal({
     if (!busy) onClose()
   }
 
+  const onBackdrop = () => {
+    if (keyboardUp.current) {
+      Keyboard.dismiss()
+      return
+    }
+    if (Date.now() - keyboardClosedAt.current < 600) return
+    requestClose()
+  }
+
   const transform = reduceMotion
     ? []
     : [
@@ -146,7 +171,7 @@ export function CenterModal({
     <Modal visible transparent animationType="none" onRequestClose={requestClose} statusBarTranslucent>
       <View style={styles.root}>
         <Animated.View style={[styles.dim, { opacity: dim }]}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={requestClose} accessibilityElementsHidden />
+          <Pressable style={StyleSheet.absoluteFill} onPress={onBackdrop} accessibilityElementsHidden />
         </Animated.View>
 
         {/* The visible area is the screen minus the keyboard; the card is

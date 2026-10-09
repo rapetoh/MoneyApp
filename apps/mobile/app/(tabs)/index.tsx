@@ -146,11 +146,11 @@ function daysLeftInMonth(nowIso: string, tz: string): number {
 }
 
 /** Compact budget-header amount: "$473" — the shared formatter's
- *  `precision: 'compact'` mode (no decimals for a quick-glance figure),
+ *  `precision: 'whole'` mode (no decimals for a quick-glance figure),
  *  replacing the deleted four-case `$/€/£/¥` glyph ternary and the
  *  hard-coded `toLocaleString('en-US')` grouping (audit 01-F6/01-F21). */
 function formatBudgetShort(amount: number, currency: string, locale: string): string {
-  return formatMoney(amount, currency, locale, { precision: 'compact' })
+  return formatMoney(amount, currency, locale, { precision: 'whole' })
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -524,9 +524,10 @@ export default function TodayScreen() {
         visible={budgetModal}
         initialAmount={budget?.amount ?? null}
         initialPeriod={budget?.period ?? null}
+        initialRollover={budget?.rollover ?? false}
         currency={currency}
         locale={locale}
-        onSave={(amount, period) => setBudget(amount, period, currency, tz)}
+        onSave={(amount, period, _categoryId, rollover) => setBudget(amount, period, currency, tz, rollover)}
         onClose={() => setBudgetModal(false)}
       />
       <IncomeEditorModal

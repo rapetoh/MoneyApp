@@ -23,7 +23,7 @@
  */
 import type { TransactionSource } from '../types/transaction'
 
-export type SourceKind = 'voice' | 'typed' | 'scan' | 'apple-pay' | 'auto'
+export type SourceKind = 'voice' | 'typed' | 'scan' | 'apple-pay' | 'auto' | 'imported'
 
 /** `TransactionSource` → the coarser bucket used for filtering/grouping
  *  (e.g. the Transactions page's SOURCE filter chips). */
@@ -38,6 +38,8 @@ export function classifySourceKind(source: TransactionSource): SourceKind {
       return 'apple-pay'
     case 'recurring_generated':
       return 'auto'
+    case 'import':
+      return 'imported'
     case 'manual':
     default:
       return 'typed'
@@ -50,6 +52,7 @@ const KIND_LABEL: Record<SourceKind, string> = {
   scan: 'Scanned',
   'apple-pay': 'Apple Pay',
   auto: 'Auto',
+  imported: 'Imported',
 }
 
 /** The one label every surface should render for a transaction's

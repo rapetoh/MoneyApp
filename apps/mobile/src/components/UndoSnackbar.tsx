@@ -72,7 +72,9 @@ export function UndoSnackbar({
       pointerEvents="box-none"
     >
       <View style={styles.pill}>
-        <Text style={styles.message} numberOfLines={1}>
+        {/* Two lines: a sentence like "Got it. Starbucks goes in
+            Entertainment from now on." must be read whole (Oct 8 2026). */}
+        <Text style={styles.message} numberOfLines={2}>
           {message}
         </Text>
         <Pressable onPress={handleUndo} hitSlop={8} style={({ pressed }) => pressed && styles.undoPressed}>
@@ -112,6 +114,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontFamily: Typography.fontFamily.sansSemiBold,
     fontSize: Typography.size.sm,
+    lineHeight: 19,
     color: Colors.white,
   },
   undoLabel: {

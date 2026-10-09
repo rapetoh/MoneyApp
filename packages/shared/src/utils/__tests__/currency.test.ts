@@ -58,6 +58,11 @@ describe('formatMoney — locale is required (07-F30)', () => {
     expect(out).toContain('.00')
   })
 
+  it('whole precision drops cents for quick-glance figures', () => {
+    expect(formatMoney(739.3, 'USD', 'en-US', { precision: 'whole' })).toBe('$739')
+    expect(formatMoney(1250.4, 'USD', 'en-US', { precision: 'whole' })).toBe('$1,250')
+  })
+
   it('compact precision is available for chart axes', () => {
     const out = formatMoney(1250, 'USD', 'en-US', { precision: 'compact' })
     expect(out.length).toBeLessThan(formatMoney(1250, 'USD', 'en-US').length)

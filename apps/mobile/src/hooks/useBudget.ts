@@ -4,7 +4,8 @@ import { getCalendars } from 'expo-localization'
 import { supabase } from '../lib/supabase'
 import { DataEvents } from '../events/dataEvents'
 import { useCachedState } from '../services/queryCache'
-import { budgetStatus, localDay } from '@voice-expense/shared'
+import { budgetStatus, inheritedCarry, localDay } from '@voice-expense/shared'
+import { getTransactions } from '../services/sync/transactionStore'
 import type {
   Budget,
   BudgetPeriod,
@@ -27,6 +28,39 @@ function deviceTimeZone(): string {
   } catch {
     return 'UTC'
   }
+}
+
+/**
+ * Rollover fields for a budget replacing `previous` in the same scope
+ * (migration 040). `rollover` undefined keeps whatever `previous` had, so a
+ * caller that does not show the switch (onboarding, Today's quick edit)
+ * never turns it off. The carry `previous` had built up moves to the new
+ * row instead of vanishing with the edit.
+ */
+async function rolloverFieldsFor(
+  userId: string,
+  previous: Budget | null | undefined,
+  rollover: boolean | undefined,
+  tz: string,
+): Promise<{ rollover: boolean; rollover_carry_in: number }> {
+  const next = rollover ?? previous?.rollover ?? false
+  if (!previous?.rollover || !next) return { rollover: next, rollover_carry_in: 0 }
+  const txns = await getTransactions(userId)
+  const carry = inheritedCarry(
+    {
+      period: previous.period,
+      starts_at: previous.starts_at,
+      category_id: previous.category_id,
+      currency_code: previous.currency_code,
+      amount: previous.amount,
+      rollover: previous.rollover,
+      rollover_carry_in: previous.rollover_carry_in,
+    },
+    next,
+    txns.filter((t) => !t.is_deleted),
+    tz,
+  )
+  return { rollover: next, rollover_carry_in: carry }
 }
 
 export function useActiveBudget(userId: string | undefined) {
@@ -80,8 +114,10 @@ export function useActiveBudget(userId: string | undefined) {
     period: BudgetPeriod,
     currency: string,
     tz: string = deviceTimeZone(),
+    rollover?: boolean,
   ) {
     if (!userId) return false
+    const carry = await rolloverFieldsFor(userId, budget, rollover, tz)
 
     // Deactivate any existing active overall budget
     await supabase
@@ -99,6 +135,7 @@ export function useActiveBudget(userId: string | undefined) {
       currency_code: currency,
       category_id: null,
       is_active: true,
+      ...carry,
       // Anchors a biweekly cycle's phase to the civil day the budget was
       // created on, in the owning profile's own zone — fix-plan 2.5 (the
       // DB default `CURRENT_DATE` is Postgres's server date, i.e. UTC,
@@ -168,8 +205,11 @@ export function useCategoryBudgets(userId: string | undefined) {
     period: BudgetPeriod,
     currency: string,
     tz: string = deviceTimeZone(),
+    rollover?: boolean,
   ): Promise<boolean> {
     if (!userId) return false
+    const previous = budgets.find((b) => b.category_id === categoryId)
+    const carry = await rolloverFieldsFor(userId, previous, rollover, tz)
     await supabase
       .from('budgets')
       .update({ is_active: false })
@@ -184,6 +224,7 @@ export function useCategoryBudgets(userId: string | undefined) {
       currency_code: currency,
       category_id: categoryId,
       is_active: true,
+      ...carry,
       starts_at: localDay(new Date().toISOString(), tz),
     })
     if (!insertError) {
@@ -232,6 +273,8 @@ export function budgetStatusFor(
       category_id: budget.category_id,
       currency_code: budget.currency_code,
       amount: budget.amount,
+      rollover: budget.rollover,
+      rollover_carry_in: budget.rollover_carry_in,
     },
     transactions,
     rules,

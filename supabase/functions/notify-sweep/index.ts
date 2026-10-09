@@ -240,7 +240,8 @@ Deno.serve(async (req) => {
       let lastLoggedAt: string | null = null
       for (const t of txns ?? []) {
         const row = t as Record<string, unknown>
-        if (row.source === 'recurring_generated') continue
+        // Rows imported from a file (migration 043) are history, not a habit.
+        if (row.source === 'recurring_generated' || row.source === 'import') continue
         const stamp = (row.client_created_at as string) ?? (row.created_at as string)
         if (stamp && (!lastLoggedAt || stamp > lastLoggedAt)) lastLoggedAt = stamp
       }

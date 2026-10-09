@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
+import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native'
 import { CenterModal } from './CenterModal'
 import { Colors, Typography, Hairline, Motion } from '../theme'
 import { t, currencySymbolFor, merchantColor, type Locale } from '@voice-expense/shared'
@@ -28,7 +28,7 @@ interface Props {
   locale: Locale
   /** Persist the edit. Return true on success. `categoryId` is null for
    *  the overall budget, or the category this budget caps. */
-  onSave: (amount: number, period: BudgetPeriod, categoryId: string | null) => Promise<boolean>
+  onSave: (amount: number, period: BudgetPeriod, categoryId: string | null, rollover: boolean) => Promise<boolean>
   onClose: () => void
   /** When provided, the dialog offers an "Applies to" picker — overall or
    *  one of these categories (per-category budgets, same model as web).
@@ -39,6 +39,8 @@ interface Props {
   /** Lock the scope (editing an existing budget) — the picker is shown but
    *  not changeable, so an edit can't silently become a different budget. */
   lockCategory?: boolean
+  /** Current rollover setting (migration 040). Defaults to off. */
+  initialRollover?: boolean | null
 }
 
 /**
@@ -62,19 +64,22 @@ export function BudgetEditorModal({
   categories,
   initialCategoryId = null,
   lockCategory = false,
+  initialRollover = false,
 }: Props) {
   const [amount, setAmount] = useState('')
   const [period, setPeriod] = useState<BudgetPeriod>('monthly')
   const [categoryId, setCategoryId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [rollover, setRollover] = useState(false)
 
   useEffect(() => {
     if (visible) {
       setAmount(initialAmount != null ? String(initialAmount) : '')
       setPeriod(initialPeriod ?? 'monthly')
       setCategoryId(initialCategoryId ?? null)
+      setRollover(initialRollover ?? false)
     }
-  }, [visible, initialAmount, initialPeriod, initialCategoryId])
+  }, [visible, initialAmount, initialPeriod, initialCategoryId, initialRollover])
 
   // Focus once the dialog has finished arriving: focusing on mount opens
   // the keyboard mid-animation, which made the card jump (owner report,
@@ -95,7 +100,7 @@ export function BudgetEditorModal({
       return
     }
     setSaving(true)
-    const ok = await onSave(parsed, period, categoryId)
+    const ok = await onSave(parsed, period, categoryId, rollover)
     setSaving(false)
     if (!ok) {
       Alert.alert(t('common.error', locale), t('settings.budget_save_error', locale))
@@ -207,6 +212,30 @@ export function BudgetEditorModal({
           )
         })}
       </View>
+
+      {/* Rollover (migration 040): what is left at the end of a period, or
+          overspent, carries into the next one. */}
+      {/* Label and switch toggle separately: a Switch inside a toggling
+          Pressable fires both and flips twice. */}
+      <View style={styles.rolloverRow}>
+        <Pressable
+          style={styles.rolloverText}
+          onPress={() => setRollover((v) => !v)}
+          accessibilityElementsHidden
+          importantForAccessibility="no"
+        >
+          <Text style={styles.rolloverTitle}>{t('budgets.rollover', locale)}</Text>
+          <Text style={styles.rolloverHint}>{t('budgets.rollover_hint', locale)}</Text>
+        </Pressable>
+        <Switch
+          value={rollover}
+          onValueChange={setRollover}
+          trackColor={{ true: Colors.accent, false: Colors.surface2 }}
+          accessibilityLabel={t('budgets.rollover', locale)}
+          accessibilityHint={t('budgets.rollover_hint', locale)}
+          testID="budget-rollover"
+        />
+      </View>
     </CenterModal>
   )
 }
@@ -263,4 +292,8 @@ const styles = StyleSheet.create({
   dot: { width: 8, height: 8, borderRadius: 4 },
   chipLabel: { fontFamily: Typography.fontFamily.sans, fontSize: 13.5, color: Colors.ink2 },
   chipLabelOn: { color: Colors.accent, fontFamily: Typography.fontFamily.sansSemiBold },
+  rolloverRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 18 },
+  rolloverText: { flex: 1, gap: 2 },
+  rolloverTitle: { fontFamily: Typography.fontFamily.sansSemiBold, fontSize: 14.5, color: Colors.ink },
+  rolloverHint: { fontFamily: Typography.fontFamily.sans, fontSize: 12.5, lineHeight: 17, color: Colors.ink3 },
 })

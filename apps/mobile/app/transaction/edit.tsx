@@ -18,6 +18,8 @@ import { useProfile } from '../../src/hooks/useProfile'
 import { useCategories } from '../../src/hooks/useCategories'
 import { useTransactions } from '../../src/hooks/useTransactions'
 import { useRecurringRules } from '../../src/hooks/useRecurringRules'
+import { useUndo } from '../../src/hooks/useUndo'
+import { forgetMerchantRule } from '../../src/services/merchantRules'
 import { getTransactionById } from '../../src/services/sync/transactionStore'
 import { CategoryPicker } from '../../src/components/CategoryPicker'
 import { DateTimeField } from '../../src/components/DateTimeField'
@@ -41,6 +43,7 @@ export default function EditTransactionScreen() {
   const { user } = useAuth()
   const { profile } = useProfile(user?.id)
   const { categories, createCategory } = useCategories(user?.id)
+  const { showUndo } = useUndo()
   const { editTransaction } = useTransactions(user?.id)
   const { rules, updateRule } = useRecurringRules(user?.id)
   const locale = (profile?.locale ?? 'en') as Locale
@@ -163,7 +166,7 @@ export default function EditTransactionScreen() {
     setSaving(true)
     const dateChanged = transactedAt !== txn.transacted_at
 
-    const { error } = await editTransaction(txn.id, {
+    const { error, learned } = await editTransaction(txn.id, {
       amount: parsedAmount,
       ...(dateChanged ? { transacted_at: transactedAt } : {}),
       direction,
@@ -206,6 +209,17 @@ export default function EditTransactionScreen() {
     if (error) {
       Alert.alert(t('common.error', locale), error)
     } else {
+      // Say what Murmur learned from this edit, with a way out.
+      if (learned && user?.id) {
+        const uid = user.id
+        const categoryName = categories.find((c) => c.id === learned.categoryId)?.name ?? ''
+        showUndo({
+          message: t('rules.learned', locale).replace('{merchant}', learned.merchantName).replace('{category}', categoryName),
+          undoLabel: t('common.undo', locale),
+          undo: () => forgetMerchantRule(uid, learned.merchantKey).then(() => undefined),
+          durationMs: 5000,
+        })
+      }
       router.back()
     }
   }

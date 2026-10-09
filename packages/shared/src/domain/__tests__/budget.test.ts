@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   budgetStatus,
+  inheritedCarry,
   resolveBudgetAnchor,
   type BudgetStatusTransaction,
   type BudgetStatusRule,
@@ -217,5 +218,113 @@ describe('budgetStatus — one definition for all five periods (04-F9/05-F5/05-F
     expect(status.committed).toBe(10)
     expect(status.remaining).toBe(50)
     expect(status.pct).toBe(0.5)
+  })
+})
+
+describe('budgetStatus — rollover (migration 040, Oct 2026)', () => {
+  const tz = 'UTC'
+  const at = '2026-10-15T12:00:00Z'
+  const base = { period: 'monthly' as const, starts_at: '2026-08-01', category_id: null, currency_code: 'USD', amount: 500 }
+  const history = [
+    txn({ transacted_at: '2026-07-20T12:00:00Z', amount_in_profile_currency: 999 }), // before the budget: ignored
+    txn({ transacted_at: '2026-08-10T12:00:00Z', amount_in_profile_currency: 400 }), // Aug: 100 left
+    txn({ transacted_at: '2026-09-10T12:00:00Z', amount_in_profile_currency: 550 }), // Sep: 50 over
+    txn({ transacted_at: '2026-10-05T12:00:00Z', amount_in_profile_currency: 100 }), // Oct (current)
+  ]
+
+  it('is off by default: past periods change nothing', () => {
+    const s = budgetStatus(base, history, [], tz, at)
+    expect(s.carryover).toBe(0)
+    expect(s.remaining).toBe(400)
+  })
+
+  it('carries every past period since the budget started, over and under', () => {
+    const s = budgetStatus({ ...base, rollover: true }, history, [], tz, at)
+    expect(s.carryover).toBe(50) // +100 (Aug) - 50 (Sep); July predates the budget
+    expect(s.remaining).toBe(450)
+    expect(s.pct).toBeCloseTo(100 / 550)
+  })
+
+  it('carries nothing in the budget\'s first period', () => {
+    const s = budgetStatus({ ...base, starts_at: '2026-10-01', rollover: true }, history, [], tz, at)
+    expect(s.carryover).toBe(0)
+  })
+
+  it('a past period with no spending carries the whole amount', () => {
+    const s = budgetStatus({ ...base, rollover: true }, [], [], tz, at)
+    expect(s.carryover).toBe(1000)
+    expect(s.remaining).toBe(1500)
+  })
+
+  it('respects a category budget\'s scope and skips rows awaiting FX', () => {
+    const rows = [
+      txn({ transacted_at: '2026-09-10T12:00:00Z', category_id: 'food', amount_in_profile_currency: 200 }),
+      txn({ transacted_at: '2026-09-11T12:00:00Z', category_id: 'rent', amount_in_profile_currency: 900 }),
+      txn({ transacted_at: '2026-09-12T12:00:00Z', category_id: 'food', amount_in_profile_currency: null }),
+    ]
+    const s = budgetStatus({ ...base, starts_at: '2026-09-01', category_id: 'food', rollover: true }, rows, [], tz, at)
+    expect(s.carryover).toBe(300)
+  })
+
+  it('an overspent history leaves nothing to spend: pct reads full', () => {
+    const rows = [txn({ transacted_at: '2026-09-10T12:00:00Z', amount_in_profile_currency: 1200 }), txn({ transacted_at: '2026-10-02T12:00:00Z', amount_in_profile_currency: 10 })]
+    const s = budgetStatus({ ...base, starts_at: '2026-09-01', rollover: true }, rows, [], tz, at)
+    expect(s.carryover).toBe(-700)
+    expect(s.remaining).toBe(-210)
+    expect(s.pct).toBe(1)
+  })
+
+  it('works for weekly and biweekly windows', () => {
+    const weekly = budgetStatus(
+      { period: 'weekly', starts_at: '2026-09-28', category_id: null, currency_code: 'USD', amount: 100, rollover: true },
+      [txn({ transacted_at: '2026-09-30T12:00:00Z', amount_in_profile_currency: 30 })],
+      [],
+      tz,
+      at,
+    )
+    // Two full weeks before the current one carried in: (100 - 30) + 100.
+    expect(weekly.carryover).toBe(170)
+    const biweekly = budgetStatus(
+      { period: 'biweekly', starts_at: '2026-09-17', category_id: null, currency_code: 'USD', amount: 100, rollover: true },
+      [],
+      [],
+      tz,
+      at,
+    )
+    // Sep 17 to Oct 1 and Oct 1 to Oct 15 have ended; Oct 15 is current.
+    expect(biweekly.carryover).toBe(200)
+  })
+})
+
+describe('inheritedCarry — editing a rollover budget keeps its carry (migration 040)', () => {
+  const tz = 'UTC'
+  const at = '2026-10-15T12:00:00Z'
+  const old = { period: 'monthly' as const, starts_at: '2026-08-01', category_id: null, currency_code: 'USD', amount: 500, rollover: true }
+  const rows = [
+    txn({ transacted_at: '2026-08-10T12:00:00Z', amount_in_profile_currency: 400 }),
+    txn({ transacted_at: '2026-09-10T12:00:00Z', amount_in_profile_currency: 300 }),
+    txn({ transacted_at: '2026-10-05T12:00:00Z', amount_in_profile_currency: 100 }),
+  ]
+
+  it('carries the old budget\'s balance into its replacement', () => {
+    expect(inheritedCarry(old, true, rows, tz, at)).toBe(300)
+    // The replacement starts today; its first window is October, so the
+    // inherited 300 plus its own new amount is what October has.
+    const replacement = { ...old, starts_at: '2026-10-15', amount: 600, rollover_carry_in: 300 }
+    const s = budgetStatus(replacement, rows, [], tz, at)
+    expect(s.carryover).toBe(300)
+    expect(s.available).toBe(900)
+    expect(s.remaining).toBe(800)
+  })
+
+  it('inherits nothing when either side has rollover off', () => {
+    expect(inheritedCarry({ ...old, rollover: false }, true, rows, tz, at)).toBe(0)
+    expect(inheritedCarry(old, false, rows, tz, at)).toBe(0)
+    expect(inheritedCarry(null, true, rows, tz, at)).toBe(0)
+  })
+
+  it('a carry-in is ignored once rollover is off', () => {
+    const s = budgetStatus({ ...old, rollover: false, rollover_carry_in: 300 }, rows, [], tz, at)
+    expect(s.carryover).toBe(0)
   })
 })

@@ -4,11 +4,12 @@ import type { Locale, Transaction } from '@voice-expense/shared'
 import { dismissPrime, enableCheckIn, needsPermissionRepair, rescheduleReminders, shouldOfferPrime } from '../services/reminders'
 
 /** When the user last logged something themselves (auto-generated
- *  recurring rows don't count: they happen without the user). */
+ *  recurring rows don't count: they happen without the user; nor do rows
+ *  imported from a file, which are history, not a habit). */
 export function lastLogTime(transactions: Transaction[]): Date | null {
   let max = 0
   for (const t of transactions) {
-    if (t.is_deleted || t.source === 'recurring_generated') continue
+    if (t.is_deleted || t.source === 'recurring_generated' || t.source === 'import') continue
     const ts = Date.parse(t.client_created_at ?? t.created_at)
     if (Number.isFinite(ts) && ts > max) max = ts
   }
@@ -19,7 +20,7 @@ export function lastLogTime(transactions: Transaction[]): Date | null {
 export function loggedExpenseCount(transactions: Transaction[]): number {
   let n = 0
   for (const t of transactions) {
-    if (!t.is_deleted && t.direction === 'debit' && t.source !== 'recurring_generated') n++
+    if (!t.is_deleted && t.direction === 'debit' && t.source !== 'recurring_generated' && t.source !== 'import') n++
   }
   return n
 }

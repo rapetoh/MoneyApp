@@ -16,6 +16,7 @@ import { runRecurringCatchUp } from '../src/services/recurringCatchUp'
 import { runFxBackfill } from '../src/services/fxBackfill'
 import { registerDevice } from '../src/services/sync/deviceRegistry'
 import { runMerchantEnrichment } from '../src/services/merchantEnrichment'
+import { loadMerchantRules } from '../src/services/merchantRules'
 import { runOncePerSession } from '../src/services/launchOnce'
 import { configurePurchases } from '../src/services/purchases'
 import { installCrashReporting } from '../src/services/analytics'
@@ -23,6 +24,7 @@ import { UndoProvider } from '../src/hooks/useUndo'
 import { VoiceSessionProvider } from '../src/hooks/useVoiceSession'
 import { SyncFailureBanner } from '../src/components/SyncFailureBanner'
 import { WalletCaptureDrain } from '../src/components/WalletCaptureDrain'
+import { WidgetSync } from '../src/components/WidgetSync'
 import { t } from '@voice-expense/shared'
 import type { Locale } from '@voice-expense/shared'
 
@@ -266,6 +268,9 @@ export default function RootLayout() {
     // Captured card descriptors ("711594-Mcgrath Volkswa") whose parse
     // answered too late get their real business name and logo domain, on
     // launch and every return to the foreground (src/services/merchantEnrichment.ts).
+    // Learned merchant categories (migration 041), warm before the first
+    // capture so a background save files by them without waiting.
+    void loadMerchantRules(userId).catch(() => {})
     void runMerchantEnrichment(userId).catch(() => {})
     const sub = AppState.addEventListener('change', (state) => {
       if (state === 'active') void runMerchantEnrichment(userId).catch(() => {})
@@ -285,6 +290,9 @@ export default function RootLayout() {
               silently (native App Intent + deep link), see
               src/services/walletCapture.ts. Renders nothing. */}
           <WalletCaptureDrain />
+          {/* Home-screen and lock-screen widgets: publishes spent today and
+              budget left to the shared App Group. Renders nothing. */}
+          <WidgetSync />
           <StatusBar style="dark" backgroundColor="#FBFAF7" />
           <Stack screenOptions={{ headerShown: false }}>
             {/* Top-level groups swap on auth / onboarding boundaries via
@@ -386,6 +394,24 @@ export default function RootLayout() {
               options={{
                 headerShown: true,
                 headerTitle: t('settings.apple_pay_capture', locale),
+                headerBackTitle: t('common.back', locale),
+                presentation: 'card',
+              }}
+            />
+            <Stack.Screen
+              name="more/import"
+              options={{
+                headerShown: true,
+                headerTitle: t('import.settings', locale),
+                headerBackTitle: t('common.back', locale),
+                presentation: 'card',
+              }}
+            />
+            <Stack.Screen
+              name="more/learned"
+              options={{
+                headerShown: true,
+                headerTitle: t('rules.title', locale),
                 headerBackTitle: t('common.back', locale),
                 presentation: 'card',
               }}

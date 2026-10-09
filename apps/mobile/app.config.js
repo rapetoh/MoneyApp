@@ -27,6 +27,11 @@ module.exports = {
       // Watch target the same way as the app (Oct 4 2026).
       appleTeamId: '47WU47J52M',
       usesAppleSignIn: true,
+      // Shared with the widget extension (targets/widget), which reads the
+      // spending snapshot the app writes there (Oct 8 2026).
+      entitlements: {
+        'com.apple.security.application-groups': ['group.com.voiceexpense.app'],
+      },
       infoPlist: {
         // Murmur implements no encryption of its own (OS TLS + data
         // protection only) — declaring exemption here means App Store

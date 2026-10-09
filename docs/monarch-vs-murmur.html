@@ -1,0 +1,170 @@
+<title>Monarch vs Murmur</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Instrument+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: one board. Big-number strip, then three lanes: shared, Monarch-only (grouped), Murmur-only. */
+:root{
+  --bg:#f5f6f8; --card:#ffffff; --fg:#141821; --muted:#5d6472; --line:#e1e4ea;
+  --mur:#0f7b6c; --mur-soft:#e3f3f0; --mon:#c2410c; --mon-soft:#fcebe2; --both:#3b4a6b; --both-soft:#e8ecf4;
+  --display:"Bricolage Grotesque",ui-sans-serif,system-ui,sans-serif;
+  --body:"Instrument Sans",ui-sans-serif,system-ui,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0f1218; --card:#171b24; --fg:#e9ecf2; --muted:#9aa2b1; --line:#262c38;
+  --mur:#4fd1bd; --mur-soft:#12312c; --mon:#fb8c5a; --mon-soft:#38200f; --both:#a9b8da; --both-soft:#1d2433; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f1218; --card:#171b24; --fg:#e9ecf2; --muted:#9aa2b1; --line:#262c38;
+  --mur:#4fd1bd; --mur-soft:#12312c; --mon:#fb8c5a; --mon-soft:#38200f; --both:#a9b8da; --both-soft:#1d2433; color-scheme:dark}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:15px;line-height:1.45}
+.wrap{max-width:1180px;margin:0 auto;padding-inline:16px;padding-block:28px 56px;display:grid;gap:28px}
+h1{font-family:var(--display);font-weight:800;font-size:clamp(28px,5vw,44px);line-height:1.05;margin:0;text-wrap:balance}
+.sub{color:var(--muted);margin:6px 0 0}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.stat b{display:block;font-family:var(--display);font-weight:800;font-size:34px;line-height:1;font-variant-numeric:tabular-nums}
+.stat span{color:var(--muted);font-size:13px}
+.stat.mur b{color:var(--mur)} .stat.mon b{color:var(--mon)} .stat.both b{color:var(--both)}
+.lane{display:grid;gap:12px}
+.lane-h{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.lane-h h2{font-family:var(--display);font-weight:800;font-size:24px;margin:0}
+.lane-h .n{font-size:13px;font-weight:600;padding:2px 9px;border-radius:99px}
+.both .n{background:var(--both-soft);color:var(--both)} .mon .n{background:var(--mon-soft);color:var(--mon)} .mur .n{background:var(--mur-soft);color:var(--mur)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px}
+.t{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px;min-width:0}
+.t b{display:block;font-weight:600}
+.t i{font-style:normal;color:var(--muted);font-size:13px}
+.both .t{border-left:3px solid var(--both)} .mon .t{border-left:3px solid var(--mon)} .mur .t{border-left:3px solid var(--mur)}
+.group{display:grid;gap:8px}
+.group h3{margin:6px 0 0;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.chip{display:inline-block;font-size:11px;font-weight:600;letter-spacing:.04em;padding:1px 6px;border-radius:5px;background:var(--mon-soft);color:var(--mon);margin-left:6px;vertical-align:1px}
+.foot{color:var(--muted);font-size:12px;border-top:1px solid var(--line);padding-top:14px}
+.foot a{color:inherit}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Monarch vs Murmur</h1>
+    <p class="sub">Every Monarch feature, split into what Murmur already does and what Murmur lacks. Researched Oct 7, 2026.</p>
+  </header>
+
+  <section class="stats">
+    <div class="stat both"><b>24</b><span>features both apps have</span></div>
+    <div class="stat mon"><b>44</b><span>Monarch has, Murmur lacks</span></div>
+    <div class="stat mur"><b>9</b><span>Murmur has, Monarch lacks</span></div>
+    <div class="stat mon"><b>$99.99</b><span>Monarch per year (no free tier)</span></div>
+    <div class="stat mur"><b>$29.99</b><span>Murmur Plus per year (free tier)</span></div>
+  </section>
+
+  <section class="lane both">
+    <div class="lane-h"><h2>Already doing</h2><span class="n">24</span></div>
+    <div class="grid">
+      <div class="t"><b>Manual entry</b><i>Both. Murmur adds voice on top.</i></div>
+      <div class="t"><b>Receipt scanning</b><i>Monarch also splits line items onto the bank charge.</i></div>
+      <div class="t"><b>Apple Pay capture</b><i>Monarch: Apple Card only. Murmur: any card in Wallet.</i></div>
+      <div class="t"><b>AI auto-categorization</b><i>Both.</i></div>
+      <div class="t"><b>Merchant cleanup + logos</b><i>Raw card codes become real names.</i></div>
+      <div class="t"><b>Custom categories</b><i>Monarch adds groups and emoji.</i></div>
+      <div class="t"><b>Notes on transactions</b><i>Both.</i></div>
+      <div class="t"><b>Search and filters</b><i>Monarch filters more fields.</i></div>
+      <div class="t"><b>Edit, delete, undo</b><i>Both.</i></div>
+      <div class="t"><b>Category budgets</b><i>Plus one overall budget in Murmur.</i></div>
+      <div class="t"><b>Recurring bills and income</b><i>Detection plus manual rules.</i></div>
+      <div class="t"><b>Subscriptions spotted</b><i>Insight cards in Murmur, page in Monarch.</i></div>
+      <div class="t"><b>Upcoming bill alerts</b><i>Both push them.</i></div>
+      <div class="t"><b>Budget alerts</b><i>Murmur warns at 80%.</i></div>
+      <div class="t"><b>Weekly recap</b><i>Monarch also emails it, AI-written.</i></div>
+      <div class="t"><b>AI assistant chat</b><i>Ask Murmur, with inline charts.</i></div>
+      <div class="t"><b>AI insights</b><i>Surges, large charges, month changes.</i></div>
+      <div class="t"><b>Income vs spending</b><i>Monarch adds savings rate.</i></div>
+      <div class="t"><b>Charts incl. treemap</b><i>Murmur web has 5 views.</i></div>
+      <div class="t"><b>Spending forecast</b><i>Murmur: this month. Monarch: decades.</i></div>
+      <div class="t"><b>iOS + web</b><i>Both.</i></div>
+      <div class="t"><b>Apple / Google / email sign-in</b><i>Both.</i></div>
+      <div class="t"><b>CSV export</b><i>Both.</i></div>
+      <div class="t"><b>Per-type notification settings</b><i>Both.</i></div>
+    </div>
+  </section>
+
+  <section class="lane mon">
+    <div class="lane-h"><h2>Monarch has, Murmur lacks</h2><span class="n">44</span></div>
+
+    <div class="group"><h3>Money in one place</h3><div class="grid">
+      <div class="t"><b>Bank and card sync</b><i>Plaid, MX, Finicity. Transactions arrive alone.</i></div>
+      <div class="t"><b>Apple Card / Cash / Savings sync</b><i>Through Apple FinanceKit.</i></div>
+      <div class="t"><b>Account balances</b><i>Every account, live.</i></div>
+      <div class="t"><b>Net worth</b><i>Assets minus debts, with history chart.</i></div>
+      <div class="t"><b>Home value</b><i>Zillow, weekly.</i></div>
+      <div class="t"><b>Car value</b><i>VinAudit, monthly.</i></div>
+      <div class="t"><b>Crypto</b><i>Coinbase sync.</i></div>
+      <div class="t"><b>Investments</b><i>Holdings, returns vs S&amp;P 500, allocation.</i></div>
+      <div class="t"><b>Fund analysis</b><span class="chip">PLUS</span><i>Morningstar fees and overlap.</i></div>
+      <div class="t"><b>Stock comp (RSU, options)</b><i>Vesting timeline.</i></div>
+      <div class="t"><b>Credit card limits</b><i>Utilization per card.</i></div>
+      <div class="t"><b>Credit score</b><i>Equifax, monthly, alert on 20+ point moves.</i></div>
+      <div class="t"><b>Bill Sync</b><i>Statement balance, minimum, due date.</i></div>
+      <div class="t"><b>Manual accounts</b><i>Any asset or debt.</i></div>
+    </div></div>
+
+    <div class="group"><h3>Transactions</h3><div class="grid">
+      <div class="t"><b>Rules</b><i>Auto rename, recategorize, tag, split.</i></div>
+      <div class="t"><b>Split a transaction</b><i>By amount or percent.</i></div>
+      <div class="t"><b>Tags</b><i>Several per transaction.</i></div>
+      <div class="t"><b>Attachments</b><i>Photos or files on a transaction.</i></div>
+      <div class="t"><b>Review inbox</b><i>"Needs review", assign to partner.</i></div>
+      <div class="t"><b>Bulk edit</b><i>Select many, change at once.</i></div>
+      <div class="t"><b>Edit history</b><i>Who or which rule changed what.</i></div>
+      <div class="t"><b>Hide transactions</b><i>Out of budgets and reports.</i></div>
+      <div class="t"><b>Explain this transaction</b><i>AI button on any charge.</i></div>
+      <div class="t"><b>Amazon + Target orders</b><i>Items matched to the charge.</i></div>
+      <div class="t"><b>Email receipt forwarding</b><i>Forward to a Monarch address.</i></div>
+      <div class="t"><b>CSV import</b><i>Transactions and balances, no duplicates.</i></div>
+    </div></div>
+
+    <div class="group"><h3>Budgets and planning</h3><div class="grid">
+      <div class="t"><b>Budget rollovers</b><i>Leftover carries to next month.</i></div>
+      <div class="t"><b>Flex budgeting</b><i>Fixed, flexible, non-monthly buckets.</i></div>
+      <div class="t"><b>Savings goals</b><i>On track, ahead, at risk.</i></div>
+      <div class="t"><b>Debt payoff goals</b><i>Avalanche vs snowball calculator.</i></div>
+      <div class="t"><b>Long-term forecast</b><span class="chip">PLUS</span><i>Net worth decades out.</i></div>
+      <div class="t"><b>Life events + retirement</b><span class="chip">PLUS</span><i>Kid, home, 401(k), scenarios.</i></div>
+      <div class="t"><b>Business and rental P&amp;L</b><span class="chip">PLUS</span><i>Schedule C export.</i></div>
+      <div class="t"><b>Free will</b><span class="chip">PLUS</span><i>Trust &amp; Will partnership.</i></div>
+    </div></div>
+
+    <div class="group"><h3>Reports</h3><div class="grid">
+      <div class="t"><b>Custom report builder</b><i>By tag, account, merchant.</i></div>
+      <div class="t"><b>Sankey cash flow</b><i>Money in to money out diagram.</i></div>
+      <div class="t"><b>Custom dashboard</b><i>Drag-and-drop widgets.</i></div>
+    </div></div>
+
+    <div class="group"><h3>People</h3><div class="grid">
+      <div class="t"><b>Household sharing</b><i>Unlimited members, one subscription.</i></div>
+      <div class="t"><b>Mine / theirs / ours</b><i>Personal and shared views.</i></div>
+      <div class="t"><b>Advisor access</b><i>CPA or planner, free.</i></div>
+    </div></div>
+
+    <div class="group"><h3>Platforms and security</h3><div class="grid">
+      <div class="t"><b>Android app</b><i>Murmur has code, no release.</i></div>
+      <div class="t"><b>iPad + Vision Pro</b><i>Native layouts.</i></div>
+      <div class="t"><b>Home-screen widgets</b><i>Budget, transactions, receipt shortcut.</i></div>
+      <div class="t"><b>Weekly recap email</b><i>Murmur sends push only.</i></div>
+    </div></div>
+  </section>
+
+  <section class="lane mur">
+    <div class="lane-h"><h2>Murmur has, Monarch lacks</h2><span class="n">9</span></div>
+    <div class="grid">
+      <div class="t"><b>Log by voice</b><i>One sentence, saved.</i></div>
+      <div class="t"><b>Siri, hands-free</b><i>Logs without opening the app.</i></div>
+      <div class="t"><b>Apple Watch app</b><i>Monarch has none.</i></div>
+      <div class="t"><b>Any Apple Pay card</b><i>Not just Apple Card.</i></div>
+      <div class="t"><b>Mac + Windows apps</b><i>Monarch is web only on desktop.</i></div>
+      <div class="t"><b>15 currencies</b><i>Incl. XOF, XAF, NGN, GHS. Monarch is US and Canada.</i></div>
+      <div class="t"><b>Free tier</b><i>Monarch has none.</i></div>
+      <div class="t"><b>No bank login needed</b><i>Nothing breaks when a bank sync fails.</i></div>
+      <div class="t"><b>Works offline</b><i>Saves on device, syncs later.</i></div>
+    </div>
+  </section>
+
+  <p class="foot">Sources: monarch.com pricing, features, what's new and blog; Monarch help center; App Store listing; 2026 reviews. Monarch Plus is $199.99/yr in the App Store. Murmur side verified against the code.</p>
+</div>

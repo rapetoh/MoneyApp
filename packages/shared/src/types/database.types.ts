@@ -188,6 +188,8 @@ export type Database = {
           is_active: boolean
           is_deleted: boolean
           period: string
+          rollover: boolean
+          rollover_carry_in: number
           starts_at: string
           synced_at: string | null
           updated_at: string
@@ -205,6 +207,8 @@ export type Database = {
           is_active?: boolean
           is_deleted?: boolean
           period: string
+          rollover?: boolean
+          rollover_carry_in?: number
           starts_at?: string
           synced_at?: string | null
           updated_at?: string
@@ -222,6 +226,8 @@ export type Database = {
           is_active?: boolean
           is_deleted?: boolean
           period?: string
+          rollover?: boolean
+          rollover_carry_in?: number
           starts_at?: string
           synced_at?: string | null
           updated_at?: string
@@ -356,6 +362,82 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      goal_contributions: {
+        Row: {
+          amount: number
+          contributed_at: string
+          created_at: string
+          goal_id: string
+          id: string
+          note: string | null
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          contributed_at?: string
+          created_at?: string
+          goal_id: string
+          id?: string
+          note?: string | null
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          contributed_at?: string
+          created_at?: string
+          goal_id?: string
+          id?: string
+          note?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "goal_contributions_goal_id_fkey"
+            columns: ["goal_id"]
+            isOneToOne: false
+            referencedRelation: "savings_goals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      merchant_rules: {
+        Row: {
+          category_id: string
+          created_at: string
+          id: string
+          merchant_key: string
+          merchant_name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          category_id: string
+          created_at?: string
+          id?: string
+          merchant_key: string
+          merchant_name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          category_id?: string
+          created_at?: string
+          id?: string
+          merchant_key?: string
+          merchant_name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "merchant_rules_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       notification_log: {
         Row: {
@@ -674,6 +756,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      savings_goals: {
+        Row: {
+          archived_at: string | null
+          created_at: string
+          currency_code: string
+          id: string
+          name: string
+          target_amount: number
+          target_date: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          archived_at?: string | null
+          created_at?: string
+          currency_code?: string
+          id?: string
+          name: string
+          target_amount: number
+          target_date?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          archived_at?: string | null
+          created_at?: string
+          currency_code?: string
+          id?: string
+          name?: string
+          target_amount?: number
+          target_date?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       sync_operations: {
         Row: {

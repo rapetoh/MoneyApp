@@ -15,6 +15,7 @@ type NavKey =
   | 'recurring'
   | 'ask'
   | 'reports'
+  | 'import'
   | 'export'
   | 'settings'
 
@@ -42,6 +43,8 @@ const NAV: Array<{
   // "Reports & forecast" here, a fourth name for one destination (audit
   // 08-F44, fix-plan 4.2 — see docs/DESIGN.md's navigation naming table).
   { key: 'reports', label: 'Insights', href: '/dashboard/insights', icon: Icon.chart, group: 'analyze' },
+  // CSV import (docs/csv-import.md, Oct 2026).
+  { key: 'import', label: 'Import', href: '/dashboard/import', icon: Icon.list, group: 'data' },
   { key: 'export', label: 'Export', href: '/dashboard/export', icon: Icon.download, group: 'data', plus: true },
   { key: 'settings', label: 'Settings', href: '/dashboard/settings', icon: Icon.settings, group: 'data' },
 ]

@@ -106,6 +106,15 @@ export interface BudgetStatusInput {
   category_id: string | null
   currency_code: string
   amount: number
+  /** Budget rollover (migration 040, Oct 2026): what was left (or
+   *  overspent) in every past period since the budget started carries
+   *  into the current one. Optional so callers on rows that predate the
+   *  column read as "off". */
+  rollover?: boolean | null
+  /** The carry inherited from the budget this one replaced (migration
+   *  040), so editing a rollover budget never drops what it had built up.
+   *  Counts only while `rollover` is on. */
+  rollover_carry_in?: number | null
 }
 
 export interface BudgetStatus {
@@ -117,11 +126,21 @@ export interface BudgetStatus {
    *  plus not-yet-posted recurring-rule occurrences. Never overlaps
    *  `spent` — see the module docstring. */
   committed: number
-  /** `budget.amount - spent - committed`, unclamped — a negative value
-   *  is "over by", which is a rendering decision, not this module's. */
+  /** What past periods carried in (plus any `rollover_carry_in`):
+   *  positive when they came in under budget, negative when they ran
+   *  over. Always `0` with rollover off. */
+  carryover: number
+  /** What this period has to spend: `budget.amount + carryover`. Every
+   *  "of $X" and every ring fills against this, never the bare amount. */
+  available: number
+  /** `budget.amount + carryover - spent - committed`, unclamped — a
+   *  negative value is "over by", which is a rendering decision, not this
+   *  module's. */
   remaining: number
-  /** `(spent + committed) / budget.amount`, unclamped for the same
-   *  reason. `0` when `budget.amount <= 0`. */
+  /** `(spent + committed) / (budget.amount + carryover)`, unclamped for
+   *  the same reason. With nothing left to spend (an amount, plus
+   *  carryover, of zero or less) it is `1` once anything is spent and `0`
+   *  otherwise. */
   pct: number
   /** The half-open window this status was computed over — the same
    *  bounds a "days left" countdown must derive from, so the countdown
@@ -220,8 +239,78 @@ export function budgetStatus(
 
   const spent = roundCents(spentCents / 100)
   const committed = roundCents((committedFromTxnsCents + committedFromRulesCents) / 100)
-  const remaining = roundCents(budget.amount - spent - committed)
-  const pct = budget.amount > 0 ? (spent + committed) / budget.amount : 0
+  const carryover = budget.rollover
+    ? roundCents((budget.rollover_carry_in ?? 0) + rolloverCarry(budget, txns, tz, anchor, window))
+    : 0
+  const available = roundCents(budget.amount + carryover)
+  const remaining = roundCents(available - spent - committed)
+  const pct = available > 0 ? (spent + committed) / available : spent + committed > 0 ? 1 : 0
 
-  return { spent, committed, remaining, pct, window, pendingCount }
+  return { spent, committed, carryover, available, remaining, pct, window, pendingCount }
+}
+
+/** Past periods walked back for a rollover: 20 years of monthly budgets,
+ *  far more than any real history, and a hard stop for a bad anchor. */
+const MAX_ROLLOVER_PERIODS = 240
+
+/**
+ * What every past period of this budget left over (or overspent), summed:
+ * for each window from the one the budget started in up to the one before
+ * `current`, `amount - spent`. Past windows have nothing "committed" left;
+ * only posted spend counts, with the same scope and FX rules as
+ * `budgetStatus` (a row still awaiting conversion is left out, never read
+ * as 0).
+ */
+function rolloverCarry(
+  budget: BudgetStatusInput,
+  txns: readonly BudgetStatusTransaction[],
+  tz: string,
+  anchor: string,
+  current: Bounds,
+): number {
+  const windows: Bounds[] = []
+  let cursor = current.start
+  for (let i = 0; i < MAX_ROLLOVER_PERIODS; i++) {
+    const before = new Date(Date.parse(cursor) - 1).toISOString()
+    const w = periodBounds(budget.period, before, tz, anchor)
+    // Stop at the window the budget started in; earlier ones never had it.
+    if (w.endExclusive <= anchor || w.start >= cursor) break
+    windows.push(w)
+    cursor = w.start
+  }
+  if (windows.length === 0) return 0
+
+  const earliest = windows[windows.length - 1].start
+  const spentByWindow = new Array<number>(windows.length).fill(0)
+  for (const t of txns) {
+    if (t.transacted_at < earliest || t.transacted_at >= current.start) continue
+    if (budget.category_id != null && t.category_id !== budget.category_id) continue
+    if (t.amount_in_profile_currency == null) continue
+    if (!isSpend(t, resolveCategoryKind(t.category_name, t.category_kind))) continue
+    const idx = windows.findIndex((w) => t.transacted_at >= w.start && t.transacted_at < w.endExclusive)
+    if (idx >= 0) spentByWindow[idx] += Math.round(t.amount_in_profile_currency * 100)
+  }
+
+  const amountCents = Math.round(budget.amount * 100)
+  let carryCents = 0
+  for (const spent of spentByWindow) carryCents += amountCents - spent
+  return roundCents(carryCents / 100)
+}
+
+/**
+ * The carry a replacement budget inherits when `previous` is retired now
+ * (migration 040's `rollover_carry_in`): `previous`'s own carryover as of
+ * the current period. The current period itself is not included; the
+ * replacement's first window is the current one, so it is counted there.
+ * `0` when `previous` did not roll over, or the replacement does not.
+ */
+export function inheritedCarry(
+  previous: BudgetStatusInput | null | undefined,
+  replacementRollsOver: boolean,
+  txns: readonly BudgetStatusTransaction[],
+  tz: string,
+  atInstantIso: string = new Date().toISOString(),
+): number {
+  if (!previous || !previous.rollover || !replacementRollsOver) return 0
+  return budgetStatus(previous, txns, [], tz, atInstantIso).carryover
 }

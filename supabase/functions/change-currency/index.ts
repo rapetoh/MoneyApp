@@ -264,21 +264,56 @@ Deno.serve(async (req) => {
 
   const { data: budgets, error: budgetsErr } = await supabase
     .from('budgets')
-    .select('id, amount')
+    .select('id, amount, rollover_carry_in')
     .eq('user_id', userId)
     .eq('is_deleted', false)
   if (budgetsErr) return json({ error: `Failed to read budgets: ${budgetsErr.message}` }, 500)
 
-  for (const b of (budgets ?? []) as Array<{ id: string; amount: number }>) {
+  for (const b of (budgets ?? []) as Array<{ id: string; amount: number; rollover_carry_in: number | null }>) {
     // `budgets.amount` carries `CHECK (amount > 0)` — clamp the floor so
     // a very small budget in a low-value currency can't round to zero
     // and fail the write.
     const newAmount = Math.max(Math.round(b.amount * finalRate * 100) / 100, 0.01)
     const { error: bErr } = await supabase
       .from('budgets')
-      .update({ amount: newAmount, currency_code: newCurrency })
+      .update({
+        amount: newAmount,
+        currency_code: newCurrency,
+        // Rolled-over balance (migration 040) is money in the same currency.
+        rollover_carry_in: Math.round(Number(b.rollover_carry_in ?? 0) * finalRate * 100) / 100,
+      })
       .eq('id', b.id)
     if (bErr) return json({ error: `Failed to convert budget ${b.id}: ${bErr.message}` }, 500)
+  }
+
+  // Savings goals and their contributions (migration 042) are money in
+  // the profile's currency too.
+  const { data: goals, error: goalsErr } = await supabase
+    .from('savings_goals')
+    .select('id, target_amount')
+    .eq('user_id', userId)
+  if (goalsErr) return json({ error: `Failed to read goals: ${goalsErr.message}` }, 500)
+  for (const g of (goals ?? []) as Array<{ id: string; target_amount: number }>) {
+    const { error: gErr } = await supabase
+      .from('savings_goals')
+      .update({
+        target_amount: Math.max(Math.round(Number(g.target_amount) * finalRate * 100) / 100, 0.01),
+        currency_code: newCurrency,
+      })
+      .eq('id', g.id)
+    if (gErr) return json({ error: `Failed to convert goal ${g.id}: ${gErr.message}` }, 500)
+  }
+  const { data: contributions, error: contribErr } = await supabase
+    .from('goal_contributions')
+    .select('id, amount')
+    .eq('user_id', userId)
+  if (contribErr) return json({ error: `Failed to read goal contributions: ${contribErr.message}` }, 500)
+  for (const c of (contributions ?? []) as Array<{ id: string; amount: number }>) {
+    const converted = Math.round(Number(c.amount) * finalRate * 100) / 100
+    // `amount <> 0`: a tiny contribution in a low-value currency keeps its sign.
+    const amount = converted === 0 ? (Number(c.amount) > 0 ? 0.01 : -0.01) : converted
+    const { error: cErr } = await supabase.from('goal_contributions').update({ amount }).eq('id', c.id)
+    if (cErr) return json({ error: `Failed to convert goal contribution ${c.id}: ${cErr.message}` }, 500)
   }
 
   const { error: profileUpdateErr } = await supabase

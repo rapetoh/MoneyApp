@@ -5,12 +5,13 @@ import { enqueue } from '../services/sync/syncQueue'
 import { syncManager, type OutboxOutcome } from '../services/sync/SyncManager'
 import { DataEvents } from '../events/dataEvents'
 import type { Transaction } from '@voice-expense/shared'
-import { snapshotFx, localDay } from '@voice-expense/shared'
+import { snapshotFx, localDay, merchantKey } from '@voice-expense/shared'
 import { validateTransactionWriteFields } from '@voice-expense/ai'
 import * as Crypto from 'expo-crypto'
 import { getCurrentProfileCurrency } from '../services/profileCurrency'
 import { useCachedState, cacheHas } from '../services/queryCache'
 import { prefetchMerchantLogos } from '../services/merchantLogo'
+import { learnMerchantCategory } from '../services/merchantRules'
 
 /** IANA zone the device is currently in. Mirrors `useProfile.ts`'s own
  *  `getDeviceTimeZone` (fix-plan 1.3 part 1 — that hook keeps
@@ -38,6 +39,10 @@ export interface MutationResult {
   id: string | null
   status: OutboxOutcome
   error: string | null
+  /** Set when an edit moved this merchant to a new category and Murmur
+   *  learned it (migration 041): the merchant as listed, its rule key, and
+   *  the category it will be filed in from now on. */
+  learned?: { merchantName: string; merchantKey: string; categoryId: string } | null
 }
 
 /**
@@ -277,7 +282,23 @@ export function useTransactions(userId: string | undefined) {
   ): Promise<MutationResult> {
     if (!userId) return { id, status: 'rejected', error: 'Not authenticated' }
 
+    const before = await getTransactionById(id)
     await updateTransactionFields(id, fields)
+
+    // Moving a merchant to another category teaches Murmur where that
+    // merchant goes (migration 041, src/services/merchantRules.ts): the next
+    // capture from it is filed there before the AI's guess.
+    let learned: MutationResult['learned'] = null
+    const learnedMerchant = fields.merchant !== undefined ? fields.merchant : before?.merchant
+    if (
+      before &&
+      fields.category_id &&
+      fields.category_id !== before.category_id &&
+      merchantKey(learnedMerchant)
+    ) {
+      const name = await learnMerchantCategory(userId, learnedMerchant, fields.category_id).catch(() => null)
+      if (name) learned = { merchantName: name, merchantKey: merchantKey(learnedMerchant)!, categoryId: fields.category_id }
+    }
 
     // If the amount changed, the FX snapshot is now stale. Reuse the
     // row's existing `fx_rate_to_profile` (the rate is dated to the
@@ -325,11 +346,11 @@ export function useTransactions(userId: string | undefined) {
     const updated = await import('../services/sync/transactionStore').then((m) =>
       m.getTransactionById(id),
     )
-    if (!updated) return { id, status: 'synced', error: null }
+    if (!updated) return { id, status: 'synced', error: null, learned }
 
     await enqueue('update', id, updated, 'transaction')
     const outcome = await syncManager.awaitOutcome(id)
-    return { id, status: outcome.status, error: outcome.error }
+    return { id, status: outcome.status, error: outcome.error, learned }
   }
 
   return { transactions, loading, error, createTransaction, editTransaction }

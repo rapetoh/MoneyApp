@@ -22,6 +22,8 @@ import { RecurringToggle } from './RecurringToggle'
 import { NumericAccessory, NUMERIC_ACCESSORY_ID } from './NumericAccessory'
 import { usePresence } from './Presence'
 import { useReduceMotion } from '../hooks/useReduceMotion'
+import { useAuth } from '../hooks/useAuth'
+import { cachedMerchantRules, learnedCategoryId } from '../services/merchantRules'
 import { Colors, Typography, Spacing, Radius } from '../theme'
 import {
   merchantColor,
@@ -33,6 +35,7 @@ import {
   normalizeParsedTransactedAt,
 } from '@voice-expense/shared'
 import type { ParsedExpense, Locale, Category, PaymentMethod, RecurringFrequency } from '@voice-expense/shared'
+import { learnedCategoryFor } from '@voice-expense/shared'
 
 /** Pulls the numeric readings a clarifying question names — "Was that
  *  $4.50 or $450?" → [4.5, 450] — so the sheet can offer them as tappable
@@ -125,12 +128,32 @@ export function VoiceResultSheet({
   )
   const aiDetectedRecurring = parsed.is_recurring_suggestion ?? false
 
-  // Canonical category resolver (fix-plan 2.9d) — exact, curated synonyms,
-  // then whole-word overlap; null over a low-confidence guess.
+  // A category the person taught Murmur for this merchant (migration 041,
+  // src/services/merchantRules.ts) wins over the AI's suggestion. Then the
+  // canonical resolver (fix-plan 2.9d): exact, curated synonyms, whole-word
+  // overlap; null over a low-confidence guess.
+  const { user } = useAuth()
+  const userId = user?.id
   useEffect(() => {
-    const resolved = resolveCategorySuggestion(parsed.category_suggestion, categories)
-    if (resolved) setCategoryId((cur) => cur ?? resolved.category.id)
-  }, [parsed.category_suggestion, categories])
+    const valid = new Set(categories.map((c) => c.id))
+    const learned = userId ? learnedCategoryFor(parsed.merchant, cachedMerchantRules(userId), valid) : null
+    if (learned) {
+      setCategoryId((cur) => cur ?? learned)
+      return
+    }
+    const aiId = resolveCategorySuggestion(parsed.category_suggestion, categories)?.category.id ?? null
+    if (aiId) setCategoryId((cur) => cur ?? aiId)
+    // Rules not loaded yet (first capture since launch): ask, and replace
+    // the AI's pick only if the person has not changed it meanwhile.
+    if (!userId) return
+    let cancelled = false
+    learnedCategoryId(userId, parsed.merchant, valid).then((id) => {
+      if (!cancelled && id) setCategoryId((cur) => (cur == null || cur === aiId ? id : cur))
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [parsed.category_suggestion, parsed.merchant, categories, userId])
 
   // ── Entrance / exit + edit-expansion ──────────────────────────────────
   // Presence comes from the enclosing <Presence> (VoiceSessionProvider):

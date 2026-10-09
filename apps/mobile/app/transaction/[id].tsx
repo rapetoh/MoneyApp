@@ -99,6 +99,7 @@ function humanSource(source: string | null | undefined, locale: Locale): string 
     case 'shortcut': return t('source.shortcut', locale)
     case 'notification_listener': return t('source.notification', locale)
     case 'recurring_generated': return t('source.recurring', locale)
+    case 'import': return t('source.import', locale)
     default: return source
   }
 }

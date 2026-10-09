@@ -272,12 +272,13 @@ export default function SettingsPage() {
     } = await supabase.auth.getUser()
     if (!user) return
 
-    const [{ data: transactions }, { data: categories }, { data: budgets }, { data: rules }] =
+    const [{ data: transactions }, { data: categories }, { data: budgets }, { data: rules }, { data: merchantRules }] =
       await Promise.all([
         supabase.from('transactions').select('*').eq('user_id', user.id).order('transacted_at'),
         supabase.from('categories').select('*').eq('user_id', user.id),
         supabase.from('budgets').select('*').eq('user_id', user.id),
         supabase.from('recurring_rules').select('*').eq('user_id', user.id),
+        supabase.from('merchant_rules').select('*').eq('user_id', user.id),
       ])
 
     const exported_at = new Date().toISOString()
@@ -293,6 +294,7 @@ export default function SettingsPage() {
             categories: categories ?? [],
             budgets: budgets ?? [],
             recurring_rules: rules ?? [],
+            merchant_rules: merchantRules ?? [],
           },
           null,
           2,

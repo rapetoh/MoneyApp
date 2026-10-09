@@ -12,6 +12,7 @@ import { useRecurringRules } from '../../src/hooks/useRecurringRules'
 import { useManualRefresh } from '../../src/hooks/useManualRefresh'
 import { Money } from '../../src/components/Money'
 import { BudgetRing } from '../../src/components/BudgetRing'
+import { GoalsSection } from '../../src/components/GoalsSection'
 import { BudgetEditorModal } from '../../src/components/BudgetEditorModal'
 import { Colors, Typography, useTabBarClearance } from '../../src/theme'
 import { t, localParts, daysBetween, formatMoney, merchantColor, categoryPalette } from '@voice-expense/shared'
@@ -131,12 +132,16 @@ export default function BudgetsScreen() {
           const st = budgetStatusFor(b, transactions, recurringRules, tz)
           const cat = b.category_id ? categoryMap[b.category_id] : undefined
           const used = (st?.spent ?? 0) + (st?.committed ?? 0)
+          // With rollover on, the period's cap is the amount plus what past
+          // periods carried in (migration 040).
+          const cap = st?.available ?? b.amount
           return {
             budget: b,
             name: cat?.name ?? '-',
             color: cat?.color ?? merchantColor(cat?.name ?? '?'),
             used,
-            pct: b.amount > 0 ? used / b.amount : 0,
+            cap,
+            pct: cap > 0 ? used / cap : used > 0 ? 2 : 0,
           }
         })
         .sort((a, b) => b.pct - a.pct),
@@ -161,15 +166,20 @@ export default function BudgetsScreen() {
   }
 
   const spent = (status?.spent ?? 0) + (status?.committed ?? 0)
-  const limit = budget?.amount ?? 0
+  // Amount plus rollover carry (migration 040); just the amount when off.
+  const limit = status?.available ?? budget?.amount ?? 0
   const remaining = Math.max(0, limit - spent)
-  const over = limit > 0 && spent > limit
+  const over = budget != null && spent > limit
   const tight = !over && limit > 0 && spent / limit > 0.92
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
       <ScrollView
         contentContainerStyle={[styles.content, { paddingBottom: tabBarClearance }]}
+        // The goal dialogs (GoalsSection) render inside this scroll view; with
+        // the default 'never' it took the first tap on their Save button just
+        // to close the keyboard, so saving took two taps (Oct 8 2026).
+        keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.ink3} />}
       >
@@ -215,7 +225,7 @@ export default function BudgetsScreen() {
               <Text style={styles.ctaBtnText}>{t('common.retry', locale)}</Text>
             </Pressable>
           </View>
-        ) : limit > 0 ? (
+        ) : budget ? (
           <View style={styles.heroCard}>
             <BudgetRing spent={spent} limit={limit} locale={locale} />
             <View style={styles.heroText}>
@@ -245,6 +255,22 @@ export default function BudgetsScreen() {
                   visibly separate rather than silently summed into one
                   "spent" figure that overclaims what has actually left the
                   account. */}
+              {/* Rollover: what past periods carried into this one. */}
+              {(status?.carryover ?? 0) !== 0 && (
+                <View style={styles.heroOfLine}>
+                  <Text style={styles.heroOfText}>{status!.carryover > 0 ? '+' : '\u2212'}</Text>
+                  <Money
+                    value={Math.abs(status!.carryover)}
+                    currencyCode={currency}
+                    locale={locale}
+                    size={13}
+                    serif={false}
+                    sansWeight="600"
+                    muted
+                  />
+                  <Text style={styles.heroOfText}> {t('budgets.rolled_over', locale)}</Text>
+                </View>
+              )}
               {(status?.committed ?? 0) > 0 && (
                 <View style={styles.heroOfLine}>
                   <Money
@@ -311,7 +337,7 @@ export default function BudgetsScreen() {
                   onPress={() => onCategoryRowPress(row.budget, row.name)}
                   style={({ pressed }) => [styles.categoryRow, i > 0 && styles.categoryRowDivider, pressed && styles.categoryRowPressed]}
                   accessibilityRole="button"
-                  accessibilityLabel={`${row.name}, ${formatMoney(row.used, row.budget.currency_code, locale)} of ${formatMoney(row.budget.amount, row.budget.currency_code, locale)}`}
+                  accessibilityLabel={`${row.name}, ${formatMoney(row.used, row.budget.currency_code, locale)} of ${formatMoney(row.cap, row.budget.currency_code, locale)}`}
                 >
                   <View style={styles.categoryTop}>
                     <View style={styles.categoryNameWrap}>
@@ -322,7 +348,7 @@ export default function BudgetsScreen() {
                     <View style={styles.categoryAmounts}>
                       <Money value={row.used} size={15} serif={false} sansWeight="700" currencyCode={row.budget.currency_code} locale={locale} />
                       <Text style={styles.categoryOf}>
-                        {`/ ${formatMoney(row.budget.amount, row.budget.currency_code, locale, { precision: 'compact' })}`}
+                        {`/ ${formatMoney(row.cap, row.budget.currency_code, locale, { precision: 'whole' })}`}
                       </Text>
                     </View>
                   </View>
@@ -331,16 +357,20 @@ export default function BudgetsScreen() {
                   </View>
                   <Text style={[styles.categoryState, over && styles.categoryStateOver, near && styles.categoryStateNear]}>
                     {over
-                      ? `${t('budgets.status_over', locale)} · ${formatMoney(row.used - row.budget.amount, row.budget.currency_code, locale, { precision: 'compact' })} ${t('budgets.over_by', locale)}`
+                      ? `${t('budgets.status_over', locale)} · ${formatMoney(row.used - row.cap, row.budget.currency_code, locale, { precision: 'whole' })} ${t('budgets.over_by', locale)}`
                       : near
-                        ? `${t('budgets.status_tight', locale)} · ${formatMoney(Math.max(0, row.budget.amount - row.used), row.budget.currency_code, locale, { precision: 'compact' })} ${t('budgets.left_of', locale)} ${formatMoney(row.budget.amount, row.budget.currency_code, locale, { precision: 'compact' })}`
-                        : `${t('budgets.status_on_pace', locale)} · ${formatMoney(Math.max(0, row.budget.amount - row.used), row.budget.currency_code, locale, { precision: 'compact' })} ${t('budgets.left_of', locale)} ${formatMoney(row.budget.amount, row.budget.currency_code, locale, { precision: 'compact' })}`}
+                        ? `${t('budgets.status_tight', locale)} · ${formatMoney(Math.max(0, row.cap - row.used), row.budget.currency_code, locale, { precision: 'whole' })} ${t('budgets.left_of', locale)} ${formatMoney(row.cap, row.budget.currency_code, locale, { precision: 'whole' })}`
+                        : `${t('budgets.status_on_pace', locale)} · ${formatMoney(Math.max(0, row.cap - row.used), row.budget.currency_code, locale, { precision: 'whole' })} ${t('budgets.left_of', locale)} ${formatMoney(row.cap, row.budget.currency_code, locale, { precision: 'whole' })}`}
                   </Text>
                 </Pressable>
               )
             })}
           </View>
         )}
+
+        {/* Savings goals (migration 042): what is being put aside, next to
+            what may go out. */}
+        <GoalsSection userId={user?.id} currency={currency} locale={locale} tz={tz} />
       </ScrollView>
 
       <BudgetEditorModal
@@ -349,13 +379,14 @@ export default function BudgetsScreen() {
         initialPeriod={editing ? editing.period : (budget?.period ?? null)}
         initialCategoryId={editing ? editing.category_id : null}
         lockCategory={editing !== null}
+        initialRollover={editing ? editing.rollover : (budget?.rollover ?? false)}
         categories={categories}
         currency={currency}
         locale={locale}
-        onSave={async (amount: number, period: BudgetPeriod, categoryId: string | null) =>
+        onSave={async (amount: number, period: BudgetPeriod, categoryId: string | null, rollover: boolean) =>
           categoryId
-            ? saveCategoryBudget(categoryId, amount, period, currency, tz)
-            : setBudget(amount, period, currency, tz)
+            ? saveCategoryBudget(categoryId, amount, period, currency, tz, rollover)
+            : setBudget(amount, period, currency, tz, rollover)
         }
         onClose={() => { setBudgetModalVisible(false); setEditing(null) }}
       />

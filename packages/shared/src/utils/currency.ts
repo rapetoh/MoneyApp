@@ -145,16 +145,28 @@ function formatMoneyPartsFallback(
  * non-English profile in English grouping. There is no safe default
  * for this parameter; callers must plumb it from `profile.locale`.
  *
- * `precision: 'compact'` (`$1.2K`) is for chart axes and other
- * space-constrained surfaces only — never a hero amount or a
- * transaction row, where the exact figure is the point.
+ * `precision: 'compact'` (`$1.2K`) is for chart axes only.
+ * `precision: 'whole'` (`$739`) is for quick-glance figures (budget
+ * captions, widgets) — never a hero amount or a transaction row, where
+ * the exact figure is the point.
  */
 export function formatMoney(
   value: number,
   currencyCode: string,
   locale: string,
-  options?: { precision?: 'exact' | 'compact' },
+  options?: { precision?: 'exact' | 'compact' | 'whole' },
 ): string {
+  // `whole` ("$739", "$1,250") is the quick-glance figure: a budget's
+  // "left this month", a widget. `compact` there read "$739.3" (Oct 8 2026):
+  // compact notation keeps one decimal below a thousand.
+  if (options?.precision === 'whole') {
+    return new Intl.NumberFormat(locale, {
+      style: 'currency',
+      currency: currencyCode,
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(value)
+  }
   return new Intl.NumberFormat(locale, {
     style: 'currency',
     currency: currencyCode,

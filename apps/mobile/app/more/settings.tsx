@@ -646,6 +646,16 @@ export default function SettingsScreen() {
           <SetRow
             label={t('settings.recurring', locale)}
             onPress={() => router.push('/recurring')}
+          />
+          {/* CSV import (docs/csv-import.md). */}
+          <SetRow
+            label={t('import.settings', locale)}
+            onPress={() => router.push('/more/import' as never)}
+          />
+          {/* Merchants Murmur learned a category for (migration 041). */}
+          <SetRow
+            label={t('rules.title', locale)}
+            onPress={() => router.push('/more/learned' as never)}
             last
           />
         </SetGroup>
@@ -831,9 +841,10 @@ export default function SettingsScreen() {
         visible={budgetModal}
         initialAmount={budget?.amount ?? null}
         initialPeriod={budget?.period ?? null}
+        initialRollover={budget?.rollover ?? false}
         currency={currency}
         locale={locale}
-        onSave={async (amount, period) => setBudget(amount, period, currency)}
+        onSave={async (amount, period, _categoryId, rollover) => setBudget(amount, period, currency, profile?.timezone || undefined, rollover)}
         onClose={() => setBudgetModal(false)}
       />
 

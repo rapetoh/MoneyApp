@@ -265,7 +265,7 @@ export default function AskMurmurPage() {
         recurring_rule_id: x.recurring_rule_id,
       }))
       const status = budgetStatus(
-        { period: overall.period, starts_at: overall.starts_at, category_id: null, currency_code: overall.currency_code, amount: overall.amount },
+        { period: overall.period, starts_at: overall.starts_at, category_id: null, currency_code: overall.currency_code, amount: overall.amount, rollover: overall.rollover },
         txnsForStatus,
         rules,
         tz,
@@ -274,7 +274,8 @@ export default function AskMurmurPage() {
         const now = localParts(nowIso, tz)
         const end = localParts(status.window.endExclusive, tz)
         budget = {
-          amount: overall.amount,
+          // Rollover included (migration 040).
+          amount: status.available,
           currency: overall.currency_code,
           period: overall.period,
           category_name: null,

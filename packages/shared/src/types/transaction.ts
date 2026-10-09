@@ -16,6 +16,8 @@ export type TransactionSource =
   | 'shortcut'
   | 'notification_listener'
   | 'recurring_generated'
+  /** Imported from a CSV file (migration 043). */
+  | 'import'
 
 export type TransactionDirection = 'debit' | 'credit'
 

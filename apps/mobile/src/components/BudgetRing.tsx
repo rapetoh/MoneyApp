@@ -24,9 +24,11 @@ interface Props {
  * the semantic is clear at a glance.
  */
 export function BudgetRing({ spent, limit, size = 110, locale = 'en' }: Props) {
-  const pct = limit > 0 ? Math.min(spent / limit, 1) : 0
+  // A rollover can leave nothing (or less than nothing) to spend: any
+  // spending then reads full and over, never an empty ring.
+  const pct = limit > 0 ? Math.min(spent / limit, 1) : spent > 0 ? 1 : 0
   const pctLabel = Math.round(pct * 100)
-  const over = limit > 0 && spent > limit
+  const over = spent > limit && (limit > 0 || spent > 0)
 
   const arcColor = over
     ? Colors.destructive ?? '#A94646'

@@ -43,6 +43,9 @@ export * from './domain/source'
 // Domain — the one category-suggestion resolver, fix-plan 2.9(d)
 export * from './domain/categoryResolver'
 export * from './domain/merchantBrand'
+export * from './domain/merchantRules'
+export * from './domain/goals'
+export * from './domain/csvImport'
 
 // i18n
 export * from './i18n'
