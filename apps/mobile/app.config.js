@@ -27,10 +27,18 @@ module.exports = {
       // Watch target the same way as the app (Oct 4 2026).
       appleTeamId: '47WU47J52M',
       usesAppleSignIn: true,
-      // Shared with the widget extension (targets/widget), which reads the
-      // spending snapshot the app writes there (Oct 8 2026).
+      // The widget extension (targets/widget) reads the spending snapshot
+      // the app writes to a shared keychain item (Oct 8 2026). Keychain
+      // sharing within one team needs no App ID capability, where an App
+      // Group would (EAS cannot switch App Groups on with an API key).
+      // The app's own identifier stays FIRST: the first group is where new
+      // keychain items go, so SecureStore keeps reading and writing the
+      // signed-in session exactly where it always has.
       entitlements: {
-        'com.apple.security.application-groups': ['group.com.voiceexpense.app'],
+        'keychain-access-groups': [
+          '$(AppIdentifierPrefix)com.voiceexpense.app',
+          '$(AppIdentifierPrefix)com.voiceexpense.widgetdata',
+        ],
       },
       infoPlist: {
         // Murmur implements no encryption of its own (OS TLS + data

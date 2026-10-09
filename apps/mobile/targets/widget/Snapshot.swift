@@ -1,4 +1,5 @@
 import Foundation
+import Security
 
 /// What the app published (src/components/WidgetSync.tsx). Every string is
 /// already formatted and translated by the app.
@@ -24,12 +25,24 @@ struct Snapshot: Decodable {
   let budget: Budget?
   let labels: Labels
 
-  static let appGroup = "group.com.voiceexpense.app"
-  static let key = "murmur.widget.snapshot"
+  /// The keychain item the app writes (modules/murmur-widget). Same team,
+  /// same group in both targets' keychain-access-groups entitlements.
+  static let keychainGroup = "47WU47J52M.com.voiceexpense.widgetdata"
+  static let keychainService = "com.voiceexpense.widget"
+  static let keychainAccount = "murmur.widget.snapshot"
 
   static func load() -> Snapshot? {
-    guard let json = UserDefaults(suiteName: appGroup)?.string(forKey: key),
-          let data = json.data(using: .utf8) else { return nil }
+    let query: [String: Any] = [
+      kSecClass as String: kSecClassGenericPassword,
+      kSecAttrService as String: keychainService,
+      kSecAttrAccount as String: keychainAccount,
+      kSecAttrAccessGroup as String: keychainGroup,
+      kSecReturnData as String: true,
+      kSecMatchLimit as String: kSecMatchLimitOne,
+    ]
+    var out: AnyObject?
+    guard SecItemCopyMatching(query as CFDictionary, &out) == errSecSuccess,
+          let data = out as? Data else { return nil }
     return try? JSONDecoder().decode(Snapshot.self, from: data)
   }
 

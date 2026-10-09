@@ -4,7 +4,8 @@
  * The widget shows exactly what the top of Today shows: spent today and
  * the budget left (or "over budget"), formatted here by the app's own
  * money formatter and i18n so the two never disagree. The snapshot goes
- * to the shared App Group through modules/murmur-widget; the native side
+ * to a keychain item shared with the widget, through modules/murmur-widget;
+ * the native side
  * reloads the widget only when the text actually changed.
  *
  * Two values age on their own: "today" after midnight and the budget once

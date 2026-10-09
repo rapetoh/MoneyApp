@@ -2,8 +2,9 @@
 // (circular, rectangular, inline). Logging is the product, so every widget
 // is a door into the voice overlay: one tap opens Murmur already listening
 // (iOS does not let a widget record audio itself). The numbers are the top
-// of Today, handed over by the app as a snapshot in the shared App Group
-// (src/components/WidgetSync.tsx -> modules/murmur-widget); the widget never
+// of Today, handed over by the app as a snapshot
+// (src/components/WidgetSync.tsx -> modules/murmur-widget, via a shared
+// keychain item); the widget never
 // reads the database or the network.
 /** @type {import('@bacons/apple-targets/app.plugin').Config} */
 module.exports = (config) => ({
@@ -17,7 +18,9 @@ module.exports = (config) => ({
     $accent: '#3F5A3E',
     surface: { light: '#FBFAF7', dark: '#1B1C19' },
   },
+  // Reads the snapshot from the keychain group the app shares (see the
+  // app's entitlements in app.config.js). No App Group, on purpose.
   entitlements: {
-    'com.apple.security.application-groups': config.ios.entitlements['com.apple.security.application-groups'],
+    'keychain-access-groups': ['$(AppIdentifierPrefix)com.voiceexpense.widgetdata'],
   },
 })
