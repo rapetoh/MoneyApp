@@ -9,7 +9,7 @@ Every way in, tested for real on itsmurmur.com and the Mac app, as four kinds of
 | Email sign-in | ✅ | ✅ | works |
 | Email sign-up | ❌ said "check your email" (no email is ever sent) | same | **fixed**: signs straight in (iPhone app had the same screen; fixed too) |
 | Google | ✅ | ❌ 1.0.0 hung on "Redirecting…", unreleased 1.0.1 blocked by Google | **fixed**: browser + hand-back (desktop 1.0.2) |
-| Apple | ❌ `invalid_client` (Oct 18, from the logs) | ❌ same secret | **needs the Apple secret renewed** (below) |
+| Apple | ✅ fixed Oct 23 (was `invalid_client`) | ✅ same secret | new key `USZ8G929WP`, secret installed, **expires 2027-04-21** |
 | Password reset | email not delivered to customers | same | **needs an email service** (below) |
 | Wrong password / expired link / signed-out dashboard | ✅ | ✅ | works |
 | Stay signed in after quitting | - | ✅ | works |
@@ -46,7 +46,7 @@ Google blocks embedded windows ("This browser or app may not be secure", verifie
 
 ## Needs the owner
 
-1. **Apple secret** (Apple sign-in on web + Mac is down): Supabase dashboard > Authentication > Sign In / Providers > Apple > generate a new secret from the Sign in with Apple key (.p8), Services ID `com.voiceexpense.app.service`, Team `47WU47J52M`. Expires every 6 months: renew by April 2027.
+1. ~~Apple secret~~ **Done Oct 23.** Owner created Sign in with Apple key `USZ8G929WP` (old key `T8NPJNMWB2` file was lost; `D5NYC4452X` belongs to Okili). Secret = ES256 JWT, iss `47WU47J52M`, sub `com.voiceexpense.app.service`, 180 days, set via Management API `external_apple_secret`. Verified: Supabase now gets `invalid_grant` for a fake code instead of `invalid_client`. **Renew before 2027-04-21** with the same key file (keep it safe; Apple never re-downloads it).
 2. **Email service** for password reset: Supabase's built-in sender only reaches project team addresses, 2 per hour. Connect Resend (or similar) as custom SMTP with `itsmurmur.com` verified.
 3. **Google screen** says "continue to ohaqhwampmyoeaopdybd.supabase.co": fix with a Supabase custom domain (auth.itsmurmur.com, paid add-on) or Google OAuth brand verification.
 4. Only 9 accounts, none new since Sep 20: the sign-up message above is the likely reason on web.
