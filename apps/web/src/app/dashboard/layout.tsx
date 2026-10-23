@@ -86,11 +86,21 @@ export default async function DashboardLayout({ children }: { children: React.Re
             minWidth: 0,
           }}
         >
-          {/* The desktop app is a Plus feature (pricing model, Sep 20
-              2026); Settings stays open so any account can be managed and
-              deleted from here. New accounts hold Plus for 14 days, so this
-              gate only appears once a trial has ended. */}
-          <DesktopPlusGate isPlus={isPlus}>{children}</DesktopPlusGate>
+          {/* The website and desktop app are a Plus feature (pricing model,
+              Sep 20 2026); Settings stays open so any account can be managed
+              and deleted from here. New accounts hold Plus for 14 days, so
+              this gate only appears once a trial or subscription has ended.
+              It names the account that will unlock, so it gets the email
+              and sign-in provider. */}
+          <DesktopPlusGate
+            isPlus={isPlus}
+            userId={user.id}
+            email={user.email ?? null}
+            provider={(user.app_metadata?.provider as string | undefined) ?? null}
+            lapsed={profile?.plus_status === 'lapsed'}
+          >
+            {children}
+          </DesktopPlusGate>
         </main>
       </div>
     </PlusProvider>

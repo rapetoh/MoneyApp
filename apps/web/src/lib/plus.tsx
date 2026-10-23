@@ -32,3 +32,19 @@ export function PlusProvider({
 export function usePlus(): { isPlus: boolean } {
   return useContext(PlusContext)
 }
+
+/**
+ * True inside the blurred dashboard preview behind the Plus screen
+ * (DesktopPlusGate). Per-feature gates (PaywallGate on Ask and Export)
+ * step aside there, so the preview shows the page itself rather than a
+ * second lock card behind the first.
+ */
+const PlusPreviewContext = createContext(false)
+
+export function PlusPreviewProvider({ children }: { children: ReactNode }) {
+  return <PlusPreviewContext.Provider value={true}>{children}</PlusPreviewContext.Provider>
+}
+
+export function usePlusPreview(): boolean {
+  return useContext(PlusPreviewContext)
+}

@@ -5,6 +5,7 @@ import { MurmurMark } from '../components/MurmurMark'
 import { HeroDownloads } from '../components/HeroDownloads'
 import { colors, font } from '../lib/theme'
 import { SUPPORT_EMAIL } from '@voice-expense/shared'
+import { APP_STORE_URL } from '../lib/links'
 
 const SITE = 'https://itsmurmur.com'
 
@@ -99,10 +100,6 @@ const FAQ: { q: string; a: string }[] = [
 
 // Desktop downloads (signed + notarized, published Aug 29, 2026). The
 // release script keeps these in step with the latest version.
-// Live on the App Store since Sep 11, 2026. The short id form is the
-// canonical link: Apple resolves it to the localised store page, so it
-// cannot rot if the listing title ever changes.
-const APP_STORE_URL = 'https://apps.apple.com/app/id6799316747'
 // GitHub's /releases/latest/download/ path takes an exact file name, and
 // electron-builder stamps the version into it, so this constant has to move
 // with every desktop release or all three buttons 404. It is one edit, and

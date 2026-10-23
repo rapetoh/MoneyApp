@@ -15,8 +15,10 @@
 // History (fix-plan 3.1): this used to render an inert `<div>Upgrade to
 // Plus</div>` next to a note that lied about a dev/prod branch; then an
 // honest "Plus is in preview" state while no purchase flow existed.
+'use client'
 import type { ReactNode } from 'react'
 import { colors, font, radius } from '../lib/theme'
+import { usePlusPreview } from '../lib/plus'
 import { Icon } from './Icons'
 import { PlusRefreshButton } from './PlusRefreshButton'
 
@@ -31,6 +33,10 @@ export function PaywallGate({
   feature: string
   children?: ReactNode
 }) {
+  // Behind the account-wide Plus screen the page is only a blurred
+  // preview; a second lock card there would read as clutter.
+  const inPreview = usePlusPreview()
+  if (inPreview) return <>{children}</>
   return (
     <div style={{ position: 'relative', minHeight: 480 }}>
       <div style={styles.overlay}>
