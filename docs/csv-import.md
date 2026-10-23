@@ -70,4 +70,4 @@ Verified Oct 23 2026: generated checking (30 lines, transfer + card payment) and
 | Endpoint | `apps/web/src/app/api/ai/parse-statement/route.ts` (60 files/hour) |
 | Web flow | `apps/web/src/app/dashboard/import/page.tsx` |
 
-Phone import stays CSV-only until a native release.
+Desktop has it from 1.0.3 (Oct 23 2026). Phone import stays CSV-only until a native release.

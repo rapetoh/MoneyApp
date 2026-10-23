@@ -430,7 +430,11 @@ page. What was done, end to end:
   `afterPack.cjs` now skips its ad-hoc re-sign whenever a real identity
   is in play so the Developer ID signature survives.
 - *Notarization:* notarytool with the Apple ID + app-specific password
-  (creds in `~/.murmur-signing/notary.env`, never committed). First-ever
+  (creds in `~/.murmur-signing/notary.env`, never committed). Load them with
+  `set -a; source ~/.murmur-signing/notary.env; set +a` before `npm run dist`:
+  the file has no `export`s, and a plain `source` silently SKIPS
+  notarization ("notarize options were unable to be generated", hit on
+  1.0.3, Oct 23 2026). Check `spctl -a -vv` says Notarized before publishing. First-ever
   submission for this team took ~2.5 h in Apple's deep scan, verdict
   **Accepted**. Verified locally: `spctl` says "accepted, source =
   Notarized Developer ID" for both arches and `stapler validate` passes

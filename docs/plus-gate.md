@@ -61,4 +61,4 @@ No auto-redirect: Safari shows "address is invalid" for a custom scheme when the
 
 - Universal link (itsmurmur.com/plus opening the app directly) needs `associatedDomains` + a native build.
 - Selling Plus on the web (Stripe via RevenueCat Web Billing) is an owner decision.
-- The desktop app bundles the web UI: the new screen reaches Mac/Windows with desktop 1.0.3.
+- Desktop 1.0.3 (Oct 23 2026) carries the new screen to Mac and Windows; verified in the packaged app.
