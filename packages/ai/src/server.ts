@@ -37,3 +37,7 @@ export {
   MAX_CONTEXT_TURNS,
 } from './askConversation'
 export type { AskPriorTurn, AskPromptInput, AskGrounding } from './askConversation'
+
+// Bank and card statement PDFs into import rows (Oct 23 2026).
+export { STATEMENT_PROMPT, STATEMENT_JSON_SCHEMA, validateStatementRows } from './statement'
+export type { StatementRow, StatementReading } from './statement'

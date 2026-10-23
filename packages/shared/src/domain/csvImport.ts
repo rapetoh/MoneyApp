@@ -556,12 +556,20 @@ export function importTransaction(
   const byName = (name: string | null | undefined) =>
     name ? (ctx.categories.find((c) => c.name.toLowerCase() === name.toLowerCase()) ?? null) : null
   const valid = new Set(ctx.categories.map((c) => c.id))
+  // Guesses (the AI's pick, merchant keywords) only file money coming in
+  // under an income category: "Interest payment" in Fees or an Airbnb payout
+  // in Shopping reads wrong (Oct 23 2026). The file's own column and learned
+  // rules are the person's choice and stand as they are.
+  const guessable =
+    row.direction === 'credit'
+      ? (c: Category | null) => (c?.kind === 'income' ? c : null)
+      : (c: Category | null) => c
   const categoryId =
     resolveCategorySuggestion(row.category, ctx.categories)?.category.id ??
     learnedCategoryFor(merchant, ctx.rules, valid) ??
     learnedCategoryFor(row.description, ctx.rules, valid) ??
-    byName(identity?.category)?.id ??
-    guessCategoryFromMerchant(row.description, ctx.categories)?.category.id ??
+    guessable(byName(identity?.category))?.id ??
+    guessable(guessCategoryFromMerchant(row.description, ctx.categories)?.category ?? null)?.id ??
     null
   const id = ctx.newId()
   return {

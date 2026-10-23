@@ -298,6 +298,38 @@ describe('importTransaction', () => {
     )
   })
 
+  it('money coming in is only guessed into an income category', () => {
+    const withIncome = {
+      ...ctx,
+      rules: [],
+      categories: [
+        ...categories,
+        { ...(cat('f', 'Fees & Charges') as object), kind: 'spend' } as never,
+        { ...(cat('i', 'Income') as object), kind: 'income' } as never,
+      ],
+    }
+    const credit = { ...row, direction: 'credit' as const, description: 'INTEREST PAYMENT' }
+    expect(
+      importTransaction(
+        credit,
+        { merchant: 'Interest', merchant_domain: null, category: 'Fees & Charges' },
+        withIncome,
+      ).category_id,
+    ).toBeNull()
+    expect(
+      importTransaction(
+        credit,
+        { merchant: 'Interest', merchant_domain: null, category: 'Income' },
+        withIncome,
+      ).category_id,
+    ).toBe('i')
+    // The file's own category is the person's choice and stands.
+    expect(
+      importTransaction({ ...credit, category: 'Fees & Charges' }, undefined, withIncome)
+        .category_id,
+    ).toBe('f')
+  })
+
   it('no AI answer: the cleaned descriptor and the local guess', () => {
     const t = importTransaction({ ...row, description: 'SHELL OIL 57444091309' }, undefined, {
       ...ctx,
