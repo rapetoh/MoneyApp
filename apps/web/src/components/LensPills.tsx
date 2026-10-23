@@ -71,7 +71,16 @@ function Glyph({ kind, on }: { kind: LensKey; on: boolean }) {
   if (kind === 'calendar') {
     return (
       <svg width={w} height={h} viewBox="0 0 14 14">
-        <rect x="1" y="3" width="12" height="10" rx="1.5" fill="none" stroke={c} strokeWidth="1.2" />
+        <rect
+          x="1"
+          y="3"
+          width="12"
+          height="10"
+          rx="1.5"
+          fill="none"
+          stroke={c}
+          strokeWidth="1.2"
+        />
         <line x1="1" y1="6" x2="13" y2="6" stroke={c} strokeWidth="1.2" />
         <circle cx="4" cy="9" r="0.8" fill={c} />
         <circle cx="7" cy="9" r="0.8" fill={c} />

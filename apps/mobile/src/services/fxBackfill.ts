@@ -70,12 +70,7 @@ export async function runFxBackfill(userId: string): Promise<number> {
     currency_code: string
     transacted_at: string
   }>) {
-    const fx = await snapshotFx(
-      row.transacted_at,
-      row.currency_code,
-      profileCurrency,
-      row.amount,
-    )
+    const fx = await snapshotFx(row.transacted_at, row.currency_code, profileCurrency, row.amount)
     if (!fx) continue
     const { error: writeError } = await supabase
       .from('transactions')

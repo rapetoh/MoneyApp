@@ -69,7 +69,12 @@ export default function FirstLogScreen() {
   useEffect(() => {
     if (reduceMotion || filed) return
     const loop = Animated.loop(
-      Animated.timing(halo, { toValue: 1, duration: 1800, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+      Animated.timing(halo, {
+        toValue: 1,
+        duration: 1800,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }),
     )
     loop.start()
     return () => loop.stop()
@@ -88,9 +93,15 @@ export default function FirstLogScreen() {
             </Animated.View>
             <Text style={styles.filedTitle}>{t('onboarding.first_log.filed_title', locale)}</Text>
             <View style={styles.filedCard}>
-              <MerchantAvatar merchant={filed.merchant} merchantDomain={filed.merchant_domain} size={40} radius={12} />
+              <MerchantAvatar
+                merchant={filed.merchant}
+                merchantDomain={filed.merchant_domain}
+                size={40}
+                radius={12}
+              />
               <Text style={styles.filedMerchant} numberOfLines={1}>
-                {filed.merchant || t(filed.direction === 'credit' ? 'voice.income_label' : 'voice.expense', locale)}
+                {filed.merchant ||
+                  t(filed.direction === 'credit' ? 'voice.income_label' : 'voice.expense', locale)}
               </Text>
               <Text style={styles.filedAmount}>
                 {formatMoney(filed.amount, filed.currency_code, locale)}
@@ -183,7 +194,13 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: Colors.ink,
   },
-  lead: { marginTop: 10, fontSize: 15, lineHeight: 22, color: Colors.ink3, fontFamily: Typography.fontFamily.sans },
+  lead: {
+    marginTop: 10,
+    fontSize: 15,
+    lineHeight: 22,
+    color: Colors.ink3,
+    fontFamily: Typography.fontFamily.sans,
+  },
   example: {
     marginTop: 24,
     padding: 16,
@@ -208,9 +225,21 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     color: Colors.ink,
   },
-  micArea: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 36, paddingBottom: 8 },
+  micArea: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 36,
+    paddingBottom: 8,
+  },
   micStack: { width: 132, height: 132, alignItems: 'center', justifyContent: 'center' },
-  halo: { position: 'absolute', width: 96, height: 96, borderRadius: 48, backgroundColor: Colors.accent },
+  halo: {
+    position: 'absolute',
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: Colors.accent,
+  },
   mic: {
     width: 96,
     height: 96,
@@ -223,9 +252,27 @@ const styles = StyleSheet.create({
     shadowRadius: 18,
     shadowOffset: { width: 0, height: 8 },
   },
-  micLabel: { marginTop: 10, fontSize: 15, color: Colors.ink2, fontFamily: Typography.fontFamily.sansSemiBold, fontWeight: '600' },
-  noteRow: { marginTop: 14, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12 },
-  note: { fontSize: 12.5, color: Colors.ink4, textAlign: 'center', fontFamily: Typography.fontFamily.sans, flexShrink: 1 },
+  micLabel: {
+    marginTop: 10,
+    fontSize: 15,
+    color: Colors.ink2,
+    fontFamily: Typography.fontFamily.sansSemiBold,
+    fontWeight: '600',
+  },
+  noteRow: {
+    marginTop: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+  },
+  note: {
+    fontSize: 12.5,
+    color: Colors.ink4,
+    textAlign: 'center',
+    fontFamily: Typography.fontFamily.sans,
+    flexShrink: 1,
+  },
   footerLinks: {
     paddingHorizontal: 28,
     paddingBottom: 12,
@@ -234,8 +281,18 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  linkAccent: { fontSize: 15, color: Colors.accent, fontFamily: Typography.fontFamily.sansSemiBold, fontWeight: '600' },
-  link: { fontSize: 15, color: Colors.ink3, fontFamily: Typography.fontFamily.sansSemiBold, fontWeight: '600' },
+  linkAccent: {
+    fontSize: 15,
+    color: Colors.accent,
+    fontFamily: Typography.fontFamily.sansSemiBold,
+    fontWeight: '600',
+  },
+  link: {
+    fontSize: 15,
+    color: Colors.ink3,
+    fontFamily: Typography.fontFamily.sansSemiBold,
+    fontWeight: '600',
+  },
   filedWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: 40 },
   check: {
     width: 84,
@@ -265,11 +322,35 @@ const styles = StyleSheet.create({
     borderWidth: Hairline.width,
     borderColor: Hairline.color,
   },
-  filedMerchant: { flex: 1, fontSize: 16, color: Colors.ink, fontFamily: Typography.fontFamily.sansSemiBold, fontWeight: '600' },
+  filedMerchant: {
+    flex: 1,
+    fontSize: 16,
+    color: Colors.ink,
+    fontFamily: Typography.fontFamily.sansSemiBold,
+    fontWeight: '600',
+  },
   filedAmount: { fontFamily: Typography.fontFamily.serif, fontSize: 22, color: Colors.ink },
-  filedBody: { marginTop: 18, fontSize: 15, lineHeight: 22, color: Colors.ink3, textAlign: 'center', fontFamily: Typography.fontFamily.sans },
+  filedBody: {
+    marginTop: 18,
+    fontSize: 15,
+    lineHeight: 22,
+    color: Colors.ink3,
+    textAlign: 'center',
+    fontFamily: Typography.fontFamily.sans,
+  },
   footer: { paddingHorizontal: 28, paddingTop: 10, paddingBottom: 8 },
-  cta: { height: 56, borderRadius: 28, backgroundColor: Colors.ink, alignItems: 'center', justifyContent: 'center' },
+  cta: {
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: Colors.ink,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   ctaPressed: { opacity: 0.85 },
-  ctaText: { color: Colors.white, fontSize: 17, fontWeight: '600', fontFamily: Typography.fontFamily.sansSemiBold },
+  ctaText: {
+    color: Colors.white,
+    fontSize: 17,
+    fontWeight: '600',
+    fontFamily: Typography.fontFamily.sansSemiBold,
+  },
 })

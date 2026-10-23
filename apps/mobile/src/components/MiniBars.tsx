@@ -40,7 +40,12 @@ export function MiniBars({
             <View
               style={[
                 styles.bar,
-                { height: h, backgroundColor: isToday ? Colors.accent ?? Colors.primary : 'rgba(40,36,28,0.14)' },
+                {
+                  height: h,
+                  backgroundColor: isToday
+                    ? (Colors.accent ?? Colors.primary)
+                    : 'rgba(40,36,28,0.14)',
+                },
               ]}
             />
             <Text style={styles.label}>{dayLabels[i]}</Text>

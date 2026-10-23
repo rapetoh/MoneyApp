@@ -105,7 +105,10 @@ interface SpeechRecognitionLike {
 }
 function getSpeechRecognitionCtor(): (new () => SpeechRecognitionLike) | null {
   if (typeof window === 'undefined') return null
-  const w = window as unknown as { SpeechRecognition?: new () => SpeechRecognitionLike; webkitSpeechRecognition?: new () => SpeechRecognitionLike }
+  const w = window as unknown as {
+    SpeechRecognition?: new () => SpeechRecognitionLike
+    webkitSpeechRecognition?: new () => SpeechRecognitionLike
+  }
   return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null
 }
 
@@ -114,7 +117,12 @@ export default function AskMurmurPage() {
   const router = useRouter()
   const { isPlus } = usePlus()
   const [userId, setUserId] = useState<string | null>(null)
-  const [profile, setProfile] = useState<{ currency_code?: string; locale?: Locale; monthly_income?: number | null; timezone?: string } | null>(null)
+  const [profile, setProfile] = useState<{
+    currency_code?: string
+    locale?: Locale
+    monthly_income?: number | null
+    timezone?: string
+  } | null>(null)
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [rules, setRules] = useState<RecurringRule[]>([])
   const [categories, setCategories] = useState<Category[]>([])
@@ -139,18 +147,34 @@ export default function AskMurmurPage() {
   const tz = profile?.timezone || 'UTC'
 
   const load = useCallback(async () => {
-    const { data: { session } } = await supabase.auth.getSession()
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
     const user = session?.user
     if (!user) return
     setUserId(user.id)
     const [p, tx, r, c, b] = await Promise.all([
       supabase.from('profiles').select('*').eq('id', user.id).single(),
-      supabase.from('transactions').select('*').eq('user_id', user.id).eq('is_deleted', false).order('transacted_at', { ascending: false }),
+      supabase
+        .from('transactions')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('is_deleted', false)
+        .order('transacted_at', { ascending: false }),
       supabase.from('recurring_rules').select('*').eq('user_id', user.id),
       supabase.from('categories').select('*').eq('user_id', user.id).eq('is_archived', false),
       supabase.from('budgets').select('*').eq('user_id', user.id).eq('is_active', true),
     ])
-    setProfile(p.data ? { currency_code: p.data.currency_code, locale: p.data.locale as Locale, monthly_income: p.data.monthly_income, timezone: p.data.timezone } : null)
+    setProfile(
+      p.data
+        ? {
+            currency_code: p.data.currency_code,
+            locale: p.data.locale as Locale,
+            monthly_income: p.data.monthly_income,
+            timezone: p.data.timezone,
+          }
+        : null,
+    )
     const failure = p.error ?? tx.error ?? r.error ?? c.error
     setLoadError(failure ? failure.message : null)
     if (!tx.error) setTransactions((tx.data ?? []) as Transaction[])
@@ -158,7 +182,10 @@ export default function AskMurmurPage() {
     if (!c.error) setCategories((c.data ?? []) as Category[])
     if (!b.error) setBudgets((b.data ?? []) as Budget[])
     try {
-      const [convs, recent] = await Promise.all([listConversations(supabase, user.id, 30), resumeCandidate(supabase, user.id)])
+      const [convs, recent] = await Promise.all([
+        listConversations(supabase, user.id, 30),
+        resumeCandidate(supabase, user.id),
+      ])
       setConversations(convs)
       setContinueCandidate(recent?.conversation ?? null)
     } catch (err) {
@@ -233,7 +260,9 @@ export default function AskMurmurPage() {
         is_recurring: !!x.is_recurring,
         recurring_rule_id: x.recurring_rule_id ?? null,
       }))
-    const wireRules: Array<AskMurmurRecurringRuleV2 & { amount_in_profile_currency?: number | null; is_active?: boolean }> = rules
+    const wireRules: Array<
+      AskMurmurRecurringRuleV2 & { amount_in_profile_currency?: number | null; is_active?: boolean }
+    > = rules
       .filter((r) => r.is_active && !r.is_deleted)
       .map((r) => ({
         id: r.id,
@@ -253,9 +282,13 @@ export default function AskMurmurPage() {
       }))
     // Overall budget as the Budgets page computes it.
     let budget: AskMurmurBudget | null = null
-    const overall = budgets.find((x) => x.category_id === null && x.period === 'monthly') ?? budgets.find((x) => x.category_id === null)
+    const overall =
+      budgets.find((x) => x.category_id === null && x.period === 'monthly') ??
+      budgets.find((x) => x.category_id === null)
     if (overall) {
-      const catKind = new Map(categories.map((c) => [c.id, resolveCategoryKind(c.name, c.kind as CategoryKind | null)]))
+      const catKind = new Map(
+        categories.map((c) => [c.id, resolveCategoryKind(c.name, c.kind as CategoryKind | null)]),
+      )
       const txnsForStatus: BudgetStatusTransaction[] = transactions.map((x) => ({
         amount_in_profile_currency: x.amount_in_profile_currency,
         direction: x.direction,
@@ -265,7 +298,14 @@ export default function AskMurmurPage() {
         recurring_rule_id: x.recurring_rule_id,
       }))
       const status = budgetStatus(
-        { period: overall.period, starts_at: overall.starts_at, category_id: null, currency_code: overall.currency_code, amount: overall.amount, rollover: overall.rollover },
+        {
+          period: overall.period,
+          starts_at: overall.starts_at,
+          category_id: null,
+          currency_code: overall.currency_code,
+          amount: overall.amount,
+          rollover: overall.rollover,
+        },
         txnsForStatus,
         rules,
         tz,
@@ -318,7 +358,9 @@ export default function AskMurmurPage() {
       time_zone: tz,
       monthly_income: profile?.monthly_income ?? null,
       transactions: snapshot.wireTxns,
-      recurring_rules: snapshot.wireRules.map(({ amount_in_profile_currency: _a, is_active: _b, ...rest }) => rest),
+      recurring_rules: snapshot.wireRules.map(
+        ({ amount_in_profile_currency: _a, is_active: _b, ...rest }) => rest,
+      ),
       ...(snapshot.budget ? { budget: snapshot.budget } : {}),
     }
   }
@@ -337,7 +379,9 @@ export default function AskMurmurPage() {
       { id: pendingId, role: 'pending' },
     ])
     try {
-      const { data: { session } } = await supabase.auth.getSession()
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
       const accessToken = session?.access_token
       if (!accessToken) throw new Error('Not signed in')
       const res = await fetch('/api/ai/ask-murmur/turn', {
@@ -348,7 +392,11 @@ export default function AskMurmurPage() {
       if (!res.ok) {
         const kind: 'busy' | 'failed' = res.status === 429 || res.status === 503 ? 'busy' : 'failed'
         if (res.status === 404) setConversationId(null)
-        setMessages((prev) => prev.map((m) => (m.id === pendingId ? { id: pendingId, role: 'error', text: trimmed, seed, kind } : m)))
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === pendingId ? { id: pendingId, role: 'error', text: trimmed, seed, kind } : m,
+          ),
+        )
         return
       }
       const data = (await res.json()) as AskTurnResponse
@@ -357,21 +405,49 @@ export default function AskMurmurPage() {
       setMessages((prev) =>
         prev.map((m) => {
           if (m.id === userMsgId && data.user_message_id) return { ...m, id: data.user_message_id }
-          if (m.id === pendingId) return { id: data.message.id ?? pendingId, role: 'assistant', reply: data.message.reply }
+          if (m.id === pendingId)
+            return {
+              id: data.message.id ?? pendingId,
+              role: 'assistant',
+              reply: data.message.reply,
+            }
           return m
         }),
       )
       if (isNew && data.conversation_id) {
-        const row: AskConversationRow = { id: data.conversation_id, user_id: userId, title: trimmed.slice(0, 60), started_at: data.message.created_at, last_message_at: data.message.created_at, is_deleted: false, created_at: data.message.created_at, updated_at: data.message.created_at }
+        const row: AskConversationRow = {
+          id: data.conversation_id,
+          user_id: userId,
+          title: trimmed.slice(0, 60),
+          started_at: data.message.created_at,
+          last_message_at: data.message.created_at,
+          is_deleted: false,
+          created_at: data.message.created_at,
+          updated_at: data.message.created_at,
+        }
         setConversations((prev) => [row, ...prev])
         setContinueCandidate(row)
       } else if (data.conversation_id) {
-        setConversations((prev) => prev.map((c) => (c.id === data.conversation_id ? { ...c, last_message_at: data.message.created_at } : c)))
-        setContinueCandidate((prev) => (prev && prev.id === data.conversation_id ? { ...prev, last_message_at: data.message.created_at } : prev))
+        setConversations((prev) =>
+          prev.map((c) =>
+            c.id === data.conversation_id ? { ...c, last_message_at: data.message.created_at } : c,
+          ),
+        )
+        setContinueCandidate((prev) =>
+          prev && prev.id === data.conversation_id
+            ? { ...prev, last_message_at: data.message.created_at }
+            : prev,
+        )
       }
     } catch (e) {
       console.error('[ask] turn failed:', e)
-      setMessages((prev) => prev.map((m) => (m.id === pendingId ? { id: pendingId, role: 'error', text: trimmed, seed, kind: 'failed' } : m)))
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === pendingId
+            ? { id: pendingId, role: 'error', text: trimmed, seed, kind: 'failed' }
+            : m,
+        ),
+      )
     }
   }
 
@@ -438,7 +514,11 @@ export default function AskMurmurPage() {
       <div style={{ display: 'flex', flexDirection: 'column' }}>
         <Toolbar title="Ask Murmur" />
         <div style={{ padding: '0 24px 24px' }}>
-          <PaywallGate feature="Ask Murmur" title="An assistant that already watches your money." body="Insights before you ask, and answers grounded in your own transactions, bills and budget." />
+          <PaywallGate
+            feature="Ask Murmur"
+            title="An assistant that already watches your money."
+            body="Insights before you ask, and answers grounded in your own transactions, bills and budget."
+          />
         </div>
       </div>
     )
@@ -462,7 +542,12 @@ export default function AskMurmurPage() {
       <div style={styles.body}>
         {/* Left rail — conversations */}
         <aside style={styles.rail}>
-          <button type="button" onClick={startNew} style={{ ...styles.railNew, opacity: showEntry ? 0.6 : 1 }} disabled={showEntry}>
+          <button
+            type="button"
+            onClick={startNew}
+            style={{ ...styles.railNew, opacity: showEntry ? 0.6 : 1 }}
+            disabled={showEntry}
+          >
             <Icon.plus color="#fff" size={13} />
             {t('ask.new_conversation', locale)}
           </button>
@@ -470,16 +555,45 @@ export default function AskMurmurPage() {
           {conversations.length === 0 ? (
             <div style={styles.railEmpty}>{t('ask.history_empty', locale)}</div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 2, overflowY: 'auto', minHeight: 0 }}>
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 2,
+                overflowY: 'auto',
+                minHeight: 0,
+              }}
+            >
               {conversations.map((c) => {
                 const active = c.id === conversationId
                 return (
-                  <div key={c.id} style={{ ...styles.railItem, background: active ? colors.accentSoft : 'transparent' }}>
-                    <button type="button" onClick={() => openConversation(c.id)} style={styles.railItemMain} title={c.title ?? ''}>
-                      <div style={{ ...styles.railTitle, color: active ? colors.accent : colors.ink }}>{c.title ?? '…'}</div>
+                  <div
+                    key={c.id}
+                    style={{
+                      ...styles.railItem,
+                      background: active ? colors.accentSoft : 'transparent',
+                    }}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => openConversation(c.id)}
+                      style={styles.railItemMain}
+                      title={c.title ?? ''}
+                    >
+                      <div
+                        style={{ ...styles.railTitle, color: active ? colors.accent : colors.ink }}
+                      >
+                        {c.title ?? '…'}
+                      </div>
                       <div style={styles.railMeta}>{formatWhen(c.last_message_at, locale)}</div>
                     </button>
-                    <button type="button" onClick={() => deleteConversation(c.id)} style={styles.railDelete} title={t('ask.delete', locale)} aria-label={t('ask.delete', locale)}>
+                    <button
+                      type="button"
+                      onClick={() => deleteConversation(c.id)}
+                      style={styles.railDelete}
+                      title={t('ask.delete', locale)}
+                      aria-label={t('ask.delete', locale)}
+                    >
                       ×
                     </button>
                   </div>
@@ -492,11 +606,25 @@ export default function AskMurmurPage() {
         {/* Main — thread + composer */}
         <section style={styles.main}>
           {loadError && (
-            <ErrorState compact message="We couldn't load your data. Ask Murmur may be missing context." detail={loadError} onRetry={load} />
+            <ErrorState
+              compact
+              message="We couldn't load your data. Ask Murmur may be missing context."
+              detail={loadError}
+              onRetry={load}
+            />
           )}
           <div style={styles.thread}>
             {showEntry ? (
-              <EntryState locale={locale} insights={insights} intents={intents} continueCandidate={continueCandidate} onContinue={(id) => openConversation(id)} onAskInsight={(i) => send(i.question, i)} onInsightAction={performAction} onIntent={(q) => send(q)} />
+              <EntryState
+                locale={locale}
+                insights={insights}
+                intents={intents}
+                continueCandidate={continueCandidate}
+                onContinue={(id) => openConversation(id)}
+                onAskInsight={(i) => send(i.question, i)}
+                onInsightAction={performAction}
+                onIntent={(q) => send(q)}
+              />
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 18, maxWidth: 760 }}>
                 {messages.map((m) => {
@@ -520,7 +648,9 @@ export default function AskMurmurPage() {
                       <div key={m.id} style={styles.assistantWrap}>
                         <MurmurMark size={28} variant="sage" rounded />
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                          <div style={{ fontSize: 14, color: colors.ink2 }}>{t(m.kind === 'busy' ? 'ask.busy' : 'ask.error', locale)}</div>
+                          <div style={{ fontSize: 14, color: colors.ink2 }}>
+                            {t(m.kind === 'busy' ? 'ask.busy' : 'ask.error', locale)}
+                          </div>
                           <button
                             type="button"
                             onClick={() => {
@@ -539,7 +669,12 @@ export default function AskMurmurPage() {
                     <div key={m.id} style={styles.assistantWrap}>
                       <MurmurMark size={28} variant="sage" rounded />
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <AskReplyBody reply={m.reply} locale={locale} currency={currency} onAction={performAction} />
+                        <AskReplyBody
+                          reply={m.reply}
+                          locale={locale}
+                          currency={currency}
+                          onAction={performAction}
+                        />
                       </div>
                     </div>
                   )
@@ -559,18 +694,38 @@ export default function AskMurmurPage() {
             <input
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
-              placeholder={listening ? 'Listening…' : t(showEntry ? 'ask.composer_placeholder' : 'ask.followup_placeholder', locale)}
+              placeholder={
+                listening
+                  ? 'Listening…'
+                  : t(showEntry ? 'ask.composer_placeholder' : 'ask.followup_placeholder', locale)
+              }
               style={styles.composerInput}
               disabled={anyPending}
               maxLength={1000}
               autoFocus
             />
             {micSupported && (
-              <button type="button" onClick={toggleMic} disabled={anyPending} style={{ ...styles.micBtn, background: listening ? colors.accentSoft : 'transparent', borderColor: listening ? colors.accent : colors.line }} title={listening ? 'Stop dictation' : 'Speak your question'} aria-pressed={listening}>
+              <button
+                type="button"
+                onClick={toggleMic}
+                disabled={anyPending}
+                style={{
+                  ...styles.micBtn,
+                  background: listening ? colors.accentSoft : 'transparent',
+                  borderColor: listening ? colors.accent : colors.line,
+                }}
+                title={listening ? 'Stop dictation' : 'Speak your question'}
+                aria-pressed={listening}
+              >
                 <Icon.mic color={listening ? colors.accent : colors.ink3} size={16} />
               </button>
             )}
-            <button type="submit" disabled={anyPending || !draft.trim()} style={{ ...styles.sendBtn, opacity: anyPending || !draft.trim() ? 0.5 : 1 }} aria-label={t('ask.send_label', locale)}>
+            <button
+              type="submit"
+              disabled={anyPending || !draft.trim()}
+              style={{ ...styles.sendBtn, opacity: anyPending || !draft.trim() ? 0.5 : 1 }}
+              aria-label={t('ask.send_label', locale)}
+            >
               <Icon.send color="#fff" size={14} />
             </button>
           </form>
@@ -605,17 +760,47 @@ function EntryState({
     <div style={{ maxWidth: 760 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18 }}>
         <MurmurMark size={40} variant="cream" rounded />
-        <div style={{ fontFamily: font.serif, fontSize: 22, color: colors.ink, fontWeight: 500, letterSpacing: -0.4, lineHeight: 1.3 }}>{t('ask.entry_lead', locale)}</div>
+        <div
+          style={{
+            fontFamily: font.serif,
+            fontSize: 22,
+            color: colors.ink,
+            fontWeight: 500,
+            letterSpacing: -0.4,
+            lineHeight: 1.3,
+          }}
+        >
+          {t('ask.entry_lead', locale)}
+        </div>
       </div>
       {continueCandidate && (
-        <button type="button" onClick={() => onContinue(continueCandidate.id)} style={styles.continueCard}>
+        <button
+          type="button"
+          onClick={() => onContinue(continueCandidate.id)}
+          style={styles.continueCard}
+        >
           <span style={styles.continueIcon}>
             <Icon.sparkle color={colors.accent} size={14} />
           </span>
           <span style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
             <span style={styles.kindEyebrow}>{t('ask.continue_eyebrow', locale)}</span>
-            <span style={{ display: 'block', fontSize: 14, fontWeight: 600, color: colors.ink, marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{continueCandidate.title ?? '…'}</span>
-            <span style={{ display: 'block', fontSize: 12, color: colors.ink4, marginTop: 1 }}>{formatWhen(continueCandidate.last_message_at, locale)}</span>
+            <span
+              style={{
+                display: 'block',
+                fontSize: 14,
+                fontWeight: 600,
+                color: colors.ink,
+                marginTop: 2,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}
+            >
+              {continueCandidate.title ?? '…'}
+            </span>
+            <span style={{ display: 'block', fontSize: 12, color: colors.ink4, marginTop: 1 }}>
+              {formatWhen(continueCandidate.last_message_at, locale)}
+            </span>
           </span>
           <Icon.chev color={colors.ink4} size={12} />
         </button>
@@ -623,13 +808,24 @@ function EntryState({
       <div style={styles.eyebrow}>{t('ask.today_eyebrow', locale)}</div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {insights.map((ins) => (
-          <InsightCard key={ins.id} insight={ins} locale={locale} onAsk={() => onAskInsight(ins)} onAction={onInsightAction} />
+          <InsightCard
+            key={ins.id}
+            insight={ins}
+            locale={locale}
+            onAsk={() => onAskInsight(ins)}
+            onAction={onInsightAction}
+          />
         ))}
       </div>
       <div style={{ ...styles.eyebrow, marginTop: 22 }}>{t('ask.intent_eyebrow', locale)}</div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
         {intents.map((it) => (
-          <button key={it.id} type="button" onClick={() => onIntent(it.question)} style={styles.intentChip}>
+          <button
+            key={it.id}
+            type="button"
+            onClick={() => onIntent(it.question)}
+            style={styles.intentChip}
+          >
             {it.label}
           </button>
         ))}
@@ -661,7 +857,17 @@ function KindIcon({ kind, color }: { kind: AskInsightKind; color: string }) {
 
 /** An insight = a finding + one decision. Restrained: an icon tile and a
  *  kind eyebrow carry the tone — no coloured stripes (owner review). */
-function InsightCard({ insight, locale, onAsk, onAction }: { insight: AskInsight; locale: Locale; onAsk: () => void; onAction: (a: AskAction) => void }) {
+function InsightCard({
+  insight,
+  locale,
+  onAsk,
+  onAction,
+}: {
+  insight: AskInsight
+  locale: Locale
+  onAsk: () => void
+  onAction: (a: AskAction) => void
+}) {
   const tone =
     insight.tone === 'alert'
       ? { fg: '#B44A3F', bg: '#F3DAD4' }
@@ -678,19 +884,40 @@ function InsightCard({ insight, locale, onAsk, onAction }: { insight: AskInsight
             <KindIcon kind={insight.kind} color={tone.fg} />
           </span>
           <div style={{ minWidth: 0, flex: 1 }}>
-            <div style={{ ...styles.kindEyebrow, color: tone.fg }}>{t(`ask.kind_${insight.kind}`, locale)}</div>
-            <div style={{ fontFamily: font.serif, fontSize: 17, color: colors.ink, letterSpacing: -0.2, lineHeight: 1.3, marginTop: 3 }}>{insight.title}</div>
-            <div style={{ fontSize: 13.5, color: colors.ink3, marginTop: 4, lineHeight: 1.4 }}>{insight.detail}</div>
+            <div style={{ ...styles.kindEyebrow, color: tone.fg }}>
+              {t(`ask.kind_${insight.kind}`, locale)}
+            </div>
+            <div
+              style={{
+                fontFamily: font.serif,
+                fontSize: 17,
+                color: colors.ink,
+                letterSpacing: -0.2,
+                lineHeight: 1.3,
+                marginTop: 3,
+              }}
+            >
+              {insight.title}
+            </div>
+            <div style={{ fontSize: 13.5, color: colors.ink3, marginTop: 4, lineHeight: 1.4 }}>
+              {insight.detail}
+            </div>
           </div>
         </div>
       </button>
       <div style={styles.insightFooter}>
         <button type="button" onClick={onAsk} style={styles.insightAskBtn}>
           <MurmurMark size={14} variant="sage" rounded />
-          <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{insight.question}</span>
+          <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {insight.question}
+          </span>
         </button>
         {insight.action && (
-          <button type="button" onClick={() => onAction(insight.action as AskAction)} style={styles.insightAction}>
+          <button
+            type="button"
+            onClick={() => onAction(insight.action as AskAction)}
+            style={styles.insightAction}
+          >
             {askActionLabel(insight.action, locale)}
           </button>
         )}
@@ -701,7 +928,12 @@ function InsightCard({ insight, locale, onAsk, onAction }: { insight: AskInsight
 
 function formatWhen(iso: string, locale: string): string {
   try {
-    return new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(iso))
+    return new Intl.DateTimeFormat(locale, {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(new Date(iso))
   } catch {
     return iso.slice(0, 16)
   }
@@ -710,36 +942,268 @@ function formatWhen(iso: string, locale: string): string {
 // ─── Styles ────────────────────────────────────────────────────────────────
 
 const styles: Record<string, CSSProperties> = {
-  body: { display: 'grid', gridTemplateColumns: '240px minmax(0, 1fr)', flex: 1, minHeight: 0, gap: 0 },
-  rail: { borderRight: `0.5px solid ${colors.line}`, padding: '16px 12px', display: 'flex', flexDirection: 'column', gap: 10, minHeight: 0, background: colors.bg },
-  railNew: { display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px', borderRadius: radius.lg, border: 'none', background: colors.ink, color: '#fff', fontSize: 13, fontWeight: 600, fontFamily: font.sans, cursor: 'pointer' },
-  railEyebrow: { fontSize: 11, fontWeight: 700, color: colors.ink3, letterSpacing: 0.6, textTransform: 'uppercase', fontFamily: font.sans, marginTop: 8, padding: '0 4px' },
+  body: {
+    display: 'grid',
+    gridTemplateColumns: '240px minmax(0, 1fr)',
+    flex: 1,
+    minHeight: 0,
+    gap: 0,
+  },
+  rail: {
+    borderRight: `0.5px solid ${colors.line}`,
+    padding: '16px 12px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 10,
+    minHeight: 0,
+    background: colors.bg,
+  },
+  railNew: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    padding: '9px 12px',
+    borderRadius: radius.lg,
+    border: 'none',
+    background: colors.ink,
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: 600,
+    fontFamily: font.sans,
+    cursor: 'pointer',
+  },
+  railEyebrow: {
+    fontSize: 11,
+    fontWeight: 700,
+    color: colors.ink3,
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+    fontFamily: font.sans,
+    marginTop: 8,
+    padding: '0 4px',
+  },
   railEmpty: { fontSize: 13, color: colors.ink4, padding: '4px' },
   railItem: { display: 'flex', alignItems: 'center', borderRadius: radius.md },
-  railItemMain: { flex: 1, minWidth: 0, textAlign: 'left', padding: '8px 10px', border: 'none', background: 'transparent', cursor: 'pointer', fontFamily: font.sans },
-  railTitle: { fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
+  railItemMain: {
+    flex: 1,
+    minWidth: 0,
+    textAlign: 'left',
+    padding: '8px 10px',
+    border: 'none',
+    background: 'transparent',
+    cursor: 'pointer',
+    fontFamily: font.sans,
+  },
+  railTitle: {
+    fontSize: 13,
+    fontWeight: 600,
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+  },
   railMeta: { fontSize: 11, color: colors.ink4, marginTop: 2 },
-  railDelete: { border: 'none', background: 'transparent', color: colors.ink4, fontSize: 16, cursor: 'pointer', padding: '4px 8px' },
+  railDelete: {
+    border: 'none',
+    background: 'transparent',
+    color: colors.ink4,
+    fontSize: 16,
+    cursor: 'pointer',
+    padding: '4px 8px',
+  },
   main: { display: 'flex', flexDirection: 'column', minHeight: 0, minWidth: 0 },
   thread: { flex: 1, overflowY: 'auto', padding: '20px 24px' },
-  eyebrow: { fontSize: 11, fontWeight: 700, color: colors.ink3, letterSpacing: 0.6, textTransform: 'uppercase', fontFamily: font.sans, marginBottom: 10 },
-  insightCard: { display: 'flex', flexDirection: 'column', background: colors.card, border: `0.5px solid ${colors.line}`, borderRadius: radius.xl, overflow: 'hidden' },
-  insightMain: { width: '100%', minWidth: 0, textAlign: 'left', padding: '14px 14px 10px', border: 'none', background: 'transparent', cursor: 'pointer', fontFamily: font.sans },
-  insightIcon: { width: 36, height: 36, borderRadius: 11, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  kindEyebrow: { display: 'block', fontSize: 10.5, fontWeight: 700, letterSpacing: 0.7, textTransform: 'uppercase', color: colors.ink3, fontFamily: font.sans },
-  insightFooter: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '10px 14px 12px', borderTop: `0.5px solid ${colors.line}` },
-  insightAskBtn: { display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, flex: 1, border: 'none', background: 'transparent', padding: 0, cursor: 'pointer', fontSize: 12.5, color: colors.ink3, fontFamily: font.sans, textAlign: 'left' },
-  insightAction: { padding: '6px 10px', borderRadius: 999, border: 'none', background: colors.accentSoft, color: colors.accent, fontSize: 12, fontWeight: 700, fontFamily: font.sans, cursor: 'pointer', whiteSpace: 'nowrap' },
-  continueCard: { display: 'flex', alignItems: 'center', gap: 12, width: '100%', background: colors.card, border: `0.5px solid ${colors.line}`, borderRadius: radius.xl, padding: '12px 14px', marginBottom: 18, cursor: 'pointer', fontFamily: font.sans },
-  continueIcon: { width: 32, height: 32, borderRadius: 10, background: colors.accentSoft, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  intentChip: { padding: '9px 14px', borderRadius: 999, border: `0.5px solid rgba(40,36,28,0.16)`, background: colors.card, color: colors.ink, fontSize: 13.5, fontFamily: font.sans, cursor: 'pointer' },
-  userBubble: { alignSelf: 'flex-end', maxWidth: '78%', background: colors.ink, color: '#fff', padding: '10px 14px', borderRadius: 18, borderBottomRightRadius: 6, fontSize: 14.5, lineHeight: 1.45, fontFamily: font.sans },
+  eyebrow: {
+    fontSize: 11,
+    fontWeight: 700,
+    color: colors.ink3,
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+    fontFamily: font.sans,
+    marginBottom: 10,
+  },
+  insightCard: {
+    display: 'flex',
+    flexDirection: 'column',
+    background: colors.card,
+    border: `0.5px solid ${colors.line}`,
+    borderRadius: radius.xl,
+    overflow: 'hidden',
+  },
+  insightMain: {
+    width: '100%',
+    minWidth: 0,
+    textAlign: 'left',
+    padding: '14px 14px 10px',
+    border: 'none',
+    background: 'transparent',
+    cursor: 'pointer',
+    fontFamily: font.sans,
+  },
+  insightIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 11,
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  kindEyebrow: {
+    display: 'block',
+    fontSize: 10.5,
+    fontWeight: 700,
+    letterSpacing: 0.7,
+    textTransform: 'uppercase',
+    color: colors.ink3,
+    fontFamily: font.sans,
+  },
+  insightFooter: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    padding: '10px 14px 12px',
+    borderTop: `0.5px solid ${colors.line}`,
+  },
+  insightAskBtn: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    minWidth: 0,
+    flex: 1,
+    border: 'none',
+    background: 'transparent',
+    padding: 0,
+    cursor: 'pointer',
+    fontSize: 12.5,
+    color: colors.ink3,
+    fontFamily: font.sans,
+    textAlign: 'left',
+  },
+  insightAction: {
+    padding: '6px 10px',
+    borderRadius: 999,
+    border: 'none',
+    background: colors.accentSoft,
+    color: colors.accent,
+    fontSize: 12,
+    fontWeight: 700,
+    fontFamily: font.sans,
+    cursor: 'pointer',
+    whiteSpace: 'nowrap',
+  },
+  continueCard: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 12,
+    width: '100%',
+    background: colors.card,
+    border: `0.5px solid ${colors.line}`,
+    borderRadius: radius.xl,
+    padding: '12px 14px',
+    marginBottom: 18,
+    cursor: 'pointer',
+    fontFamily: font.sans,
+  },
+  continueIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    background: colors.accentSoft,
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  intentChip: {
+    padding: '9px 14px',
+    borderRadius: 999,
+    border: `0.5px solid rgba(40,36,28,0.16)`,
+    background: colors.card,
+    color: colors.ink,
+    fontSize: 13.5,
+    fontFamily: font.sans,
+    cursor: 'pointer',
+  },
+  userBubble: {
+    alignSelf: 'flex-end',
+    maxWidth: '78%',
+    background: colors.ink,
+    color: '#fff',
+    padding: '10px 14px',
+    borderRadius: 18,
+    borderBottomRightRadius: 6,
+    fontSize: 14.5,
+    lineHeight: 1.45,
+    fontFamily: font.sans,
+  },
   assistantWrap: { display: 'flex', gap: 12, alignItems: 'flex-start' },
   thinking: { fontFamily: font.sans, fontSize: 13, color: colors.ink3, padding: '6px 0' },
-  retryPill: { alignSelf: 'flex-start', padding: '7px 12px', borderRadius: 999, border: 'none', background: colors.ink, color: '#fff', fontSize: 13, fontWeight: 600, fontFamily: font.sans, cursor: 'pointer' },
-  composer: { display: 'flex', alignItems: 'center', gap: 8, padding: '12px 24px 16px', borderTop: `0.5px solid ${colors.line}`, background: colors.bg },
-  composerInput: { flex: 1, height: 44, borderRadius: 22, padding: '0 16px', border: `0.5px solid rgba(40,36,28,0.16)`, background: colors.card, fontSize: 14.5, fontFamily: font.sans, color: colors.ink, outline: 'none' },
-  micBtn: { width: 40, height: 40, borderRadius: 20, border: `0.5px solid ${colors.line}`, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' },
-  sendBtn: { width: 44, height: 44, borderRadius: 22, border: 'none', background: colors.ink, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' },
-  newBtn: { display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 10px', borderRadius: 999, border: `0.5px solid ${colors.line}`, background: colors.card, color: colors.ink2, fontSize: 12.5, fontWeight: 600, fontFamily: font.sans, cursor: 'pointer' },
+  retryPill: {
+    alignSelf: 'flex-start',
+    padding: '7px 12px',
+    borderRadius: 999,
+    border: 'none',
+    background: colors.ink,
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: 600,
+    fontFamily: font.sans,
+    cursor: 'pointer',
+  },
+  composer: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    padding: '12px 24px 16px',
+    borderTop: `0.5px solid ${colors.line}`,
+    background: colors.bg,
+  },
+  composerInput: {
+    flex: 1,
+    height: 44,
+    borderRadius: 22,
+    padding: '0 16px',
+    border: `0.5px solid rgba(40,36,28,0.16)`,
+    background: colors.card,
+    fontSize: 14.5,
+    fontFamily: font.sans,
+    color: colors.ink,
+    outline: 'none',
+  },
+  micBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    border: `0.5px solid ${colors.line}`,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    cursor: 'pointer',
+  },
+  sendBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    border: 'none',
+    background: colors.ink,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    cursor: 'pointer',
+  },
+  newBtn: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 6,
+    padding: '6px 10px',
+    borderRadius: 999,
+    border: `0.5px solid ${colors.line}`,
+    background: colors.card,
+    color: colors.ink2,
+    fontSize: 12.5,
+    fontWeight: 600,
+    fontFamily: font.sans,
+    cursor: 'pointer',
+  },
 }

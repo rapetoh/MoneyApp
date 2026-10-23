@@ -66,8 +66,14 @@ vi.mock('react-native', () => {
           this._value = v
         }
       },
-      timing: () => ({ start: (cb?: (r: { finished: boolean }) => void) => cb?.({ finished: true }), stop: () => {} }),
-      parallel: () => ({ start: (cb?: (r: { finished: boolean }) => void) => cb?.({ finished: true }), stop: () => {} }),
+      timing: () => ({
+        start: (cb?: (r: { finished: boolean }) => void) => cb?.({ finished: true }),
+        stop: () => {},
+      }),
+      parallel: () => ({
+        start: (cb?: (r: { finished: boolean }) => void) => cb?.({ finished: true }),
+        stop: () => {},
+      }),
       add: (a: unknown) => a,
       multiply: (a: unknown) => a,
       View: passthrough('Animated.View'),
@@ -96,7 +102,9 @@ vi.mock('react-native-safe-area-context', () => ({
 }))
 
 const { Modal } = (await import('react-native')) as unknown as { Modal: React.ComponentType<any> }
-const { Pressable } = (await import('react-native')) as unknown as { Pressable: React.ComponentType<any> }
+const { Pressable } = (await import('react-native')) as unknown as {
+  Pressable: React.ComponentType<any>
+}
 const { BottomSheet } = await import('../BottomSheet')
 
 /** Mirrors how every real call site owns `visible` — BottomSheet itself

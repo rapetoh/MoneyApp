@@ -15,11 +15,10 @@ export default function TermsPage() {
   return (
     <LegalPage title="Terms of Use" updated="August 16, 2026">
       <p>
-        These terms govern your use of Murmur, the iPhone app, the desktop app and the web
-        dashboard (the &quot;Service&quot;), provided by the developer named on Murmur&apos;s App
-        Store listing (&quot;Murmur&quot;, &quot;we&quot;, &quot;us&quot;). By creating an account
-        or using the Service you agree to them. If you don&apos;t agree, please don&apos;t use
-        Murmur.
+        These terms govern your use of Murmur, the iPhone app, the desktop app and the web dashboard
+        (the &quot;Service&quot;), provided by the developer named on Murmur&apos;s App Store
+        listing (&quot;Murmur&quot;, &quot;we&quot;, &quot;us&quot;). By creating an account or
+        using the Service you agree to them. If you don&apos;t agree, please don&apos;t use Murmur.
       </p>
 
       <h2>1. What Murmur is</h2>
@@ -103,8 +102,8 @@ export default function TermsPage() {
       <p>
         You own what you record. Our <a href="/privacy">Privacy Policy</a> explains what we collect
         and how it is handled. You can export or permanently delete your data from Settings at any
-        time. If you delete your account, your data is gone, including any active Plus benefits
-        tied to it.
+        time. If you delete your account, your data is gone, including any active Plus benefits tied
+        to it.
       </p>
 
       <h2>6. Acceptable use</h2>

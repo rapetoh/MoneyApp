@@ -48,7 +48,13 @@ function splitMonthKey(key: string): { y: number; m: number } {
  *  `timeZone` option, never a `Date` getter (fix-plan 1.3). Day 15 is an
  *  arbitrary mid-month anchor so the resolved instant can never cross
  *  into an adjacent month across a DST transition. */
-function monthLabel(y: number, m: number, tz: string, locale: string, opts: Intl.DateTimeFormatOptions): string {
+function monthLabel(
+  y: number,
+  m: number,
+  tz: string,
+  locale: string,
+  opts: Intl.DateTimeFormatOptions,
+): string {
   const instant = civilDateTimeToInstant(y, m, 15, 12, 0, 0, tz)
   return new Date(instant).toLocaleDateString(locale, { ...opts, timeZone: tz })
 }
@@ -72,7 +78,12 @@ function totalsByMonth(txns: Transaction[], tz: string): Record<string, number> 
 /** Daily debits for the civil month `monthKey`, in `tz`. `dayOf[n]` =
  *  total spent on day `n` (1..daysInMonth); day 0 unused, keeping the
  *  index honest. */
-function dailyTotals(txns: Transaction[], monthKey: string, tz: string, daysInMonth: number): number[] {
+function dailyTotals(
+  txns: Transaction[],
+  monthKey: string,
+  tz: string,
+  daysInMonth: number,
+): number[] {
   const dayOf: number[] = new Array(daysInMonth + 1).fill(0)
   for (const tx of txns) {
     if (tx.is_deleted || tx.direction !== 'debit') continue
@@ -150,20 +161,22 @@ export function HistoryHeatmap({ transactions, locale, currencyCode, tz }: Props
   const months = useMemo(() => {
     const keys = new Set(Object.keys(monthTotals))
     keys.add(currentMonthKey)
-    return Array.from(keys)
-      .map((k) => {
-        const { y, m } = splitMonthKey(k)
-        return {
-          key: k,
-          y,
-          m,
-          total: monthTotals[k] ?? 0,
-          current: k === currentMonthKey,
-        }
-      })
-      // Keys are `YYYY-MM` — lexicographic order is chronological order,
-      // no `Date#getTime()` needed to sort them newest-first.
-      .sort((a, b) => (a.key < b.key ? 1 : a.key > b.key ? -1 : 0))
+    return (
+      Array.from(keys)
+        .map((k) => {
+          const { y, m } = splitMonthKey(k)
+          return {
+            key: k,
+            y,
+            m,
+            total: monthTotals[k] ?? 0,
+            current: k === currentMonthKey,
+          }
+        })
+        // Keys are `YYYY-MM` — lexicographic order is chronological order,
+        // no `Date#getTime()` needed to sort them newest-first.
+        .sort((a, b) => (a.key < b.key ? 1 : a.key > b.key ? -1 : 0))
+    )
   }, [monthTotals, currentMonthKey])
 
   const daysInMonth = useMemo(() => daysInMonthOf(heatmapMonthKey, tz), [heatmapMonthKey, tz])
@@ -261,13 +274,20 @@ export function HistoryHeatmap({ transactions, locale, currencyCode, tz }: Props
                   size={18}
                   color={
                     canGoNext
-                      ? Colors.ink2 ?? Colors.textSecondary
-                      : Colors.ink4 ?? Colors.textMuted
+                      ? (Colors.ink2 ?? Colors.textSecondary)
+                      : (Colors.ink4 ?? Colors.textMuted)
                   }
                 />
               </Pressable>
             </View>
-            <Money value={heatmapTotal} size={16} serif={false} sansWeight="700" currencyCode={currencyCode} locale={locale} />
+            <Money
+              value={heatmapTotal}
+              size={16}
+              serif={false}
+              sansWeight="700"
+              currencyCode={currencyCode}
+              locale={locale}
+            />
           </View>
 
           {/* Shared `onLayout` measurement (fix-plan 2.4) — the header row
@@ -285,7 +305,12 @@ export function HistoryHeatmap({ transactions, locale, currencyCode, tz }: Props
             <View style={styles.grid}>
               {gridCells.map((cell, i) => {
                 if (!cell) {
-                  return <View key={`x${i}`} style={[styles.cellEmpty, { width: cellSize, height: cellSize }]} />
+                  return (
+                    <View
+                      key={`x${i}`}
+                      style={[styles.cellEmpty, { width: cellSize, height: cellSize }]}
+                    />
+                  )
                 }
                 const isToday = isCurrentMonth && cell.day === nowParts.d
                 const intensity =
@@ -293,7 +318,7 @@ export function HistoryHeatmap({ transactions, locale, currencyCode, tz }: Props
                 const bg =
                   cell.amount > 0
                     ? `rgba(63,90,62,${intensity.toFixed(2)})`
-                    : Colors.surface2 ?? '#F5F2EB'
+                    : (Colors.surface2 ?? '#F5F2EB')
                 const textLight = cell.amount > 0 && intensity > 0.5
                 return (
                   <View
@@ -308,9 +333,7 @@ export function HistoryHeatmap({ transactions, locale, currencyCode, tz }: Props
                       style={[
                         styles.cellText,
                         {
-                          color: textLight
-                            ? '#FFFFFF'
-                            : Colors.ink3 ?? Colors.textSecondary,
+                          color: textLight ? '#FFFFFF' : (Colors.ink3 ?? Colors.textSecondary),
                         },
                       ]}
                     >
@@ -353,13 +376,18 @@ export function HistoryHeatmap({ transactions, locale, currencyCode, tz }: Props
                       })}
                     </Text>
                     {m.current && (
-                      <Text style={styles.monthInProgress}>
-                        {t('history.in_progress', locale)}
-                      </Text>
+                      <Text style={styles.monthInProgress}>{t('history.in_progress', locale)}</Text>
                     )}
                   </View>
                   <View style={styles.monthRowRight}>
-                    <Money value={m.total} size={14} serif={false} sansWeight="600" currencyCode={currencyCode} locale={locale} />
+                    <Money
+                      value={m.total}
+                      size={14}
+                      serif={false}
+                      sansWeight="600"
+                      currencyCode={currencyCode}
+                      locale={locale}
+                    />
                     <Ionicons
                       name="chevron-forward"
                       size={16}

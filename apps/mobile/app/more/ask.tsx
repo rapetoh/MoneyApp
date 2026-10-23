@@ -43,7 +43,12 @@ import {
   FREE_ASK_QUESTIONS_PER_MONTH,
 } from '@voice-expense/shared'
 import type { AskAction, AskInsight, AskReply } from '@voice-expense/shared'
-import { AskTurnError, buildAskData, buildAskTurnRequest, postAskTurn } from '../../src/services/askMurmurClient'
+import {
+  AskTurnError,
+  buildAskData,
+  buildAskTurnRequest,
+  postAskTurn,
+} from '../../src/services/askMurmurClient'
 import { AskInsightCard, performAskAction } from '../../src/components/AskInsightCard'
 import { goBack } from '../../src/services/goBack'
 
@@ -118,7 +123,17 @@ export default function AskMurmurScreen() {
       budget,
       budgetStatus,
     }),
-    [locale, currency, profile?.monthly_income, profile?.timezone, transactions, recurringRules, categories, budget, budgetStatus],
+    [
+      locale,
+      currency,
+      profile?.monthly_income,
+      profile?.timezone,
+      transactions,
+      recurringRules,
+      categories,
+      budget,
+      budgetStatus,
+    ],
   )
   const dataRef = useRef(dataArgs)
   dataRef.current = dataArgs
@@ -208,7 +223,8 @@ export default function AskMurmurScreen() {
       setMessages((prev) =>
         prev.map((m) => {
           if (m.id === userMsgId && res.user_message_id) return { ...m, id: res.user_message_id }
-          if (m.id === pendingId) return { id: res.message.id ?? pendingId, role: 'assistant', reply: res.message.reply }
+          if (m.id === pendingId)
+            return { id: res.message.id ?? pendingId, role: 'assistant', reply: res.message.reply }
           return m
         }),
       )
@@ -241,7 +257,13 @@ export default function AskMurmurScreen() {
       setMessages((prev) =>
         prev.map((m) =>
           m.id === pendingId
-            ? { id: pendingId, role: 'error', text: trimmed, seed, kind: e.kind === 'busy' ? 'busy' : 'failed' }
+            ? {
+                id: pendingId,
+                role: 'error',
+                text: trimmed,
+                seed,
+                kind: e.kind === 'busy' ? 'busy' : 'failed',
+              }
             : m,
         ),
       )
@@ -330,7 +352,11 @@ export default function AskMurmurScreen() {
             <Pressable
               onPress={startNew}
               disabled={showEntry}
-              style={({ pressed }) => [styles.iconPill, showEntry && styles.iconPillDisabled, pressed && styles.pressed]}
+              style={({ pressed }) => [
+                styles.iconPill,
+                showEntry && styles.iconPillDisabled,
+                pressed && styles.pressed,
+              ]}
               hitSlop={8}
               accessibilityLabel={t('ask.new_conversation', locale)}
             >
@@ -339,7 +365,10 @@ export default function AskMurmurScreen() {
           </View>
         </View>
 
-        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
           <ScrollView
             ref={scrollRef}
             contentContainerStyle={styles.threadContent}
@@ -381,7 +410,12 @@ export default function AskMurmurScreen() {
                 }
                 return (
                   <MurmurTurn key={m.id}>
-                    <AskReplyBody reply={m.reply} locale={locale} currency={currency} onAction={performAction} />
+                    <AskReplyBody
+                      reply={m.reply}
+                      locale={locale}
+                      currency={currency}
+                      onAction={performAction}
+                    />
                   </MurmurTurn>
                 )
               })
@@ -399,7 +433,10 @@ export default function AskMurmurScreen() {
               <Ionicons name="sparkles" size={13} color={Colors.accent} />
               <Text style={styles.quotaText}>
                 {freeAsksLeft === null
-                  ? t('ask.free_quota', locale).replace('{count}', String(FREE_ASK_QUESTIONS_PER_MONTH))
+                  ? t('ask.free_quota', locale).replace(
+                      '{count}',
+                      String(FREE_ASK_QUESTIONS_PER_MONTH),
+                    )
                   : freeAsksLeft <= 0
                     ? t('ask.free_quota_none', locale)
                     : freeAsksLeft === 1
@@ -416,7 +453,10 @@ export default function AskMurmurScreen() {
               <TextInput
                 value={draft}
                 onChangeText={setDraft}
-                placeholder={t(showEntry ? 'ask.composer_placeholder' : 'ask.followup_placeholder', locale)}
+                placeholder={t(
+                  showEntry ? 'ask.composer_placeholder' : 'ask.followup_placeholder',
+                  locale,
+                )}
                 placeholderTextColor={Colors.ink4}
                 style={styles.input}
                 returnKeyType="send"
@@ -429,7 +469,11 @@ export default function AskMurmurScreen() {
               <Pressable
                 onPress={() => send(draft)}
                 disabled={!canSend}
-                style={({ pressed }) => [styles.sendBtn, !canSend && styles.sendBtnDisabled, pressed && styles.pressed]}
+                style={({ pressed }) => [
+                  styles.sendBtn,
+                  !canSend && styles.sendBtnDisabled,
+                  pressed && styles.pressed,
+                ]}
                 accessibilityRole="button"
                 accessibilityLabel={t('ask.send_label', locale)}
               >
@@ -460,7 +504,10 @@ export default function AskMurmurScreen() {
             <Text style={styles.historyEmpty}>{t('ask.history_empty', locale)}</Text>
           ) : (
             history.map((c) => (
-              <View key={c.id} style={[styles.historyRow, c.id === conversationId && styles.historyRowActive]}>
+              <View
+                key={c.id}
+                style={[styles.historyRow, c.id === conversationId && styles.historyRowActive]}
+              >
                 <Pressable style={styles.historyMain} onPress={() => openConversation(c.id)}>
                   <Text style={styles.historyTitle} numberOfLines={1}>
                     {c.title ?? '…'}
@@ -494,10 +541,21 @@ export default function AskMurmurScreen() {
       const { data: sessionData } = await supabase.auth.getSession()
       const authToken = sessionData.session?.access_token
       if (!authToken) throw new AskTurnError('unauthorized', 401)
-      const request = buildAskTurnRequest({ conversationId: conversationIdRef.current, message: text, seedInsight: seed, data: dataRef.current })
+      const request = buildAskTurnRequest({
+        conversationId: conversationIdRef.current,
+        message: text,
+        seedInsight: seed,
+        data: dataRef.current,
+      })
       const res = await postAskTurn({ apiBaseUrl, authToken, request })
       if (res.conversation_id) setConversationId(res.conversation_id)
-      setMessages((prev) => prev.map((m) => (m.id === pendingId ? { id: res.message.id ?? pendingId, role: 'assistant', reply: res.message.reply } : m)))
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === pendingId
+            ? { id: res.message.id ?? pendingId, role: 'assistant', reply: res.message.reply }
+            : m,
+        ),
+      )
       setHistory(null)
       scrollToEnd()
     } catch (err) {
@@ -507,7 +565,19 @@ export default function AskMurmurScreen() {
         router.push('/more/paywall')
         return
       }
-      setMessages((prev) => prev.map((m) => (m.id === pendingId ? { id: pendingId, role: 'error', text, seed, kind: e.kind === 'busy' ? 'busy' : 'failed' } : m)))
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === pendingId
+            ? {
+                id: pendingId,
+                role: 'error',
+                text,
+                seed,
+                kind: e.kind === 'busy' ? 'busy' : 'failed',
+              }
+            : m,
+        ),
+      )
     }
   }
 }
@@ -555,7 +625,9 @@ function EntryState({
             <Text style={styles.continueTitle} numberOfLines={1}>
               {continueCandidate.title ?? '…'}
             </Text>
-            <Text style={styles.continueMeta}>{formatWhen(continueCandidate.last_message_at, locale)}</Text>
+            <Text style={styles.continueMeta}>
+              {formatWhen(continueCandidate.last_message_at, locale)}
+            </Text>
           </View>
           <Ionicons name="chevron-forward" size={16} color={Colors.ink4} />
         </Pressable>
@@ -563,13 +635,25 @@ function EntryState({
       <Text style={styles.sectionEyebrow}>{t('ask.today_eyebrow', locale)}</Text>
       <View style={styles.insightList}>
         {insights.map((ins) => (
-          <AskInsightCard key={ins.id} insight={ins} locale={locale} onAsk={() => onAskInsight(ins)} onAction={onInsightAction} />
+          <AskInsightCard
+            key={ins.id}
+            insight={ins}
+            locale={locale}
+            onAsk={() => onAskInsight(ins)}
+            onAction={onInsightAction}
+          />
         ))}
       </View>
-      <Text style={[styles.sectionEyebrow, { marginTop: 22 }]}>{t('ask.intent_eyebrow', locale)}</Text>
+      <Text style={[styles.sectionEyebrow, { marginTop: 22 }]}>
+        {t('ask.intent_eyebrow', locale)}
+      </Text>
       <View style={styles.intentRow}>
         {intents.map((it) => (
-          <Pressable key={it.id} onPress={() => onIntent(it.question)} style={({ pressed }) => [styles.intentChip, pressed && styles.pressed]}>
+          <Pressable
+            key={it.id}
+            onPress={() => onIntent(it.question)}
+            style={({ pressed }) => [styles.intentChip, pressed && styles.pressed]}
+          >
             <Text style={styles.intentText}>{it.label}</Text>
           </Pressable>
         ))}
@@ -592,7 +676,13 @@ function UserBubble({ text }: { text: string }) {
   )
 }
 
-function MurmurTurn({ children, animating = false }: { children: React.ReactNode; animating?: boolean }) {
+function MurmurTurn({
+  children,
+  animating = false,
+}: {
+  children: React.ReactNode
+  animating?: boolean
+}) {
   return (
     <View style={styles.murmurRow}>
       <BreathingMark animating={animating} />
@@ -612,8 +702,18 @@ function BreathingMark({ animating }: { animating: boolean }) {
     }
     const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(scale, { toValue: 1.12, duration: 1300, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-        Animated.timing(scale, { toValue: 1, duration: 1300, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(scale, {
+          toValue: 1.12,
+          duration: 1300,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(scale, {
+          toValue: 1,
+          duration: 1300,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
       ]),
     )
     loop.start()
@@ -636,12 +736,25 @@ function ThinkingTurn({ locale }: { locale: Locale }) {
   )
 }
 
-function ErrorTurn({ locale, kind, onRetry }: { locale: Locale; kind: 'busy' | 'failed'; onRetry: () => void }) {
+function ErrorTurn({
+  locale,
+  kind,
+  onRetry,
+}: {
+  locale: Locale
+  kind: 'busy' | 'failed'
+  onRetry: () => void
+}) {
   return (
     <MurmurTurn>
       <View style={styles.thinkingCard}>
-        <Text style={styles.errorText}>{t(kind === 'busy' ? 'ask.busy' : 'ask.error', locale)}</Text>
-        <Pressable onPress={onRetry} style={({ pressed }) => [styles.retryBtn, pressed && styles.pressed]}>
+        <Text style={styles.errorText}>
+          {t(kind === 'busy' ? 'ask.busy' : 'ask.error', locale)}
+        </Text>
+        <Pressable
+          onPress={onRetry}
+          style={({ pressed }) => [styles.retryBtn, pressed && styles.pressed]}
+        >
           <Ionicons name="refresh" size={14} color="#FFFFFF" />
           <Text style={styles.retryText}>{t('ask.retry', locale)}</Text>
         </Pressable>
@@ -652,7 +765,12 @@ function ErrorTurn({ locale, kind, onRetry }: { locale: Locale; kind: 'busy' | '
 
 function formatWhen(iso: string, locale: string): string {
   try {
-    return new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(iso))
+    return new Intl.DateTimeFormat(locale, {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(new Date(iso))
   } catch {
     return iso.slice(0, 16)
   }
@@ -670,8 +788,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 6,
   },
-  quotaText: { flex: 1, fontSize: 12.5, color: Colors.ink3, fontFamily: Typography.fontFamily.sans },
-  quotaCta: { fontSize: 12.5, color: Colors.accent, fontFamily: Typography.fontFamily.sansSemiBold, fontWeight: '700' },
+  quotaText: {
+    flex: 1,
+    fontSize: 12.5,
+    color: Colors.ink3,
+    fontFamily: Typography.fontFamily.sans,
+  },
+  quotaCta: {
+    fontSize: 12.5,
+    color: Colors.accent,
+    fontFamily: Typography.fontFamily.sansSemiBold,
+    fontWeight: '700',
+  },
   safe: { flex: 1, backgroundColor: Colors.background },
   headerRow: {
     paddingHorizontal: Spacing.lg,
@@ -694,10 +822,20 @@ const styles = StyleSheet.create({
   iconPillDisabled: { opacity: 0.4 },
   headerActions: { flexDirection: 'row', gap: 8 },
   titleWrap: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  title: { fontSize: 15, fontWeight: '700', color: Colors.ink, fontFamily: Typography.fontFamily.sansBold },
+  title: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: Colors.ink,
+    fontFamily: Typography.fontFamily.sansBold,
+  },
   pressed: { opacity: 0.6 },
 
-  threadContent: { flexGrow: 1, paddingHorizontal: Spacing.lg, paddingTop: Spacing.md, paddingBottom: Spacing.xl },
+  threadContent: {
+    flexGrow: 1,
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.md,
+    paddingBottom: Spacing.xl,
+  },
 
   // Entry
   entryHead: { paddingTop: 18, paddingBottom: 18, alignItems: 'flex-start', gap: 12 },
@@ -730,10 +868,35 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     marginBottom: 18,
   },
-  continueIcon: { width: 32, height: 32, borderRadius: 10, backgroundColor: Colors.accentSoft, alignItems: 'center', justifyContent: 'center' },
-  continueEyebrow: { fontSize: 10.5, fontWeight: '700', letterSpacing: 0.7, textTransform: 'uppercase', color: Colors.ink3, fontFamily: Typography.fontFamily.sansBold },
-  continueTitle: { fontSize: 14.5, color: Colors.ink, fontWeight: '600', marginTop: 2, fontFamily: Typography.fontFamily.sansSemiBold },
-  continueMeta: { fontSize: 12, color: Colors.ink4, marginTop: 1, fontFamily: Typography.fontFamily.sans },
+  continueIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: Colors.accentSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  continueEyebrow: {
+    fontSize: 10.5,
+    fontWeight: '700',
+    letterSpacing: 0.7,
+    textTransform: 'uppercase',
+    color: Colors.ink3,
+    fontFamily: Typography.fontFamily.sansBold,
+  },
+  continueTitle: {
+    fontSize: 14.5,
+    color: Colors.ink,
+    fontWeight: '600',
+    marginTop: 2,
+    fontFamily: Typography.fontFamily.sansSemiBold,
+  },
+  continueMeta: {
+    fontSize: 12,
+    color: Colors.ink4,
+    marginTop: 1,
+    fontFamily: Typography.fontFamily.sans,
+  },
   intentRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   intentChip: {
     paddingHorizontal: 14,
@@ -743,7 +906,12 @@ const styles = StyleSheet.create({
     borderWidth: Hairline.width,
     borderColor: 'rgba(40,36,28,0.14)',
   },
-  intentText: { fontSize: 13.5, color: Colors.ink, fontWeight: '500', fontFamily: Typography.fontFamily.sans },
+  intentText: {
+    fontSize: 13.5,
+    color: Colors.ink,
+    fontWeight: '500',
+    fontFamily: Typography.fontFamily.sans,
+  },
 
   // Thread
   userRow: { flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 14 },
@@ -755,7 +923,13 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     borderBottomRightRadius: 6,
   },
-  userText: { fontSize: 15, color: '#FFFFFF', lineHeight: 21, letterSpacing: -0.1, fontFamily: Typography.fontFamily.sans },
+  userText: {
+    fontSize: 15,
+    color: '#FFFFFF',
+    lineHeight: 21,
+    letterSpacing: -0.1,
+    fontFamily: Typography.fontFamily.sans,
+  },
   murmurRow: { flexDirection: 'row', gap: 10, marginBottom: 14 },
   murmurCol: { flex: 1 },
   thinkingCard: {
@@ -768,7 +942,12 @@ const styles = StyleSheet.create({
     borderColor: Hairline.color,
   },
   thinkingText: { fontSize: 14, color: Colors.ink3, fontFamily: Typography.fontFamily.sans },
-  errorText: { fontSize: 14.5, color: Colors.ink2, lineHeight: 21, fontFamily: Typography.fontFamily.sans },
+  errorText: {
+    fontSize: 14.5,
+    color: Colors.ink2,
+    lineHeight: 21,
+    fontFamily: Typography.fontFamily.sans,
+  },
   retryBtn: {
     alignSelf: 'flex-start',
     marginTop: 12,
@@ -780,7 +959,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
   },
-  retryText: { color: '#FFFFFF', fontSize: 13, fontWeight: '700', fontFamily: Typography.fontFamily.sansBold },
+  retryText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
+    fontFamily: Typography.fontFamily.sansBold,
+  },
 
   // Composer
   inputWrap: {
@@ -803,18 +987,59 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: Colors.ink,
   },
-  sendBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.ink, alignItems: 'center', justifyContent: 'center' },
+  sendBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: Colors.ink,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   sendBtnDisabled: { opacity: 0.35 },
-  footerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 10 },
-  footerText: { fontSize: 11.5, color: Colors.ink4, fontWeight: '500', fontFamily: Typography.fontFamily.sans },
+  footerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 10,
+  },
+  footerText: {
+    fontSize: 11.5,
+    color: Colors.ink4,
+    fontWeight: '500',
+    fontFamily: Typography.fontFamily.sans,
+  },
 
   // History sheet
   historyList: { paddingHorizontal: 4, paddingBottom: 12 },
-  historyEmpty: { padding: 20, textAlign: 'center', color: Colors.ink3, fontFamily: Typography.fontFamily.sans, fontSize: 14 },
-  historyRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 12, borderRadius: 12, gap: 10 },
+  historyEmpty: {
+    padding: 20,
+    textAlign: 'center',
+    color: Colors.ink3,
+    fontFamily: Typography.fontFamily.sans,
+    fontSize: 14,
+  },
+  historyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    gap: 10,
+  },
   historyRowActive: { backgroundColor: Colors.accentSoft },
   historyMain: { flex: 1 },
-  historyTitle: { fontSize: 15, color: Colors.ink, fontWeight: '600', fontFamily: Typography.fontFamily.sansSemiBold },
-  historyMeta: { fontSize: 12, color: Colors.ink4, marginTop: 2, fontFamily: Typography.fontFamily.sans },
+  historyTitle: {
+    fontSize: 15,
+    color: Colors.ink,
+    fontWeight: '600',
+    fontFamily: Typography.fontFamily.sansSemiBold,
+  },
+  historyMeta: {
+    fontSize: 12,
+    color: Colors.ink4,
+    marginTop: 2,
+    fontFamily: Typography.fontFamily.sans,
+  },
   historyDelete: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
 })

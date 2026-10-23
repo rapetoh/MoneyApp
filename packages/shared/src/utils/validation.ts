@@ -22,7 +22,10 @@ export const MAX_AMOUNT = 9_999_999_999.99
 
 export type AmountValidation =
   | { ok: true; amount: number }
-  | { ok: false; reason: 'empty' | 'not_a_number' | 'not_positive' | 'too_large' | 'too_many_decimals' }
+  | {
+      ok: false
+      reason: 'empty' | 'not_a_number' | 'not_positive' | 'too_large' | 'too_many_decimals'
+    }
 
 /**
  * Validates a raw amount string typed into a decimal-pad field.

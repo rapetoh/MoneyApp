@@ -13,7 +13,13 @@
  */
 import { strict as assert } from 'node:assert'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import { DatabaseSync, asSqliteDatabase, makeTempDir, openShim, type Shim } from '../../services/sync/__tests__/testDb'
+import {
+  DatabaseSync,
+  asSqliteDatabase,
+  makeTempDir,
+  openShim,
+  type Shim,
+} from '../../services/sync/__tests__/testDb'
 import { initDatabase, __setDbForTests } from '../../services/sync/localDb'
 
 const mocks = vi.hoisted(() => ({
@@ -72,7 +78,8 @@ vi.mock('expo-image', () => ({ Image: { prefetch: vi.fn(async () => true) } }))
 
 const { syncManager } = await import('../../services/sync/SyncManager')
 const { deleteTransactionAndEnqueue } = await import('../useTransactions')
-const { upsertTransaction, getTransactionById } = await import('../../services/sync/transactionStore')
+const { upsertTransaction, getTransactionById } =
+  await import('../../services/sync/transactionStore')
 const { getPendingCount } = await import('../../services/sync/syncQueue')
 
 function pgError(code: string, message: string) {
@@ -150,7 +157,7 @@ describe.skipIf(!DatabaseSync)('deleteTransactionAndEnqueue', () => {
     }
   }
 
-  it('a transaction that would be missing from any particular hook instance\'s React state is still soft-deleted and enqueued — no queue entry is dropped', async () => {
+  it("a transaction that would be missing from any particular hook instance's React state is still soft-deleted and enqueued — no queue entry is dropped", async () => {
     // Seeded straight into SQLite, exactly like a row written by a
     // different screen's `useTransactions()` instance (or one that arrived
     // via pullRemote/realtime) that this call never loaded into any

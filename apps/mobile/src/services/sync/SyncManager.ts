@@ -41,7 +41,12 @@ import { touchDeviceSynced } from './deviceRegistry'
 import { DataEvents } from '../../events/dataEvents'
 import type { SyncEntityType } from '@voice-expense/shared'
 
-const ENTITY_TYPES: readonly SyncEntityType[] = ['transaction', 'category', 'budget', 'recurring_rule']
+const ENTITY_TYPES: readonly SyncEntityType[] = [
+  'transaction',
+  'category',
+  'budget',
+  'recurring_rule',
+]
 const DRAIN_BATCH_SIZE = 10
 const PULL_PAGE_SIZE = 500
 const REALTIME_TABLES: Record<SyncEntityType, string> = {
@@ -303,7 +308,10 @@ class SyncManager {
    * `error` carries the real `last_error` on a `'rejected'` outcome, so
    * the caller can show it instead of a generic failure message.
    */
-  async awaitOutcome(entityId: string, timeoutMs = 5000): Promise<{ status: OutboxOutcome; error: string | null }> {
+  async awaitOutcome(
+    entityId: string,
+    timeoutMs = 5000,
+  ): Promise<{ status: OutboxOutcome; error: string | null }> {
     const deadline = Date.now() + timeoutMs
     this.drainQueue()
     for (;;) {

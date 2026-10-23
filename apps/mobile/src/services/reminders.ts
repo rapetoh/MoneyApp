@@ -2,7 +2,14 @@ import * as Notifications from 'expo-notifications'
 import * as SecureStore from 'expo-secure-store'
 import { Platform } from 'react-native'
 import { getCalendars } from 'expo-localization'
-import { t, localParts, localDay, addDays, civilDateTimeToInstant, type Locale } from '@voice-expense/shared'
+import {
+  t,
+  localParts,
+  localDay,
+  addDays,
+  civilDateTimeToInstant,
+  type Locale,
+} from '@voice-expense/shared'
 
 /**
  * Reminders: the evening check-in and the quiet-day nudges (first-run
@@ -42,7 +49,14 @@ const KEY_QUIET_OPTED_OUT = 'day_two_user_opted_out'
 const KEY_LEGACY_ID = 'day_two_notification_id'
 
 /** Every per-user key this module owns, for sign-out teardown (useAuth). */
-export const REMINDER_SECURE_KEYS = [KEY_IDS, KEY_LAST_LOG, KEY_CHECKIN, KEY_PRIME_DISMISSED, KEY_ASKED, KEY_QUIET_OPTED_OUT]
+export const REMINDER_SECURE_KEYS = [
+  KEY_IDS,
+  KEY_LAST_LOG,
+  KEY_CHECKIN,
+  KEY_PRIME_DISMISSED,
+  KEY_ASKED,
+  KEY_QUIET_OPTED_OUT,
+]
 
 export interface CheckIn {
   enabled: boolean
@@ -103,7 +117,11 @@ function deviceTimeZone(): string {
 /** "8:00 PM" / "20:00" for a check-in hour, in the user's language. */
 export function formatCheckInHour(hour: number, locale: Locale): string {
   const iso = `2026-01-01T${String(hour).padStart(2, '0')}:00:00Z`
-  return new Date(iso).toLocaleTimeString(locale, { hour: 'numeric', minute: '2-digit', timeZone: 'UTC' })
+  return new Date(iso).toLocaleTimeString(locale, {
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZone: 'UTC',
+  })
 }
 
 /**
@@ -128,12 +146,15 @@ export function planReminders(input: {
 
   if (checkIn?.enabled) {
     const nowIso = now.toISOString()
-    const loggedToday = lastLogAt != null && localDay(lastLogAt.toISOString(), tz) === localDay(nowIso, tz)
+    const loggedToday =
+      lastLogAt != null && localDay(lastLogAt.toISOString(), tz) === localDay(nowIso, tz)
     const today = localParts(nowIso, tz)
     const out: PlannedReminder[] = []
     for (let d = 0; d < HORIZON_DAYS; d++) {
       const day = addDays(today.y, today.m, today.d, d)
-      const at = new Date(civilDateTimeToInstant(day.y, day.m, day.d, checkIn.hour, checkIn.minute, 0, tz))
+      const at = new Date(
+        civilDateTimeToInstant(day.y, day.m, day.d, checkIn.hour, checkIn.minute, 0, tz),
+      )
       if (at.getTime() <= now.getTime()) continue
       if (d === 0 && loggedToday) continue
       out.push({ at, kind: kindAt(at) })
@@ -189,9 +210,15 @@ export async function getPermissionStatus(): Promise<'granted' | 'denied' | 'und
 export async function requestPermission(): Promise<'granted' | 'denied'> {
   await SecureStore.setItemAsync(KEY_ASKED, '1')
   const settings = await Notifications.requestPermissionsAsync({
-    ios: { allowAlert: true, allowBadge: false, allowSound: true, provideAppNotificationSettings: true },
+    ios: {
+      allowAlert: true,
+      allowBadge: false,
+      allowSound: true,
+      provideAppNotificationSettings: true,
+    },
   })
-  return settings.granted || settings.ios?.status === Notifications.IosAuthorizationStatus.PROVISIONAL
+  return settings.granted ||
+    settings.ios?.status === Notifications.IosAuthorizationStatus.PROVISIONAL
     ? 'granted'
     : 'denied'
 }
@@ -377,7 +404,10 @@ export function cancelAllReminders(): Promise<void> {
  * Turn the evening check-in on at `hour`, ask for permission if it was
  * never asked (the caller's screen is the explanation), and schedule.
  */
-export async function enableCheckIn(locale: Locale, hour: number = DEFAULT_CHECKIN.hour): Promise<'granted' | 'denied'> {
+export async function enableCheckIn(
+  locale: Locale,
+  hour: number = DEFAULT_CHECKIN.hour,
+): Promise<'granted' | 'denied'> {
   await setCheckIn({ enabled: true, hour, minute: 0 })
   let status = await getPermissionStatus()
   if (status === 'undetermined') status = await requestPermission()

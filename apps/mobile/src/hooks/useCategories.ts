@@ -75,16 +75,24 @@ export function useCategories(userId: string | undefined) {
   }
 
   async function archiveCategory(id: string) {
-    const { error } = await supabase
-      .from('categories')
-      .update({ is_archived: true })
-      .eq('id', id)
+    const { error } = await supabase.from('categories').update({ is_archived: true }).eq('id', id)
     if (!error) await fetch()
     return !error
   }
 
   // Build a lookup map for quick name resolution
-  const categoryMap = useMemo(() => Object.fromEntries(categories.map((c) => [c.id, c])), [categories])
+  const categoryMap = useMemo(
+    () => Object.fromEntries(categories.map((c) => [c.id, c])),
+    [categories],
+  )
 
-  return { categories, categoryMap, loading, error, createCategory, renameCategory, archiveCategory }
+  return {
+    categories,
+    categoryMap,
+    loading,
+    error,
+    createCategory,
+    renameCategory,
+    archiveCategory,
+  }
 }

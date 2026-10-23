@@ -128,7 +128,9 @@ function civilFieldsAt(epochMs: number, tz: string): Record<string, number> {
     }
     return out
   }
-  const m = dtf.format(new Date(epochMs)).match(/(\d{2})\/(\d{2})\/(\d{4}),?\s+(\d{2}):(\d{2}):(\d{2})/u)
+  const m = dtf
+    .format(new Date(epochMs))
+    .match(/(\d{2})\/(\d{2})\/(\d{4}),?\s+(\d{2}):(\d{2}):(\d{2})/u)
   if (!m) throw new Error(`period.ts: unparseable DateTimeFormat output for tz "${tz}"`)
   return { month: +m[1], day: +m[2], year: +m[3], hour: +m[4], minute: +m[5], second: +m[6] }
 }
@@ -141,7 +143,8 @@ function tzOffsetMsAt(epochMs: number, tz: string): number {
   const fields = civilFieldsAt(epochMs, tz)
   const get = (type: string): number => {
     const found = fields[type]
-    if (found === undefined || Number.isNaN(found)) throw new Error(`period.ts: Intl did not return a "${type}" part for tz "${tz}"`)
+    if (found === undefined || Number.isNaN(found))
+      throw new Error(`period.ts: Intl did not return a "${type}" part for tz "${tz}"`)
     return found
   }
   const asIfUtc = Date.UTC(
@@ -427,7 +430,12 @@ export function addMonthsClamped(
  * daily/weekly/biweekly stepping, which must not drift by an hour across
  * a DST transition the way `Date.prototype.setDate` does (audit 04-F20).
  */
-export function addDays(y: number, m: number, d: number, deltaDays: number): { y: number; m: number; d: number } {
+export function addDays(
+  y: number,
+  m: number,
+  d: number,
+  deltaDays: number,
+): { y: number; m: number; d: number } {
   const { y: ry, month0, d: rd } = civilFromDayNumber(civilDayNumber(y, m - 1, d) + deltaDays)
   return { y: ry, m: month0 + 1, d: rd }
 }
@@ -439,7 +447,14 @@ export function addDays(y: number, m: number, d: number, deltaDays: number): { y
  * to its first occurrence on or after a target instant without iterating
  * one occurrence at a time (audit 03-F25's closed-form fix).
  */
-export function daysBetween(y1: number, m1: number, d1: number, y2: number, m2: number, d2: number): number {
+export function daysBetween(
+  y1: number,
+  m1: number,
+  d1: number,
+  y2: number,
+  m2: number,
+  d2: number,
+): number {
   return civilDayNumber(y2, m2 - 1, d2) - civilDayNumber(y1, m1 - 1, d1)
 }
 

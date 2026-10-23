@@ -71,7 +71,11 @@ function inWindow(t: PatternTxn, w: PatternWindow): boolean {
  * (clamped to however much history exists), never a literal `12` or
  * `13` (05-F6's bug).
  */
-export function heaviestWeekday(txns: readonly PatternTxn[], window: PatternWindow, tz: string): Pattern {
+export function heaviestWeekday(
+  txns: readonly PatternTxn[],
+  window: PatternWindow,
+  tz: string,
+): Pattern {
   const weekdaySums = new Array(7).fill(0)
   const weekdayDays: Array<Set<string>> = Array.from({ length: 7 }, () => new Set())
   let totalSpendTxns = 0
@@ -119,7 +123,11 @@ export function heaviestWeekday(txns: readonly PatternTxn[], window: PatternWind
  * existed). Gated on ≥10 total spend transactions **and** ≥21 distinct
  * days of history in the window.
  */
-export function categoryShare(txns: readonly PatternTxn[], window: PatternWindow, tz: string): Pattern {
+export function categoryShare(
+  txns: readonly PatternTxn[],
+  window: PatternWindow,
+  tz: string,
+): Pattern {
   const totals = new Map<string, number>()
   let total = 0
   let count = 0
@@ -183,7 +191,11 @@ export function topMerchants(
     sampleSize: sorted.length,
     confident,
     ...(confident
-      ? { data: { merchants: sorted.slice(0, limit).map(([merchant, amount]) => ({ merchant, amount })) } }
+      ? {
+          data: {
+            merchants: sorted.slice(0, limit).map(([merchant, amount]) => ({ merchant, amount })),
+          },
+        }
       : {}),
   }
 }
@@ -221,8 +233,14 @@ export function heatmap(
  *  0` as "Patterns will appear as your history grows" (the fallback
  *  copy that already existed and was unreachable after a single
  *  transaction pre-2.11, because nothing gated the claims above it). */
-export function patterns(txns: readonly PatternTxn[], window: PatternWindow, tz: string): Pattern[] {
-  return [heaviestWeekday(txns, window, tz), categoryShare(txns, window, tz), topMerchants(txns, window)].filter(
-    (p) => p.confident,
-  )
+export function patterns(
+  txns: readonly PatternTxn[],
+  window: PatternWindow,
+  tz: string,
+): Pattern[] {
+  return [
+    heaviestWeekday(txns, window, tz),
+    categoryShare(txns, window, tz),
+    topMerchants(txns, window),
+  ].filter((p) => p.confident)
 }

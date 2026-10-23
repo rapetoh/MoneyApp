@@ -69,7 +69,12 @@ export interface AskPromptInput {
   has_prior_turns: boolean
 }
 
-const LOCALE_NAMES: Record<Locale, string> = { en: 'English', fr: 'French', es: 'Spanish', pt: 'Portuguese' }
+const LOCALE_NAMES: Record<Locale, string> = {
+  en: 'English',
+  fr: 'French',
+  es: 'Spanish',
+  pt: 'Portuguese',
+}
 
 export const MAX_CONTEXT_TURNS = 6
 /** Serialized size cap for one turn's computed records in the context. */
@@ -171,7 +176,13 @@ export function buildContextMessages(
     if (!turn.reply) continue
     const parts: string[] = [`ANSWER: ${stripHtml(turn.reply.text)}`]
     const shown = turn.reply.blocks
-      .map((bl) => (bl.type === 'transactions' ? `transactions(${bl.rows.length})` : bl.type === 'chart' ? `chart(${bl.chart.data.length})` : bl.type))
+      .map((bl) =>
+        bl.type === 'transactions'
+          ? `transactions(${bl.rows.length})`
+          : bl.type === 'chart'
+            ? `chart(${bl.chart.data.length})`
+            : bl.type,
+      )
       .join(', ')
     if (shown) parts.push(`SHOWN: ${shown}`)
     if (turn.computed && turn.computed.length > 0) {
@@ -230,7 +241,10 @@ function validateBlock(raw: unknown): AskBlock | null {
     }
     case 'rows': {
       const caption = asStr(r.caption).trim()
-      const rows = (Array.isArray(r.rows) ? r.rows : []).map(validateStatRow).filter((x): x is AskMurmurStatRow => x !== null).slice(0, MAX_ROWS)
+      const rows = (Array.isArray(r.rows) ? r.rows : [])
+        .map(validateStatRow)
+        .filter((x): x is AskMurmurStatRow => x !== null)
+        .slice(0, MAX_ROWS)
       if (!caption || rows.length === 0) return null
       return { type: 'rows', caption, rows }
     }
@@ -257,7 +271,10 @@ function validateBlock(raw: unknown): AskBlock | null {
     }
     case 'steps': {
       const caption = asStr(r.caption).trim()
-      const steps = (Array.isArray(r.steps) ? r.steps : []).map((s) => asStr(s).trim()).filter(Boolean).slice(0, MAX_STEPS)
+      const steps = (Array.isArray(r.steps) ? r.steps : [])
+        .map((s) => asStr(s).trim())
+        .filter(Boolean)
+        .slice(0, MAX_STEPS)
       if (!caption || steps.length === 0) return null
       return { type: 'steps', caption, steps }
     }
@@ -271,7 +288,8 @@ function validateAction(raw: unknown): AskAction | null {
   const r = raw as Record<string, unknown>
   const label = asStr(r.label).trim()
   const intent = r.intent
-  if (!label || typeof intent !== 'string' || !VALID_INTENTS.has(intent as AskActionIntent)) return null
+  if (!label || typeof intent !== 'string' || !VALID_INTENTS.has(intent as AskActionIntent))
+    return null
   const action: AskAction = { label: label.slice(0, 40), intent: intent as AskActionIntent }
   if (r.params && typeof r.params === 'object' && !Array.isArray(r.params)) {
     const allowed = VALID_INTENT_PARAMS[action.intent]
@@ -289,7 +307,8 @@ function validateAction(raw: unknown): AskAction | null {
 export function validateFocus(raw: unknown): AskFocus | null {
   if (!raw || typeof raw !== 'object') return null
   const r = raw as Record<string, unknown>
-  const subject = typeof r.subject === 'string' && r.subject.trim() ? r.subject.trim().slice(0, 80) : null
+  const subject =
+    typeof r.subject === 'string' && r.subject.trim() ? r.subject.trim().slice(0, 80) : null
   let window: AskFocus['window'] = null
   if (r.window && typeof r.window === 'object') {
     const w = r.window as Record<string, unknown>
@@ -323,18 +342,28 @@ export function validateFocus(raw: unknown): AskFocus | null {
 export function validateAskReply(raw: unknown, transactionCount: number): AskReply {
   const obj = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {}
   const out_of_scope = obj.out_of_scope === true
-  const kind: AskReply['kind'] = obj.kind === 'smalltalk' || obj.kind === 'meta' ? obj.kind : 'money'
+  const kind: AskReply['kind'] =
+    obj.kind === 'smalltalk' || obj.kind === 'meta' ? obj.kind : 'money'
   // Accept the legacy key too, in case the model echoes an old example.
-  const verdictObj = obj.verdict && typeof obj.verdict === 'object' ? (obj.verdict as Record<string, unknown>) : null
+  const verdictObj =
+    obj.verdict && typeof obj.verdict === 'object' ? (obj.verdict as Record<string, unknown>) : null
   const text = (asStr(obj.text) || (verdictObj ? asStr(verdictObj.text) : '')).trim()
   const sentimentRaw = obj.sentiment ?? verdictObj?.sentiment
-  const sentiment = sentimentRaw === 'positive' || sentimentRaw === 'negative' ? sentimentRaw : 'neutral'
-  const blocks = out_of_scope || kind !== 'money'
-    ? []
-    : (Array.isArray(obj.blocks) ? obj.blocks : []).map(validateBlock).filter((b): b is AskBlock => b !== null).slice(0, MAX_BLOCKS)
+  const sentiment =
+    sentimentRaw === 'positive' || sentimentRaw === 'negative' ? sentimentRaw : 'neutral'
+  const blocks =
+    out_of_scope || kind !== 'money'
+      ? []
+      : (Array.isArray(obj.blocks) ? obj.blocks : [])
+          .map(validateBlock)
+          .filter((b): b is AskBlock => b !== null)
+          .slice(0, MAX_BLOCKS)
   const actions = out_of_scope
     ? []
-    : (Array.isArray(obj.actions) ? obj.actions : []).map(validateAction).filter((a): a is AskAction => a !== null).slice(0, 3)
+    : (Array.isArray(obj.actions) ? obj.actions : [])
+        .map(validateAction)
+        .filter((a): a is AskAction => a !== null)
+        .slice(0, 3)
   return {
     kind,
     text,
@@ -368,7 +397,8 @@ function addTrusted(set: Set<number>, v: number) {
 function walkNumbers(v: unknown, into: Set<number>) {
   if (typeof v === 'number') addTrusted(into, v)
   else if (Array.isArray(v)) for (const x of v) walkNumbers(x, into)
-  else if (v && typeof v === 'object') for (const x of Object.values(v as Record<string, unknown>)) walkNumbers(x, into)
+  else if (v && typeof v === 'object')
+    for (const x of Object.values(v as Record<string, unknown>)) walkNumbers(x, into)
 }
 
 /** Every number the model may quote this turn without it being an
@@ -397,26 +427,42 @@ export function trustedFigures(input: {
   addTrusted(trusted, input.overview.total_credit)
   addTrusted(trusted, input.overview.transaction_count)
   if (input.budget) {
-    for (const v of [input.budget.amount, input.budget.spent, input.budget.committed, input.budget.remaining, input.budget.days_left]) addTrusted(trusted, v)
+    for (const v of [
+      input.budget.amount,
+      input.budget.spent,
+      input.budget.committed,
+      input.budget.remaining,
+      input.budget.days_left,
+    ])
+      addTrusted(trusted, v)
   }
   if (input.monthlyIncome != null) addTrusted(trusted, input.monthlyIncome)
-  for (const v of [...extractCurrencyValues(input.message), ...extractPercentValues(input.message)]) addTrusted(trusted, v)
+  for (const v of [...extractCurrencyValues(input.message), ...extractPercentValues(input.message)])
+    addTrusted(trusted, v)
   if (input.seedInsight) {
     for (const s of [input.seedInsight.title, input.seedInsight.detail]) {
-      for (const v of [...extractCurrencyValues(s), ...extractPercentValues(s)]) addTrusted(trusted, v)
+      for (const v of [...extractCurrencyValues(s), ...extractPercentValues(s)])
+        addTrusted(trusted, v)
     }
   }
   return trusted
 }
 
-export function groundAskReply(reply: AskReply, trusted: Set<number>, calls: ToolCallRecord[]): AskGrounding {
+export function groundAskReply(
+  reply: AskReply,
+  trusted: Set<number>,
+  calls: ToolCallRecord[],
+): AskGrounding {
   if (reply.out_of_scope) return { untraced: [], direction_violation: null, recital: null }
   const untraced: string[] = []
   // A small-talk or meta reply must not carry figures at all — the number
   // is not "wrong", it is unasked for (owner screenshots Aug 16: "how are
   // you doing?" answered with spending totals four times).
   const recital =
-    reply.kind && reply.kind !== 'money' && (extractCurrencyValues(stripHtml(reply.text)).length > 0 || extractPercentValues(stripHtml(reply.text)).length > 0)
+    reply.kind &&
+    reply.kind !== 'money' &&
+    (extractCurrencyValues(stripHtml(reply.text)).length > 0 ||
+      extractPercentValues(stripHtml(reply.text)).length > 0)
       ? `you marked this reply "${reply.kind}" but it recites figures — the user did not ask about their money; answer as a person, with no amounts`
       : null
   const check = (label: string, text: string) => {
@@ -443,7 +489,8 @@ export function groundAskReply(reply: AskReply, trusted: Set<number>, calls: Too
         break
       case 'chart':
         b.chart.data.forEach((p, j) => {
-          if (!isTrustedCurrency(p.value, trusted) && !isTrustedPercent(p.value, trusted)) untraced.push(`blocks[${i}].chart[${j}](${p.label}): ${p.value}`)
+          if (!isTrustedCurrency(p.value, trusted) && !isTrustedPercent(p.value, trusted))
+            untraced.push(`blocks[${i}].chart[${j}](${p.label}): ${p.value}`)
         })
         break
       case 'steps':
@@ -459,7 +506,11 @@ export function groundAskReply(reply: AskReply, trusted: Set<number>, calls: Too
 
 /** The focus to persist after a turn: the model's own, filled from the
  *  previous state and this turn's calls where it left gaps. */
-export function mergeFocus(prev: AskFocus | null, fromModel: AskFocus | null, calls: ToolCallRecord[]): AskFocus | null {
+export function mergeFocus(
+  prev: AskFocus | null,
+  fromModel: AskFocus | null,
+  calls: ToolCallRecord[],
+): AskFocus | null {
   const lastWindow = (() => {
     for (let i = calls.length - 1; i >= 0; i--) {
       const c = calls[i]
@@ -480,13 +531,24 @@ export function mergeFocus(prev: AskFocus | null, fromModel: AskFocus | null, ca
     const r = c.result as Record<string, unknown>
     const a = (c.args ?? {}) as Record<string, unknown>
     if (c.name === 'total' && typeof r.total === 'number') {
-      const label = [a.direction === 'credit' ? 'income' : 'spent', a.category_name, a.merchant_contains, a.window].filter(Boolean).join(' ')
+      const label = [
+        a.direction === 'credit' ? 'income' : 'spent',
+        a.category_name,
+        a.merchant_contains,
+        a.window,
+      ]
+        .filter(Boolean)
+        .join(' ')
       derivedFigures.push({ label, value: r.total })
     } else if (c.name === 'arith' && typeof r.result === 'number') {
-      derivedFigures.push({ label: `${String(a.op)}(${String(a.a)}, ${String(a.b)})`, value: r.result })
+      derivedFigures.push({
+        label: `${String(a.op)}(${String(a.a)}, ${String(a.b)})`,
+        value: r.result,
+      })
     } else if (c.name === 'recurring_total' && typeof r.monthly_total === 'number') {
       derivedFigures.push({ label: 'recurring monthly total', value: r.monthly_total })
-      if (typeof r.still_due_this_month_total === 'number') derivedFigures.push({ label: 'still due this month', value: r.still_due_this_month_total })
+      if (typeof r.still_due_this_month_total === 'number')
+        derivedFigures.push({ label: 'still due this month', value: r.still_due_this_month_total })
     } else if (c.name === 'list_transactions' && typeof r.total === 'number') {
       derivedFigures.push({ label: `listed ${String(a.window ?? '')} total`, value: r.total })
     }
@@ -503,7 +565,13 @@ export function mergeFocus(prev: AskFocus | null, fromModel: AskFocus | null, ca
     entities: Array.from(entities).slice(-12),
     figures: (fromModel?.figures?.length ? fromModel.figures : derivedFigures).slice(0, 8),
   }
-  if (!merged.subject && !merged.window && merged.entities.length === 0 && merged.figures.length === 0) return null
+  if (
+    !merged.subject &&
+    !merged.window &&
+    merged.entities.length === 0 &&
+    merged.figures.length === 0
+  )
+    return null
   return merged
 }
 
@@ -517,8 +585,18 @@ export function compactComputed(calls: ToolCallRecord[]): AskComputedRecord[] {
     const args = c.args && typeof c.args === 'object' ? (c.args as Record<string, unknown>) : {}
     let result: unknown = c.result
     if (c.name === 'list_transactions' && result && typeof result === 'object') {
-      const r = result as { transactions?: unknown[]; count?: number; total?: number; truncated?: boolean }
-      result = { transactions: (r.transactions ?? []).slice(0, 12), count: r.count, total: r.total, truncated: r.truncated }
+      const r = result as {
+        transactions?: unknown[]
+        count?: number
+        total?: number
+        truncated?: boolean
+      }
+      result = {
+        transactions: (r.transactions ?? []).slice(0, 12),
+        count: r.count,
+        total: r.total,
+        truncated: r.truncated,
+      }
     } else if (c.name === 'recurring_total' && result && typeof result === 'object') {
       const r = result as Record<string, unknown>
       result = {
@@ -527,7 +605,13 @@ export function compactComputed(calls: ToolCallRecord[]): AskComputedRecord[] {
         still_due_this_month_total: r.still_due_this_month_total,
         still_due_this_month: r.still_due_this_month,
         upcoming: r.upcoming,
-        rules: Array.isArray(r.rules) ? (r.rules as Array<Record<string, unknown>>).slice(0, 12).map((x) => ({ name: x.name, monthly_amount: x.monthly_amount, charged_this_month: x.charged_this_month })) : [],
+        rules: Array.isArray(r.rules)
+          ? (r.rules as Array<Record<string, unknown>>).slice(0, 12).map((x) => ({
+              name: x.name,
+              monthly_amount: x.monthly_amount,
+              charged_this_month: x.charged_this_month,
+            }))
+          : [],
       }
     } else if (c.name === 'series' && result && typeof result === 'object') {
       const r = result as { points?: unknown[]; coverage?: unknown }
@@ -539,9 +623,21 @@ export function compactComputed(calls: ToolCallRecord[]): AskComputedRecord[] {
         window_end_exclusive: r.window_end_exclusive,
         expected_income_total: r.expected_income_total,
         expected_bills_total: r.expected_bills_total,
-        rules: Array.isArray(r.rules) ? (r.rules as Array<Record<string, unknown>>).slice(0, 12).map((x) => ({ name: x.name, direction: x.direction, occurrences: x.occurrences, dates: Array.isArray(x.dates) ? (x.dates as unknown[]).slice(0, 6) : [], total: x.total })) : [],
+        rules: Array.isArray(r.rules)
+          ? (r.rules as Array<Record<string, unknown>>).slice(0, 12).map((x) => ({
+              name: x.name,
+              direction: x.direction,
+              occurrences: x.occurrences,
+              dates: Array.isArray(x.dates) ? (x.dates as unknown[]).slice(0, 6) : [],
+              total: x.total,
+            }))
+          : [],
       }
-    } else if ((c.name === 'top_merchants' || c.name === 'sum_by_category') && result && typeof result === 'object') {
+    } else if (
+      (c.name === 'top_merchants' || c.name === 'sum_by_category') &&
+      result &&
+      typeof result === 'object'
+    ) {
       const r = result as Record<string, unknown[]>
       const key = c.name === 'top_merchants' ? 'merchants' : 'categories'
       result = { [key]: (r[key] ?? []).slice(0, 10) }
@@ -556,7 +652,11 @@ export function compactComputed(calls: ToolCallRecord[]): AskComputedRecord[] {
       if (JSON.stringify(records[i]).length > JSON.stringify(records[biggest]).length) biggest = i
     }
     const b = records[biggest]
-    if (b.result && typeof b.result === 'object' && !(b.result as { truncated_context?: boolean }).truncated_context) {
+    if (
+      b.result &&
+      typeof b.result === 'object' &&
+      !(b.result as { truncated_context?: boolean }).truncated_context
+    ) {
       records[biggest] = { ...b, result: summarizeResult(b.result) }
     } else {
       records.splice(biggest, 1)

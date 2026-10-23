@@ -4,7 +4,13 @@ import { BottomSheet } from './BottomSheet'
 import { CategoryPicker } from './CategoryPicker'
 import { Colors, Typography, Hairline, Radius, Spacing } from '../theme'
 import { computeNextOccurrence } from '../hooks/useRecurringRules'
-import { t, currencySymbolFor, validateAmount, localDay, civilDateTimeToInstant } from '@voice-expense/shared'
+import {
+  t,
+  currencySymbolFor,
+  validateAmount,
+  localDay,
+  civilDateTimeToInstant,
+} from '@voice-expense/shared'
 import type { Category, Locale, RecurringFrequency, RecurringRule } from '@voice-expense/shared'
 
 const CURRENCIES = ['USD', 'EUR', 'GBP', 'CAD', 'CHF', 'JPY', 'AUD', 'XAF', 'NGN', 'GHS']
@@ -129,7 +135,8 @@ export function RecurringRuleEditor({
     }
   }, [visible, mode, initial, defaultCurrency, tz])
 
-  const title = mode === 'edit' ? t('recurring.edit_rule_title', locale) : t('recurring.new_rule_title', locale)
+  const title =
+    mode === 'edit' ? t('recurring.edit_rule_title', locale) : t('recurring.new_rule_title', locale)
 
   async function handleSave() {
     const amountValidation = validateAmount(amount, currency)
@@ -201,11 +208,17 @@ export function RecurringRuleEditor({
         <Pressable
           onPress={handleSave}
           disabled={saving}
-          style={({ pressed }) => [styles.saveButton, saving && styles.saveButtonDisabled, pressed && { opacity: 0.85 }]}
+          style={({ pressed }) => [
+            styles.saveButton,
+            saving && styles.saveButtonDisabled,
+            pressed && { opacity: 0.85 },
+          ]}
           accessibilityRole="button"
         >
           <Text style={styles.saveButtonText}>
-            {mode === 'edit' ? t('voice.save_changes', locale) : t('recurring.add_rule_cta', locale)}
+            {mode === 'edit'
+              ? t('voice.save_changes', locale)
+              : t('recurring.add_rule_cta', locale)}
           </Text>
         </Pressable>
       }
@@ -220,7 +233,9 @@ export function RecurringRuleEditor({
           accessibilityRole="tab"
           accessibilityState={{ selected: direction === 'debit' }}
         >
-          <Text style={[styles.directionLabel, direction === 'debit' && styles.directionLabelActive]}>
+          <Text
+            style={[styles.directionLabel, direction === 'debit' && styles.directionLabelActive]}
+          >
             {t('voice.expense', locale)}
           </Text>
         </Pressable>
@@ -230,7 +245,12 @@ export function RecurringRuleEditor({
           accessibilityRole="tab"
           accessibilityState={{ selected: direction === 'credit' }}
         >
-          <Text style={[styles.directionLabel, direction === 'credit' && styles.directionLabelActiveIncome]}>
+          <Text
+            style={[
+              styles.directionLabel,
+              direction === 'credit' && styles.directionLabelActiveIncome,
+            ]}
+          >
             {t('voice.income_label', locale)}
           </Text>
         </Pressable>
@@ -416,7 +436,12 @@ const styles = StyleSheet.create({
     borderColor: Hairline.color,
     marginTop: 8,
   },
-  directionBtn: { flex: 1, paddingVertical: Spacing.sm, alignItems: 'center', borderRadius: Radius.sm },
+  directionBtn: {
+    flex: 1,
+    paddingVertical: Spacing.sm,
+    alignItems: 'center',
+    borderRadius: Radius.sm,
+  },
   directionBtnActive: { backgroundColor: Colors.expense ?? Colors.ink },
   directionBtnActiveIncome: { backgroundColor: Colors.income ?? Colors.primary },
   directionLabel: {
@@ -474,9 +499,19 @@ const styles = StyleSheet.create({
     borderColor: Hairline.color,
     backgroundColor: Colors.surface ?? Colors.card,
   },
-  chipActive: { backgroundColor: Colors.primaryLight ?? Colors.accentSoft, borderColor: Colors.primary ?? Colors.accent },
-  chipLabel: { fontFamily: Typography.fontFamily.sans, fontSize: 13, color: Colors.ink3 ?? Colors.textSecondary },
-  chipLabelActive: { color: Colors.primary ?? Colors.accent, fontFamily: Typography.fontFamily.sansSemiBold },
+  chipActive: {
+    backgroundColor: Colors.primaryLight ?? Colors.accentSoft,
+    borderColor: Colors.primary ?? Colors.accent,
+  },
+  chipLabel: {
+    fontFamily: Typography.fontFamily.sans,
+    fontSize: 13,
+    color: Colors.ink3 ?? Colors.textSecondary,
+  },
+  chipLabelActive: {
+    color: Colors.primary ?? Colors.accent,
+    fontFamily: Typography.fontFamily.sansSemiBold,
+  },
 
   stepperRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   stepperBtn: {
@@ -518,7 +553,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  checkboxActive: { backgroundColor: Colors.primary ?? Colors.accent, borderColor: Colors.primary ?? Colors.accent },
+  checkboxActive: {
+    backgroundColor: Colors.primary ?? Colors.accent,
+    borderColor: Colors.primary ?? Colors.accent,
+  },
   checkboxMark: { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
   endToggleLabel: {
     fontFamily: Typography.fontFamily.sansSemiBold,

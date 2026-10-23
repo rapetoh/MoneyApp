@@ -66,9 +66,8 @@ vi.mock('expo-constants', () => ({ default: { deviceName: 'Test Device' } }))
 // hoisted above imports by vitest, but these dynamic-safe static imports
 // still only resolve the (now-mocked) module graph at collection time).
 const { syncManager } = await import('../SyncManager')
-const { enqueue, getDeadLetterEntries, getPendingCount, getDeadCount, getReadyBatch } = await import(
-  '../syncQueue'
-)
+const { enqueue, getDeadLetterEntries, getPendingCount, getDeadCount, getReadyBatch } =
+  await import('../syncQueue')
 
 /** A chainable object that resolves to `result` no matter how many
  *  `.eq()/.order()/.limit()/.gt()/.lt()/.update()` calls precede the
@@ -161,7 +160,10 @@ describe.skipIf(!DatabaseSync)('SyncManager drain loop', () => {
     mocks.rpc.mockImplementation((_fn: string, args: { payload: { client_id: string } }) => {
       if (args.payload.client_id === 'b') {
         // 23514 — a CHECK violation (e.g. amount <= 0). Permanent.
-        return Promise.resolve({ data: null, error: pgError('23514', 'violates check constraint "transactions_amount_check"') })
+        return Promise.resolve({
+          data: null,
+          error: pgError('23514', 'violates check constraint "transactions_amount_check"'),
+        })
       }
       return Promise.resolve({ data: { ...args.payload }, error: null })
     })
@@ -223,7 +225,10 @@ describe.skipIf(!DatabaseSync)('SyncManager drain loop', () => {
     await enqueue('create', 'dup-1', payload, 'transaction')
     mocks.rpc.mockResolvedValue({
       data: null,
-      error: pgError('23505', 'duplicate key value violates unique constraint "idx_txn_recurring_dedup"'),
+      error: pgError(
+        '23505',
+        'duplicate key value violates unique constraint "idx_txn_recurring_dedup"',
+      ),
     })
 
     await syncManager.drainQueue()
@@ -242,7 +247,10 @@ describe.skipIf(!DatabaseSync)('SyncManager drain loop', () => {
     await enqueue('create', 'dup-2', payload, 'transaction')
     mocks.rpc.mockResolvedValue({
       data: null,
-      error: pgError('23505', 'duplicate key value violates unique constraint "transactions_user_client_unique"'),
+      error: pgError(
+        '23505',
+        'duplicate key value violates unique constraint "transactions_user_client_unique"',
+      ),
     })
 
     await syncManager.drainQueue()
@@ -254,7 +262,12 @@ describe.skipIf(!DatabaseSync)('SyncManager drain loop', () => {
 
   it('drains strictly in id order across a batch boundary larger than the page size', async () => {
     for (let i = 0; i < 25; i++) {
-      await enqueue('create', `t${i}`, fullPayload({ client_id: `t${i}`, id: `t${i}` }), 'transaction')
+      await enqueue(
+        'create',
+        `t${i}`,
+        fullPayload({ client_id: `t${i}`, id: `t${i}` }),
+        'transaction',
+      )
     }
     mocks.rpc.mockImplementation((_fn: string, args: { payload: { client_id: string } }) =>
       Promise.resolve({ data: { ...args.payload }, error: null }),
@@ -265,7 +278,10 @@ describe.skipIf(!DatabaseSync)('SyncManager drain loop', () => {
     const order = mocks.rpc.mock.calls.map(
       (call) => (call[1] as { payload: { client_id: string } }).payload.client_id,
     )
-    assert.deepEqual(order, Array.from({ length: 25 }, (_, i) => `t${i}`))
+    assert.deepEqual(
+      order,
+      Array.from({ length: 25 }, (_, i) => `t${i}`),
+    )
     expect(await getPendingCount()).toBe(0)
   })
 
@@ -274,7 +290,12 @@ describe.skipIf(!DatabaseSync)('SyncManager drain loop', () => {
       data: null,
       error: pgError('23514', 'violates check constraint "transactions_amount_check"'),
     })
-    await enqueue('create', 'reject-1', fullPayload({ client_id: 'reject-1', id: 'reject-1' }), 'transaction')
+    await enqueue(
+      'create',
+      'reject-1',
+      fullPayload({ client_id: 'reject-1', id: 'reject-1' }),
+      'transaction',
+    )
 
     const outcome = await syncManager.awaitOutcome('reject-1', 2000)
 
@@ -284,7 +305,12 @@ describe.skipIf(!DatabaseSync)('SyncManager drain loop', () => {
 
   it('awaitOutcome reports "synced" once the entry drains successfully', async () => {
     mocks.rpc.mockResolvedValue({ data: { id: 'sync-1' }, error: null })
-    await enqueue('create', 'sync-1', fullPayload({ client_id: 'sync-1', id: 'sync-1' }), 'transaction')
+    await enqueue(
+      'create',
+      'sync-1',
+      fullPayload({ client_id: 'sync-1', id: 'sync-1' }),
+      'transaction',
+    )
 
     const outcome = await syncManager.awaitOutcome('sync-1', 2000)
 
@@ -295,12 +321,18 @@ describe.skipIf(!DatabaseSync)('SyncManager drain loop', () => {
   it('a transient failure schedules a real retry timer that re-drains within the backoff window', async () => {
     vi.useFakeTimers()
     try {
-      await enqueue('create', 'retry-1', fullPayload({ client_id: 'retry-1', id: 'retry-1' }), 'transaction')
+      await enqueue(
+        'create',
+        'retry-1',
+        fullPayload({ client_id: 'retry-1', id: 'retry-1' }),
+        'transaction',
+      )
 
       let attempt = 0
       mocks.rpc.mockImplementation(() => {
         attempt++
-        if (attempt === 1) return Promise.resolve({ data: null, error: { message: 'Network request failed' } })
+        if (attempt === 1)
+          return Promise.resolve({ data: null, error: { message: 'Network request failed' } })
         return Promise.resolve({ data: { id: 'retry-1' }, error: null })
       })
 

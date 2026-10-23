@@ -8,7 +8,11 @@
  * reachable from this package's `src/**\/*.test.ts`-scoped Vitest config).
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { runOncePerSession, hasRunOncePerSession, __resetRunOncePerSessionForTests } from '../launchOnce'
+import {
+  runOncePerSession,
+  hasRunOncePerSession,
+  __resetRunOncePerSessionForTests,
+} from '../launchOnce'
 
 describe('runOncePerSession', () => {
   beforeEach(() => {
@@ -75,7 +79,10 @@ describe('runOncePerSession', () => {
 
     expect(failing).toHaveBeenCalledTimes(1)
     expect(succeeding).toHaveBeenCalledTimes(1)
-    expect(warn).toHaveBeenCalledWith(expect.stringContaining('runRecurringCatchUp:user-1'), expect.any(Error))
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('runRecurringCatchUp:user-1'),
+      expect.any(Error),
+    )
 
     warn.mockRestore()
   })

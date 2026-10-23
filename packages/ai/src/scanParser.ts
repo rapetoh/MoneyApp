@@ -20,9 +20,7 @@ export interface ScanOptions {
  *  There is no partial/editable case for a scan: a rejected image has no
  *  honest amount to prefill, so the caller must not open a savable editor
  *  at all — it should offer retake-or-enter-manually instead. */
-export type ScanResult =
-  | { ok: true; expense: ParsedExpense }
-  | { ok: false; reason: string }
+export type ScanResult = { ok: true; expense: ParsedExpense } | { ok: false; reason: string }
 
 const DEFAULT_REJECTION_REASON: Record<ScanType, string> = {
   receipt: "That doesn't look like a receipt.",

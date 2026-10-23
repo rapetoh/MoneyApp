@@ -103,12 +103,7 @@ export function ErrorState({
 function WarningGlyph({ color }: { color: string }) {
   return (
     <svg width={16} height={16} viewBox="0 0 24 24" fill="none">
-      <path
-        d="M12 3l10 18H2L12 3z"
-        stroke={color}
-        strokeWidth="1.8"
-        strokeLinejoin="round"
-      />
+      <path d="M12 3l10 18H2L12 3z" stroke={color} strokeWidth="1.8" strokeLinejoin="round" />
       <path d="M12 10v4" stroke={color} strokeWidth="1.8" strokeLinecap="round" />
       <circle cx="12" cy="17" r="0.9" fill={color} />
     </svg>

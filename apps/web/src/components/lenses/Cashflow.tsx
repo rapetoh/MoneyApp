@@ -67,7 +67,15 @@ export function CashflowLens({ props }: { props: LensProps }) {
   const savingsRate = totalIn > 0 ? Math.round((net / totalIn) * 100) : null
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: 14, height: 600, fontFamily: font.sans }}>
+    <div
+      style={{
+        display: 'grid',
+        gridTemplateColumns: '1fr 280px',
+        gap: 14,
+        height: 600,
+        fontFamily: font.sans,
+      }}
+    >
       <div
         style={{
           background: '#fff',
@@ -103,9 +111,7 @@ export function CashflowLens({ props }: { props: LensProps }) {
             >
               {fmt(bal, props.currency, props.locale)}
             </span>
-            <span style={{ fontSize: 12, color: colors.ink3 }}>
-              balance · day {daysInMonth}
-            </span>
+            <span style={{ fontSize: 12, color: colors.ink3 }}>balance · day {daysInMonth}</span>
             {net >= 0 && (
               <span
                 style={{
@@ -161,7 +167,14 @@ export function CashflowLens({ props }: { props: LensProps }) {
               </g>
             )
           })}
-          <line x1={padX} x2={W - padX} y1={y(0)} y2={y(0)} stroke={colors.ink4} strokeWidth="0.5" />
+          <line
+            x1={padX}
+            x2={W - padX}
+            y1={y(0)}
+            y2={y(0)}
+            stroke={colors.ink4}
+            strokeWidth="0.5"
+          />
           {points.map((p, i) => (
             <g key={i}>
               {p.inAmt > 0 && (
@@ -339,7 +352,15 @@ function Stat({
         </div>
       </div>
       <div style={{ height: 8, marginTop: 8, borderRadius: 4, background: colors.surface2 }}>
-        <div style={{ width: '100%', height: '100%', background: color, opacity: 0.85, borderRadius: 4 }} />
+        <div
+          style={{
+            width: '100%',
+            height: '100%',
+            background: color,
+            opacity: 0.85,
+            borderRadius: 4,
+          }}
+        />
       </div>
     </div>
   )

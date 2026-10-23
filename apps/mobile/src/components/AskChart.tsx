@@ -18,7 +18,16 @@ interface Props {
 // distinguishable at a glance instead of six shades of sage (owner review,
 // Aug 16). A single measure over time (the line) stays one colour, the
 // brand accent, because there is nothing to tell apart.
-const PALETTE_SEED_HUES = ['#E85D04', '#2D6A4F', '#457B9D', '#9B59B6', '#C77A2E', '#2A9D8F', '#8E424C', '#5A5F34']
+const PALETTE_SEED_HUES = [
+  '#E85D04',
+  '#2D6A4F',
+  '#457B9D',
+  '#9B59B6',
+  '#C77A2E',
+  '#2A9D8F',
+  '#8E424C',
+  '#5A5F34',
+]
 const PALETTE: string[] = PALETTE_SEED_HUES.map((hex) => categoryPalette(hex).fg)
 const colorFor = (idx: number) => PALETTE[idx % PALETTE.length]
 const MAX_POINTS = 10
@@ -32,13 +41,19 @@ const MAX_POINTS = 10
  */
 export function AskChart({ chart, currency, locale }: Props) {
   const [width, setWidth] = useState(0)
-  const data = useMemo(() => chart.data.filter((p) => Number.isFinite(p.value)).slice(0, MAX_POINTS), [chart.data])
+  const data = useMemo(
+    () => chart.data.filter((p) => Number.isFinite(p.value)).slice(0, MAX_POINTS),
+    [chart.data],
+  )
   const fmt = (v: number) => formatMoney(v, currency, locale, { precision: 'compact' })
 
   if (data.length < 2) return null
 
   return (
-    <View style={styles.card} onLayout={(e: LayoutChangeEvent) => setWidth(e.nativeEvent.layout.width)}>
+    <View
+      style={styles.card}
+      onLayout={(e: LayoutChangeEvent) => setWidth(e.nativeEvent.layout.width)}
+    >
       <Text style={styles.title}>{chart.title}</Text>
       {width > 0 && (
         <>
@@ -54,7 +69,15 @@ export function AskChart({ chart, currency, locale }: Props) {
 }
 
 // ── Vertical bars — time buckets ─────────────────────────────────────────────
-function Bars({ data, width, fmt }: { data: AskMurmurChartPoint[]; width: number; fmt: (v: number) => string }) {
+function Bars({
+  data,
+  width,
+  fmt,
+}: {
+  data: AskMurmurChartPoint[]
+  width: number
+  fmt: (v: number) => string
+}) {
   const H = 132
   const labelH = 18
   const valueH = 16
@@ -66,7 +89,14 @@ function Bars({ data, width, fmt }: { data: AskMurmurChartPoint[]; width: number
   return (
     <View>
       <Svg width={width} height={H}>
-        <SvgLine x1={0} y1={valueH + plotH} x2={width} y2={valueH + plotH} stroke={Hairline.color} strokeWidth={1} />
+        <SvgLine
+          x1={0}
+          y1={valueH + plotH}
+          x2={width}
+          y2={valueH + plotH}
+          stroke={Hairline.color}
+          strokeWidth={1}
+        />
         {data.map((d, i) => {
           const h = Math.max(2, (d.value / max) * plotH)
           const x = i * (barW + gap)
@@ -75,12 +105,21 @@ function Bars({ data, width, fmt }: { data: AskMurmurChartPoint[]; width: number
         })}
       </Svg>
       {/* Selective direct label: only the peak, in ink. */}
-      <View style={[styles.peakLabelWrap, { left: maxIdx * (barW + gap), width: barW }]} pointerEvents="none">
-        <Text style={styles.peakLabel} numberOfLines={1}>{fmt(data[maxIdx].value)}</Text>
+      <View
+        style={[styles.peakLabelWrap, { left: maxIdx * (barW + gap), width: barW }]}
+        pointerEvents="none"
+      >
+        <Text style={styles.peakLabel} numberOfLines={1}>
+          {fmt(data[maxIdx].value)}
+        </Text>
       </View>
       <View style={styles.xLabels}>
         {data.map((d, i) => (
-          <Text key={i} style={[styles.xLabel, { width: barW, marginRight: i < data.length - 1 ? gap : 0 }]} numberOfLines={1}>
+          <Text
+            key={i}
+            style={[styles.xLabel, { width: barW, marginRight: i < data.length - 1 ? gap : 0 }]}
+            numberOfLines={1}
+          >
             {d.label}
           </Text>
         ))}
@@ -90,7 +129,15 @@ function Bars({ data, width, fmt }: { data: AskMurmurChartPoint[]; width: number
 }
 
 // ── Line — trend ─────────────────────────────────────────────────────────────
-function LineChart({ data, width, fmt }: { data: AskMurmurChartPoint[]; width: number; fmt: (v: number) => string }) {
+function LineChart({
+  data,
+  width,
+  fmt,
+}: {
+  data: AskMurmurChartPoint[]
+  width: number
+  fmt: (v: number) => string
+}) {
   const H = 132
   const labelH = 18
   const pad = 10
@@ -99,32 +146,87 @@ function LineChart({ data, width, fmt }: { data: AskMurmurChartPoint[]; width: n
   const min = Math.min(...data.map((d) => d.value), 0)
   const range = max - min || 1
   const step = data.length > 1 ? (width - 8) / (data.length - 1) : 0
-  const pts = data.map((d, i) => ({ x: 4 + i * step, y: pad + plotH - ((d.value - min) / range) * plotH }))
-  const path = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')
+  const pts = data.map((d, i) => ({
+    x: 4 + i * step,
+    y: pad + plotH - ((d.value - min) / range) * plotH,
+  }))
+  const path = pts
+    .map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`)
+    .join(' ')
   const last = pts[pts.length - 1]
   return (
     <View>
       <Svg width={width} height={H}>
-        <SvgLine x1={0} y1={pad + plotH} x2={width} y2={pad + plotH} stroke={Hairline.color} strokeWidth={1} />
-        <Path d={path} stroke={Colors.accent} strokeWidth={2.5} fill="none" strokeLinejoin="round" strokeLinecap="round" />
+        <SvgLine
+          x1={0}
+          y1={pad + plotH}
+          x2={width}
+          y2={pad + plotH}
+          stroke={Hairline.color}
+          strokeWidth={1}
+        />
+        <Path
+          d={path}
+          stroke={Colors.accent}
+          strokeWidth={2.5}
+          fill="none"
+          strokeLinejoin="round"
+          strokeLinecap="round"
+        />
         {pts.map((p, i) => (
-          <Circle key={i} cx={p.x} cy={p.y} r={i === pts.length - 1 ? 4.5 : 3} fill="#FFFFFF" stroke={Colors.accent} strokeWidth={2} />
+          <Circle
+            key={i}
+            cx={p.x}
+            cy={p.y}
+            r={i === pts.length - 1 ? 4.5 : 3}
+            fill="#FFFFFF"
+            stroke={Colors.accent}
+            strokeWidth={2}
+          />
         ))}
       </Svg>
-      <View style={[styles.peakLabelWrap, { left: Math.min(Math.max(last.x - 30, 0), width - 60), width: 60, top: Math.max(last.y - 24, 0) }]} pointerEvents="none">
-        <Text style={styles.peakLabel} numberOfLines={1}>{fmt(data[data.length - 1].value)}</Text>
+      <View
+        style={[
+          styles.peakLabelWrap,
+          {
+            left: Math.min(Math.max(last.x - 30, 0), width - 60),
+            width: 60,
+            top: Math.max(last.y - 24, 0),
+          },
+        ]}
+        pointerEvents="none"
+      >
+        <Text style={styles.peakLabel} numberOfLines={1}>
+          {fmt(data[data.length - 1].value)}
+        </Text>
       </View>
       <View style={styles.xLabelsSpread}>
-        <Text style={styles.xLabel} numberOfLines={1}>{data[0].label}</Text>
-        {data.length > 2 && <Text style={styles.xLabel} numberOfLines={1}>{data[Math.floor(data.length / 2)].label}</Text>}
-        <Text style={[styles.xLabel, { textAlign: 'right' }]} numberOfLines={1}>{data[data.length - 1].label}</Text>
+        <Text style={styles.xLabel} numberOfLines={1}>
+          {data[0].label}
+        </Text>
+        {data.length > 2 && (
+          <Text style={styles.xLabel} numberOfLines={1}>
+            {data[Math.floor(data.length / 2)].label}
+          </Text>
+        )}
+        <Text style={[styles.xLabel, { textAlign: 'right' }]} numberOfLines={1}>
+          {data[data.length - 1].label}
+        </Text>
       </View>
     </View>
   )
 }
 
 // ── Horizontal bars — ranked list ────────────────────────────────────────────
-function HBars({ data, width, fmt }: { data: AskMurmurChartPoint[]; width: number; fmt: (v: number) => string }) {
+function HBars({
+  data,
+  width,
+  fmt,
+}: {
+  data: AskMurmurChartPoint[]
+  width: number
+  fmt: (v: number) => string
+}) {
   const max = Math.max(...data.map((d) => d.value), 0) || 1
   const labelW = Math.min(120, Math.round(width * 0.38))
   const valueW = 64
@@ -133,11 +235,20 @@ function HBars({ data, width, fmt }: { data: AskMurmurChartPoint[]; width: numbe
     <View style={{ gap: 8 }}>
       {data.map((d, i) => (
         <View key={i} style={styles.hRow}>
-          <Text style={[styles.hLabel, { width: labelW }]} numberOfLines={1}>{d.label}</Text>
+          <Text style={[styles.hLabel, { width: labelW }]} numberOfLines={1}>
+            {d.label}
+          </Text>
           <View style={{ width: barMax }}>
-            <View style={[styles.hBar, { width: Math.max(4, (d.value / max) * barMax), backgroundColor: colorFor(i) }]} />
+            <View
+              style={[
+                styles.hBar,
+                { width: Math.max(4, (d.value / max) * barMax), backgroundColor: colorFor(i) },
+              ]}
+            />
           </View>
-          <Text style={[styles.hValue, { width: valueW }]} numberOfLines={1}>{fmt(d.value)}</Text>
+          <Text style={[styles.hValue, { width: valueW }]} numberOfLines={1}>
+            {fmt(d.value)}
+          </Text>
         </View>
       ))}
     </View>
@@ -152,7 +263,15 @@ function HBars({ data, width, fmt }: { data: AskMurmurChartPoint[]; width: numbe
 // outside the SVG and was clipped — the "circle with angles" in the owner's
 // screenshots. A neutral track ring behind the slices and the total in the
 // centre mirror the desktop chart.
-function Donut({ data, width, fmt }: { data: AskMurmurChartPoint[]; width: number; fmt: (v: number) => string }) {
+function Donut({
+  data,
+  width,
+  fmt,
+}: {
+  data: AskMurmurChartPoint[]
+  width: number
+  fmt: (v: number) => string
+}) {
   const slices = data.slice(0, 6)
   const total = slices.reduce((s, d) => s + Math.max(d.value, 0), 0)
   if (total <= 0) return null
@@ -198,8 +317,12 @@ function Donut({ data, width, fmt }: { data: AskMurmurChartPoint[]; width: numbe
         {slices.map((d, i) => (
           <View key={i} style={styles.legendRow}>
             <View style={[styles.legendDot, { backgroundColor: colorFor(i) }]} />
-            <Text style={styles.legendLabel} numberOfLines={1}>{d.label}</Text>
-            <Text style={styles.legendValue} numberOfLines={1}>{Math.round((Math.max(d.value, 0) / total) * 100)}%</Text>
+            <Text style={styles.legendLabel} numberOfLines={1}>
+              {d.label}
+            </Text>
+            <Text style={styles.legendValue} numberOfLines={1}>
+              {Math.round((Math.max(d.value, 0) / total) * 100)}%
+            </Text>
           </View>
         ))}
       </View>
@@ -271,7 +394,12 @@ const styles = StyleSheet.create({
   legend: { flex: 1, gap: 8 },
   legendRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   legendDot: { width: 8, height: 8, borderRadius: 4 },
-  legendLabel: { flex: 1, fontSize: 12.5, color: Colors.ink2, fontFamily: Typography.fontFamily.sans },
+  legendLabel: {
+    flex: 1,
+    fontSize: 12.5,
+    color: Colors.ink2,
+    fontFamily: Typography.fontFamily.sans,
+  },
   legendValue: {
     fontSize: 12.5,
     fontWeight: '700',

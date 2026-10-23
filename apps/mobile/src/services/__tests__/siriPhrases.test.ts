@@ -15,10 +15,7 @@ const { PHRASES, LOCALES } = require('../../../native/ios/siri-phrases.js') as {
 }
 const KINDS = ['expense', 'income'] as const
 
-const swift = readFileSync(
-  path.join(__dirname, '../../../native/ios/SiriLogExpense.swift'),
-  'utf8',
-)
+const swift = readFileSync(path.join(__dirname, '../../../native/ios/SiriLogExpense.swift'), 'utf8')
 
 describe('Siri phrases', () => {
   it('declares every English phrase the translations are keyed by', () => {

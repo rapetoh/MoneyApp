@@ -299,7 +299,11 @@ export function occurrencesInWindow(
   const out: Occurrence[] = []
   let cursor = firstOccurrenceOnOrAfter(rule, startInstant, tz)
   let iterations = 0
-  while (cursor && instantMs(cursor.instant) < instantMs(endExclusiveInstant) && iterations < limit) {
+  while (
+    cursor &&
+    instantMs(cursor.instant) < instantMs(endExclusiveInstant) &&
+    iterations < limit
+  ) {
     out.push(cursor)
     cursor = nextOccurrence(rule, cursor.instant, tz)
     iterations++

@@ -78,12 +78,19 @@ export default function LearnedCategoriesScreen() {
             {sorted.map((rule, i) => {
               const category = categoryMap[rule.category_id]
               return (
-                <View key={rule.merchant_key} style={[styles.row, i === sorted.length - 1 && styles.rowLast]}>
+                <View
+                  key={rule.merchant_key}
+                  style={[styles.row, i === sorted.length - 1 && styles.rowLast]}
+                >
                   <View style={styles.rowText}>
-                    <Text style={styles.merchant} numberOfLines={1}>{rule.merchant_name}</Text>
+                    <Text style={styles.merchant} numberOfLines={1}>
+                      {rule.merchant_name}
+                    </Text>
                     <View style={styles.categoryLine}>
                       <Ionicons name="arrow-forward" size={12} color={Colors.ink4} />
-                      <Text style={styles.category} numberOfLines={1}>{category?.name ?? '-'}</Text>
+                      <Text style={styles.category} numberOfLines={1}>
+                        {category?.name ?? '-'}
+                      </Text>
                     </View>
                   </View>
                   <Pressable
@@ -150,8 +157,26 @@ const styles = StyleSheet.create({
   merchant: { fontFamily: Typography.fontFamily.sansSemiBold, fontSize: 15, color: Colors.ink },
   categoryLine: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   category: { fontFamily: Typography.fontFamily.sans, fontSize: 13, color: Colors.ink3 },
-  forget: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, backgroundColor: Colors.surface2 },
-  forgetText: { fontFamily: Typography.fontFamily.sansSemiBold, fontSize: 12.5, color: Colors.ink2 },
-  emptyCard: { backgroundColor: Colors.surface ?? Colors.card, borderRadius: Radius.card, padding: Spacing.base },
-  emptyText: { fontFamily: Typography.fontFamily.sans, fontSize: 14, lineHeight: 20, color: Colors.ink3 },
+  forget: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: Colors.surface2,
+  },
+  forgetText: {
+    fontFamily: Typography.fontFamily.sansSemiBold,
+    fontSize: 12.5,
+    color: Colors.ink2,
+  },
+  emptyCard: {
+    backgroundColor: Colors.surface ?? Colors.card,
+    borderRadius: Radius.card,
+    padding: Spacing.base,
+  },
+  emptyText: {
+    fontFamily: Typography.fontFamily.sans,
+    fontSize: 14,
+    lineHeight: 20,
+    color: Colors.ink3,
+  },
 })

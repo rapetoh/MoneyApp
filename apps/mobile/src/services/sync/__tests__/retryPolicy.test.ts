@@ -21,7 +21,9 @@ describe('isRecurringDedupConflict', () => {
   })
 
   it('does not match a non-23505 code', () => {
-    expect(isRecurringDedupConflict({ code: '23514', message: 'idx_txn_recurring_dedup' })).toBe(false)
+    expect(isRecurringDedupConflict({ code: '23514', message: 'idx_txn_recurring_dedup' })).toBe(
+      false,
+    )
   })
 
   it('is false for null/undefined', () => {
@@ -38,19 +40,27 @@ describe('classifyError', () => {
   })
 
   it('classifies any other 23xxx as permanent — a CHECK violation (23514) dead-letters, not retries', () => {
-    expect(classifyError({ code: '23514', message: 'violates check constraint "transactions_amount_check"' })).toBe(
-      'permanent',
-    )
+    expect(
+      classifyError({
+        code: '23514',
+        message: 'violates check constraint "transactions_amount_check"',
+      }),
+    ).toBe('permanent')
   })
 
   it('classifies a different unique violation (not the recurring index) as permanent, never soft-deleted', () => {
     expect(
-      classifyError({ code: '23505', message: 'duplicate key value violates unique constraint "transactions_pkey"' }),
+      classifyError({
+        code: '23505',
+        message: 'duplicate key value violates unique constraint "transactions_pkey"',
+      }),
     ).toBe('permanent')
   })
 
   it('classifies 42xxx (e.g. an unknown column) as permanent', () => {
-    expect(classifyError({ code: '42703', message: 'column "bogus" does not exist' })).toBe('permanent')
+    expect(classifyError({ code: '42703', message: 'column "bogus" does not exist' })).toBe(
+      'permanent',
+    )
   })
 
   it('classifies a network failure with no SQLSTATE as transient', () => {

@@ -5,7 +5,11 @@ import { Colors } from '../theme'
  *  Replaces the "Step 1 of 2" labels (first-run audit L1). */
 export function StepDots({ step, total }: { step: number; total: number }) {
   return (
-    <View style={styles.row} accessibilityRole="progressbar" accessibilityValue={{ min: 1, max: total, now: step + 1 }}>
+    <View
+      style={styles.row}
+      accessibilityRole="progressbar"
+      accessibilityValue={{ min: 1, max: total, now: step + 1 }}
+    >
       {Array.from({ length: total }, (_, i) => (
         <View key={i} style={[styles.dot, i === step && styles.current, i < step && styles.done]} />
       ))}

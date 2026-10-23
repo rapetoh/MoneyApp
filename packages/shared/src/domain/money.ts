@@ -45,9 +45,7 @@ export type FlowKind = 'income' | 'expense' | 'transfer'
  * the destination: once a row carries a real `kind`, pass it and this
  * list is never consulted for that row.
  */
-export const DEFAULT_TRANSFER_CATEGORY_NAMES: ReadonlySet<string> = new Set([
-  'Savings & Investing',
-])
+export const DEFAULT_TRANSFER_CATEGORY_NAMES: ReadonlySet<string> = new Set(['Savings & Investing'])
 
 /** The `byCategory` key used for transactions with no `category_id`. */
 export const UNCATEGORIZED_CATEGORY_KEY = '__uncategorized__'

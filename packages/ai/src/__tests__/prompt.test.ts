@@ -38,7 +38,12 @@ describe('sanitizeCategoryNames', () => {
 
 describe('getPrompt — categories are a delimited data block, not woven into prose', () => {
   it('wraps categories in <user_categories> tags', () => {
-    const prompt = getPrompt({ locale: 'en', currency: 'USD', today: '2026-08-08', categories: ['Rent', 'Food'] })
+    const prompt = getPrompt({
+      locale: 'en',
+      currency: 'USD',
+      today: '2026-08-08',
+      categories: ['Rent', 'Food'],
+    })
     expect(prompt).toContain('<user_categories>')
     expect(prompt).toContain('</user_categories>')
     expect(prompt).toContain('Rent')

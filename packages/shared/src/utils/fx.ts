@@ -35,9 +35,7 @@ import { localDay } from './period'
  * Supabase row shape, the local SQLite shape, and the export DTOs
  * without forcing a Transaction import everywhere.
  */
-export function aggAmount(t: {
-  amount_in_profile_currency?: number | null
-}): number {
+export function aggAmount(t: { amount_in_profile_currency?: number | null }): number {
   return t.amount_in_profile_currency ?? 0
 }
 
@@ -49,9 +47,7 @@ export function aggAmount(t: {
  * `summarize()` in `packages/shared/src/domain/money.ts`, which is
  * this predicate's first real caller (07-F8: it had zero before).
  */
-export function isFxPending(t: {
-  amount_in_profile_currency?: number | null
-}): boolean {
+export function isFxPending(t: { amount_in_profile_currency?: number | null }): boolean {
   return t.amount_in_profile_currency == null
 }
 

@@ -34,19 +34,65 @@ const NAV: Array<{
   badgeKey?: 'recurring'
 }> = [
   { key: 'overview', label: 'Overview', href: '/dashboard', icon: Icon.chart, group: 'overview' },
-  { key: 'tx', label: 'Transactions', href: '/dashboard/transactions', icon: Icon.list, group: 'overview' },
-  { key: 'budgets', label: 'Budgets', href: '/dashboard/budgets', icon: Icon.sparkle, group: 'plan' },
-  { key: 'recurring', label: 'Recurring', href: '/dashboard/recurring', icon: Icon.refresh, group: 'plan', badgeKey: 'recurring' },
-  { key: 'ask', label: 'Ask Murmur', href: '/dashboard/ask', icon: Icon.sparkle, group: 'plan', plus: true, aiPill: true },
+  {
+    key: 'tx',
+    label: 'Transactions',
+    href: '/dashboard/transactions',
+    icon: Icon.list,
+    group: 'overview',
+  },
+  {
+    key: 'budgets',
+    label: 'Budgets',
+    href: '/dashboard/budgets',
+    icon: Icon.sparkle,
+    group: 'plan',
+  },
+  {
+    key: 'recurring',
+    label: 'Recurring',
+    href: '/dashboard/recurring',
+    icon: Icon.refresh,
+    group: 'plan',
+    badgeKey: 'recurring',
+  },
+  {
+    key: 'ask',
+    label: 'Ask Murmur',
+    href: '/dashboard/ask',
+    icon: Icon.sparkle,
+    group: 'plan',
+    plus: true,
+    aiPill: true,
+  },
   // Insights is free on every platform (CROSS §4.2) — no plus flag. Label
   // matches the page's own toolbar title/H1 and the mobile tab — was
   // "Reports & forecast" here, a fourth name for one destination (audit
   // 08-F44, fix-plan 4.2 — see docs/DESIGN.md's navigation naming table).
-  { key: 'reports', label: 'Insights', href: '/dashboard/insights', icon: Icon.chart, group: 'analyze' },
+  {
+    key: 'reports',
+    label: 'Insights',
+    href: '/dashboard/insights',
+    icon: Icon.chart,
+    group: 'analyze',
+  },
   // CSV import (docs/csv-import.md, Oct 2026).
   { key: 'import', label: 'Import', href: '/dashboard/import', icon: Icon.list, group: 'data' },
-  { key: 'export', label: 'Export', href: '/dashboard/export', icon: Icon.download, group: 'data', plus: true },
-  { key: 'settings', label: 'Settings', href: '/dashboard/settings', icon: Icon.settings, group: 'data' },
+  {
+    key: 'export',
+    label: 'Export',
+    href: '/dashboard/export',
+    icon: Icon.download,
+    group: 'data',
+    plus: true,
+  },
+  {
+    key: 'settings',
+    label: 'Settings',
+    href: '/dashboard/settings',
+    icon: Icon.settings,
+    group: 'data',
+  },
 ]
 
 const GROUP_LABEL: Record<GroupKey, string> = {
@@ -101,9 +147,7 @@ export function Sidebar({
             <div style={styles.groupLabel}>{GROUP_LABEL[g]}</div>
             {NAV.filter((n) => n.group === g).map((n) => {
               const active =
-                n.href === '/dashboard'
-                  ? pathname === '/dashboard'
-                  : pathname.startsWith(n.href)
+                n.href === '/dashboard' ? pathname === '/dashboard' : pathname.startsWith(n.href)
               const itemColor = active ? '#fff' : colors.ink2
               const itemIconColor = active ? '#fff' : colors.ink3
               return (
@@ -117,7 +161,14 @@ export function Sidebar({
                     color: itemColor,
                   }}
                 >
-                  <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 16 }}>
+                  <span
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      width: 16,
+                    }}
+                  >
                     {n.icon({ color: itemIconColor, size: 14 })}
                   </span>
                   <span style={{ flex: 1 }}>{n.label}</span>
@@ -143,9 +194,7 @@ export function Sidebar({
                       AI
                     </span>
                   )}
-                  {n.plus && !n.aiPill && !active && (
-                    <span style={styles.plusBadge}>Plus</span>
-                  )}
+                  {n.plus && !n.aiPill && !active && <span style={styles.plusBadge}>Plus</span>}
                 </Link>
               )
             })}

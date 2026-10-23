@@ -21,7 +21,10 @@ function txn(overrides: Partial<PatternTxn> = {}): PatternTxn {
   }
 }
 
-const NINETY_DAY_WINDOW: PatternWindow = { start: '2026-05-01T00:00:00Z', endExclusive: '2026-08-31T00:00:00Z' }
+const NINETY_DAY_WINDOW: PatternWindow = {
+  start: '2026-05-01T00:00:00Z',
+  endExclusive: '2026-08-31T00:00:00Z',
+}
 
 describe('2.11 "Done when": three transactions on one day claim nothing', () => {
   const txns: PatternTxn[] = [
@@ -49,7 +52,9 @@ describe('heaviestWeekday — divides by the actual weekday count, not a literal
     }
     // 12 weekday (non-Saturday) transactions to clear the ≥12-total gate.
     for (let i = 0; i < 12; i++) {
-      txns.push(txn({ transacted_at: `2026-08-0${(i % 6) + 2}T09:00:00Z`, amount_in_profile_currency: 5 }))
+      txns.push(
+        txn({ transacted_at: `2026-08-0${(i % 6) + 2}T09:00:00Z`, amount_in_profile_currency: 5 }),
+      )
     }
     const result = heaviestWeekday(txns, NINETY_DAY_WINDOW, 'UTC')
     expect(result.confident).toBe(true)
@@ -64,7 +69,9 @@ describe('heaviestWeekday — divides by the actual weekday count, not a literal
       txns.push(txn({ transacted_at: `2026-08-${d}T12:00:00Z`, amount_in_profile_currency: 30 }))
     }
     for (let i = 0; i < 12; i++) {
-      txns.push(txn({ transacted_at: `2026-08-0${(i % 6) + 2}T09:00:00Z`, amount_in_profile_currency: 5 }))
+      txns.push(
+        txn({ transacted_at: `2026-08-0${(i % 6) + 2}T09:00:00Z`, amount_in_profile_currency: 5 }),
+      )
     }
     expect(heaviestWeekday(txns, NINETY_DAY_WINDOW, 'UTC').confident).toBe(false)
   })

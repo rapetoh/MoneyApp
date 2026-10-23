@@ -49,7 +49,12 @@ type Cat = { id: string; name: string; kind: CategoryKind; color: string | null 
  * always have. The month-level KPI header/MindMap/Treemap route through
  * `monthSummary()` (fix-plan 1.4) for the transfer-aware figures instead.
  */
-function buildMonthDays(monthIso: string, tz: string, endExclusive: string, txns: LensTxn[]): LensDay[] {
+function buildMonthDays(
+  monthIso: string,
+  tz: string,
+  endExclusive: string,
+  txns: LensTxn[],
+): LensDay[] {
   const [yStr, mStr] = monthIso.split('-')
   const y = Number(yStr)
   const m = Number(mStr)
@@ -75,7 +80,9 @@ function buildMonthDays(monthIso: string, tz: string, endExclusive: string, txns
 
   for (const t of txns) {
     if (t.transacted_at < days[0]?.windowStart || t.transacted_at >= endExclusive) continue
-    const day = days.find((d) => t.transacted_at >= d.windowStart && t.transacted_at < d.windowEndExclusive)
+    const day = days.find(
+      (d) => t.transacted_at >= d.windowStart && t.transacted_at < d.windowEndExclusive,
+    )
     if (!day) continue
     day.txns.push(t)
     if (t.amount_in_profile_currency == null) continue // FX-pending — excluded, not folded in as 0
@@ -92,7 +99,9 @@ export default async function OverviewPage({
   searchParams: Promise<{ lens?: string; month?: string }>
 }) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
   const [profile, transactions, categories, recurring] = await Promise.all([
@@ -105,7 +114,9 @@ export default async function OverviewPage({
       // amount_in_profile_currency added — LensRecurring (and MindMap's
       // "Recurring outflow") cannot get the sign, FX conversion or
       // cadence right without them. See types.ts's LensRecurring doc.
-      .select('name, amount, amount_in_profile_currency, currency_code, direction, frequency, interval')
+      .select(
+        'name, amount, amount_in_profile_currency, currency_code, direction, frequency, interval',
+      )
       .eq('user_id', user.id)
       .eq('is_active', true)
       .then((r) => (r.data ?? []) as LensRecurring[]),
@@ -139,7 +150,10 @@ export default async function OverviewPage({
   // themselves (`LensProps.windowStart`/`windowEndExclusive`) and a
   // precomputed `days` array (below) instead.
   const bounds = monthBounds(monthIso, tz)
-  const monthLabel = new Date(bounds.start).toLocaleDateString(locale, { month: 'long', timeZone: tz })
+  const monthLabel = new Date(bounds.start).toLocaleDateString(locale, {
+    month: 'long',
+    timeZone: tz,
+  })
   const todayIso = localDay(new Date().toISOString(), tz)
 
   // Shape transactions for lens consumption. We pass the *full* set so
@@ -150,8 +164,8 @@ export default async function OverviewPage({
     amount_in_profile_currency: t.amount_in_profile_currency ?? null,
     direction: t.direction,
     category_id: t.category_id ?? null,
-    category_name: t.category_id ? catMap[t.category_id] ?? null : null,
-    category_kind: t.category_id ? catKindMap[t.category_id] ?? null : null,
+    category_name: t.category_id ? (catMap[t.category_id] ?? null) : null,
+    category_kind: t.category_id ? (catKindMap[t.category_id] ?? null) : null,
     merchant: t.merchant ?? null,
     merchant_domain: t.merchant_domain ?? null,
     transacted_at: t.transacted_at,
@@ -196,11 +210,16 @@ export default async function OverviewPage({
   const pendingCount = summary.pendingCount
 
   const fmtShort = (v: number) =>
-    new Intl.NumberFormat(locale, { style: 'currency', currency, maximumFractionDigits: 0 }).format(v)
+    new Intl.NumberFormat(locale, { style: 'currency', currency, maximumFractionDigits: 0 }).format(
+      v,
+    )
 
   return (
     <div style={styles.page}>
-      <Toolbar title="Overview" right={<MonthPicker selected={monthIso} locale={locale} tz={tz} />} />
+      <Toolbar
+        title="Overview"
+        right={<MonthPicker selected={monthIso} locale={locale} tz={tz} />}
+      />
       <div style={styles.content}>
         <div style={styles.headerRow}>
           <div>

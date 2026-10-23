@@ -18,7 +18,13 @@ import { enqueue } from './sync/syncQueue'
 import { syncManager } from './sync/SyncManager'
 import { loadMerchantRules } from './merchantRules'
 import { identifyMerchants } from '@voice-expense/ai'
-import { importTransaction, descriptorsToIdentify, type Category, type ImportRow, type Transaction } from '@voice-expense/shared'
+import {
+  importTransaction,
+  descriptorsToIdentify,
+  type Category,
+  type ImportRow,
+  type Transaction,
+} from '@voice-expense/shared'
 
 const CHUNK = 200
 

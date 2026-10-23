@@ -130,7 +130,7 @@ describe('nextOccurrence — DST (04-F20)', () => {
     expect(after.instant).toBe('2026-03-11T14:00:00.000Z')
   })
 
-  it('is independent of the host process\'s ambient TZ — only the `tz` argument matters (04-F2)', () => {
+  it("is independent of the host process's ambient TZ — only the `tz` argument matters (04-F2)", () => {
     const rule = monthlyRule()
     const compute = () => nextOccurrence(rule, rule.starts_at, 'America/Chicago')!.instant
 
@@ -184,7 +184,10 @@ describe('the dedup-window rule — local civil day, not UTC day (03-F16 / 04-F2
 
 describe('occurrencesDue (03-F15 — bounded catch-up in one run)', () => {
   it('a monthly rule six months behind yields six occurrences from a single call', () => {
-    const rule = { ...monthlyRule({ starts_at: '2026-01-31T14:00:00.000Z' }), last_generated: null as string | null }
+    const rule = {
+      ...monthlyRule({ starts_at: '2026-01-31T14:00:00.000Z' }),
+      last_generated: null as string | null,
+    }
     const now = '2026-07-15T00:00:00.000Z'
     const due = occurrencesDue(rule, now, 'UTC')
     expect(due.map((o) => o.occurrenceDate)).toEqual([
@@ -198,7 +201,10 @@ describe('occurrencesDue (03-F15 — bounded catch-up in one run)', () => {
   })
 
   it('respects the limit rather than running away', () => {
-    const rule = { ...monthlyRule({ starts_at: '2020-01-31T14:00:00.000Z' }), last_generated: null as string | null }
+    const rule = {
+      ...monthlyRule({ starts_at: '2020-01-31T14:00:00.000Z' }),
+      last_generated: null as string | null,
+    }
     const due = occurrencesDue(rule, '2026-08-09T00:00:00.000Z', 'UTC', 3)
     expect(due).toHaveLength(3)
   })
@@ -235,7 +241,11 @@ describe('firstOccurrenceOnOrAfter / occurrencesInWindow (03-F25 — no iteratio
 
 describe('chargesInWindow', () => {
   it('flattens and sorts occurrences across multiple rules by instant', () => {
-    const rentRule = { id: 'rent', amount: 1500, ...monthlyRule({ starts_at: '2026-08-01T13:00:00.000Z' }) }
+    const rentRule = {
+      id: 'rent',
+      amount: 1500,
+      ...monthlyRule({ starts_at: '2026-08-01T13:00:00.000Z' }),
+    }
     const netflixRule = {
       id: 'netflix',
       amount: 9.99,
@@ -265,9 +275,18 @@ describe('monthlyEquivalent / annualEquivalent (03-F23 — honour interval)', ()
     expect(monthlyEquivalent({ frequency: 'yearly', interval: 1, amount: 120 })).toBe(10)
   })
   it('uses exact calendar ratios for sub-monthly cadences (26/12, 52/12, 365.25/12)', () => {
-    expect(monthlyEquivalent({ frequency: 'biweekly', interval: 1, amount: 2500 })).toBeCloseTo(5416.67, 2)
-    expect(monthlyEquivalent({ frequency: 'weekly', interval: 1, amount: 100 })).toBeCloseTo(433.33, 2)
-    expect(monthlyEquivalent({ frequency: 'daily', interval: 1, amount: 1 })).toBeCloseTo(30.4375, 4)
+    expect(monthlyEquivalent({ frequency: 'biweekly', interval: 1, amount: 2500 })).toBeCloseTo(
+      5416.67,
+      2,
+    )
+    expect(monthlyEquivalent({ frequency: 'weekly', interval: 1, amount: 100 })).toBeCloseTo(
+      433.33,
+      2,
+    )
+    expect(monthlyEquivalent({ frequency: 'daily', interval: 1, amount: 1 })).toBeCloseTo(
+      30.4375,
+      4,
+    )
   })
 
   it('annualEquivalent is twelve times the monthly figure', () => {
@@ -317,4 +336,3 @@ describe('buildRuleAnchor', () => {
     expect(anchor.anchor_time).toBe('14:30:05')
   })
 })
-

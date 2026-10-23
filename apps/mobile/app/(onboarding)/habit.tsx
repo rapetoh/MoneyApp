@@ -1,5 +1,14 @@
 import { useState } from 'react'
-import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native'
+import {
+  ActivityIndicator,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  View,
+} from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
@@ -8,7 +17,13 @@ import { useAuth } from '../../src/hooks/useAuth'
 import { useProfile } from '../../src/hooks/useProfile'
 import { KEY_ONBOARDING_FOLLOWUP, type OnboardingFollowup } from '../../src/hooks/useFirstRun'
 import { StepDots } from '../../src/components/StepDots'
-import { CHECKIN_HOURS, DEFAULT_CHECKIN, enableCheckIn, formatCheckInHour, setCheckIn } from '../../src/services/reminders'
+import {
+  CHECKIN_HOURS,
+  DEFAULT_CHECKIN,
+  enableCheckIn,
+  formatCheckInHour,
+  setCheckIn,
+} from '../../src/services/reminders'
 import { track } from '../../src/services/analytics'
 import { Colors, Typography, Hairline } from '../../src/theme'
 import { t, type Locale } from '@voice-expense/shared'
@@ -99,7 +114,9 @@ export default function HabitScreen() {
                   accessibilityRole="button"
                   accessibilityState={{ selected: h === hour }}
                 >
-                  <Text style={[styles.hourText, h === hour && styles.hourTextOn]}>{formatCheckInHour(h, locale)}</Text>
+                  <Text style={[styles.hourText, h === hour && styles.hourTextOn]}>
+                    {formatCheckInHour(h, locale)}
+                  </Text>
                 </Pressable>
               ))}
             </View>
@@ -143,7 +160,11 @@ export default function HabitScreen() {
           style={({ pressed }) => [styles.cta, (pressed || saving) && styles.ctaPressed]}
           accessibilityRole="button"
         >
-          {saving ? <ActivityIndicator color={Colors.white} /> : <Text style={styles.ctaText}>{t('common.continue', locale)}</Text>}
+          {saving ? (
+            <ActivityIndicator color={Colors.white} />
+          ) : (
+            <Text style={styles.ctaText}>{t('common.continue', locale)}</Text>
+          )}
         </Pressable>
       </View>
     </SafeAreaView>
@@ -162,7 +183,13 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: Colors.ink,
   },
-  lead: { marginTop: 10, fontSize: 15, lineHeight: 22, color: Colors.ink3, fontFamily: Typography.fontFamily.sans },
+  lead: {
+    marginTop: 10,
+    fontSize: 15,
+    lineHeight: 22,
+    color: Colors.ink3,
+    fontFamily: Typography.fontFamily.sans,
+  },
   card: {
     marginTop: 18,
     padding: 16,
@@ -180,8 +207,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  cardTitle: { fontSize: 15.5, color: Colors.ink, fontFamily: Typography.fontFamily.sansSemiBold, fontWeight: '600' },
-  cardBody: { marginTop: 3, fontSize: 13, lineHeight: 19, color: Colors.ink3, fontFamily: Typography.fontFamily.sans },
+  cardTitle: {
+    fontSize: 15.5,
+    color: Colors.ink,
+    fontFamily: Typography.fontFamily.sansSemiBold,
+    fontWeight: '600',
+  },
+  cardBody: {
+    marginTop: 3,
+    fontSize: 13,
+    lineHeight: 19,
+    color: Colors.ink3,
+    fontFamily: Typography.fontFamily.sans,
+  },
   hours: { marginTop: 14, flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   hour: {
     paddingHorizontal: 12,
@@ -194,12 +232,34 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   hourOn: { backgroundColor: Colors.ink, borderColor: Colors.ink },
-  hourText: { fontSize: 13.5, color: Colors.ink2, fontFamily: Typography.fontFamily.sansSemiBold, fontWeight: '600' },
+  hourText: {
+    fontSize: 13.5,
+    color: Colors.ink2,
+    fontFamily: Typography.fontFamily.sansSemiBold,
+    fontWeight: '600',
+  },
   hourTextOn: { color: Colors.white },
-  toggleRow: { marginTop: 14, flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 4 },
-  toggleText: { fontSize: 14.5, color: Colors.ink, fontFamily: Typography.fontFamily.sansSemiBold, fontWeight: '600' },
+  toggleRow: {
+    marginTop: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 4,
+  },
+  toggleText: {
+    fontSize: 14.5,
+    color: Colors.ink,
+    fontFamily: Typography.fontFamily.sansSemiBold,
+    fontWeight: '600',
+  },
   footer: { paddingHorizontal: 28, paddingTop: 10, paddingBottom: 8 },
-  note: { fontSize: 12.5, color: Colors.ink4, textAlign: 'center', marginBottom: 10, fontFamily: Typography.fontFamily.sans },
+  note: {
+    fontSize: 12.5,
+    color: Colors.ink4,
+    textAlign: 'center',
+    marginBottom: 10,
+    fontFamily: Typography.fontFamily.sans,
+  },
   error: {
     color: Colors.destructive,
     fontSize: 13,
@@ -207,7 +267,18 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     fontFamily: Typography.fontFamily.sansSemiBold,
   },
-  cta: { height: 56, borderRadius: 28, backgroundColor: Colors.ink, alignItems: 'center', justifyContent: 'center' },
+  cta: {
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: Colors.ink,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   ctaPressed: { opacity: 0.85 },
-  ctaText: { color: Colors.white, fontSize: 17, fontWeight: '600', fontFamily: Typography.fontFamily.sansSemiBold },
+  ctaText: {
+    color: Colors.white,
+    fontSize: 17,
+    fontWeight: '600',
+    fontFamily: Typography.fontFamily.sansSemiBold,
+  },
 })

@@ -155,7 +155,13 @@ async function runRecurringCatchUpInner(userId: string): Promise<number> {
         // monthly bill generated today for last-month's date uses
         // last-month's rate so the historical totals stay coherent.
         const profileCurrency = getCurrentProfileCurrency()
-        const fx = await snapshotFx(transactedAt, rule.currency_code, profileCurrency, rule.amount, tz)
+        const fx = await snapshotFx(
+          transactedAt,
+          rule.currency_code,
+          profileCurrency,
+          rule.amount,
+          tz,
+        )
 
         const txn: Transaction = {
           id: txnId,

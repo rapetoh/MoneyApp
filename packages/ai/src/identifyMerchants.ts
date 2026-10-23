@@ -4,7 +4,11 @@
  * throws: a batch that fails just leaves its descriptors unnamed, and the
  * importer falls back to the cleaned descriptor and local guesses.
  */
-import { MERCHANT_BATCH_MAX, MERCHANT_DESCRIPTOR_MAX_LENGTH, type MerchantBatchResult } from './merchantBatch'
+import {
+  MERCHANT_BATCH_MAX,
+  MERCHANT_DESCRIPTOR_MAX_LENGTH,
+  type MerchantBatchResult,
+} from './merchantBatch'
 
 /** Enough for a few thousand bank rows; the rest keep their cleaned names. */
 export const IDENTIFY_MAX_DESCRIPTORS = 600
@@ -31,7 +35,10 @@ export async function identifyMerchants(args: {
       try {
         const res = await fetch(`${args.apiBaseUrl}/api/ai/identify-merchants`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${args.authToken}` },
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${args.authToken}`,
+          },
           body: JSON.stringify({ descriptors: batch, categories: args.categories.slice(0, 100) }),
         })
         if (res.status === 429 && attempt === 0) {

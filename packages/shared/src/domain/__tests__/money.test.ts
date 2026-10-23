@@ -51,9 +51,22 @@ describe('summarize — the audit scenario (05-F2 / 08-F13 / 02-F17)', () => {
 
   it('the FIX-PLAN done-when fixture: credit 1000, debit 100 (Food), debit 300 (Savings & Investing)', () => {
     const result = summarize([
-      txn({ direction: 'credit', category_id: null, category_name: null, amount_in_profile_currency: 1000 }),
-      txn({ category_id: 'cat-food', category_name: 'Food & Dining', amount_in_profile_currency: 100 }),
-      txn({ category_id: 'cat-savings', category_name: 'Savings & Investing', amount_in_profile_currency: 300 }),
+      txn({
+        direction: 'credit',
+        category_id: null,
+        category_name: null,
+        amount_in_profile_currency: 1000,
+      }),
+      txn({
+        category_id: 'cat-food',
+        category_name: 'Food & Dining',
+        amount_in_profile_currency: 100,
+      }),
+      txn({
+        category_id: 'cat-savings',
+        category_name: 'Savings & Investing',
+        amount_in_profile_currency: 300,
+      }),
     ])
 
     expect(result.income).toBe(1000)
@@ -68,7 +81,11 @@ describe('summarize — the audit scenario (05-F2 / 08-F13 / 02-F17)', () => {
     // `max(0, in - out)` formula printed "$0 saved". This one prints
     // the true, negative figure instead of flooring it away.
     const result = summarize([
-      txn({ category_id: 'cat-food', category_name: 'Food & Dining', amount_in_profile_currency: 92 }),
+      txn({
+        category_id: 'cat-food',
+        category_name: 'Food & Dining',
+        amount_in_profile_currency: 92,
+      }),
     ])
     expect(result.income).toBe(0)
     expect(result.expense).toBe(92)
@@ -122,7 +139,9 @@ describe('summarize — byCategory is the full map, never truncated (05-F36 / 05
       amount: i + 1,
     }))
     const result = summarize(
-      cats.map((c) => txn({ category_id: c.id, category_name: c.name, amount_in_profile_currency: c.amount })),
+      cats.map((c) =>
+        txn({ category_id: c.id, category_name: c.name, amount_in_profile_currency: c.amount }),
+      ),
     )
     expect(Object.keys(result.byCategory)).toHaveLength(12)
     const total = Object.values(result.byCategory).reduce((s, c) => s + c.amount, 0)
@@ -137,9 +156,22 @@ describe('summarize — byCategory is the full map, never truncated (05-F36 / 05
 
   it('excludes transfer and income categories from byCategory', () => {
     const result = summarize([
-      txn({ direction: 'credit', category_id: null, category_name: null, amount_in_profile_currency: 1000 }),
-      txn({ category_id: 'cat-savings', category_name: 'Savings & Investing', amount_in_profile_currency: 300 }),
-      txn({ category_id: 'cat-food', category_name: 'Food & Dining', amount_in_profile_currency: 50 }),
+      txn({
+        direction: 'credit',
+        category_id: null,
+        category_name: null,
+        amount_in_profile_currency: 1000,
+      }),
+      txn({
+        category_id: 'cat-savings',
+        category_name: 'Savings & Investing',
+        amount_in_profile_currency: 300,
+      }),
+      txn({
+        category_id: 'cat-food',
+        category_name: 'Food & Dining',
+        amount_in_profile_currency: 50,
+      }),
     ])
     expect(Object.keys(result.byCategory)).toEqual(['cat-food'])
   })
@@ -147,7 +179,10 @@ describe('summarize — byCategory is the full map, never truncated (05-F36 / 05
 
 describe('summarize — window filtering is half-open [start, endExclusive)', () => {
   const inMonth = txn({ transacted_at: '2026-08-01T00:00:00Z', amount_in_profile_currency: 1 })
-  const atEndExclusive = txn({ transacted_at: '2026-09-01T00:00:00Z', amount_in_profile_currency: 2 })
+  const atEndExclusive = txn({
+    transacted_at: '2026-09-01T00:00:00Z',
+    amount_in_profile_currency: 2,
+  })
   const beforeStart = txn({ transacted_at: '2026-07-31T23:59:59Z', amount_in_profile_currency: 4 })
 
   it('includes the start instant and excludes the end instant', () => {

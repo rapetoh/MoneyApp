@@ -311,9 +311,8 @@ export function validateAskMurmurResponse(
   fallbackTransactionCount: number,
 ): AskMurmurResponse {
   const obj = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {}
-  const verdictRaw = obj.verdict && typeof obj.verdict === 'object'
-    ? (obj.verdict as Record<string, unknown>)
-    : {}
+  const verdictRaw =
+    obj.verdict && typeof obj.verdict === 'object' ? (obj.verdict as Record<string, unknown>) : {}
   const verdictText = asString(verdictRaw.text).trim()
   const out_of_scope = asBool(obj.out_of_scope, false)
   // If the model returned an empty verdict, leave it empty here. The route's
@@ -321,7 +320,7 @@ export function validateAskMurmurResponse(
   // and the deterministic intent-answer fallback covers the case where every
   // retry also empties out. Never substitute apology language at this layer.
   const fallbackText = out_of_scope
-    ? "I keep my answers grounded in your own transactions and recurring rules. For things like specific investments, taxes, or current market prices, a human professional is the right call."
+    ? 'I keep my answers grounded in your own transactions and recurring rules. For things like specific investments, taxes, or current market prices, a human professional is the right call.'
     : ''
   const verdict: AskMurmurResponse['verdict'] = {
     text: verdictText || fallbackText,
@@ -333,9 +332,7 @@ export function validateAskMurmurResponse(
     const b = obj.breakdown as Record<string, unknown>
     const caption = asString(b.caption).trim()
     const rowsArr = Array.isArray(b.rows) ? b.rows : []
-    const rows = rowsArr
-      .map(validateRow)
-      .filter((r): r is AskMurmurStatRow => r !== null)
+    const rows = rowsArr.map(validateRow).filter((r): r is AskMurmurStatRow => r !== null)
     if (caption && rows.length > 0) breakdown = { caption, rows }
   }
 
@@ -348,13 +345,12 @@ export function validateAskMurmurResponse(
   }
 
   const actionsArr = Array.isArray(obj.actions) ? obj.actions : []
-  const actions = actionsArr
-    .map(validateAction)
-    .filter((a): a is AskMurmurAction => a !== null)
+  const actions = actionsArr.map(validateAction).filter((a): a is AskMurmurAction => a !== null)
 
-  const attributionRaw = obj.attribution && typeof obj.attribution === 'object'
-    ? (obj.attribution as Record<string, unknown>)
-    : {}
+  const attributionRaw =
+    obj.attribution && typeof obj.attribution === 'object'
+      ? (obj.attribution as Record<string, unknown>)
+      : {}
   const transaction_count = Math.max(
     0,
     Math.round(asNumber(attributionRaw.transaction_count, fallbackTransactionCount)),
@@ -443,7 +439,8 @@ function parseLocaleNumber(raw: string): number {
  *  etc.) so "90 days" doesn't get treated as $90. */
 export function extractCurrencyValues(text: string): number[] {
   const out: number[] = []
-  const re = /(?:[$€£¥₦]|\b(?:USD|EUR|GBP|JPY|CAD|XAF|NGN|GHS|CHF|AUD)\b)?\s*(-?\d{1,3}(?:[,.\s]\d{3})*(?:[.,]\d{1,2})?|-?\d+(?:[.,]\d{1,2})?)/gi
+  const re =
+    /(?:[$€£¥₦]|\b(?:USD|EUR|GBP|JPY|CAD|XAF|NGN|GHS|CHF|AUD)\b)?\s*(-?\d{1,3}(?:[,.\s]\d{3})*(?:[.,]\d{1,2})?|-?\d+(?:[.,]\d{1,2})?)/gi
   let m: RegExpExecArray | null
   while ((m = re.exec(text)) !== null) {
     const raw = m[1]
@@ -616,10 +613,7 @@ export function validateAskMurmurResponseAgainstCalls(
   // direction is structurally guaranteed wrong — the original sin we
   // built this whole architecture to eliminate.
   const violations: string[] = []
-  const dirIssue = checkComparisonDirection(
-    response.verdict.text,
-    comparisonsFromCalls(calls),
-  )
+  const dirIssue = checkComparisonDirection(response.verdict.text, comparisonsFromCalls(calls))
   if (dirIssue) violations.push(dirIssue)
 
   return {

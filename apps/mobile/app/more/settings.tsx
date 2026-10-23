@@ -69,10 +69,12 @@ import {
 import type { BudgetPeriod } from '@voice-expense/shared'
 import { useRouter } from 'expo-router'
 
-const LOCALES: { value: Locale; label: string }[] = (Object.keys(LOCALE_LABELS) as Locale[]).map((value) => ({
-  value,
-  label: LOCALE_LABELS[value],
-}))
+const LOCALES: { value: Locale; label: string }[] = (Object.keys(LOCALE_LABELS) as Locale[]).map(
+  (value) => ({
+    value,
+    label: LOCALE_LABELS[value],
+  }),
+)
 // One list with onboarding's setup screen (first-run audit C1).
 const CURRENCIES: readonly string[] = SUPPORTED_CURRENCIES
 const BUDGET_PERIODS: { value: BudgetPeriod; key: string }[] = [
@@ -553,11 +555,7 @@ export default function SettingsScreen() {
               setNameModal(true)
             }}
           />
-          <SetRow
-            label={t('settings.timezone', locale)}
-            detail={deviceTimeZone}
-            chevron={false}
-          />
+          <SetRow label={t('settings.timezone', locale)} detail={deviceTimeZone} chevron={false} />
           {/* Account deletion (App Store 5.1.1(v), Sep 8 2026 rejection):
               the row a reviewer looks for sits with the account itself.
               The Privacy Center keeps its copy; both run useDeleteAccount. */}
@@ -742,7 +740,8 @@ export default function SettingsScreen() {
         {notifDenied && (
           <Pressable onPress={() => Linking.openSettings()} style={styles.notifNote}>
             <Text style={styles.notifNoteText}>
-              {t('settings.notifications_off', locale)} <Text style={styles.notifNoteLink}>{t('common.open_settings', locale)}</Text>
+              {t('settings.notifications_off', locale)}{' '}
+              <Text style={styles.notifNoteLink}>{t('common.open_settings', locale)}</Text>
             </Text>
           </Pressable>
         )}
@@ -844,7 +843,9 @@ export default function SettingsScreen() {
         initialRollover={budget?.rollover ?? false}
         currency={currency}
         locale={locale}
-        onSave={async (amount, period, _categoryId, rollover) => setBudget(amount, period, currency, profile?.timezone || undefined, rollover)}
+        onSave={async (amount, period, _categoryId, rollover) =>
+          setBudget(amount, period, currency, profile?.timezone || undefined, rollover)
+        }
         onClose={() => setBudgetModal(false)}
       />
 
@@ -883,9 +884,13 @@ export default function SettingsScreen() {
         <SafeAreaView style={styles.modal} edges={['top', 'bottom', 'left', 'right']}>
           <View style={styles.modalHeader}>
             <Pressable onPress={() => setExportPickerOpen(false)}>
-              <Text style={styles.modalCancel} numberOfLines={1}>{t('common.cancel', locale)}</Text>
+              <Text style={styles.modalCancel} numberOfLines={1}>
+                {t('common.cancel', locale)}
+              </Text>
             </Pressable>
-            <Text style={styles.modalTitle} numberOfLines={1}>{t('export.picker_title', locale)}</Text>
+            <Text style={styles.modalTitle} numberOfLines={1}>
+              {t('export.picker_title', locale)}
+            </Text>
             <View style={{ width: 60 }} />
           </View>
           {(['csv', 'json', 'pdf'] as ExportFormat[]).map((fmt, i) => {
@@ -928,7 +933,9 @@ export default function SettingsScreen() {
                 {t('common.cancel', locale)}
               </Text>
             </Pressable>
-            <Text style={styles.modalTitle} numberOfLines={1}>{t('settings.currency', locale)}</Text>
+            <Text style={styles.modalTitle} numberOfLines={1}>
+              {t('settings.currency', locale)}
+            </Text>
             <View style={{ width: 60 }} />
           </View>
           {currencyConverting ? (
@@ -967,9 +974,13 @@ export default function SettingsScreen() {
         <View style={styles.modal}>
           <View style={styles.modalHeader}>
             <Pressable onPress={() => setLocaleModal(false)}>
-              <Text style={styles.modalCancel} numberOfLines={1}>{t('common.cancel', locale)}</Text>
+              <Text style={styles.modalCancel} numberOfLines={1}>
+                {t('common.cancel', locale)}
+              </Text>
             </Pressable>
-            <Text style={styles.modalTitle} numberOfLines={1}>{t('settings.language', locale)}</Text>
+            <Text style={styles.modalTitle} numberOfLines={1}>
+              {t('settings.language', locale)}
+            </Text>
             <View style={{ width: 60 }} />
           </View>
           {LOCALES.map((l, i) => (
@@ -1006,9 +1017,13 @@ export default function SettingsScreen() {
           <View style={styles.modal}>
             <View style={styles.modalHeader}>
               <Pressable onPress={() => setApiUrlModal(false)}>
-                <Text style={styles.modalCancel} numberOfLines={1}>{t('common.cancel', locale)}</Text>
+                <Text style={styles.modalCancel} numberOfLines={1}>
+                  {t('common.cancel', locale)}
+                </Text>
               </Pressable>
-              <Text style={styles.modalTitle} numberOfLines={1}>{t('settings.ai_server_url', locale)}</Text>
+              <Text style={styles.modalTitle} numberOfLines={1}>
+                {t('settings.ai_server_url', locale)}
+              </Text>
               <Pressable
                 onPress={async () => {
                   await setApiUrl(apiUrlInput)
@@ -1065,9 +1080,13 @@ export default function SettingsScreen() {
         <View style={styles.modal}>
           <View style={styles.modalHeader}>
             <Pressable onPress={() => setNameModal(false)}>
-              <Text style={styles.modalCancel} numberOfLines={1}>{t('common.cancel', locale)}</Text>
+              <Text style={styles.modalCancel} numberOfLines={1}>
+                {t('common.cancel', locale)}
+              </Text>
             </Pressable>
-            <Text style={styles.modalTitle} numberOfLines={1}>{t('settings.display_name', locale)}</Text>
+            <Text style={styles.modalTitle} numberOfLines={1}>
+              {t('settings.display_name', locale)}
+            </Text>
             <Pressable onPress={handleSaveName}>
               <Text style={styles.modalDone}>{t('common.save', locale)}</Text>
             </Pressable>
@@ -1100,9 +1119,13 @@ export default function SettingsScreen() {
         <View style={styles.modal}>
           <View style={styles.modalHeader}>
             <Pressable onPress={() => setSyncIssuesModal(false)}>
-              <Text style={styles.modalCancel} numberOfLines={1}>{t('common.cancel', locale)}</Text>
+              <Text style={styles.modalCancel} numberOfLines={1}>
+                {t('common.cancel', locale)}
+              </Text>
             </Pressable>
-            <Text style={styles.modalTitle} numberOfLines={1}>{t('settings.sync_issues', locale)}</Text>
+            <Text style={styles.modalTitle} numberOfLines={1}>
+              {t('settings.sync_issues', locale)}
+            </Text>
             <View style={{ width: 60 }} />
           </View>
           <ScrollView
@@ -1153,7 +1176,13 @@ export default function SettingsScreen() {
 }
 
 const styles = StyleSheet.create({
-  hourRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 16, paddingBottom: 12 },
+  hourRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+  },
   hourChip: {
     paddingHorizontal: 12,
     height: 34,
@@ -1163,7 +1192,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   hourChipOn: { backgroundColor: Colors.ink },
-  hourChipText: { fontSize: 13, color: Colors.ink2, fontFamily: Typography.fontFamily.sansSemiBold, fontWeight: '600' },
+  hourChipText: {
+    fontSize: 13,
+    color: Colors.ink2,
+    fontFamily: Typography.fontFamily.sansSemiBold,
+    fontWeight: '600',
+  },
   hourChipTextOn: { color: Colors.white },
   notifNote: { marginHorizontal: 20, marginTop: -8, marginBottom: 16 },
   notifHint: {
@@ -1175,8 +1209,17 @@ const styles = StyleSheet.create({
     color: Colors.ink3,
     fontFamily: Typography.fontFamily.sans,
   },
-  notifNoteText: { fontSize: 12.5, lineHeight: 18, color: Colors.ink3, fontFamily: Typography.fontFamily.sans },
-  notifNoteLink: { color: Colors.accent, fontFamily: Typography.fontFamily.sansSemiBold, fontWeight: '600' },
+  notifNoteText: {
+    fontSize: 12.5,
+    lineHeight: 18,
+    color: Colors.ink3,
+    fontFamily: Typography.fontFamily.sans,
+  },
+  notifNoteLink: {
+    color: Colors.accent,
+    fontFamily: Typography.fontFamily.sansSemiBold,
+    fontWeight: '600',
+  },
   safe: { flex: 1, backgroundColor: Colors.background },
   content: {
     paddingTop: 4,

@@ -37,9 +37,7 @@ interface Cell {
 // next to a $20 K one is still readable. Top row gets 80% of the
 // canvas height for the bigger items; tail row 20% for the long tail.
 // Values returned as percentages of the canvas (0-100) on each axis.
-function layoutCells(
-  items: Array<{ label: string; amt: number; color: string }>,
-): Cell[] {
+function layoutCells(items: Array<{ label: string; amt: number; color: string }>): Cell[] {
   if (items.length === 0) return []
   const total = items.reduce((s, i) => s + i.amt, 0)
   if (total <= 0) return []
@@ -51,12 +49,7 @@ function layoutCells(
 
   const cells: Cell[] = []
 
-  function packRow(
-    rowItems: typeof topItems,
-    yPct: number,
-    hPct: number,
-    minWPct: number,
-  ): void {
+  function packRow(rowItems: typeof topItems, yPct: number, hPct: number, minWPct: number): void {
     if (rowItems.length === 0) return
     const rowTotal = rowItems.reduce((s, i) => s + i.amt, 0)
     if (rowTotal <= 0) return
@@ -132,7 +125,14 @@ export function TreemapLens({ props }: { props: LensProps }) {
         fontFamily: font.sans,
       }}
     >
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: 12,
+        }}
+      >
         <div>
           <div
             style={{

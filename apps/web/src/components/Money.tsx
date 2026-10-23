@@ -43,7 +43,11 @@ export function Money({
   // formatMoneyParts (packages/shared/src/utils/currency.ts) is the one
   // Intl-backed formatter both platforms consume — this used to be a
   // hand-rolled `formatToParts` call duplicating that module exactly.
-  const { symbol, symbolFirst, integer, decimal, fraction } = formatMoneyParts(value, currency, locale)
+  const { symbol, symbolFirst, integer, decimal, fraction } = formatMoneyParts(
+    value,
+    currency,
+    locale,
+  )
 
   const sign = isNeg ? '−' : showPositiveSign ? '+' : ''
 
@@ -60,17 +64,13 @@ export function Money({
       }}
     >
       {sign}
-      {symbolFirst && (
-        <SymbolSpan symbol={symbol} size={size} />
-      )}
+      {symbolFirst && <SymbolSpan symbol={symbol} size={size} />}
       {integer}
       <span style={{ opacity: 0.55 }}>
         {decimal}
         {fraction}
       </span>
-      {!symbolFirst && (
-        <SymbolSpan symbol={' ' + symbol} size={size} />
-      )}
+      {!symbolFirst && <SymbolSpan symbol={' ' + symbol} size={size} />}
     </span>
   )
 }

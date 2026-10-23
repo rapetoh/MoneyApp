@@ -53,7 +53,8 @@ function parseFontFamilyMap(src: string): { literal: Record<string, string>; sys
  *  `FONT_MAP = { ... }` block, key -> basename of the required file. */
 function parseFontMap(src: string): Record<string, string> {
   const blockMatch = src.match(/const FONT_MAP = {([\s\S]*?)\n}/)
-  if (!blockMatch) throw new Error('Could not locate `const FONT_MAP = { ... }` block in _layout.tsx')
+  if (!blockMatch)
+    throw new Error('Could not locate `const FONT_MAP = { ... }` block in _layout.tsx')
   const map: Record<string, string> = {}
   const entryPattern = /'?([\w-]+)'?:\s*require\('([^']+)'\)/g
   let match: RegExpExecArray | null

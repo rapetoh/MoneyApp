@@ -59,7 +59,12 @@ describe('forecastMonthly — confidence gate (2.11 "Done when")', () => {
     const txns: ForecastTxn[] = []
     // A complete prior month (July) with enough spend to register.
     for (let d = 1; d <= 20; d++) {
-      txns.push(txn({ transacted_at: `2026-07-${String(d).padStart(2, '0')}T12:00:00Z`, amount_in_profile_currency: 10 }))
+      txns.push(
+        txn({
+          transacted_at: `2026-07-${String(d).padStart(2, '0')}T12:00:00Z`,
+          amount_in_profile_currency: 10,
+        }),
+      )
     }
     txns.push(txn({ transacted_at: '2026-08-05T12:00:00Z', amount_in_profile_currency: 20 }))
     const result = forecastMonthly(txns, [], '2026-08-12T12:00:00Z', 'UTC')
@@ -72,7 +77,12 @@ describe('forecastMonthly — confidence gate (2.11 "Done when")', () => {
   it('1 complete prior month but dayOfMonth < 10 and < 10 distinct spending days is not confident', () => {
     const txns: ForecastTxn[] = []
     for (let d = 1; d <= 20; d++) {
-      txns.push(txn({ transacted_at: `2026-07-${String(d).padStart(2, '0')}T12:00:00Z`, amount_in_profile_currency: 10 }))
+      txns.push(
+        txn({
+          transacted_at: `2026-07-${String(d).padStart(2, '0')}T12:00:00Z`,
+          amount_in_profile_currency: 10,
+        }),
+      )
     }
     txns.push(txn({ transacted_at: '2026-08-03T12:00:00Z', amount_in_profile_currency: 20 }))
     const result = forecastMonthly(txns, [], '2026-08-05T12:00:00Z', 'UTC')
@@ -81,7 +91,11 @@ describe('forecastMonthly — confidence gate (2.11 "Done when")', () => {
 
   it('a Savings & Investing transfer is excluded from monthToDate, same as every other totals surface', () => {
     const txns: ForecastTxn[] = [
-      txn({ transacted_at: '2026-08-05T12:00:00Z', amount_in_profile_currency: 40, category_id: 'cat-food' }),
+      txn({
+        transacted_at: '2026-08-05T12:00:00Z',
+        amount_in_profile_currency: 40,
+        category_id: 'cat-food',
+      }),
       txn({
         transacted_at: '2026-08-06T12:00:00Z',
         amount_in_profile_currency: 300,

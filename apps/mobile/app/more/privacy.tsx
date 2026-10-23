@@ -95,11 +95,15 @@ export default function PrivacyScreen() {
               policy. */}
           <SetGroup label={t('privacy.group_rights', locale)}>
             <SetRow
-              label={exporting ? t('privacy.export_all_busy', locale) : t('privacy.export_all', locale)}
+              label={
+                exporting ? t('privacy.export_all_busy', locale) : t('privacy.export_all', locale)
+              }
               onPress={handleExportAll}
             />
             <SetRow
-              label={deleting ? t('privacy.delete_all_busy', locale) : t('privacy.delete_all', locale)}
+              label={
+                deleting ? t('privacy.delete_all_busy', locale) : t('privacy.delete_all', locale)
+              }
               onPress={requestDeleteAccount}
               danger
               last
@@ -254,7 +258,6 @@ const styles = StyleSheet.create({
   },
   rowPressed: { opacity: 0.6 },
 
-
   // Settings-style row (single line label + optional detail + toggle/chevron)
   rowLabelSingle: {
     flex: 1,
@@ -267,5 +270,4 @@ const styles = StyleSheet.create({
     color: Colors.ink3 ?? Colors.textSecondary,
     fontFamily: Typography.fontFamily.sans,
   },
-
 })

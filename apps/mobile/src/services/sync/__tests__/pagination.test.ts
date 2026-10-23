@@ -69,9 +69,15 @@ describe('paginateAscending', () => {
   it('calls onPage per page so the caller can merge before advancing the cursor', async () => {
     const rows: Row[] = [{ id: '1', updated_at: '2026-08-01T00:00:00Z' }]
     const merged: Row[][] = []
-    await paginateAscending(async () => page(rows), (r) => r.updated_at, undefined, 500, async (r) => {
-      merged.push(r)
-    })
+    await paginateAscending(
+      async () => page(rows),
+      (r) => r.updated_at,
+      undefined,
+      500,
+      async (r) => {
+        merged.push(r)
+      },
+    )
     expect(merged).toEqual([rows])
   })
 

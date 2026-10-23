@@ -1,11 +1,21 @@
 import OpenAI from 'openai'
 import { validateToken } from '../../../../lib/auth'
-import { getPrompt, validateParsedExpense, isParseRejection, PARSED_EXPENSE_JSON_SCHEMA } from '@voice-expense/ai'
+import {
+  getPrompt,
+  validateParsedExpense,
+  isParseRejection,
+  PARSED_EXPENSE_JSON_SCHEMA,
+} from '@voice-expense/ai'
 import type { Locale } from '@voice-expense/shared'
 import type { NextRequest } from 'next/server'
 import { createJsonCompletionWithRetry } from '../../../../lib/aiCompletion'
 import { checkRateLimit } from '../../../../lib/rateLimit'
-import { contentLengthExceeds, isSupportedCurrency, isSupportedLocale, MAX_TRANSCRIPT_LENGTH } from '../../../../lib/parseGuards'
+import {
+  contentLengthExceeds,
+  isSupportedCurrency,
+  isSupportedLocale,
+  MAX_TRANSCRIPT_LENGTH,
+} from '../../../../lib/parseGuards'
 import { getOpenAIEnv } from '../../../../lib/env'
 
 const openai = new OpenAI({ apiKey: getOpenAIEnv().OPENAI_API_KEY })
@@ -39,7 +49,13 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  let body: { transcript?: string; locale?: string; currency?: string; categories?: string[]; todayCivilDate?: string }
+  let body: {
+    transcript?: string
+    locale?: string
+    currency?: string
+    categories?: string[]
+    todayCivilDate?: string
+  }
   try {
     body = await req.json()
   } catch {
@@ -51,7 +67,10 @@ export async function POST(req: NextRequest) {
     return Response.json({ error: 'transcript is required' }, { status: 400 })
   }
   if (transcript.length > MAX_TRANSCRIPT_LENGTH) {
-    return Response.json({ error: `transcript exceeds ${MAX_TRANSCRIPT_LENGTH} characters` }, { status: 400 })
+    return Response.json(
+      { error: `transcript exceeds ${MAX_TRANSCRIPT_LENGTH} characters` },
+      { status: 400 },
+    )
   }
 
   // Trust boundary on the input side (audit 02-F21): `locale`/`currency`
@@ -60,10 +79,16 @@ export async function POST(req: NextRequest) {
   // outright rather than silently substituted — silently substituting
   // here would just move the same bug one line down.
   if (!isSupportedLocale(locale)) {
-    return Response.json({ error: `unsupported locale: ${JSON.stringify(locale)}` }, { status: 400 })
+    return Response.json(
+      { error: `unsupported locale: ${JSON.stringify(locale)}` },
+      { status: 400 },
+    )
   }
   if (!isSupportedCurrency(currency)) {
-    return Response.json({ error: `unsupported currency: ${JSON.stringify(currency)}` }, { status: 400 })
+    return Response.json(
+      { error: `unsupported currency: ${JSON.stringify(currency)}` },
+      { status: 400 },
+    )
   }
   if (!Array.isArray(categories) || categories.some((c) => typeof c !== 'string')) {
     return Response.json({ error: 'categories must be a string array' }, { status: 400 })
@@ -124,7 +149,9 @@ export async function POST(req: NextRequest) {
     // produced so a classification drift can be traced to a model change
     // without needing a DB column (no consumer needs the model id at
     // query time; this is an observability trail, not app state).
-    console.log(`[parse-expense] ok model=${MODEL} confidence=${result.confidence} retried=${completion.retried}`)
+    console.log(
+      `[parse-expense] ok model=${MODEL} confidence=${result.confidence} retried=${completion.retried}`,
+    )
     return Response.json(result)
   } catch (err) {
     // Message + status only — the raw OpenAI SDK error object embeds the

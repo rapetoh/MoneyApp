@@ -25,8 +25,7 @@ export interface NotificationPayload {
 const NativeModule =
   Platform.OS === 'android' ? NativeModulesProxy.NotificationListenerModule : null
 
-const emitter =
-  NativeModule ? new EventEmitter(NativeModule as any) : null
+const emitter = NativeModule ? new EventEmitter(NativeModule as any) : null
 
 /** Returns true if the notification listener permission is granted. Android only. */
 export async function isPermissionGranted(): Promise<boolean> {
@@ -50,7 +49,9 @@ export function addPaymentNotificationListener(
     // No-op on iOS — return a dummy subscription
     return { remove: () => {} } as Subscription
   }
-  return (emitter as unknown as {
-    addListener: (name: string, fn: (payload: NotificationPayload) => void) => Subscription
-  }).addListener('onPaymentNotification', listener)
+  return (
+    emitter as unknown as {
+      addListener: (name: string, fn: (payload: NotificationPayload) => void) => Subscription
+    }
+  ).addListener('onPaymentNotification', listener)
 }

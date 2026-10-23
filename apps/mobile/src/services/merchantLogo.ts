@@ -1,5 +1,10 @@
 import { Image } from 'expo-image'
-import { guessDomain, brandDomainForMerchant, cleanMerchantDescriptor, merchantLogoSrc } from '@voice-expense/shared'
+import {
+  guessDomain,
+  brandDomainForMerchant,
+  cleanMerchantDescriptor,
+  merchantLogoSrc,
+} from '@voice-expense/shared'
 import type { Transaction, RecurringRule } from '@voice-expense/shared'
 
 /**

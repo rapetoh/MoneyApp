@@ -42,7 +42,11 @@ import { track } from './analytics'
 type RegistrationOutcome = 'ok' | 'no_permission' | 'token_error' | 'token_timeout' | 'upsert_error'
 let lastReported: string | null = null
 
-function report(outcome: RegistrationOutcome, detail: string | null = null, permission: string | null = null) {
+function report(
+  outcome: RegistrationOutcome,
+  detail: string | null = null,
+  permission: string | null = null,
+) {
   const key = `${outcome}:${detail ?? ''}`
   if (key === lastReported) return
   lastReported = key
@@ -208,7 +212,9 @@ export async function unregisterPushToken(): Promise<void> {
  */
 export function subscribePushNavigation(navigate: (path: string) => void): () => void {
   const sub = Notifications.addNotificationResponseReceivedListener((response) => {
-    const data = response.notification.request.content.data as { screen?: string; budget?: string; rule?: string } | undefined
+    const data = response.notification.request.content.data as
+      | { screen?: string; budget?: string; rule?: string }
+      | undefined
     const screen = data?.screen
     if (!screen) return
     switch (screen) {

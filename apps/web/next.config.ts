@@ -38,7 +38,7 @@ function supabaseConnectSrc(): string {
 // self-hosted via `next/font` (`app/layout.tsx`) specifically so this
 // list needs no Google Fonts exception.
 function contentSecurityPolicy(): string {
-  const connect = ['\'self\'', supabaseConnectSrc()].filter(Boolean).join(' ')
+  const connect = ["'self'", supabaseConnectSrc()].filter(Boolean).join(' ')
   return [
     "default-src 'self'",
     "script-src 'self' 'unsafe-inline'",

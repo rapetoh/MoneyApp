@@ -75,7 +75,11 @@ type ChatMessage =
   | {
       role: 'assistant'
       content: string | null
-      tool_calls?: Array<{ id: string; type: 'function'; function: { name: string; arguments: string } }>
+      tool_calls?: Array<{
+        id: string
+        type: 'function'
+        function: { name: string; arguments: string }
+      }>
     }
   | { role: 'tool'; tool_call_id: string; content: string }
 
@@ -102,9 +106,12 @@ export async function POST(req: NextRequest) {
 
   const message = (body.message ?? '').toString().trim()
   if (!message) return Response.json({ error: 'message is required' }, { status: 400 })
-  if (message.length > MAX_MESSAGE_LEN) return Response.json({ error: 'message is too long' }, { status: 400 })
+  if (message.length > MAX_MESSAGE_LEN)
+    return Response.json({ error: 'message is too long' }, { status: 400 })
   const conversationId =
-    typeof body.conversation_id === 'string' && UUID_RE.test(body.conversation_id) ? body.conversation_id : null
+    typeof body.conversation_id === 'string' && UUID_RE.test(body.conversation_id)
+      ? body.conversation_id
+      : null
 
   // The caller's own session — RLS scopes every read/write below to them.
   const { NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY } = getSupabaseEnv()
@@ -125,7 +132,10 @@ export async function POST(req: NextRequest) {
     return Response.json({ error: 'profile unavailable' }, { status: 503 })
   }
   const entitled = isPlusFromProfile(
-    profile as { plus_status?: 'active' | 'lapsed' | 'free' | null; trial_ends_at?: string | null } | null,
+    profile as {
+      plus_status?: 'active' | 'lapsed' | 'free' | null
+      trial_ends_at?: string | null
+    } | null,
   )
 
   // Free accounts get a taste rather than a wall (pricing model, Sep 20
@@ -159,12 +169,15 @@ export async function POST(req: NextRequest) {
   }
 
   // Data payload (same trust boundary as before: normalized, capped).
-  const transactions: AskMurmurTransaction[] = (Array.isArray(body.transactions) ? body.transactions : [])
+  const transactions: AskMurmurTransaction[] = (
+    Array.isArray(body.transactions) ? body.transactions : []
+  )
     .slice(-MAX_TRANSACTIONS)
     .map((t) => ({
       amount: typeof t.amount === 'number' ? t.amount : 0,
       amount_in_profile_currency:
-        typeof t.amount_in_profile_currency === 'number' && Number.isFinite(t.amount_in_profile_currency)
+        typeof t.amount_in_profile_currency === 'number' &&
+        Number.isFinite(t.amount_in_profile_currency)
           ? t.amount_in_profile_currency
           : null,
       direction: (t.direction === 'credit' ? 'credit' : 'debit') as 'debit' | 'credit',
@@ -175,7 +188,9 @@ export async function POST(req: NextRequest) {
       recurring_rule_id: typeof t.recurring_rule_id === 'string' ? t.recurring_rule_id : null,
     }))
     .filter((t) => t.transacted_at)
-  const recurring_rules: AskMurmurRecurringRuleV2[] = (Array.isArray(body.recurring_rules) ? body.recurring_rules : [])
+  const recurring_rules: AskMurmurRecurringRuleV2[] = (
+    Array.isArray(body.recurring_rules) ? body.recurring_rules : []
+  )
     .slice(0, MAX_RECURRING)
     .filter((r) => r && typeof r === 'object' && typeof r.amount === 'number')
     .map((r) => ({
@@ -187,18 +202,27 @@ export async function POST(req: NextRequest) {
       ...(typeof r.category_name === 'string' ? { category_name: r.category_name } : {}),
       ...(typeof r.interval === 'number' ? { interval: r.interval } : {}),
       ...(typeof r.starts_at === 'string' ? { starts_at: r.starts_at } : {}),
-      ...(r.ends_at === null || typeof r.ends_at === 'string' ? { ends_at: r.ends_at ?? null } : {}),
+      ...(r.ends_at === null || typeof r.ends_at === 'string'
+        ? { ends_at: r.ends_at ?? null }
+        : {}),
       ...(typeof r.anchor_day === 'number' ? { anchor_day: r.anchor_day } : {}),
       ...(typeof r.anchor_weekday === 'number' ? { anchor_weekday: r.anchor_weekday } : {}),
       ...(typeof r.anchor_time === 'string' ? { anchor_time: r.anchor_time } : {}),
     }))
   const budget = parseBudget(body.budget)
   const seedInsight = parseSeedInsight(body.seed_insight)
-  const locale = (['en', 'fr', 'es', 'pt'].includes(String(body.locale)) ? body.locale : 'en') as Locale
-  const currency = (typeof body.currency === 'string' && body.currency ? body.currency : 'USD').slice(0, 3).toUpperCase()
+  const locale = (
+    ['en', 'fr', 'es', 'pt'].includes(String(body.locale)) ? body.locale : 'en'
+  ) as Locale
+  const currency = (typeof body.currency === 'string' && body.currency ? body.currency : 'USD')
+    .slice(0, 3)
+    .toUpperCase()
   const now_utc = resolveNowUtc(body.now_utc)
   const time_zone = resolveTimeZone(body.time_zone)
-  const monthly_income = typeof body.monthly_income === 'number' && Number.isFinite(body.monthly_income) ? body.monthly_income : null
+  const monthly_income =
+    typeof body.monthly_income === 'number' && Number.isFinite(body.monthly_income)
+      ? body.monthly_income
+      : null
 
   // Load the thread (RLS: only the owner's).
   let conversation: AskConversationRow | null = null
@@ -229,15 +253,32 @@ export async function POST(req: NextRequest) {
     priorTurns = pairTurns(((msgs ?? []) as unknown as AskMessageRow[]).slice().reverse())
   }
   // The thread's focus = the last answered turn's focus.
-  const prevFocus: AskFocus | null = [...priorTurns].reverse().find((tn) => tn.reply?.focus)?.reply?.focus ?? null
+  const prevFocus: AskFocus | null =
+    [...priorTurns].reverse().find((tn) => tn.reply?.focus)?.reply?.focus ?? null
 
-  const ctx: ToolContext = { now_utc, tz: time_zone, currency, monthly_income, locale, transactions, recurring_rules }
+  const ctx: ToolContext = {
+    now_utc,
+    tz: time_zone,
+    currency,
+    monthly_income,
+    locale,
+    transactions,
+    recurring_rules,
+  }
   const overview = buildDataOverview(ctx)
   const startedAt = Date.now()
   console.log(
     `[ask-turn] conv=${conversationId ? 'resume' : 'new'} prior_turns=${priorTurns.length} message_len=${message.length} transactions=${transactions.length} rules=${recurring_rules.length}`,
   )
-  if (DEBUG_TRACE) console.log('[ask-turn] trace message=', JSON.stringify(message), 'focus=', JSON.stringify(prevFocus), 'overview=', JSON.stringify(overview))
+  if (DEBUG_TRACE)
+    console.log(
+      '[ask-turn] trace message=',
+      JSON.stringify(message),
+      'focus=',
+      JSON.stringify(prevFocus),
+      'overview=',
+      JSON.stringify(overview),
+    )
 
   const systemPrompt = buildAskSystemPrompt({
     locale,
@@ -268,7 +309,9 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     const e = err as { status?: number; message?: string; headers?: Record<string, string> }
     if (e?.status !== 429) {
-      console.error(`[ask-turn] model call threw (status=${e?.status ?? 'n/a'}): ${e?.message ?? String(err)}`)
+      console.error(
+        `[ask-turn] model call threw (status=${e?.status ?? 'n/a'}): ${e?.message ?? String(err)}`,
+      )
       return Response.json({ error: 'AI request failed' }, { status: 502 })
     }
     // Capacity, not a bad answer: the OpenAI org tier is 30k tokens/min for
@@ -292,14 +335,19 @@ export async function POST(req: NextRequest) {
       } catch (err2) {
         const e2 = err2 as { status?: number; message?: string }
         if (e2?.status !== 429) {
-          console.error(`[ask-turn] model call threw after 429 wait (status=${e2?.status ?? 'n/a'}): ${e2?.message ?? String(err2)}`)
+          console.error(
+            `[ask-turn] model call threw after 429 wait (status=${e2?.status ?? 'n/a'}): ${e2?.message ?? String(err2)}`,
+          )
           return Response.json({ error: 'AI request failed' }, { status: 502 })
         }
       }
     }
     if (!recovered) {
       console.error('[ask-turn] still rate limited after bounded waits')
-      return Response.json({ error: 'busy', retry_after_seconds: 10 }, { status: 503, headers: { 'Retry-After': '10' } })
+      return Response.json(
+        { error: 'busy', retry_after_seconds: 10 },
+        { status: 503, headers: { 'Retry-After': '10' } },
+      )
     }
     outcome = recovered
   }
@@ -335,7 +383,9 @@ export async function POST(req: NextRequest) {
     console.error(`[ask-turn] persist failed: ${err instanceof Error ? err.message : String(err)}`)
   }
 
-  console.log(`[ask-turn] ok tool_calls=${calls.length} blocks=${finalReply.blocks.length} persisted=${convId ? 'yes' : 'no'} ms=${Date.now() - startedAt}`)
+  console.log(
+    `[ask-turn] ok tool_calls=${calls.length} blocks=${finalReply.blocks.length} persisted=${convId ? 'yes' : 'no'} ms=${Date.now() - startedAt}`,
+  )
   const res: AskTurnResponse = {
     conversation_id: convId ?? '',
     user_message_id: userMessageId,
@@ -379,8 +429,11 @@ async function answer(
   if (secondIssues.length === 0) return second
   // Both attempts flawed: ship the one with fewer issues rather than an
   // error, and say so in the log — but never an empty answer.
-  console.warn(`[ask-turn] retry still flawed (${secondIssues.length} vs ${issues.length}); shipping the better one`)
-  if (second.reply.text && (!first.reply.text || secondIssues.length <= issues.length)) return second
+  console.warn(
+    `[ask-turn] retry still flawed (${secondIssues.length} vs ${issues.length}); shipping the better one`,
+  )
+  if (second.reply.text && (!first.reply.text || secondIssues.length <= issues.length))
+    return second
   return first
 }
 
@@ -392,7 +445,9 @@ function issuesFor(
 ): string[] {
   const issues: string[] = []
   if (!r.reply.out_of_scope && r.reply.text.trim().length < 6) {
-    issues.push('empty answer: the "text" field was empty - write the answer, leading with the conclusion and its figure')
+    issues.push(
+      'empty answer: the "text" field was empty - write the answer, leading with the conclusion and its figure',
+    )
   }
   const trusted = trustedFigures({
     calls: r.calls,
@@ -406,9 +461,12 @@ function issuesFor(
   })
   const grounding = groundAskReply(r.reply, trusted, r.calls)
   if (grounding.untraced.length > 0) {
-    issues.push(`ungrounded figures (${grounding.untraced.slice(0, 4).join('; ')}) - these numbers match no tool result; compute them with the tools (arith for ratios/differences) or drop them`)
+    issues.push(
+      `ungrounded figures (${grounding.untraced.slice(0, 4).join('; ')}) - these numbers match no tool result; compute them with the tools (arith for ratios/differences) or drop them`,
+    )
   }
-  if (grounding.direction_violation) issues.push(`comparison direction: ${grounding.direction_violation}`)
+  if (grounding.direction_violation)
+    issues.push(`comparison direction: ${grounding.direction_violation}`)
   if (grounding.recital) issues.push(`unasked figures: ${grounding.recital}`)
   return issues
 }
@@ -419,7 +477,11 @@ async function runLoop(
   message: string,
   ctx: ToolContext,
 ): Promise<{ reply: AskReply; calls: ToolCallRecord[] }> {
-  const messages: ChatMessage[] = [{ role: 'system', content: systemPrompt }, ...contextMessages, { role: 'user', content: message }]
+  const messages: ChatMessage[] = [
+    { role: 'system', content: systemPrompt },
+    ...contextMessages,
+    { role: 'user', content: message },
+  ]
   const calls: ToolCallRecord[] = []
 
   for (let iter = 0; iter < MAX_TOOL_ITERATIONS; iter++) {
@@ -438,13 +500,18 @@ async function runLoop(
     })
     const msg = completion.choices[0].message
     const fnCalls = (msg.tool_calls ?? []).filter(
-      (tc): tc is Extract<NonNullable<typeof msg.tool_calls>[number], { type: 'function' }> => tc.type === 'function',
+      (tc): tc is Extract<NonNullable<typeof msg.tool_calls>[number], { type: 'function' }> =>
+        tc.type === 'function',
     )
     if (fnCalls.length > 0) {
       messages.push({
         role: 'assistant',
         content: msg.content ?? '',
-        tool_calls: fnCalls.map((tc) => ({ id: tc.id, type: 'function', function: { name: tc.function.name, arguments: tc.function.arguments } })),
+        tool_calls: fnCalls.map((tc) => ({
+          id: tc.id,
+          type: 'function',
+          function: { name: tc.function.name, arguments: tc.function.arguments },
+        })),
       })
       for (const tc of fnCalls) {
         let args: unknown
@@ -461,9 +528,15 @@ async function runLoop(
         )
         console.log(`[ask-turn] tool ${tc.function.name} ok=${resolved.ok}`)
         if (DEBUG_TRACE) {
-          console.log(`[ask-turn] trace args=${JSON.stringify(args).slice(0, 240)} result=${JSON.stringify(resolved.ok ? resolved.result : { error: resolved.error }).slice(0, 300)}`)
+          console.log(
+            `[ask-turn] trace args=${JSON.stringify(args).slice(0, 240)} result=${JSON.stringify(resolved.ok ? resolved.result : { error: resolved.error }).slice(0, 300)}`,
+          )
         }
-        messages.push({ role: 'tool', tool_call_id: tc.id, content: JSON.stringify(resolved.ok ? resolved.result : { error: resolved.error }) })
+        messages.push({
+          role: 'tool',
+          tool_call_id: tc.id,
+          content: JSON.stringify(resolved.ok ? resolved.result : { error: resolved.error }),
+        })
       }
       continue
     }
@@ -477,7 +550,15 @@ async function runLoop(
     return { reply: validateAskReply(parsed, ctx.transactions.length), calls }
   }
   return {
-    reply: { text: '', sentiment: 'neutral', blocks: [], actions: [], focus: null, out_of_scope: false, transaction_count: ctx.transactions.length },
+    reply: {
+      text: '',
+      sentiment: 'neutral',
+      blocks: [],
+      actions: [],
+      focus: null,
+      out_of_scope: false,
+      transaction_count: ctx.transactions.length,
+    },
     calls,
   }
 }
@@ -517,23 +598,49 @@ function parseBudget(raw: unknown): AskMurmurBudget | null {
   if (!raw || typeof raw !== 'object') return null
   const b = raw as Record<string, unknown>
   const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : null)
-  const amount = num(b.amount), spent = num(b.spent), committed = num(b.committed), remaining = num(b.remaining), days_left = num(b.days_left)
+  const amount = num(b.amount),
+    spent = num(b.spent),
+    committed = num(b.committed),
+    remaining = num(b.remaining),
+    days_left = num(b.days_left)
   const PERIODS = ['weekly', 'biweekly', 'monthly', 'quarterly', 'yearly'] as const
-  if (amount === null || spent === null || committed === null || remaining === null || days_left === null) return null
-  if (typeof b.period !== 'string' || !(PERIODS as readonly string[]).includes(b.period)) return null
+  if (
+    amount === null ||
+    spent === null ||
+    committed === null ||
+    remaining === null ||
+    days_left === null
+  )
+    return null
+  if (typeof b.period !== 'string' || !(PERIODS as readonly string[]).includes(b.period))
+    return null
   if (typeof b.period_start !== 'string' || typeof b.period_end !== 'string') return null
   return {
-    amount, spent, committed, remaining,
+    amount,
+    spent,
+    committed,
+    remaining,
     days_left: Math.max(0, Math.trunc(days_left)),
     period: b.period as AskMurmurBudget['period'],
-    currency: typeof b.currency === 'string' && b.currency ? b.currency.slice(0, 3).toUpperCase() : 'USD',
-    category_name: typeof b.category_name === 'string' && b.category_name ? b.category_name.slice(0, 80) : null,
+    currency:
+      typeof b.currency === 'string' && b.currency ? b.currency.slice(0, 3).toUpperCase() : 'USD',
+    category_name:
+      typeof b.category_name === 'string' && b.category_name ? b.category_name.slice(0, 80) : null,
     period_start: b.period_start.slice(0, 40),
     period_end: b.period_end.slice(0, 40),
   }
 }
 
-const INSIGHT_KINDS = new Set(['upcoming_bill', 'budget_pace', 'category_surge', 'subscriptions', 'month_delta', 'net_flow', 'large_transaction', 'no_data'])
+const INSIGHT_KINDS = new Set([
+  'upcoming_bill',
+  'budget_pace',
+  'category_surge',
+  'subscriptions',
+  'month_delta',
+  'net_flow',
+  'large_transaction',
+  'no_data',
+])
 function parseSeedInsight(raw: unknown): GroundingInputs['seedInsight'] {
   if (!raw || typeof raw !== 'object') return null
   const r = raw as Record<string, unknown>

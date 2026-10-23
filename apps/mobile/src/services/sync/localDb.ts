@@ -98,7 +98,9 @@ export const CATEGORY_COLUMNS = [
   { name: 'updated_at', ddl: 'TEXT NOT NULL' },
 ] as const
 export type CategoryColumnName = (typeof CATEGORY_COLUMNS)[number]['name']
-export const CATEGORY_COLUMN_NAMES: readonly CategoryColumnName[] = CATEGORY_COLUMNS.map((c) => c.name)
+export const CATEGORY_COLUMN_NAMES: readonly CategoryColumnName[] = CATEGORY_COLUMNS.map(
+  (c) => c.name,
+)
 
 export const BUDGET_COLUMNS = [
   { name: 'id', ddl: 'TEXT PRIMARY KEY' },
@@ -138,9 +140,8 @@ export const RECURRING_RULE_COLUMNS = [
   { name: 'updated_at', ddl: 'TEXT NOT NULL' },
 ] as const
 export type RecurringRuleColumnName = (typeof RECURRING_RULE_COLUMNS)[number]['name']
-export const RECURRING_RULE_COLUMN_NAMES: readonly RecurringRuleColumnName[] = RECURRING_RULE_COLUMNS.map(
-  (c) => c.name,
-)
+export const RECURRING_RULE_COLUMN_NAMES: readonly RecurringRuleColumnName[] =
+  RECURRING_RULE_COLUMNS.map((c) => c.name)
 
 /** Shared by every table's fresh-install CREATE and the rebuild helper below. */
 function buildCreateTableSql(
@@ -476,7 +477,9 @@ async function addSyncContractV2(db: SchemaDb): Promise<void> {
   `)
 
   await db.execAsync(buildCreateTableSql('categories', CATEGORY_COLUMNS))
-  await db.execAsync('CREATE INDEX IF NOT EXISTS idx_categories_user ON categories (user_id, is_deleted)')
+  await db.execAsync(
+    'CREATE INDEX IF NOT EXISTS idx_categories_user ON categories (user_id, is_deleted)',
+  )
 
   await db.execAsync(buildCreateTableSql('budgets', BUDGET_COLUMNS))
   await db.execAsync('CREATE INDEX IF NOT EXISTS idx_budgets_user ON budgets (user_id, is_deleted)')
@@ -563,9 +566,10 @@ export async function wipeLocalDatabase(): Promise<void> {
  */
 export async function getSyncCursor(entityType: string): Promise<string | undefined> {
   const db = await getDb()
-  const row = await db.getFirstAsync<{ value: string }>('SELECT value FROM sync_meta WHERE key = ?', [
-    `cursor:${entityType}`,
-  ])
+  const row = await db.getFirstAsync<{ value: string }>(
+    'SELECT value FROM sync_meta WHERE key = ?',
+    [`cursor:${entityType}`],
+  )
   return row?.value ?? undefined
 }
 

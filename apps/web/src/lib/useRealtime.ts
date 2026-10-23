@@ -34,10 +34,8 @@ export function useRealtime(table: string, filter: string | null, onChange: () =
     // shapes' own reasoning).
     const channel = supabase
       .channel(`web:${table}:${filter}:${Math.random().toString(36).slice(2)}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table, filter },
-        () => onChangeRef.current(),
+      .on('postgres_changes', { event: '*', schema: 'public', table, filter }, () =>
+        onChangeRef.current(),
       )
       .subscribe()
 

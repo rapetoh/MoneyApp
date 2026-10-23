@@ -168,7 +168,15 @@ export interface BudgetStatus {
 export function resolveBudgetAnchor(startsAt: string, tz: string): string {
   const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(startsAt)
   if (!dateOnly) return startsAt
-  return civilDateTimeToInstant(Number(dateOnly[1]), Number(dateOnly[2]), Number(dateOnly[3]), 0, 0, 0, tz)
+  return civilDateTimeToInstant(
+    Number(dateOnly[1]),
+    Number(dateOnly[2]),
+    Number(dateOnly[3]),
+    0,
+    0,
+    0,
+    tz,
+  )
 }
 
 /**
@@ -192,7 +200,9 @@ export function budgetStatus(
     (t) => t.transacted_at >= window.start && t.transacted_at < window.endExclusive,
   )
   const scoped =
-    budget.category_id == null ? inWindow : inWindow.filter((t) => t.category_id === budget.category_id)
+    budget.category_id == null
+      ? inWindow
+      : inWindow.filter((t) => t.category_id === budget.category_id)
 
   let spentCents = 0
   let committedFromTxnsCents = 0
@@ -201,7 +211,10 @@ export function budgetStatus(
 
   for (const t of scoped) {
     if (t.recurring_rule_id) {
-      postedCountByRule.set(t.recurring_rule_id, (postedCountByRule.get(t.recurring_rule_id) ?? 0) + 1)
+      postedCountByRule.set(
+        t.recurring_rule_id,
+        (postedCountByRule.get(t.recurring_rule_id) ?? 0) + 1,
+      )
     }
     const categoryKind = resolveCategoryKind(t.category_name, t.category_kind)
     if (!isSpend(t, categoryKind)) continue
@@ -287,7 +300,9 @@ function rolloverCarry(
     if (budget.category_id != null && t.category_id !== budget.category_id) continue
     if (t.amount_in_profile_currency == null) continue
     if (!isSpend(t, resolveCategoryKind(t.category_name, t.category_kind))) continue
-    const idx = windows.findIndex((w) => t.transacted_at >= w.start && t.transacted_at < w.endExclusive)
+    const idx = windows.findIndex(
+      (w) => t.transacted_at >= w.start && t.transacted_at < w.endExclusive,
+    )
     if (idx >= 0) spentByWindow[idx] += Math.round(t.amount_in_profile_currency * 100)
   }
 

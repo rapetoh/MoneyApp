@@ -87,7 +87,12 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
   content: { paddingHorizontal: 28, paddingTop: 24, paddingBottom: 32 },
   topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  skip: { fontSize: 15, color: Colors.ink3, fontFamily: Typography.fontFamily.sansSemiBold, fontWeight: '600' },
+  skip: {
+    fontSize: 15,
+    color: Colors.ink3,
+    fontFamily: Typography.fontFamily.sansSemiBold,
+    fontWeight: '600',
+  },
   headline: {
     marginTop: 28,
     fontFamily: Typography.fontFamily.serif,
@@ -97,7 +102,13 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: Colors.ink,
   },
-  lead: { marginTop: 10, fontSize: 15, lineHeight: 22, color: Colors.ink3, fontFamily: Typography.fontFamily.sans },
+  lead: {
+    marginTop: 10,
+    fontSize: 15,
+    lineHeight: 22,
+    color: Colors.ink3,
+    fontFamily: Typography.fontFamily.sans,
+  },
   list: { marginTop: 26, gap: 10 },
   row: {
     flexDirection: 'row',
@@ -118,6 +129,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  rowTitle: { fontSize: 15.5, color: Colors.ink, fontFamily: Typography.fontFamily.sansSemiBold, fontWeight: '600' },
-  rowSub: { marginTop: 2, fontSize: 13, lineHeight: 18, color: Colors.ink3, fontFamily: Typography.fontFamily.sans },
+  rowTitle: {
+    fontSize: 15.5,
+    color: Colors.ink,
+    fontFamily: Typography.fontFamily.sansSemiBold,
+    fontWeight: '600',
+  },
+  rowSub: {
+    marginTop: 2,
+    fontSize: 13,
+    lineHeight: 18,
+    color: Colors.ink3,
+    fontFamily: Typography.fontFamily.sans,
+  },
 })

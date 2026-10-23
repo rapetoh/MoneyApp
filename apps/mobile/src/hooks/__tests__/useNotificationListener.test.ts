@@ -44,9 +44,11 @@ vi.mock('expo-modules-core', () => ({
   EventEmitter: class MockEventEmitter {
     addListener(_name: string, fn: Listener) {
       registeredListeners.push(fn)
-      return { remove: () => {
-        registeredListeners = registeredListeners.filter((l) => l !== fn)
-      } }
+      return {
+        remove: () => {
+          registeredListeners = registeredListeners.filter((l) => l !== fn)
+        },
+      }
     }
   },
 }))
@@ -189,7 +191,7 @@ describe('useNotificationListener — payload delivery', () => {
 })
 
 describe('useNotificationListener — no second listener for a permission-only caller', () => {
-  it('attaches no native subscription when onPayment is omitted (Settings\' use)', async () => {
+  it("attaches no native subscription when onPayment is omitted (Settings' use)", async () => {
     await act(async () => {
       renderer = TestRenderer.create(React.createElement(Harness, {}))
       await Promise.resolve()

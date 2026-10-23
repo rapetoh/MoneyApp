@@ -129,7 +129,9 @@ export function useRecurringRules(userId: string | undefined) {
     setLoading(false)
   }, [userId])
 
-  useEffect(() => { fetch() }, [fetch])
+  useEffect(() => {
+    fetch()
+  }, [fetch])
 
   async function createRule(params: {
     name: string | null
@@ -198,7 +200,13 @@ export function useRecurringRules(userId: string | undefined) {
       // write-time snapshot in the app (migration 011).
       const profileCurrency = getCurrentProfileCurrency()
       const tz = deviceTimeZone()
-      const fx = await snapshotFx(anchorInstant, params.currency_code, profileCurrency, params.amount, tz)
+      const fx = await snapshotFx(
+        anchorInstant,
+        params.currency_code,
+        profileCurrency,
+        params.amount,
+        tz,
+      )
       if (fx) fxSnapshot = fx
     }
     // Shared anchor derivation (fix-plan 3.3's `buildRuleAnchor`) — this
@@ -316,7 +324,11 @@ export function useRecurringRules(userId: string | undefined) {
     const current = rules.find((r) => r.id === id)
     await supabase
       .from('recurring_rules')
-      .update({ is_deleted: true, deleted_at: new Date().toISOString(), version: (current?.version ?? 1) + 1 })
+      .update({
+        is_deleted: true,
+        deleted_at: new Date().toISOString(),
+        version: (current?.version ?? 1) + 1,
+      })
       .eq('id', id)
     await fetch()
   }
@@ -396,7 +408,8 @@ export function useRecurringRules(userId: string | undefined) {
     } else if (changes.amount != null && current?.fx_rate_to_profile != null) {
       payload = {
         ...payload,
-        amount_in_profile_currency: Math.round(changes.amount * current.fx_rate_to_profile * 100) / 100,
+        amount_in_profile_currency:
+          Math.round(changes.amount * current.fx_rate_to_profile * 100) / 100,
       }
     }
     // Surfaced return (fix-plan 2.13's pattern, extended here) — this

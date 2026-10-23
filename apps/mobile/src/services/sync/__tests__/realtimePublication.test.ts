@@ -35,7 +35,10 @@ describe('019_realtime_publication.sql', () => {
 
   it('publishes every table a mobile postgres_changes subscriber listens to', () => {
     const arrayMatch = sql.match(/ARRAY\[([^\]]+)\]/)
-    expect(arrayMatch, 'migration must build its table list from an ARRAY[...] literal').toBeTruthy()
+    expect(
+      arrayMatch,
+      'migration must build its table list from an ARRAY[...] literal',
+    ).toBeTruthy()
     const published = Array.from(arrayMatch![1].matchAll(/'([a-z_]+)'/g)).map((m) => m[1])
 
     for (const table of SUBSCRIBED_TABLES) {

@@ -16,10 +16,17 @@ import { useAuth } from '../src/hooks/useAuth'
 import { useProfile } from '../src/hooks/useProfile'
 import { useManualRefresh } from '../src/hooks/useManualRefresh'
 import { useCategories } from '../src/hooks/useCategories'
-import { useRecurringRules, computeNextOccurrence, isRuleOverdue } from '../src/hooks/useRecurringRules'
+import {
+  useRecurringRules,
+  computeNextOccurrence,
+  isRuleOverdue,
+} from '../src/hooks/useRecurringRules'
 import { MerchantAvatar } from '../src/components/MerchantAvatar'
 import { Money } from '../src/components/Money'
-import { RecurringRuleEditor, type RecurringRuleFormValues } from '../src/components/RecurringRuleEditor'
+import {
+  RecurringRuleEditor,
+  type RecurringRuleFormValues,
+} from '../src/components/RecurringRuleEditor'
 import { Colors, Typography, Hairline } from '../src/theme'
 import { formatCurrency, monthlyEquivalent, t } from '@voice-expense/shared'
 import type { Locale } from '@voice-expense/shared'
@@ -178,8 +185,14 @@ export default function RecurringScreen() {
   // the reader no way to tie the $342 hero to anything). Each section
   // header carries its own monthly subtotal — the same two numbers the
   // hero shows, so hero and list visibly agree.
-  const activeExpenses = useMemo(() => activeRules.filter((r) => r.direction === 'debit'), [activeRules])
-  const activeIncome = useMemo(() => activeRules.filter((r) => r.direction === 'credit'), [activeRules])
+  const activeExpenses = useMemo(
+    () => activeRules.filter((r) => r.direction === 'debit'),
+    [activeRules],
+  )
+  const activeIncome = useMemo(
+    () => activeRules.filter((r) => r.direction === 'credit'),
+    [activeRules],
+  )
 
   function handleRowPress(rule: RecurringRule) {
     // Action sheet via Alert — preserves the shipped pause/resume + delete
@@ -189,7 +202,9 @@ export default function RecurringScreen() {
     // Destructive delete is last, matching iOS convention.
     Alert.alert(
       rule.name ?? formatCurrency(rule.amount, rule.currency_code, locale),
-      t(FREQ_KEY[rule.frequency], locale) + ' · ' + formatCurrency(rule.amount, rule.currency_code, locale),
+      t(FREQ_KEY[rule.frequency], locale) +
+        ' · ' +
+        formatCurrency(rule.amount, rule.currency_code, locale),
       [
         {
           text: t('detail.edit', locale),
@@ -259,7 +274,9 @@ export default function RecurringScreen() {
         <ScrollView
           contentContainerStyle={styles.content}
           showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.ink3} />}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.ink3} />
+          }
         >
           {/* Title block */}
           <View style={styles.intro}>
@@ -274,7 +291,11 @@ export default function RecurringScreen() {
             // yet" empty copy, which used to be reachable for a failed
             // read exactly as readily as for a genuinely rule-free account.
             <View style={styles.emptyState}>
-              <Ionicons name="alert-circle-outline" size={40} color={Colors.destructive ?? '#A94646'} />
+              <Ionicons
+                name="alert-circle-outline"
+                size={40}
+                color={Colors.destructive ?? '#A94646'}
+              />
               <Text style={styles.emptyTitle}>{t('common.load_failed', locale)}</Text>
               <Pressable
                 onPress={refetch}
@@ -312,7 +333,9 @@ export default function RecurringScreen() {
                       a year in subscriptions" mislabelled a savings
                       transfer as a subscription and never said the figure
                       excluded income (build 12 feedback). */}
-                  <Text style={styles.heroEyebrow}>{t('recurring.expenses_per_month', locale)}</Text>
+                  <Text style={styles.heroEyebrow}>
+                    {t('recurring.expenses_per_month', locale)}
+                  </Text>
                   <View style={styles.heroAmountRow}>
                     <Money value={monthlyTotal} size={46} currencyCode={currency} locale={locale} />
                     <Text style={styles.heroPer}>{t('recurring.per_month', locale)}</Text>
@@ -326,7 +349,9 @@ export default function RecurringScreen() {
                   </Text>
                   {inflowMonthly > 0 && (
                     <View style={styles.heroInflowRow}>
-                      <Text style={styles.heroInflowLabel}>{t('recurring.income_per_month', locale)}</Text>
+                      <Text style={styles.heroInflowLabel}>
+                        {t('recurring.income_per_month', locale)}
+                      </Text>
                       <View style={styles.heroInflowAmount}>
                         <Money
                           value={inflowMonthly}
@@ -350,9 +375,12 @@ export default function RecurringScreen() {
               {activeExpenses.length > 0 && (
                 <View style={styles.sectionWrap}>
                   <View style={styles.sectionHead}>
-                    <Text style={styles.sectionLabel}>{t('recurring.expenses_section', locale)}</Text>
+                    <Text style={styles.sectionLabel}>
+                      {t('recurring.expenses_section', locale)}
+                    </Text>
                     <Text style={styles.sectionTotal}>
-                      {formatCurrency(monthlyTotal, currency, locale)}{t('recurring.short_monthly', locale)}
+                      {formatCurrency(monthlyTotal, currency, locale)}
+                      {t('recurring.short_monthly', locale)}
                     </Text>
                   </View>
                   <View style={styles.listCard}>
@@ -376,7 +404,8 @@ export default function RecurringScreen() {
                   <View style={styles.sectionHead}>
                     <Text style={styles.sectionLabel}>{t('recurring.income_section', locale)}</Text>
                     <Text style={[styles.sectionTotal, { color: Colors.income }]}>
-                      {formatCurrency(inflowMonthly, currency, locale)}{t('recurring.short_monthly', locale)}
+                      {formatCurrency(inflowMonthly, currency, locale)}
+                      {t('recurring.short_monthly', locale)}
                     </Text>
                   </View>
                   <View style={styles.listCard}>
@@ -516,7 +545,9 @@ function RuleRow({
             <Text style={styles.ruleFreqTag}>{t(FREQ_SHORT_KEY[rule.frequency], locale)}</Text>
             {showMonthlyEq && (
               <Text style={styles.ruleMonthlyEq} numberOfLines={1}>
-                {'≈ '}{formatCurrency(monthlyEq, currency, locale)}{t('recurring.short_monthly', locale)}
+                {'≈ '}
+                {formatCurrency(monthlyEq, currency, locale)}
+                {t('recurring.short_monthly', locale)}
               </Text>
             )}
           </>

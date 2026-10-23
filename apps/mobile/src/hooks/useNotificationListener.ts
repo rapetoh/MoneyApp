@@ -3,7 +3,11 @@ import { Platform } from 'react-native'
 import { NativeModulesProxy, EventEmitter } from 'expo-modules-core'
 import type { ParsedExpense } from '@voice-expense/shared'
 import { cleanMerchantDescriptor, normalizeMerchantCase } from '@voice-expense/shared'
-import { validateParsedExpense, isParseRejection, deriveDirectionFromFlowType } from '@voice-expense/ai'
+import {
+  validateParsedExpense,
+  isParseRejection,
+  deriveDirectionFromFlowType,
+} from '@voice-expense/ai'
 
 // Local Subscription shape — expo-modules-core stopped exporting this type in
 // recent SDKs. The only field we use is .remove(), so a minimal local type is
@@ -15,9 +19,7 @@ type Subscription = { remove: () => void }
  * The actual module (Kotlin) is compiled in during EAS Android build via expo-modules autolinking.
  */
 const NativeModule =
-  Platform.OS === 'android'
-    ? (NativeModulesProxy.NotificationListenerModule ?? null)
-    : null
+  Platform.OS === 'android' ? (NativeModulesProxy.NotificationListenerModule ?? null) : null
 
 const emitter = NativeModule ? new EventEmitter(NativeModule as any) : null
 
@@ -44,9 +46,11 @@ function addPaymentNotificationListener(
   listener: (payload: NotificationPayload) => void,
 ): Subscription {
   if (!emitter) return { remove: () => {} } as Subscription
-  return (emitter as unknown as {
-    addListener: (name: string, fn: (payload: NotificationPayload) => void) => Subscription
-  }).addListener('onPaymentNotification', listener)
+  return (
+    emitter as unknown as {
+      addListener: (name: string, fn: (payload: NotificationPayload) => void) => Subscription
+    }
+  ).addListener('onPaymentNotification', listener)
 }
 
 export interface UseNotificationListenerReturn {

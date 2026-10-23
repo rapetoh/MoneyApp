@@ -6,7 +6,9 @@ const goal = { target_amount: 1200, target_date: '2027-01-01', created_at: '2026
 
 describe('goalStatus', () => {
   it('sums contributions, withdrawals included, never below zero', () => {
-    expect(goalStatus(goal, [{ amount: 500 }, { amount: -100 }], tz, '2026-07-02T12:00:00Z').saved).toBe(400)
+    expect(
+      goalStatus(goal, [{ amount: 500 }, { amount: -100 }], tz, '2026-07-02T12:00:00Z').saved,
+    ).toBe(400)
     expect(goalStatus(goal, [{ amount: -50 }], tz, '2026-07-02T12:00:00Z').saved).toBe(0)
   })
 
@@ -38,7 +40,12 @@ describe('goalStatus', () => {
   })
 
   it('no date: progress only', () => {
-    const s = goalStatus({ ...goal, target_date: null }, [{ amount: 300 }], tz, '2026-07-02T12:00:00Z')
+    const s = goalStatus(
+      { ...goal, target_date: null },
+      [{ amount: 300 }],
+      tz,
+      '2026-07-02T12:00:00Z',
+    )
     expect(s.pace).toBe('no_date')
     expect(s.pct).toBe(0.25)
     expect(s.daysLeft).toBeNull()

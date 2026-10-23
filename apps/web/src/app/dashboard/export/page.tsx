@@ -58,9 +58,15 @@ function defaultDateRange(): { from: string; to: string } {
 export default function ExportPage() {
   const supabase = createClient()
   const [transactions, setTransactions] = useState<Txn[]>([])
-  const [categories, setCategories] = useState<Array<{ id: string; name: string; kind: CategoryKind }>>([])
+  const [categories, setCategories] = useState<
+    Array<{ id: string; name: string; kind: CategoryKind }>
+  >([])
   const [recurringRules, setRecurringRules] = useState<ExportRecurringRule[]>([])
-  const [profile, setProfile] = useState<{ currency_code?: string; locale?: string; timezone?: string } | null>(null)
+  const [profile, setProfile] = useState<{
+    currency_code?: string
+    locale?: string
+    timezone?: string
+  } | null>(null)
   const [loading, setLoading] = useState(true)
   // Read-error state, distinct from "loaded, zero transactions in range"
   // (fix-plan 2.13 / audit 08-F21 family) — this page has no separate
@@ -78,7 +84,9 @@ export default function ExportPage() {
   const [dateTo, setDateTo] = useState(() => defaultDateRange().to)
 
   const load = useCallback(async () => {
-    const { data: { user } } = await supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
     if (!user) return
     const [t, c, r, p] = await Promise.all([
       supabase
@@ -92,12 +100,17 @@ export default function ExportPage() {
         .from('recurring_rules')
         .select('id, name, amount, currency_code, direction, frequency, is_active')
         .eq('user_id', user.id),
-      supabase.from('profiles').select('currency_code, locale, timezone').eq('id', user.id).single(),
+      supabase
+        .from('profiles')
+        .select('currency_code, locale, timezone')
+        .eq('id', user.id)
+        .single(),
     ])
     const failure = t.error ?? c.error ?? r.error ?? p.error
     setLoadError(failure ? failure.message : null)
     if (!t.error) setTransactions((t.data ?? []) as Txn[])
-    if (!c.error) setCategories((c.data ?? []) as Array<{ id: string; name: string; kind: CategoryKind }>)
+    if (!c.error)
+      setCategories((c.data ?? []) as Array<{ id: string; name: string; kind: CategoryKind }>)
     if (!r.error) setRecurringRules((r.data ?? []) as ExportRecurringRule[])
     if (!p.error) setProfile(p.data)
     setLoading(false)
@@ -114,10 +127,7 @@ export default function ExportPage() {
   // dashboard/layout.tsx.
   const tz = profile?.timezone || 'UTC'
 
-  const catKindById = useMemo(
-    () => new Map(categories.map((c) => [c.id, c.kind])),
-    [categories],
-  )
+  const catKindById = useMemo(() => new Map(categories.map((c) => [c.id, c.kind])), [categories])
 
   // The one export-assembly call (fix-plan 2.15): every date below
   // (the range bounds and each row's own date/time) resolves through
@@ -136,7 +146,7 @@ export default function ExportPage() {
       merchant: t.merchant,
       note: t.note,
       category_id: t.category_id,
-      category_kind: t.category_id ? catKindById.get(t.category_id) ?? null : null,
+      category_kind: t.category_id ? (catKindById.get(t.category_id) ?? null) : null,
       payment_method: t.payment_method,
       source: t.source,
       is_recurring: t.is_recurring,
@@ -152,7 +162,17 @@ export default function ExportPage() {
       dateFrom,
       dateTo,
     })
-  }, [transactions, categories, catKindById, recurringRules, currency, locale, tz, dateFrom, dateTo])
+  }, [
+    transactions,
+    categories,
+    catKindById,
+    recurringRules,
+    currency,
+    locale,
+    tz,
+    dateFrom,
+    dateTo,
+  ])
 
   const filtered = exportResult.rows
   const totalExpenses = exportResult.summary.expense
@@ -207,9 +227,11 @@ export default function ExportPage() {
         r.source,
         r.note,
       ])
-      let csv = '\uFEFF' + [headers, ...rows]
-        .map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(','))
-        .join('\r\n')
+      let csv =
+        '\uFEFF' +
+        [headers, ...rows]
+          .map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(','))
+          .join('\r\n')
       // A row missing its FX snapshot prints an empty converted-amount
       // cell rather than a silent 0 — this trailing note is the receipt
       // for why the header total and a naive row-count-based check might
@@ -298,7 +320,15 @@ export default function ExportPage() {
               read as a synonym for the Settings → Privacy card's separate,
               free "Export all my data" GDPR backup, which this isn't
               (audit 08-F44, fix-plan 4.2). */}
-          <div style={{ fontFamily: font.serif, fontSize: 28, fontWeight: 500, color: colors.ink, letterSpacing: -0.6 }}>
+          <div
+            style={{
+              fontFamily: font.serif,
+              fontSize: 28,
+              fontWeight: 500,
+              color: colors.ink,
+              letterSpacing: -0.6,
+            }}
+          >
             Export transactions
           </div>
           <div style={{ fontSize: 13, color: colors.ink3, marginTop: 2 }}>
@@ -310,11 +340,21 @@ export default function ExportPage() {
           <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end' }}>
             <div style={styles.field}>
               <label style={styles.label}>From</label>
-              <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} style={styles.input} />
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+                style={styles.input}
+              />
             </div>
             <div style={styles.field}>
               <label style={styles.label}>To</label>
-              <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} style={styles.input} />
+              <input
+                type="date"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+                style={styles.input}
+              />
             </div>
           </div>
           {loadError ? (
@@ -329,11 +369,27 @@ export default function ExportPage() {
               <div style={styles.summary}>
                 <div style={styles.summaryItem}>
                   <span style={styles.summaryLabel}>Transactions</span>
-                  <span style={{ fontFamily: font.display, fontSize: 18, fontWeight: 700, color: colors.ink }}>{filtered.length}</span>
+                  <span
+                    style={{
+                      fontFamily: font.display,
+                      fontSize: 18,
+                      fontWeight: 700,
+                      color: colors.ink,
+                    }}
+                  >
+                    {filtered.length}
+                  </span>
                 </div>
                 <div style={styles.summaryItem}>
                   <span style={styles.summaryLabel}>Total expenses</span>
-                  <Money value={totalExpenses} currency={currency} locale={locale} size={18} serif={false} bold={700} />
+                  <Money
+                    value={totalExpenses}
+                    currency={currency}
+                    locale={locale}
+                    size={18}
+                    serif={false}
+                    bold={700}
+                  />
                 </div>
                 <div style={styles.summaryItem}>
                   <span style={styles.summaryLabel}>Total income</span>
@@ -351,8 +407,8 @@ export default function ExportPage() {
               </div>
               {pendingCount > 0 && (
                 <div style={styles.pendingNote}>
-                  {pendingCount} transaction{pendingCount === 1 ? '' : 's'} awaiting currency conversion -
-                  excluded from the totals above until the exchange rate lands.
+                  {pendingCount} transaction{pendingCount === 1 ? '' : 's'} awaiting currency
+                  conversion - excluded from the totals above until the exchange rate lands.
                 </div>
               )}
             </>
@@ -422,7 +478,9 @@ function FormatCard({
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ fontFamily: font.serif, fontSize: 22, fontWeight: 500, color: colors.ink }}>{title}</div>
+        <div style={{ fontFamily: font.serif, fontSize: 22, fontWeight: 500, color: colors.ink }}>
+          {title}
+        </div>
         <div
           style={{
             width: 32,
@@ -438,7 +496,14 @@ function FormatCard({
         </div>
       </div>
       <div style={{ fontFamily: font.sans, fontSize: 12, color: colors.ink3 }}>{sub}</div>
-      <div style={{ fontFamily: font.sans, fontSize: 11, color: busy ? colors.accent : colors.ink4, marginTop: 4 }}>
+      <div
+        style={{
+          fontFamily: font.sans,
+          fontSize: 11,
+          color: busy ? colors.accent : colors.ink4,
+          marginTop: 4,
+        }}
+      >
         {busy ? 'Preparing…' : 'Click to download'}
       </div>
     </button>

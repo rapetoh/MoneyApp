@@ -26,7 +26,9 @@ const storageKey = (ruleId: string) => `income_name_prompted_${ruleId}`
  *  right away is the double-ask the first-run audit (M3) removed. */
 const LAUNCHED_AT = Date.now()
 
-export function isUnnamedIncomeRule(r: Pick<RecurringRule, 'direction' | 'is_active' | 'name'>): boolean {
+export function isUnnamedIncomeRule(
+  r: Pick<RecurringRule, 'direction' | 'is_active' | 'name'>,
+): boolean {
   if (r.direction !== 'credit' || !r.is_active) return false
   const name = (r.name ?? '').trim().toLowerCase()
   return name === '' || DEFAULT_NAMES.has(name)

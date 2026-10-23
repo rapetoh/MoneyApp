@@ -25,11 +25,7 @@ interface Props {
 // Three example phrasings. Same set across locales (the translations live in
 // the ask.suggestion_* style keys below: home.day_one_example_{1,2,3}) so
 // first-log guidance reads naturally in each language.
-const EXAMPLE_KEYS = [
-  'home.day_one_example_1',
-  'home.day_one_example_2',
-  'home.day_one_example_3',
-]
+const EXAMPLE_KEYS = ['home.day_one_example_1', 'home.day_one_example_2', 'home.day_one_example_3']
 
 /**
  * Day-1 guided first log, S_DayOne in docs/money-app/project/mobile-screens-5.jsx.
@@ -52,84 +48,94 @@ export function DayOneFirstLog({ locale, onSkip, onTypeInstead }: Props) {
     if (reduceMotion) return
     const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(bob, { toValue: 1, duration: 700, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-        Animated.timing(bob, { toValue: 0, duration: 700, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        Animated.timing(bob, {
+          toValue: 1,
+          duration: 700,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(bob, {
+          toValue: 0,
+          duration: 700,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
       ]),
     )
     loop.start()
     return () => loop.stop()
   }, [bob, reduceMotion])
   // Just above the mic button: bar offset + bar + the button's overhang.
-  const pointerBottom = insets.bottom + TAB_BAR_BOTTOM_OFFSET + TAB_BAR_HEIGHT + TAB_BAR_FAB_OVERHANG + 8
+  const pointerBottom =
+    insets.bottom + TAB_BAR_BOTTOM_OFFSET + TAB_BAR_HEIGHT + TAB_BAR_FAB_OVERHANG + 8
 
   return (
     <View style={styles.root}>
-    <ScrollView
-      contentContainerStyle={[styles.content, { paddingBottom: tabBarClearance }]}
-      showsVerticalScrollIndicator={false}
-    >
-      {/* Top row — progress eyebrow + Skip */}
-      <View style={styles.topRow}>
-        <Text style={styles.progress}>{t('home.day_one_progress', locale)}</Text>
-        <Pressable
-          onPress={onSkip}
-          hitSlop={10}
-          style={({ pressed }) => pressed && { opacity: 0.6 }}
-        >
-          <Text style={styles.skipText}>{t('common.skip', locale)}</Text>
-        </Pressable>
-      </View>
-
-      {/* Hero copy */}
-      <View style={styles.hero}>
-        <Text style={styles.headline}>{t('home.day_one_headline', locale)}</Text>
-        <Text style={styles.body}>{t('home.day_one_body', locale)}</Text>
-      </View>
-
-      {/* Example cards */}
-      <View style={styles.examples}>
-        {EXAMPLE_KEYS.map((key) => (
-          <View key={key} style={styles.exampleRow}>
-            <View style={styles.micTile}>
-              <Ionicons
-                name="mic"
-                size={15}
-                color={Colors.accent ?? Colors.primary}
-              />
-            </View>
-            <Text style={styles.exampleText} numberOfLines={2}>
-              {t(key, locale)}
-            </Text>
-          </View>
-        ))}
-      </View>
-
-      {/* Bottom escape hatch — type instead of speaking */}
-      <Pressable
-        onPress={onTypeInstead}
-        hitSlop={8}
-        style={({ pressed }) => [styles.typeInsteadWrap, pressed && { opacity: 0.6 }]}
+      <ScrollView
+        contentContainerStyle={[styles.content, { paddingBottom: tabBarClearance }]}
+        showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.typeInsteadPrefix}>
-          {t('home.day_one_or', locale)}{' '}
-          <Text style={styles.typeInsteadAccent}>
-            {t('home.day_one_type_instead', locale)}
+        {/* Top row — progress eyebrow + Skip */}
+        <View style={styles.topRow}>
+          <Text style={styles.progress}>{t('home.day_one_progress', locale)}</Text>
+          <Pressable
+            onPress={onSkip}
+            hitSlop={10}
+            style={({ pressed }) => pressed && { opacity: 0.6 }}
+          >
+            <Text style={styles.skipText}>{t('common.skip', locale)}</Text>
+          </Pressable>
+        </View>
+
+        {/* Hero copy */}
+        <View style={styles.hero}>
+          <Text style={styles.headline}>{t('home.day_one_headline', locale)}</Text>
+          <Text style={styles.body}>{t('home.day_one_body', locale)}</Text>
+        </View>
+
+        {/* Example cards */}
+        <View style={styles.examples}>
+          {EXAMPLE_KEYS.map((key) => (
+            <View key={key} style={styles.exampleRow}>
+              <View style={styles.micTile}>
+                <Ionicons name="mic" size={15} color={Colors.accent ?? Colors.primary} />
+              </View>
+              <Text style={styles.exampleText} numberOfLines={2}>
+                {t(key, locale)}
+              </Text>
+            </View>
+          ))}
+        </View>
+
+        {/* Bottom escape hatch — type instead of speaking */}
+        <Pressable
+          onPress={onTypeInstead}
+          hitSlop={8}
+          style={({ pressed }) => [styles.typeInsteadWrap, pressed && { opacity: 0.6 }]}
+        >
+          <Text style={styles.typeInsteadPrefix}>
+            {t('home.day_one_or', locale)}{' '}
+            <Text style={styles.typeInsteadAccent}>{t('home.day_one_type_instead', locale)}</Text>
           </Text>
-        </Text>
-      </Pressable>
-    </ScrollView>
-    <Animated.View
-      pointerEvents="none"
-      style={[
-        styles.pointer,
-        { bottom: pointerBottom, transform: [{ translateY: bob.interpolate({ inputRange: [0, 1], outputRange: [0, 6] }) }] },
-      ]}
-    >
-      <View style={styles.pointerPill}>
-        <Text style={styles.pointerText}>{t('onboarding.first_log.tap', locale)}</Text>
-      </View>
-      <Ionicons name="caret-down" size={16} color={Colors.ink} style={{ marginTop: -4 }} />
-    </Animated.View>
+        </Pressable>
+      </ScrollView>
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          styles.pointer,
+          {
+            bottom: pointerBottom,
+            transform: [
+              { translateY: bob.interpolate({ inputRange: [0, 1], outputRange: [0, 6] }) },
+            ],
+          },
+        ]}
+      >
+        <View style={styles.pointerPill}>
+          <Text style={styles.pointerText}>{t('onboarding.first_log.tap', locale)}</Text>
+        </View>
+        <Ionicons name="caret-down" size={16} color={Colors.ink} style={{ marginTop: -4 }} />
+      </Animated.View>
     </View>
   )
 }
@@ -143,7 +149,12 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     backgroundColor: Colors.ink,
   },
-  pointerText: { color: Colors.white, fontSize: 13.5, fontWeight: '600', fontFamily: Typography.fontFamily.sansSemiBold },
+  pointerText: {
+    color: Colors.white,
+    fontSize: 13.5,
+    fontWeight: '600',
+    fontFamily: Typography.fontFamily.sansSemiBold,
+  },
   // `paddingBottom` set per-instance above from `useTabBarClearance()`.
   content: {},
 

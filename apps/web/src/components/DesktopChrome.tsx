@@ -40,7 +40,7 @@ export function DesktopChrome() {
     setIsMac(onMac)
     document.documentElement.style.setProperty(
       '--desktop-title-bar',
-      onMac ? `${TITLE_BAR_HEIGHT}px` : '0px'
+      onMac ? `${TITLE_BAR_HEIGHT}px` : '0px',
     )
   }, [])
 
@@ -49,23 +49,25 @@ export function DesktopChrome() {
   return (
     <div
       aria-hidden
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        height: TITLE_BAR_HEIGHT,
-        zIndex: 1000,
-        // Whole strip drags the window; child controls would need
-        // `-webkit-app-region: no-drag` to remain clickable. The strip
-        // is purely visual padding right now, so blanket drag is fine.
-        WebkitAppRegion: 'drag',
-        // Opaque cream — must mask any content that scrolls underneath
-        // (sidebar logo, page header, etc.) so the macOS traffic lights
-        // never collide with app content. Same colour as bgDesk so the
-        // strip is invisible to the user but visually load-bearing.
-        background: '#F4F1EA',
-      } as React.CSSProperties}
+      style={
+        {
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: TITLE_BAR_HEIGHT,
+          zIndex: 1000,
+          // Whole strip drags the window; child controls would need
+          // `-webkit-app-region: no-drag` to remain clickable. The strip
+          // is purely visual padding right now, so blanket drag is fine.
+          WebkitAppRegion: 'drag',
+          // Opaque cream — must mask any content that scrolls underneath
+          // (sidebar logo, page header, etc.) so the macOS traffic lights
+          // never collide with app content. Same colour as bgDesk so the
+          // strip is invisible to the user but visually load-bearing.
+          background: '#F4F1EA',
+        } as React.CSSProperties
+      }
     />
   )
 }

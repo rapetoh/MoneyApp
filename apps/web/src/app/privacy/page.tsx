@@ -24,8 +24,8 @@ export default function PrivacyPage() {
           <li>Your voice is transcribed on your device. Audio never leaves your phone.</li>
           <li>
             We don&apos;t sell your data, we don&apos;t show ads, and we use no advertising or
-            tracking services. We do keep anonymous usage and crash data, and you can switch
-            it off in the app.
+            tracking services. We do keep anonymous usage and crash data, and you can switch it off
+            in the app.
           </li>
           <li>
             You can export or permanently delete everything, yourself, from Settings, no email
@@ -89,16 +89,16 @@ export default function PrivacyPage() {
       <h2>Anonymous usage and crash data</h2>
       <p>
         So we can see what is broken and what confuses people, the app records anonymous product
-        events, such as finishing a setup step or opening the subscription screen, and error
-        reports when the app hits a bug. Each one carries a random identifier for that
-        installation of the app, never your account, your name or your email, and never your
-        transactions, amounts, merchants or anything you say. It is stored in our own database
-        and is never sold or shared with any analytics, advertising or tracking company.
+        events, such as finishing a setup step or opening the subscription screen, and error reports
+        when the app hits a bug. Each one carries a random identifier for that installation of the
+        app, never your account, your name or your email, and never your transactions, amounts,
+        merchants or anything you say. It is stored in our own database and is never sold or shared
+        with any analytics, advertising or tracking company.
       </p>
       <p>
         This is on by default and you can switch it off at any time: in the app, Settings &gt;
-        Privacy Center; on the web, Settings. Switching it off stops the collection immediately,
-        and our server then refuses anything that installation tries to send.
+        Privacy Center; on the web, Settings. Switching it off stops the collection immediately, and
+        our server then refuses anything that installation tries to send.
       </p>
 
       <h2>What we don&apos;t do</h2>
@@ -107,9 +107,9 @@ export default function PrivacyPage() {
         <li>No selling, renting or sharing of your data for advertising.</li>
         <li>No advertising in the product.</li>
         <li>
-          No third-party analytics, advertising or tracking services. The anonymous usage and
-          crash data we keep ourselves can be switched off at any time (app: Settings &gt; Privacy
-          Center; web: Settings).
+          No third-party analytics, advertising or tracking services. The anonymous usage and crash
+          data we keep ourselves can be switched off at any time (app: Settings &gt; Privacy Center;
+          web: Settings).
         </li>
       </ul>
 
@@ -159,9 +159,7 @@ export default function PrivacyPage() {
           <tr>
             <td>Google</td>
             <td>Sign in with Google (if you choose it); merchant logos</td>
-            <td>
-              Sign-in only if used; for logos, the merchant name alone
-            </td>
+            <td>Sign-in only if used; for logos, the merchant name alone</td>
           </tr>
           <tr>
             <td>Frankfurter (ECB rates)</td>
@@ -174,9 +172,10 @@ export default function PrivacyPage() {
       <h2>How long we keep it</h2>
       <p>
         For as long as your account exists. Deleting your account (Settings → Account → Delete
-        account, also in the Privacy Center) permanently removes your transactions, budgets, categories, recurring rules,
-        conversations, devices, profile and sign-in record; database backups are purged on their
-        rolling schedule shortly after. You can export everything at any time as CSV, JSON or PDF.
+        account, also in the Privacy Center) permanently removes your transactions, budgets,
+        categories, recurring rules, conversations, devices, profile and sign-in record; database
+        backups are purged on their rolling schedule shortly after. You can export everything at any
+        time as CSV, JSON or PDF.
       </p>
 
       <h2>Security</h2>

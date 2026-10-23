@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl} from 'react-native'
+import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import Svg, { Path, Defs, LinearGradient, Stop } from 'react-native-svg'
@@ -60,7 +60,13 @@ function splitMonthKey(key: string): { y: number; m: number } {
 /** Display label for a civil month, resolved in `tz` regardless of the
  *  device's own runtime zone — `civilDateTimeToInstant` + an explicit
  *  `timeZone` option, never a `Date` getter (fix-plan 1.3). */
-function monthLabel(y: number, m: number, tz: string, locale: string, opts: Intl.DateTimeFormatOptions): string {
+function monthLabel(
+  y: number,
+  m: number,
+  tz: string,
+  locale: string,
+  opts: Intl.DateTimeFormatOptions,
+): string {
   const instant = civilDateTimeToInstant(y, m, 15, 12, 0, 0, tz)
   return new Date(instant).toLocaleDateString(locale, { ...opts, timeZone: tz })
 }
@@ -123,12 +129,7 @@ function TrendSpark({
 
   return (
     <View style={{ marginTop: 14 }}>
-      <Svg
-        width="100%"
-        height={VB_H}
-        viewBox={`0 0 ${VB_W} ${VB_H}`}
-        preserveAspectRatio="none"
-      >
+      <Svg width="100%" height={VB_H} viewBox={`0 0 ${VB_W} ${VB_H}`} preserveAspectRatio="none">
         <Defs>
           <LinearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
             <Stop offset="0%" stopColor={accent} stopOpacity={0.22} />
@@ -136,7 +137,14 @@ function TrendSpark({
           </LinearGradient>
         </Defs>
         <Path d={fillPath} fill="url(#trendFill)" />
-        <Path d={linePath} fill="none" stroke={accent} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+        <Path
+          d={linePath}
+          fill="none"
+          stroke={accent}
+          strokeWidth={2}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
       </Svg>
       <View style={trendAxisStyles.row}>
         <Text style={trendAxisStyles.tick}>{startLabel}</Text>
@@ -186,7 +194,7 @@ function spendInWindow(
     if (tx.is_deleted) continue
     if (tx.transacted_at < startInstant || tx.transacted_at >= endExclusiveInstant) continue
     if (tx.amount_in_profile_currency == null) continue
-    const kind = tx.category_id ? categoryKindById[tx.category_id] ?? null : null
+    const kind = tx.category_id ? (categoryKindById[tx.category_id] ?? null) : null
     if (!isSpend(tx, kind)) continue
     total += tx.amount_in_profile_currency
   }
@@ -265,7 +273,10 @@ export default function InsightsScreen() {
     return opts
   }, [nowParts.y, nowParts.m])
 
-  const monthBoundsInstants = useMemo(() => monthBounds(selectedMonthKey, tz), [selectedMonthKey, tz])
+  const monthBoundsInstants = useMemo(
+    () => monthBounds(selectedMonthKey, tz),
+    [selectedMonthKey, tz],
+  )
   const daysInSelectedMonth = useMemo(() => {
     const next = addMonthsClamped(selY, selM, 1, 1)
     return daysBetween(selY, selM, 1, next.y, next.m, next.d)
@@ -284,12 +295,19 @@ export default function InsightsScreen() {
   const rangeFmt = new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric', timeZone: tz })
   const rangeStart = new Date(civilDateTimeToInstant(selY, selM, 1, 12, 0, 0, tz))
   const rangeEnd = new Date(civilDateTimeToInstant(selY, selM, rangeEndDay, 12, 0, 0, tz))
-  const rangeLabel = typeof rangeFmt.formatRange === 'function'
-    ? rangeFmt.formatRange(rangeStart, rangeEnd)
-    : `${rangeFmt.format(rangeStart)} – ${rangeFmt.format(rangeEnd)}`
+  const rangeLabel =
+    typeof rangeFmt.formatRange === 'function'
+      ? rangeFmt.formatRange(rangeStart, rangeEnd)
+      : `${rangeFmt.format(rangeStart)} – ${rangeFmt.format(rangeEnd)}`
 
   const monthSpent = useMemo(
-    () => spendInWindow(transactions, categoryKindById, monthBoundsInstants.start, monthBoundsInstants.endExclusive),
+    () =>
+      spendInWindow(
+        transactions,
+        categoryKindById,
+        monthBoundsInstants.start,
+        monthBoundsInstants.endExclusive,
+      ),
     [transactions, categoryKindById, monthBoundsInstants],
   )
 
@@ -300,10 +318,18 @@ export default function InsightsScreen() {
     [prevMonthTarget, tz],
   )
   const prevMonthSpent = useMemo(
-    () => spendInWindow(transactions, categoryKindById, prevMonthBoundsInstants.start, prevMonthBoundsInstants.endExclusive),
+    () =>
+      spendInWindow(
+        transactions,
+        categoryKindById,
+        prevMonthBoundsInstants.start,
+        prevMonthBoundsInstants.endExclusive,
+      ),
     [transactions, categoryKindById, prevMonthBoundsInstants],
   )
-  const prevMonthLabel = monthLabel(prevMonthTarget.y, prevMonthTarget.m, tz, locale, { month: 'short' })
+  const prevMonthLabel = monthLabel(prevMonthTarget.y, prevMonthTarget.m, tz, locale, {
+    month: 'short',
+  })
 
   // If current month in-progress, normalize the % to days-elapsed so a
   // mid-month comparison isn't misleadingly low.
@@ -312,8 +338,7 @@ export default function InsightsScreen() {
     isCurrentMonth && prevMonthSpent > 0
       ? (prevMonthSpent * daysElapsed) / daysInSelectedMonth
       : prevMonthSpent
-  const deltaPct =
-    prevEquiv > 0 ? Math.round(((monthSpent - prevEquiv) / prevEquiv) * 100) : null
+  const deltaPct = prevEquiv > 0 ? Math.round(((monthSpent - prevEquiv) / prevEquiv) * 100) : null
 
   // Categories: sum non-transfer debits per category for the selected
   // month, sorted desc. The percentage denominator is the FULL total —
@@ -325,9 +350,13 @@ export default function InsightsScreen() {
     const byId: Record<string, { id: string; name: string; color: string; amount: number }> = {}
     for (const tx of transactions) {
       if (tx.is_deleted) continue
-      if (tx.transacted_at < monthBoundsInstants.start || tx.transacted_at >= monthBoundsInstants.endExclusive) continue
+      if (
+        tx.transacted_at < monthBoundsInstants.start ||
+        tx.transacted_at >= monthBoundsInstants.endExclusive
+      )
+        continue
       if (tx.amount_in_profile_currency == null) continue
-      const kind = tx.category_id ? categoryKindById[tx.category_id] ?? null : null
+      const kind = tx.category_id ? (categoryKindById[tx.category_id] ?? null) : null
       if (!isSpend(tx, kind)) continue
       const id = tx.category_id ?? '__uncategorized__'
       const catRow = tx.category_id ? categoryMap[tx.category_id] : null
@@ -341,7 +370,10 @@ export default function InsightsScreen() {
     const TOP_N = 6
     const top = all.slice(0, TOP_N)
     const rest = all.slice(TOP_N)
-    const rows = top.map((r) => ({ ...r, pct: total > 0 ? Math.round((r.amount / total) * 100) : 0 }))
+    const rows = top.map((r) => ({
+      ...r,
+      pct: total > 0 ? Math.round((r.amount / total) * 100) : 0,
+    }))
     if (rest.length > 0) {
       const otherAmount = rest.reduce((s, r) => s + r.amount, 0)
       rows.push({
@@ -375,11 +407,19 @@ export default function InsightsScreen() {
   const trendStartLabel = useMemo(() => {
     const startDayNum = rangeEndDay - (trend.length - 1)
     const start = civilDateTimeToInstant(selY, selM, Math.max(1, startDayNum), 12, 0, 0, tz)
-    return new Date(start).toLocaleDateString(locale, { month: 'short', day: 'numeric', timeZone: tz })
+    return new Date(start).toLocaleDateString(locale, {
+      month: 'short',
+      day: 'numeric',
+      timeZone: tz,
+    })
   }, [selY, selM, rangeEndDay, trend.length, tz, locale])
   const trendEndLabel = useMemo(() => {
     const end = civilDateTimeToInstant(selY, selM, rangeEndDay, 12, 0, 0, tz)
-    return new Date(end).toLocaleDateString(locale, { month: 'short', day: 'numeric', timeZone: tz })
+    return new Date(end).toLocaleDateString(locale, {
+      month: 'short',
+      day: 'numeric',
+      timeZone: tz,
+    })
   }, [selY, selM, rangeEndDay, tz, locale])
 
   // Forecast — the one shared entry point (fix-plan 2.11): both
@@ -395,8 +435,8 @@ export default function InsightsScreen() {
           direction: tx.direction,
           transacted_at: tx.transacted_at,
           category_id: tx.category_id,
-          category_name: tx.category_id ? categoryMap[tx.category_id]?.name ?? null : null,
-          category_kind: tx.category_id ? categoryKindById[tx.category_id] ?? null : null,
+          category_name: tx.category_id ? (categoryMap[tx.category_id]?.name ?? null) : null,
+          category_kind: tx.category_id ? (categoryKindById[tx.category_id] ?? null) : null,
           is_recurring: tx.is_recurring,
         })),
     [transactions, categoryMap, categoryKindById],
@@ -461,14 +501,26 @@ export default function InsightsScreen() {
     })
       .filter((i) => i.kind !== 'no_data')
       .slice(0, 3)
-  }, [locale, currency, profile?.monthly_income, transactions, rules, categories, tz, budget, budgetStatus])
+  }, [
+    locale,
+    currency,
+    profile?.monthly_income,
+    transactions,
+    rules,
+    categories,
+    tz,
+    budget,
+    budgetStatus,
+  ])
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView
         contentContainerStyle={[styles.content, { paddingBottom: tabBarClearance }]}
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.ink3} />}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.ink3} />
+        }
       >
         {/* Title block — eyebrow + serif headline. Month picker is a subtle
             button in the eyebrow row so the overall page header stays calm. */}
@@ -499,9 +551,7 @@ export default function InsightsScreen() {
                 <View style={styles.welcomeBadge}>
                   <Ionicons name="sparkles" size={14} color={Colors.accent} />
                 </View>
-                <Text style={styles.welcomeEyebrow}>
-                  {t('insights.unlock_eyebrow', locale)}
-                </Text>
+                <Text style={styles.welcomeEyebrow}>{t('insights.unlock_eyebrow', locale)}</Text>
                 <Pressable
                   onPress={dismissWelcome}
                   hitSlop={12}
@@ -514,12 +564,8 @@ export default function InsightsScreen() {
                   <Ionicons name="close" size={14} color={Colors.ink3} />
                 </Pressable>
               </View>
-              <Text style={styles.welcomeTitle}>
-                {t('insights.unlock_title', locale)}
-              </Text>
-              <Text style={styles.welcomeBody}>
-                {t('insights.unlock_body', locale)}
-              </Text>
+              <Text style={styles.welcomeTitle}>{t('insights.unlock_title', locale)}</Text>
+              <Text style={styles.welcomeBody}>{t('insights.unlock_body', locale)}</Text>
             </View>
           </View>
         )}
@@ -582,11 +628,19 @@ export default function InsightsScreen() {
             // best available retry is re-driving the same pull it already
             // runs on mount.
             <View style={styles.emptyCard}>
-              <Ionicons name="alert-circle-outline" size={28} color={Colors.destructive ?? '#A94646'} style={{ marginBottom: 4 }} />
+              <Ionicons
+                name="alert-circle-outline"
+                size={28}
+                color={Colors.destructive ?? '#A94646'}
+                style={{ marginBottom: 4 }}
+              />
               <Text style={styles.emptyText}>{t('common.load_failed', locale)}</Text>
               <Pressable
                 onPress={() => user?.id && syncManager.pullRemote(user.id)}
-                style={({ pressed }) => [styles.errorRetryBtn, pressed && styles.errorRetryBtnPressed]}
+                style={({ pressed }) => [
+                  styles.errorRetryBtn,
+                  pressed && styles.errorRetryBtnPressed,
+                ]}
               >
                 <Ionicons name="refresh" size={14} color="#FFFFFF" />
                 <Text style={styles.errorRetryText}>{t('common.retry', locale)}</Text>
@@ -602,10 +656,7 @@ export default function InsightsScreen() {
                 const isLast = i === categoryBreakdown.length - 1
                 const barWidthPct = Math.max(4, (row.pct / Math.max(maxCatPct, 1)) * 100)
                 return (
-                  <View
-                    key={row.id}
-                    style={[styles.catRow, !isLast && styles.catRowDivider]}
-                  >
+                  <View key={row.id} style={[styles.catRow, !isLast && styles.catRowDivider]}>
                     <View style={styles.catRowHeader}>
                       <View style={styles.catLeft}>
                         <View style={[styles.catDot, { backgroundColor: row.color }]} />
@@ -614,7 +665,14 @@ export default function InsightsScreen() {
                         </Text>
                       </View>
                       <View style={styles.catRight}>
-                        <Money value={row.amount} currencyCode={currency} locale={locale} size={15} serif={false} sansWeight="600" />
+                        <Money
+                          value={row.amount}
+                          currencyCode={currency}
+                          locale={locale}
+                          size={15}
+                          serif={false}
+                          sansWeight="600"
+                        />
                         <Text style={styles.catPct}>{row.pct}%</Text>
                       </View>
                     </View>
@@ -686,7 +744,12 @@ export default function InsightsScreen() {
         <View style={styles.historyWrap}>
           <Text style={styles.historySectionLabel}>{t('insights.history', locale)}</Text>
           {isPlus ? (
-            <HistoryHeatmap transactions={transactions} locale={locale} currencyCode={currency} tz={tz} />
+            <HistoryHeatmap
+              transactions={transactions}
+              locale={locale}
+              currencyCode={currency}
+              tz={tz}
+            />
           ) : (
             <PlusLock
               icon="calendar-outline"
@@ -722,7 +785,11 @@ export default function InsightsScreen() {
           return (
             <Pressable
               key={key}
-              style={[styles.monthOption, active && styles.monthOptionActive, locked && styles.monthOptionLocked]}
+              style={[
+                styles.monthOption,
+                active && styles.monthOptionActive,
+                locked && styles.monthOptionLocked,
+              ]}
               onPress={() => {
                 setMonthPickerOpen(false)
                 if (locked) {
@@ -733,9 +800,20 @@ export default function InsightsScreen() {
               }}
             >
               {locked && (
-                <Ionicons name="lock-closed" size={13} color={Colors.ink4} style={{ marginRight: 8 }} />
+                <Ionicons
+                  name="lock-closed"
+                  size={13}
+                  color={Colors.ink4}
+                  style={{ marginRight: 8 }}
+                />
               )}
-              <Text style={[styles.monthOptionText, active && styles.monthOptionTextActive, locked && styles.monthOptionTextLocked]}>
+              <Text
+                style={[
+                  styles.monthOptionText,
+                  active && styles.monthOptionTextActive,
+                  locked && styles.monthOptionTextLocked,
+                ]}
+              >
                 {monthLabel(y, m, tz, locale, { month: 'long', year: 'numeric' })}
               </Text>
               {active && (

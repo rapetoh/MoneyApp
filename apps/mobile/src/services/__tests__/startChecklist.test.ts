@@ -31,6 +31,10 @@ describe('orderStartItems', () => {
 
   it('always opens on something still to do', () => {
     const withDone = [item('budget', true), item('first_expense'), item('ask')]
-    expect(orderStartItems(withDone, 'budget').map((i) => i.key)).toEqual(['first_expense', 'ask', 'budget'])
+    expect(orderStartItems(withDone, 'budget').map((i) => i.key)).toEqual([
+      'first_expense',
+      'ask',
+      'budget',
+    ])
   })
 })

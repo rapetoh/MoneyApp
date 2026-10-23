@@ -49,7 +49,7 @@ describe('merchantColor — deterministic fallback-avatar palette (fix-plan 4.4 
 describe('guessDomain', () => {
   it('resolves a known merchant via KNOWN_DOMAINS', () => {
     expect(guessDomain('Starbucks')).toBe('starbucks.com')
-    expect(guessDomain(' McDonald\'s ')).toBe(KNOWN_DOMAINS.mcdonalds)
+    expect(guessDomain(" McDonald's ")).toBe(KNOWN_DOMAINS.mcdonalds)
   })
 
   it('falls back to a stripped-and-lowercased .com guess', () => {

@@ -28,7 +28,9 @@ const MODEL = process.env.AI_PARSE_MODEL ?? 'gpt-4o-mini'
 async function main() {
   const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey) {
-    console.error('OPENAI_API_KEY is not set — this script calls the live model, nothing else runs it.')
+    console.error(
+      'OPENAI_API_KEY is not set — this script calls the live model, nothing else runs it.',
+    )
     process.exit(1)
   }
   const openai = new OpenAI({ apiKey })
@@ -76,7 +78,9 @@ async function main() {
       )
     }
     if (row.expected.flowType && raw.flow_type !== row.expected.flowType) {
-      problems.push(`flow_type: expected ${row.expected.flowType}, got ${JSON.stringify(raw.flow_type)}`)
+      problems.push(
+        `flow_type: expected ${row.expected.flowType}, got ${JSON.stringify(raw.flow_type)}`,
+      )
     }
     if (Number(raw.amount) !== row.expected.amount) {
       problems.push(`amount: expected ${row.expected.amount}, got ${raw.amount}`)
@@ -87,25 +91,33 @@ async function main() {
       )
     }
     if (row.expected.noteContains && !String(raw.note ?? '').includes(row.expected.noteContains)) {
-      problems.push(`note: expected to contain "${row.expected.noteContains}", got ${JSON.stringify(raw.note)}`)
+      problems.push(
+        `note: expected to contain "${row.expected.noteContains}", got ${JSON.stringify(raw.note)}`,
+      )
     }
 
     const recordedDrift =
       JSON.stringify(raw) !== JSON.stringify({ ...row.rawResponse, currency: raw.currency })
-        ? ' (live output differs from corpus.ts\'s rawResponse — consider refreshing it)'
+        ? " (live output differs from corpus.ts's rawResponse — consider refreshing it)"
         : ''
 
     if (problems.length === 0) {
-      console.log(`ok   [${row.lang}] ${row.id}${row.knownFailing ? ' — was knownFailing, consider flipping it!' : ''}`)
+      console.log(
+        `ok   [${row.lang}] ${row.id}${row.knownFailing ? ' — was knownFailing, consider flipping it!' : ''}`,
+      )
     } else {
       mismatches += 1
-      console.log(`FAIL [${row.lang}] ${row.id}${row.knownFailing ? ' (expected — still knownFailing)' : ''}${recordedDrift}`)
+      console.log(
+        `FAIL [${row.lang}] ${row.id}${row.knownFailing ? ' (expected — still knownFailing)' : ''}${recordedDrift}`,
+      )
       for (const p of problems) console.log(`       ${p}`)
     }
   }
 
   console.log('')
-  console.log(`${GOLDEN_CORPUS.length - mismatches}/${GOLDEN_CORPUS.length} rows match expected output against the live model.`)
+  console.log(
+    `${GOLDEN_CORPUS.length - mismatches}/${GOLDEN_CORPUS.length} rows match expected output against the live model.`,
+  )
   // Rows marked knownFailing are *expected* to mismatch; only a clean exit
   // when everything else is fine is actionable without manual reading.
   process.exit(0)

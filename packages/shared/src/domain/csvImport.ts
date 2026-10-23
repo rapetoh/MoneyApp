@@ -18,7 +18,11 @@
 import { daysBetween, civilDateTimeToInstant } from '../utils/period'
 import type { Category } from '../types/category'
 import { resolveCategorySuggestion, guessCategoryFromMerchant } from './categoryResolver'
-import { cleanMerchantDescriptor, normalizeMerchantCase, brandDomainForMerchant } from './merchantBrand'
+import {
+  cleanMerchantDescriptor,
+  normalizeMerchantCase,
+  brandDomainForMerchant,
+} from './merchantBrand'
 import { learnedCategoryFor, type MerchantRule } from './merchantRules'
 
 // ── Reading the file ─────────────────────────────────────────────────────
@@ -128,9 +132,38 @@ export function parseAmount(raw: string, mark: DecimalMark = '.'): number | null
 export type DateOrder = 'ymd' | 'mdy' | 'dmy'
 
 const MONTHS: Record<string, number> = {
-  jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, sept: 9, oct: 10, nov: 11, dec: 12,
-  janv: 1, fev: 2, fevr: 2, mars: 3, avr: 4, mai: 5, juin: 6, juil: 7, aout: 8, déc: 12, dic: 12, ene: 1,
-  abr: 4, ago: 8, set: 9, out: 10, dez: 12, fév: 2, août: 8,
+  jan: 1,
+  feb: 2,
+  mar: 3,
+  apr: 4,
+  may: 5,
+  jun: 6,
+  jul: 7,
+  aug: 8,
+  sep: 9,
+  sept: 9,
+  oct: 10,
+  nov: 11,
+  dec: 12,
+  janv: 1,
+  fev: 2,
+  fevr: 2,
+  mars: 3,
+  avr: 4,
+  mai: 5,
+  juin: 6,
+  juil: 7,
+  aout: 8,
+  déc: 12,
+  dic: 12,
+  ene: 1,
+  abr: 4,
+  ago: 8,
+  set: 9,
+  out: 10,
+  dez: 12,
+  fév: 2,
+  août: 8,
 }
 
 /** Day-first or month-first, read from the whole column: a first part above
@@ -209,7 +242,8 @@ const HEADER_WORDS: Record<keyof ColumnMapping, RegExp> = {
   amount: /^amount|^montant|^importe|^valor|^value|^sum|^betrag|^total/i,
   debit: /debit|withdrawal|money out|paid out|spent|^out$|d[ée]bit|cargo|retiro|sa[ií]da/i,
   credit: /credit|deposit|money in|paid in|received|^in$|cr[ée]dit|abono|ingreso|entrada/i,
-  description: /description|merchant|payee|^name|narrative|libell[ée]|concepto|descri[çc][ãa]o|beneficiary|counterparty|^title/i,
+  description:
+    /description|merchant|payee|^name|narrative|libell[ée]|concepto|descri[çc][ãa]o|beneficiary|counterparty|^title/i,
   category: /categor/i,
 }
 
@@ -217,14 +251,23 @@ const HEADER_WORDS: Record<keyof ColumnMapping, RegExp> = {
 export function hasHeaderRow(rows: readonly string[][]): boolean {
   const first = rows[0]
   if (!first) return false
-  const looksLikeData = first.some((c) => parseDate(c, 'mdy') != null) && first.some((c) => /\d/.test(c) && parseAmount(c) != null)
+  const looksLikeData =
+    first.some((c) => parseDate(c, 'mdy') != null) &&
+    first.some((c) => /\d/.test(c) && parseAmount(c) != null)
   return !looksLikeData
 }
 
 /** Best guess at each column, from header words, then from the values. */
 export function detectColumns(rows: readonly string[][], header: boolean): ColumnMapping {
   const width = Math.max(0, ...rows.slice(0, 20).map((r) => r.length))
-  const mapping: ColumnMapping = { date: null, amount: null, debit: null, credit: null, description: null, category: null }
+  const mapping: ColumnMapping = {
+    date: null,
+    amount: null,
+    debit: null,
+    credit: null,
+    description: null,
+    category: null,
+  }
   const taken = new Set<number>()
   const take = (key: keyof ColumnMapping, i: number) => {
     mapping[key] = i
@@ -241,18 +284,25 @@ export function detectColumns(rows: readonly string[][], header: boolean): Colum
     // Weaker description words ("Memo", "Details") only when nothing better
     // is named: Chase's "Details" column holds DEBIT or CREDIT.
     if (mapping.description == null) {
-      const i = names.findIndex((n, idx) => !taken.has(idx) && /memo|details|reference|note/i.test(n.trim()))
+      const i = names.findIndex(
+        (n, idx) => !taken.has(idx) && /memo|details|reference|note/i.test(n.trim()),
+      )
       if (i >= 0) take('description', i)
     }
   }
 
   const data = rows.slice(header ? 1 : 0, (header ? 1 : 0) + 30)
   const share = (i: number, test: (c: string) => boolean) =>
-    data.length ? data.filter((r) => r[i] != null && r[i] !== '' && test(r[i])).length / data.length : 0
+    data.length
+      ? data.filter((r) => r[i] != null && r[i] !== '' && test(r[i])).length / data.length
+      : 0
 
   if (mapping.date == null) {
     for (let i = 0; i < width; i++) {
-      if (!taken.has(i) && share(i, (c) => parseDate(c, 'mdy') != null || parseDate(c, 'dmy') != null) > 0.8) {
+      if (
+        !taken.has(i) &&
+        share(i, (c) => parseDate(c, 'mdy') != null || parseDate(c, 'dmy') != null) > 0.8
+      ) {
         take('date', i)
         break
       }
@@ -260,7 +310,10 @@ export function detectColumns(rows: readonly string[][], header: boolean): Colum
   }
   if (mapping.amount == null && (mapping.debit == null || mapping.credit == null)) {
     for (let i = 0; i < width; i++) {
-      if (!taken.has(i) && share(i, (c) => /\d/.test(c) && !/[a-z]{3,}/i.test(c) && parseAmount(c) != null) > 0.8) {
+      if (
+        !taken.has(i) &&
+        share(i, (c) => /\d/.test(c) && !/[a-z]{3,}/i.test(c) && parseAmount(c) != null) > 0.8
+      ) {
         take('amount', i)
         break
       }
@@ -292,7 +345,11 @@ export function detectColumns(rows: readonly string[][], header: boolean): Colum
 // ── Rows ─────────────────────────────────────────────────────────────────
 
 /** How a single signed amount column reads. */
-export type SignConvention = 'negative_is_expense' | 'positive_is_expense' | 'all_expenses' | 'all_income'
+export type SignConvention =
+  | 'negative_is_expense'
+  | 'positive_is_expense'
+  | 'all_expenses'
+  | 'all_income'
 
 /** Negative and positive values both present: negative is money out (how
  *  banks export). Only one sign present: they are all expenses. */
@@ -326,7 +383,10 @@ export interface ImportSkip {
   reason: 'no_date' | 'no_amount' | 'zero'
 }
 
-export function buildImportRows(rows: readonly string[][], opts: ImportOptions): { rows: ImportRow[]; skipped: ImportSkip[] } {
+export function buildImportRows(
+  rows: readonly string[][],
+  opts: ImportOptions,
+): { rows: ImportRow[]; skipped: ImportSkip[] } {
   const out: ImportRow[] = []
   const skipped: ImportSkip[] = []
   const { mapping: m } = opts
@@ -363,8 +423,12 @@ export function buildImportRows(rows: readonly string[][], opts: ImportOptions):
             : opts.sign === 'all_income'
               ? 'credit'
               : opts.sign === 'negative_is_expense'
-                ? (v < 0 ? 'debit' : 'credit')
-                : (v > 0 ? 'debit' : 'credit')
+                ? v < 0
+                  ? 'debit'
+                  : 'credit'
+                : v > 0
+                  ? 'debit'
+                  : 'credit'
       }
     }
     if (signed == null) {
@@ -375,9 +439,17 @@ export function buildImportRows(rows: readonly string[][], opts: ImportOptions):
       skipped.push({ line, reason: 'zero' })
       continue
     }
-    const description = (m.description != null ? cells[m.description] : '')?.replace(/\s+/g, ' ').trim() ?? ''
-    const category = m.category != null ? (cells[m.category]?.trim() || null) : null
-    out.push({ line, day, amount: Math.round(signed * 100) / 100, direction, description, category })
+    const description =
+      (m.description != null ? cells[m.description] : '')?.replace(/\s+/g, ' ').trim() ?? ''
+    const category = m.category != null ? cells[m.category]?.trim() || null : null
+    out.push({
+      line,
+      day,
+      amount: Math.round(signed * 100) / 100,
+      direction,
+      description,
+      category,
+    })
   }
   return { rows: out, skipped }
 }
@@ -401,7 +473,10 @@ export const DUPLICATE_DAY_TOLERANCE = 2
  * $4.50 coffees in the file against one logged coffee import one.
  * Returns the `line`s to hold back.
  */
-export function findDuplicates(rows: readonly ImportRow[], existing: readonly ExistingForDuplicates[]): Set<number> {
+export function findDuplicates(
+  rows: readonly ImportRow[],
+  existing: readonly ExistingForDuplicates[],
+): Set<number> {
   const pool = new Map<string, Array<{ day: string; used: boolean }>>()
   for (const e of existing) {
     const key = `${e.direction}:${Math.round(e.amount * 100)}`
@@ -468,10 +543,15 @@ export interface ImportContext {
  * zone shift can move it to a neighbouring day. Same-currency, so the FX
  * snapshot is 1.
  */
-export function importTransaction(row: ImportRow, identity: MerchantIdentity | undefined, ctx: ImportContext) {
+export function importTransaction(
+  row: ImportRow,
+  identity: MerchantIdentity | undefined,
+  ctx: ImportContext,
+) {
   const [y, m, d] = row.day.split('-').map(Number)
   const transactedAt = civilDateTimeToInstant(y, m, d, 12, 0, 0, ctx.tz)
-  const cleaned = normalizeMerchantCase(cleanMerchantDescriptor(row.description)) || row.description || null
+  const cleaned =
+    normalizeMerchantCase(cleanMerchantDescriptor(row.description)) || row.description || null
   const merchant = (identity?.merchant ?? cleaned)?.slice(0, 200) || null
   const byName = (name: string | null | undefined) =>
     name ? (ctx.categories.find((c) => c.name.toLowerCase() === name.toLowerCase()) ?? null) : null

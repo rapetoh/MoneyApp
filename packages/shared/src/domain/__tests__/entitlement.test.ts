@@ -275,7 +275,13 @@ describe('billing issue is distinguishable from cancellation', () => {
   it('surfaces billing_issues_detected_at and the grace deadline', () => {
     const r = resolveEntitlement(
       subscriber(
-        { plus: { product_identifier: PLUS_PRODUCTS.monthly, expires_date: PAST, grace_period_expires_date: FUTURE } },
+        {
+          plus: {
+            product_identifier: PLUS_PRODUCTS.monthly,
+            expires_date: PAST,
+            grace_period_expires_date: FUTURE,
+          },
+        },
         {
           [PLUS_PRODUCTS.monthly]: {
             expires_date: PAST,
@@ -298,18 +304,15 @@ describe('billing issue is distinguishable from cancellation', () => {
 
   it('leaves the billing signal null when the user simply cancelled', () => {
     const r = resolveEntitlement(
-      subscriber(
-        { plus: { product_identifier: PLUS_PRODUCTS.monthly, expires_date: FUTURE } },
-        {
-          [PLUS_PRODUCTS.monthly]: {
-            expires_date: FUTURE,
-            unsubscribe_detected_at: '2026-08-14T10:00:00Z',
-            period_type: 'normal',
-            store: 'app_store',
-            is_sandbox: false,
-          },
-        } as RcSubscriber['subscriptions'],
-      ),
+      subscriber({ plus: { product_identifier: PLUS_PRODUCTS.monthly, expires_date: FUTURE } }, {
+        [PLUS_PRODUCTS.monthly]: {
+          expires_date: FUTURE,
+          unsubscribe_detected_at: '2026-08-14T10:00:00Z',
+          period_type: 'normal',
+          store: 'app_store',
+          is_sandbox: false,
+        },
+      } as RcSubscriber['subscriptions']),
       NOW,
     )
     expect(r.plus_will_renew).toBe(false)

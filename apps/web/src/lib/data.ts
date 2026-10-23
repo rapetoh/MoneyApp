@@ -40,11 +40,7 @@ export async function getProfile(supabase: SupabaseClient, userId: string) {
   return data
 }
 
-export async function getTransactions(
-  supabase: SupabaseClient,
-  userId: string,
-  limit?: number,
-) {
+export async function getTransactions(supabase: SupabaseClient, userId: string, limit?: number) {
   let query = supabase
     .from('transactions')
     .select('*')

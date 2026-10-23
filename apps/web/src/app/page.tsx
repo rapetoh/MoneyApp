@@ -13,7 +13,8 @@ const SITE = 'https://itsmurmur.com'
 // site's own hero at 1200x630, rebuilt by `npm run assets` (see
 // scripts/build-site-assets.mjs), so the preview and the page cannot drift
 // apart: change the hero, re-run it, and the card follows.
-const OG_ALT = 'Murmur: speak your spending. The Today screen with an Apple Pay purchase capturing itself.'
+const OG_ALT =
+  'Murmur: speak your spending. The Today screen with an Apple Pay purchase capturing itself.'
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE),
@@ -177,12 +178,30 @@ const MARQUEE = [
  * re-describing them underneath.
  */
 const SHOTS = [
-  { src: '/shots/voice.webp', alt: 'Murmur listening and writing out "Twelve forty at Starbucks for coffee" as it is spoken' },
-  { src: '/shots/confirm.webp', alt: 'The confirmation card: $12.40 at Starbucks, filed under Coffee & tea, with one-tap corrections and an undo' },
-  { src: '/shots/insights.webp', alt: 'Insights: $1,330.00 spent this month, 12% below March, broken down by category' },
-  { src: '/shots/applepay.webp', alt: 'An Apple Pay purchase capturing itself: Starbucks, $6.40, Coffee & tea' },
-  { src: '/shots/recurring.webp', alt: 'Recurring: $291.40 a month of bills and subscriptions, $3,497 a year, each with its next due date' },
-  { src: '/shots/ask.webp', alt: 'Ask Murmur answering "Can I afford a trip to Lisbon?" from the user\'s own spending' },
+  {
+    src: '/shots/voice.webp',
+    alt: 'Murmur listening and writing out "Twelve forty at Starbucks for coffee" as it is spoken',
+  },
+  {
+    src: '/shots/confirm.webp',
+    alt: 'The confirmation card: $12.40 at Starbucks, filed under Coffee & tea, with one-tap corrections and an undo',
+  },
+  {
+    src: '/shots/insights.webp',
+    alt: 'Insights: $1,330.00 spent this month, 12% below March, broken down by category',
+  },
+  {
+    src: '/shots/applepay.webp',
+    alt: 'An Apple Pay purchase capturing itself: Starbucks, $6.40, Coffee & tea',
+  },
+  {
+    src: '/shots/recurring.webp',
+    alt: 'Recurring: $291.40 a month of bills and subscriptions, $3,497 a year, each with its next due date',
+  },
+  {
+    src: '/shots/ask.webp',
+    alt: 'Ask Murmur answering "Can I afford a trip to Lisbon?" from the user\'s own spending',
+  },
 ]
 
 export default async function RootPage() {
@@ -269,7 +288,13 @@ export default async function RootPage() {
               ].map(([head, sub]) => (
                 <li key={head} className="lp-proof-item">
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden>
-                    <path d="M4 12.5 9.5 18 20 6.5" stroke="#3F5A3E" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" />
+                    <path
+                      d="M4 12.5 9.5 18 20 6.5"
+                      stroke="#3F5A3E"
+                      strokeWidth="3.2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
                   </svg>
                   <div>
                     <strong>{head}</strong>
@@ -436,7 +461,12 @@ export default async function RootPage() {
           <div className="lp-kicker">The app itself</div>
           <h2 className="lp-h2">Not a mockup.</h2>
         </div>
-        <div className="lp-shots" tabIndex={0} role="group" aria-label="App screens, scroll sideways">
+        <div
+          className="lp-shots"
+          tabIndex={0}
+          role="group"
+          aria-label="App screens, scroll sideways"
+        >
           {SHOTS.map((shot) => (
             <img
               key={shot.src}
@@ -881,7 +911,13 @@ export default async function RootPage() {
                 {item.q}
                 <span aria-hidden className="lp-faq-mark">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                    <path d="m5 9 7 7 7-7" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+                    <path
+                      d="m5 9 7 7 7-7"
+                      stroke="currentColor"
+                      strokeWidth="2.6"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
                   </svg>
                 </span>
               </summary>
@@ -901,8 +937,8 @@ export default async function RootPage() {
             <div className="lp-kicker lp-kicker-light">Get Murmur</div>
             <h2 className="lp-h2 lp-h2-light">Say it once. It is filed.</h2>
             <p className="lp-p lp-p-light" style={{ maxWidth: 480, margin: '12px auto 0' }}>
-              Free forever on iPhone. One account, every screen, and two weeks of Plus the
-              moment you sign in. No card, nothing to cancel.
+              Free forever on iPhone. One account, every screen, and two weeks of Plus the moment
+              you sign in. No card, nothing to cancel.
             </p>
           </div>
 
@@ -926,12 +962,22 @@ export default async function RootPage() {
             <div className="lp-get-card">
               <div className="lp-get-icon">
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
-                  <rect x="2.5" y="4" width="19" height="12.5" rx="2" stroke="#1B1915" strokeWidth="1.9" />
+                  <rect
+                    x="2.5"
+                    y="4"
+                    width="19"
+                    height="12.5"
+                    rx="2"
+                    stroke="#1B1915"
+                    strokeWidth="1.9"
+                  />
                   <path d="M1 19.5h22" stroke="#1B1915" strokeWidth="1.9" strokeLinecap="round" />
                 </svg>
               </div>
               <h3 className="lp-get-name">Mac</h3>
-              <p className="lp-get-sub">The month as a mind map, reports, and Ask on a big screen.</p>
+              <p className="lp-get-sub">
+                The month as a mind map, reports, and Ask on a big screen.
+              </p>
               <div className="lp-get-pair">
                 <a href={MAC_DMG_ARM} className="lp-btn-secondary lp-get-btn">
                   Apple Silicon
@@ -963,11 +1009,17 @@ export default async function RootPage() {
               <div className="lp-get-icon">
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
                   <circle cx="12" cy="12" r="9" stroke="#1B1915" strokeWidth="1.9" />
-                  <path d="M3 12h18M12 3c2.6 2.6 2.6 15.4 0 18M12 3c-2.6 2.6-2.6 15.4 0 18" stroke="#1B1915" strokeWidth="1.6" />
+                  <path
+                    d="M3 12h18M12 3c2.6 2.6 2.6 15.4 0 18M12 3c-2.6 2.6-2.6 15.4 0 18"
+                    stroke="#1B1915"
+                    strokeWidth="1.6"
+                  />
                 </svg>
               </div>
               <h3 className="lp-get-name">Web</h3>
-              <p className="lp-get-sub">Nothing to install. Your numbers in any browser, on any machine.</p>
+              <p className="lp-get-sub">
+                Nothing to install. Your numbers in any browser, on any machine.
+              </p>
               <Link href={appHref} className="lp-btn-secondary lp-get-btn">
                 {user ? 'Open your dashboard' : 'Open the web app'}
               </Link>
@@ -976,8 +1028,8 @@ export default async function RootPage() {
           </div>
 
           <p className="lp-get-foot">
-            Logging is free forever on iPhone. The big screens, unlimited Ask, your full history
-            and automatic subscription detection are Murmur Plus, $4.99 a month or $29.99 a year,
+            Logging is free forever on iPhone. The big screens, unlimited Ask, your full history and
+            automatic subscription detection are Murmur Plus, $4.99 a month or $29.99 a year,
             shareable with five family members.
           </p>
         </div>
@@ -1004,8 +1056,18 @@ export default async function RootPage() {
                 inLanguage: ['en', 'fr', 'es', 'pt'],
                 offers: [
                   { '@type': 'Offer', price: '0', priceCurrency: 'USD', name: 'Murmur Free' },
-                  { '@type': 'Offer', price: '4.99', priceCurrency: 'USD', name: 'Murmur Plus, monthly' },
-                  { '@type': 'Offer', price: '29.99', priceCurrency: 'USD', name: 'Murmur Plus, yearly' },
+                  {
+                    '@type': 'Offer',
+                    price: '4.99',
+                    priceCurrency: 'USD',
+                    name: 'Murmur Plus, monthly',
+                  },
+                  {
+                    '@type': 'Offer',
+                    price: '29.99',
+                    priceCurrency: 'USD',
+                    name: 'Murmur Plus, yearly',
+                  },
                 ],
               },
               {
@@ -1053,7 +1115,9 @@ export default async function RootPage() {
               <Link href="/privacy">Privacy</Link>
               <Link href="/terms">Terms</Link>
               <Link href={appHref}>Web dashboard</Link>
-              <a href={APP_STORE_URL} rel="noreferrer">Download on the App Store</a>
+              <a href={APP_STORE_URL} rel="noreferrer">
+                Download on the App Store
+              </a>
               <a href={MAC_DMG_ARM}>Download for Mac</a>
               <a href={WIN_EXE}>Download for Windows</a>
               {SUPPORT_EMAIL && <a href={'mailto:' + SUPPORT_EMAIL}>{SUPPORT_EMAIL}</a>}

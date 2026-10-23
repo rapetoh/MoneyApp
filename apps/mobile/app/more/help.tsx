@@ -20,7 +20,8 @@ export default function HelpScreen() {
   // brand.ts) means this screen never offers a channel it can't honour.
   // Narrowed into a local pair (not a derived boolean) so TypeScript can
   // see both are non-null wherever `supportMailto` is used below.
-  const supportMailto = SUPPORT_EMAIL && SUPPORT_MAILTO ? { email: SUPPORT_EMAIL, mailto: SUPPORT_MAILTO } : null
+  const supportMailto =
+    SUPPORT_EMAIL && SUPPORT_MAILTO ? { email: SUPPORT_EMAIL, mailto: SUPPORT_MAILTO } : null
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom', 'left', 'right']}>

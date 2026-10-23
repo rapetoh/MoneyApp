@@ -73,44 +73,83 @@ describe('budgetStatus — one definition for all five periods (04-F9/05-F5/05-F
     const at = '2026-08-20T12:00:00Z'
     const tz = 'UTC'
     const quarterly = budgetStatus(
-      { period: 'quarterly', starts_at: '2026-08-01', category_id: null, currency_code: 'USD', amount: 100 },
+      {
+        period: 'quarterly',
+        starts_at: '2026-08-01',
+        category_id: null,
+        currency_code: 'USD',
+        amount: 100,
+      },
       [],
       [],
       tz,
       at,
     )
     const yearly = budgetStatus(
-      { period: 'yearly', starts_at: '2026-08-01', category_id: null, currency_code: 'USD', amount: 100 },
+      {
+        period: 'yearly',
+        starts_at: '2026-08-01',
+        category_id: null,
+        currency_code: 'USD',
+        amount: 100,
+      },
       [],
       [],
       tz,
       at,
     )
     const monthly = budgetStatus(
-      { period: 'monthly', starts_at: '2026-08-01', category_id: null, currency_code: 'USD', amount: 100 },
+      {
+        period: 'monthly',
+        starts_at: '2026-08-01',
+        category_id: null,
+        currency_code: 'USD',
+        amount: 100,
+      },
       [],
       [],
       tz,
       at,
     )
-    expect(quarterly.window).toEqual({ start: '2026-07-01T00:00:00.000Z', endExclusive: '2026-10-01T00:00:00.000Z' })
-    expect(yearly.window).toEqual({ start: '2026-01-01T00:00:00.000Z', endExclusive: '2027-01-01T00:00:00.000Z' })
+    expect(quarterly.window).toEqual({
+      start: '2026-07-01T00:00:00.000Z',
+      endExclusive: '2026-10-01T00:00:00.000Z',
+    })
+    expect(yearly.window).toEqual({
+      start: '2026-01-01T00:00:00.000Z',
+      endExclusive: '2027-01-01T00:00:00.000Z',
+    })
     expect(quarterly.window).not.toEqual(monthly.window)
     expect(yearly.window).not.toEqual(monthly.window)
   })
 
   it('biweekly anchored 2026-08-01 reports [2026-08-15, 2026-08-29) on both the 20th and the 21st', () => {
     const tz = 'UTC'
-    const budget = { period: 'biweekly' as const, starts_at: '2026-08-01', category_id: null, currency_code: 'USD', amount: 500 }
+    const budget = {
+      period: 'biweekly' as const,
+      starts_at: '2026-08-01',
+      category_id: null,
+      currency_code: 'USD',
+      amount: 500,
+    }
     const on20th = budgetStatus(budget, [], [], tz, '2026-08-20T12:00:00Z')
     const on21st = budgetStatus(budget, [], [], tz, '2026-08-21T12:00:00Z')
-    expect(on20th.window).toEqual({ start: '2026-08-15T00:00:00.000Z', endExclusive: '2026-08-29T00:00:00.000Z' })
+    expect(on20th.window).toEqual({
+      start: '2026-08-15T00:00:00.000Z',
+      endExclusive: '2026-08-29T00:00:00.000Z',
+    })
     expect(on21st.window).toEqual(on20th.window)
   })
 
   it('a transaction 40 days in the future reports spent === 0 and committed === 0 (out of window entirely)', () => {
     const status = budgetStatus(
-      { period: 'monthly', starts_at: '2026-08-01', category_id: null, currency_code: 'USD', amount: 100 },
+      {
+        period: 'monthly',
+        starts_at: '2026-08-01',
+        category_id: null,
+        currency_code: 'USD',
+        amount: 100,
+      },
       [txn({ amount_in_profile_currency: 50, transacted_at: '2026-09-17T12:00:00Z' })],
       [],
       'UTC',
@@ -122,7 +161,13 @@ describe('budgetStatus — one definition for all five periods (04-F9/05-F5/05-F
 
   it('a future-dated row still inside the window counts as committed, not spent', () => {
     const status = budgetStatus(
-      { period: 'monthly', starts_at: '2026-08-01', category_id: null, currency_code: 'USD', amount: 1000 },
+      {
+        period: 'monthly',
+        starts_at: '2026-08-01',
+        category_id: null,
+        currency_code: 'USD',
+        amount: 1000,
+      },
       [txn({ amount_in_profile_currency: 50, transacted_at: '2026-08-25T12:00:00Z' })],
       [],
       'UTC',
@@ -134,7 +179,13 @@ describe('budgetStatus — one definition for all five periods (04-F9/05-F5/05-F
 
   it('excludes a transfer-kind category from spent (fix-plan 1.4 adoption)', () => {
     const status = budgetStatus(
-      { period: 'monthly', starts_at: '2026-08-01', category_id: null, currency_code: 'USD', amount: 1000 },
+      {
+        period: 'monthly',
+        starts_at: '2026-08-01',
+        category_id: null,
+        currency_code: 'USD',
+        amount: 1000,
+      },
       [
         txn({ amount_in_profile_currency: 50, category_name: 'Food & Dining' }),
         txn({ amount_in_profile_currency: 300, category_name: 'Savings & Investing' }),
@@ -148,7 +199,13 @@ describe('budgetStatus — one definition for all five periods (04-F9/05-F5/05-F
 
   it('sums a due, unposted recurring rule into committed', () => {
     const status = budgetStatus(
-      { period: 'monthly', starts_at: '2026-08-01', category_id: null, currency_code: 'USD', amount: 1000 },
+      {
+        period: 'monthly',
+        starts_at: '2026-08-01',
+        category_id: null,
+        currency_code: 'USD',
+        amount: 1000,
+      },
       [],
       [rule({ amount: 15 })],
       'UTC',
@@ -159,8 +216,20 @@ describe('budgetStatus — one definition for all five periods (04-F9/05-F5/05-F
 
   it('does not double-count a rule occurrence that already posted as a transaction', () => {
     const status = budgetStatus(
-      { period: 'monthly', starts_at: '2026-08-01', category_id: null, currency_code: 'USD', amount: 1000 },
-      [txn({ amount_in_profile_currency: 15, transacted_at: '2026-08-05T12:00:00Z', recurring_rule_id: 'rule-1' })],
+      {
+        period: 'monthly',
+        starts_at: '2026-08-01',
+        category_id: null,
+        currency_code: 'USD',
+        amount: 1000,
+      },
+      [
+        txn({
+          amount_in_profile_currency: 15,
+          transacted_at: '2026-08-05T12:00:00Z',
+          recurring_rule_id: 'rule-1',
+        }),
+      ],
       [rule({ amount: 15 })],
       'UTC',
       '2026-08-20T12:00:00Z',
@@ -171,7 +240,13 @@ describe('budgetStatus — one definition for all five periods (04-F9/05-F5/05-F
 
   it('excludes a recurring rule whose currency does not match the budget rather than summing it at face value', () => {
     const status = budgetStatus(
-      { period: 'monthly', starts_at: '2026-08-01', category_id: null, currency_code: 'USD', amount: 1000 },
+      {
+        period: 'monthly',
+        starts_at: '2026-08-01',
+        category_id: null,
+        currency_code: 'USD',
+        amount: 1000,
+      },
       [],
       [rule({ amount: 15, currency_code: 'EUR' })],
       'UTC',
@@ -182,7 +257,13 @@ describe('budgetStatus — one definition for all five periods (04-F9/05-F5/05-F
 
   it('scopes to only the matching category for a per-category budget', () => {
     const status = budgetStatus(
-      { period: 'monthly', starts_at: '2026-08-01', category_id: 'cat-food', currency_code: 'USD', amount: 200 },
+      {
+        period: 'monthly',
+        starts_at: '2026-08-01',
+        category_id: 'cat-food',
+        currency_code: 'USD',
+        amount: 200,
+      },
       [
         txn({ amount_in_profile_currency: 50, category_id: 'cat-food' }),
         txn({ amount_in_profile_currency: 999, category_id: 'cat-other' }),
@@ -196,7 +277,13 @@ describe('budgetStatus — one definition for all five periods (04-F9/05-F5/05-F
 
   it('excludes a pending-FX transaction from spent and reports it in pendingCount', () => {
     const status = budgetStatus(
-      { period: 'monthly', starts_at: '2026-08-01', category_id: null, currency_code: 'USD', amount: 200 },
+      {
+        period: 'monthly',
+        starts_at: '2026-08-01',
+        category_id: null,
+        currency_code: 'USD',
+        amount: 200,
+      },
       [txn({ amount_in_profile_currency: null })],
       [],
       'UTC',
@@ -208,7 +295,13 @@ describe('budgetStatus — one definition for all five periods (04-F9/05-F5/05-F
 
   it('remaining and pct are derived from spent + committed together', () => {
     const status = budgetStatus(
-      { period: 'monthly', starts_at: '2026-08-01', category_id: null, currency_code: 'USD', amount: 100 },
+      {
+        period: 'monthly',
+        starts_at: '2026-08-01',
+        category_id: null,
+        currency_code: 'USD',
+        amount: 100,
+      },
       [txn({ amount_in_profile_currency: 40 })],
       [rule({ amount: 10 })],
       'UTC',
@@ -224,7 +317,13 @@ describe('budgetStatus — one definition for all five periods (04-F9/05-F5/05-F
 describe('budgetStatus — rollover (migration 040, Oct 2026)', () => {
   const tz = 'UTC'
   const at = '2026-10-15T12:00:00Z'
-  const base = { period: 'monthly' as const, starts_at: '2026-08-01', category_id: null, currency_code: 'USD', amount: 500 }
+  const base = {
+    period: 'monthly' as const,
+    starts_at: '2026-08-01',
+    category_id: null,
+    currency_code: 'USD',
+    amount: 500,
+  }
   const history = [
     txn({ transacted_at: '2026-07-20T12:00:00Z', amount_in_profile_currency: 999 }), // before the budget: ignored
     txn({ transacted_at: '2026-08-10T12:00:00Z', amount_in_profile_currency: 400 }), // Aug: 100 left
@@ -245,8 +344,14 @@ describe('budgetStatus — rollover (migration 040, Oct 2026)', () => {
     expect(s.pct).toBeCloseTo(100 / 550)
   })
 
-  it('carries nothing in the budget\'s first period', () => {
-    const s = budgetStatus({ ...base, starts_at: '2026-10-01', rollover: true }, history, [], tz, at)
+  it("carries nothing in the budget's first period", () => {
+    const s = budgetStatus(
+      { ...base, starts_at: '2026-10-01', rollover: true },
+      history,
+      [],
+      tz,
+      at,
+    )
     expect(s.carryover).toBe(0)
   })
 
@@ -256,18 +361,39 @@ describe('budgetStatus — rollover (migration 040, Oct 2026)', () => {
     expect(s.remaining).toBe(1500)
   })
 
-  it('respects a category budget\'s scope and skips rows awaiting FX', () => {
+  it("respects a category budget's scope and skips rows awaiting FX", () => {
     const rows = [
-      txn({ transacted_at: '2026-09-10T12:00:00Z', category_id: 'food', amount_in_profile_currency: 200 }),
-      txn({ transacted_at: '2026-09-11T12:00:00Z', category_id: 'rent', amount_in_profile_currency: 900 }),
-      txn({ transacted_at: '2026-09-12T12:00:00Z', category_id: 'food', amount_in_profile_currency: null }),
+      txn({
+        transacted_at: '2026-09-10T12:00:00Z',
+        category_id: 'food',
+        amount_in_profile_currency: 200,
+      }),
+      txn({
+        transacted_at: '2026-09-11T12:00:00Z',
+        category_id: 'rent',
+        amount_in_profile_currency: 900,
+      }),
+      txn({
+        transacted_at: '2026-09-12T12:00:00Z',
+        category_id: 'food',
+        amount_in_profile_currency: null,
+      }),
     ]
-    const s = budgetStatus({ ...base, starts_at: '2026-09-01', category_id: 'food', rollover: true }, rows, [], tz, at)
+    const s = budgetStatus(
+      { ...base, starts_at: '2026-09-01', category_id: 'food', rollover: true },
+      rows,
+      [],
+      tz,
+      at,
+    )
     expect(s.carryover).toBe(300)
   })
 
   it('an overspent history leaves nothing to spend: pct reads full', () => {
-    const rows = [txn({ transacted_at: '2026-09-10T12:00:00Z', amount_in_profile_currency: 1200 }), txn({ transacted_at: '2026-10-02T12:00:00Z', amount_in_profile_currency: 10 })]
+    const rows = [
+      txn({ transacted_at: '2026-09-10T12:00:00Z', amount_in_profile_currency: 1200 }),
+      txn({ transacted_at: '2026-10-02T12:00:00Z', amount_in_profile_currency: 10 }),
+    ]
     const s = budgetStatus({ ...base, starts_at: '2026-09-01', rollover: true }, rows, [], tz, at)
     expect(s.carryover).toBe(-700)
     expect(s.remaining).toBe(-210)
@@ -276,7 +402,14 @@ describe('budgetStatus — rollover (migration 040, Oct 2026)', () => {
 
   it('works for weekly and biweekly windows', () => {
     const weekly = budgetStatus(
-      { period: 'weekly', starts_at: '2026-09-28', category_id: null, currency_code: 'USD', amount: 100, rollover: true },
+      {
+        period: 'weekly',
+        starts_at: '2026-09-28',
+        category_id: null,
+        currency_code: 'USD',
+        amount: 100,
+        rollover: true,
+      },
       [txn({ transacted_at: '2026-09-30T12:00:00Z', amount_in_profile_currency: 30 })],
       [],
       tz,
@@ -285,7 +418,14 @@ describe('budgetStatus — rollover (migration 040, Oct 2026)', () => {
     // Two full weeks before the current one carried in: (100 - 30) + 100.
     expect(weekly.carryover).toBe(170)
     const biweekly = budgetStatus(
-      { period: 'biweekly', starts_at: '2026-09-17', category_id: null, currency_code: 'USD', amount: 100, rollover: true },
+      {
+        period: 'biweekly',
+        starts_at: '2026-09-17',
+        category_id: null,
+        currency_code: 'USD',
+        amount: 100,
+        rollover: true,
+      },
       [],
       [],
       tz,
@@ -299,14 +439,21 @@ describe('budgetStatus — rollover (migration 040, Oct 2026)', () => {
 describe('inheritedCarry — editing a rollover budget keeps its carry (migration 040)', () => {
   const tz = 'UTC'
   const at = '2026-10-15T12:00:00Z'
-  const old = { period: 'monthly' as const, starts_at: '2026-08-01', category_id: null, currency_code: 'USD', amount: 500, rollover: true }
+  const old = {
+    period: 'monthly' as const,
+    starts_at: '2026-08-01',
+    category_id: null,
+    currency_code: 'USD',
+    amount: 500,
+    rollover: true,
+  }
   const rows = [
     txn({ transacted_at: '2026-08-10T12:00:00Z', amount_in_profile_currency: 400 }),
     txn({ transacted_at: '2026-09-10T12:00:00Z', amount_in_profile_currency: 300 }),
     txn({ transacted_at: '2026-10-05T12:00:00Z', amount_in_profile_currency: 100 }),
   ]
 
-  it('carries the old budget\'s balance into its replacement', () => {
+  it("carries the old budget's balance into its replacement", () => {
     expect(inheritedCarry(old, true, rows, tz, at)).toBe(300)
     // The replacement starts today; its first window is October, so the
     // inherited 300 plus its own new amount is what October has.

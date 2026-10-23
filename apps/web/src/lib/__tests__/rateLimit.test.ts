@@ -24,7 +24,7 @@ describe('checkRateLimit', () => {
     expect(checkRateLimit('parse:user-1', 1, 60_000, 61_001).allowed).toBe(true)
   })
 
-  it('tracks separate buckets per key — one user or route cannot exhaust another\'s budget', () => {
+  it("tracks separate buckets per key — one user or route cannot exhaust another's budget", () => {
     checkRateLimit('parse:user-1', 1, 60_000, 1000)
     expect(checkRateLimit('parse:user-1', 1, 60_000, 1000).allowed).toBe(false)
     expect(checkRateLimit('scan:user-1', 1, 60_000, 1000).allowed).toBe(true)

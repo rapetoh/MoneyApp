@@ -66,10 +66,7 @@ export function MerchantLogo({
       brandDomainForMerchant(name!) ??
       guessDomain(cleanMerchantDescriptor(name!)))
     : null
-  const logoUrl =
-    domain && !logoFailed
-      ? merchantLogoSrc(domain)
-      : null
+  const logoUrl = domain && !logoFailed ? merchantLogoSrc(domain) : null
 
   if (logoUrl) {
     return (

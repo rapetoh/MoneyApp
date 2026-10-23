@@ -59,35 +59,49 @@ export function MurmurMark({
           </radialGradient>
         </defs>
       )}
-      {p.bg && (
-        <rect width="160" height="160" rx={radius * (160 / size)} fill={p.bg} />
-      )}
+      {p.bg && <rect width="160" height="160" rx={radius * (160 / size)} fill={p.bg} />}
       <g transform={p.bg ? `translate(80 80) scale(${TILE_SCALE}) translate(-80 -80)` : undefined}>
-      <circle cx="80" cy="80" r="62" fill={coinFill} />
-      {p.coin === 'gradient' && (
-        <>
-          <circle cx="80" cy="80" r="62" fill="none" stroke="#FBFAF7" strokeWidth="1" opacity="0.18" />
-          <circle cx="80" cy="80" r="50" fill="none" stroke="#FBFAF7" strokeWidth="1" opacity="0.18" />
-        </>
-      )}
-      <path
-        d="M40 80 Q 55 64, 70 80 T 100 80 T 130 80"
-        stroke={p.wave}
-        strokeWidth="5"
-        fill="none"
-        strokeLinecap="round"
-        opacity="0.95"
-        className={animating ? 'murmur-pulse-arc1' : undefined}
-      />
-      <path
-        d="M40 96 Q 55 86, 70 96 T 100 96 T 120 96"
-        stroke={p.wave}
-        strokeWidth="3"
-        fill="none"
-        strokeLinecap="round"
-        opacity="0.45"
-        className={animating ? 'murmur-pulse-arc2' : undefined}
-      />
+        <circle cx="80" cy="80" r="62" fill={coinFill} />
+        {p.coin === 'gradient' && (
+          <>
+            <circle
+              cx="80"
+              cy="80"
+              r="62"
+              fill="none"
+              stroke="#FBFAF7"
+              strokeWidth="1"
+              opacity="0.18"
+            />
+            <circle
+              cx="80"
+              cy="80"
+              r="50"
+              fill="none"
+              stroke="#FBFAF7"
+              strokeWidth="1"
+              opacity="0.18"
+            />
+          </>
+        )}
+        <path
+          d="M40 80 Q 55 64, 70 80 T 100 80 T 130 80"
+          stroke={p.wave}
+          strokeWidth="5"
+          fill="none"
+          strokeLinecap="round"
+          opacity="0.95"
+          className={animating ? 'murmur-pulse-arc1' : undefined}
+        />
+        <path
+          d="M40 96 Q 55 86, 70 96 T 100 96 T 120 96"
+          stroke={p.wave}
+          strokeWidth="3"
+          fill="none"
+          strokeLinecap="round"
+          opacity="0.45"
+          className={animating ? 'murmur-pulse-arc2' : undefined}
+        />
       </g>
     </svg>
   )

@@ -16,7 +16,16 @@ import { colors, font } from '../lib/theme'
 // had anything to do with categories at all. Every slice/bar instead
 // cycles through a fixed, hue-spread rotation, each stop derived via
 // `categoryPalette` so it clears the same 4.5:1 contrast floor.
-const PALETTE_SEED_HUES = ['#E85D04', '#2D6A4F', '#457B9D', '#9B59B6', '#C77A2E', '#2A9D8F', '#8E424C', '#5A5F34']
+const PALETTE_SEED_HUES = [
+  '#E85D04',
+  '#2D6A4F',
+  '#457B9D',
+  '#9B59B6',
+  '#C77A2E',
+  '#2A9D8F',
+  '#8E424C',
+  '#5A5F34',
+]
 const PALETTE: string[] = PALETTE_SEED_HUES.map((hex) => categoryPalette(hex).fg)
 
 function colorFor(_label: string, idx: number): string {
@@ -51,13 +60,7 @@ export function AskChart({
   )
 }
 
-function Donut({
-  data,
-  fmt,
-}: {
-  data: AskMurmurChart['data']
-  fmt: (n: number) => string
-}) {
+function Donut({ data, fmt }: { data: AskMurmurChart['data']; fmt: (n: number) => string }) {
   const total = data.reduce((s, p) => s + p.value, 0)
   if (total <= 0) return null
   const r = 64
@@ -117,13 +120,7 @@ function Donut({
   )
 }
 
-function Bars({
-  data,
-  fmt,
-}: {
-  data: AskMurmurChart['data']
-  fmt: (n: number) => string
-}) {
+function Bars({ data, fmt }: { data: AskMurmurChart['data']; fmt: (n: number) => string }) {
   const max = Math.max(...data.map((p) => p.value), 1)
   const w = 560
   const h = 180
@@ -181,13 +178,7 @@ function Bars({
   )
 }
 
-function HBars({
-  data,
-  fmt,
-}: {
-  data: AskMurmurChart['data']
-  fmt: (n: number) => string
-}) {
+function HBars({ data, fmt }: { data: AskMurmurChart['data']; fmt: (n: number) => string }) {
   const max = Math.max(...data.map((p) => p.value), 1)
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -243,13 +234,7 @@ function HBars({
   )
 }
 
-function LineChart({
-  data,
-  fmt,
-}: {
-  data: AskMurmurChart['data']
-  fmt: (n: number) => string
-}) {
+function LineChart({ data, fmt }: { data: AskMurmurChart['data']; fmt: (n: number) => string }) {
   const w = 560
   const h = 180
   const pad = 32
@@ -293,8 +278,22 @@ function LineChart({
         )}
         {data.map((p, i) => (
           <g key={i}>
-            <circle cx={x(i)} cy={y(p.value)} r="3.5" fill="#fff" stroke={colors.accent} strokeWidth="2" />
-            <text x={x(i)} y={h + 14} fontSize="10" fill={colors.ink3} textAnchor="middle" fontWeight="600">
+            <circle
+              cx={x(i)}
+              cy={y(p.value)}
+              r="3.5"
+              fill="#fff"
+              stroke={colors.accent}
+              strokeWidth="2"
+            />
+            <text
+              x={x(i)}
+              y={h + 14}
+              fontSize="10"
+              fill={colors.ink3}
+              textAnchor="middle"
+              fontWeight="600"
+            >
               {p.label}
             </text>
           </g>
@@ -311,13 +310,7 @@ function LineChart({
   )
 }
 
-function ValueRow({
-  data,
-  fmt,
-}: {
-  data: AskMurmurChart['data']
-  fmt: (n: number) => string
-}) {
+function ValueRow({ data, fmt }: { data: AskMurmurChart['data']; fmt: (n: number) => string }) {
   return (
     <div
       style={{

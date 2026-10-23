@@ -46,11 +46,7 @@ export interface MoneyParts {
   fraction: string
 }
 
-export function formatMoneyParts(
-  value: number,
-  currencyCode: string,
-  locale: string,
-): MoneyParts {
+export function formatMoneyParts(value: number, currencyCode: string, locale: string): MoneyParts {
   const nf = new Intl.NumberFormat(locale, {
     style: 'currency',
     currency: currencyCode,
@@ -121,8 +117,10 @@ function formatMoneyPartsFallback(
   const digitRun = formatted.match(/\d[\d\s.,  ']*\d|\d/u)
   const numeric = digitRun ? digitRun[0] : String(abs.toFixed(2))
   const affixBefore = digitRun ? formatted.slice(0, digitRun.index).trim() : ''
-  const symbol = (affixBefore || formatted.slice((digitRun?.index ?? 0) + numeric.length).trim())
-    || currencySymbolFor(currencyCode)
+  const symbol =
+    affixBefore ||
+    formatted.slice((digitRun?.index ?? 0) + numeric.length).trim() ||
+    currencySymbolFor(currencyCode)
   // The decimal separator is the LAST non-digit run in the numeric part
   // (grouping separators repeat every 3 digits; the decimal comes last).
   const sepMatch = numeric.match(/([^\d])(\d+)$/u)

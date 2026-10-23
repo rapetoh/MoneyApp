@@ -107,7 +107,10 @@ async function logoAttachment(
     if (!res.ok) return null
     const bytes = new Uint8Array(await res.arrayBuffer())
     if (bytes.length < 64) return null
-    const file = new File(Paths.cache, `notif-logo-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.png`)
+    const file = new File(
+      Paths.cache,
+      `notif-logo-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.png`,
+    )
     file.create()
     file.write(bytes)
     // expo-notifications' TypeScript type names the file `url`, but its iOS

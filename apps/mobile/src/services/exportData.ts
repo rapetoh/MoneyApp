@@ -1,7 +1,15 @@
 import { File, Paths } from 'expo-file-system'
 import * as Sharing from 'expo-sharing'
 import * as Print from 'expo-print'
-import type { Transaction, Category, CategoryKind, Locale, ExportableTransaction, ExportRecurringRule, ExportRow } from '@voice-expense/shared'
+import type {
+  Transaction,
+  Category,
+  CategoryKind,
+  Locale,
+  ExportableTransaction,
+  ExportRecurringRule,
+  ExportRow,
+} from '@voice-expense/shared'
 import { t, buildExport, exportSummaryJSON, localDay } from '@voice-expense/shared'
 
 /**
@@ -89,7 +97,7 @@ function assembleExport(input: ExportInput) {
     merchant: tx.merchant,
     note: tx.note,
     category_id: tx.category_id,
-    category_kind: tx.category_id ? catKindById.get(tx.category_id) ?? null : null,
+    category_kind: tx.category_id ? (catKindById.get(tx.category_id) ?? null) : null,
     payment_method: tx.payment_method,
     source: tx.source,
     is_recurring: tx.is_recurring,
@@ -357,10 +365,7 @@ export type ExportFormat = 'csv' | 'json' | 'pdf'
  *  file to the system share sheet. Throws if the share sheet isn't
  *  available on the current platform (e.g. Expo Go without sharing
  *  configured). */
-export async function exportAndShare(
-  format: ExportFormat,
-  input: ExportInput,
-): Promise<void> {
+export async function exportAndShare(format: ExportFormat, input: ExportInput): Promise<void> {
   const stamp = todayStamp(resolveTimezone(input))
   const filename = `murmur-${stamp}.${format}`
 
@@ -398,6 +403,11 @@ export async function exportAndShare(
   await Sharing.shareAsync(uri, {
     mimeType,
     dialogTitle: t('export.share_dialog_title', input.locale),
-    UTI: format === 'pdf' ? 'com.adobe.pdf' : format === 'csv' ? 'public.comma-separated-values-text' : 'public.json',
+    UTI:
+      format === 'pdf'
+        ? 'com.adobe.pdf'
+        : format === 'csv'
+          ? 'public.comma-separated-values-text'
+          : 'public.json',
   })
 }

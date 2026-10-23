@@ -1,5 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
-import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native'
+import {
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  TextInput,
+  View,
+} from 'react-native'
 import { CenterModal } from './CenterModal'
 import { Colors, Typography, Hairline, Motion } from '../theme'
 import { t, currencySymbolFor, merchantColor, type Locale } from '@voice-expense/shared'
@@ -28,7 +37,12 @@ interface Props {
   locale: Locale
   /** Persist the edit. Return true on success. `categoryId` is null for
    *  the overall budget, or the category this budget caps. */
-  onSave: (amount: number, period: BudgetPeriod, categoryId: string | null, rollover: boolean) => Promise<boolean>
+  onSave: (
+    amount: number,
+    period: BudgetPeriod,
+    categoryId: string | null,
+    rollover: boolean,
+  ) => Promise<boolean>
   onClose: () => void
   /** When provided, the dialog offers an "Applies to" picker — overall or
    *  one of these categories (per-category budgets, same model as web).
@@ -207,7 +221,9 @@ export function BudgetEditorModal({
               accessibilityRole="radio"
               accessibilityState={{ selected }}
             >
-              <Text style={[styles.chipLabel, selected && styles.chipLabelOn]}>{t(p.key, locale)}</Text>
+              <Text style={[styles.chipLabel, selected && styles.chipLabelOn]}>
+                {t(p.key, locale)}
+              </Text>
             </Pressable>
           )
         })}
@@ -294,6 +310,15 @@ const styles = StyleSheet.create({
   chipLabelOn: { color: Colors.accent, fontFamily: Typography.fontFamily.sansSemiBold },
   rolloverRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 18 },
   rolloverText: { flex: 1, gap: 2 },
-  rolloverTitle: { fontFamily: Typography.fontFamily.sansSemiBold, fontSize: 14.5, color: Colors.ink },
-  rolloverHint: { fontFamily: Typography.fontFamily.sans, fontSize: 12.5, lineHeight: 17, color: Colors.ink3 },
+  rolloverTitle: {
+    fontFamily: Typography.fontFamily.sansSemiBold,
+    fontSize: 14.5,
+    color: Colors.ink,
+  },
+  rolloverHint: {
+    fontFamily: Typography.fontFamily.sans,
+    fontSize: 12.5,
+    lineHeight: 17,
+    color: Colors.ink3,
+  },
 })

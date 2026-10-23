@@ -33,7 +33,9 @@ vi.mock('react-native', () => {
   return { Pressable }
 })
 
-const { Pressable } = (await import('react-native')) as unknown as { Pressable: React.ComponentType<any> }
+const { Pressable } = (await import('react-native')) as unknown as {
+  Pressable: React.ComponentType<any>
+}
 const { Tappable } = await import('../Tappable')
 
 function layoutEvent(height: number) {

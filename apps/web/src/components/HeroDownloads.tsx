@@ -83,7 +83,13 @@ export function HeroDownloads({
         <a href="#get" className="lp-btn-ghost">
           Mac, Windows &amp; web
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden>
-            <path d="M12 4v15m0 0 6-6m-6 6-6-6" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+            <path
+              d="M12 4v15m0 0 6-6m-6 6-6-6"
+              stroke="currentColor"
+              strokeWidth="2.4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
           </svg>
         </a>
       </div>

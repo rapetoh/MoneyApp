@@ -51,7 +51,7 @@ export function TransactionRow({
   const isVoice = transaction.source === 'voice'
   const isRecurring = transaction.is_recurring === true
   const sign = isCredit ? 1 : -1
-  const amountColor = isCredit ? Colors.income : Colors.ink ?? Colors.text
+  const amountColor = isCredit ? Colors.income : (Colors.ink ?? Colors.text)
   const chipColor = categoryColor ?? Colors.ink3 ?? Colors.textSecondary
 
   return (

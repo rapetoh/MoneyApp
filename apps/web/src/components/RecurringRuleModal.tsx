@@ -172,7 +172,9 @@ export function RecurringRuleModal({
     <div style={styles.overlay} onClick={onClose}>
       <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
         <div style={styles.header}>
-          <div style={styles.title}>{mode === 'edit' ? 'Edit recurring rule' : 'New recurring rule'}</div>
+          <div style={styles.title}>
+            {mode === 'edit' ? 'Edit recurring rule' : 'New recurring rule'}
+          </div>
           <button type="button" onClick={onClose} style={styles.closeBtn} aria-label="Close">
             ×
           </button>
@@ -183,7 +185,10 @@ export function RecurringRuleModal({
             <button
               type="button"
               onClick={() => setDirection('debit')}
-              style={{ ...styles.directionBtn, ...(direction === 'debit' ? styles.directionBtnActive : {}) }}
+              style={{
+                ...styles.directionBtn,
+                ...(direction === 'debit' ? styles.directionBtnActive : {}),
+              }}
             >
               Expense
             </button>
@@ -212,7 +217,11 @@ export function RecurringRuleModal({
               />
             </Field>
             <Field label="Currency">
-              <select value={currency} onChange={(e) => setCurrency(e.target.value)} style={styles.input}>
+              <select
+                value={currency}
+                onChange={(e) => setCurrency(e.target.value)}
+                style={styles.input}
+              >
                 {CURRENCIES.map((c) => (
                   <option key={c} value={c}>
                     {c}
@@ -233,7 +242,11 @@ export function RecurringRuleModal({
           </Field>
 
           <Field label="Category">
-            <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} style={styles.input}>
+            <select
+              value={categoryId}
+              onChange={(e) => setCategoryId(e.target.value)}
+              style={styles.input}
+            >
               <option value="">Uncategorized</option>
               {categories.map((c) => (
                 <option key={c.id} value={c.id}>
@@ -279,7 +292,11 @@ export function RecurringRuleModal({
           </Field>
 
           <label style={styles.endToggleRow}>
-            <input type="checkbox" checked={hasEndDate} onChange={(e) => setHasEndDate(e.target.checked)} />
+            <input
+              type="checkbox"
+              checked={hasEndDate}
+              onChange={(e) => setHasEndDate(e.target.checked)}
+            />
             <span style={styles.endToggleLabel}>This has an end date</span>
           </label>
           {hasEndDate && (
@@ -315,7 +332,15 @@ export function RecurringRuleModal({
   )
 }
 
-function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+function Field({
+  label,
+  hint,
+  children,
+}: {
+  label: string
+  hint?: string
+  children: React.ReactNode
+}) {
   return (
     <div style={styles.field}>
       <div style={styles.fieldLabel}>{label}</div>

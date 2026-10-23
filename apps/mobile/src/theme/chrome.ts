@@ -62,5 +62,7 @@ export function useTabBarClearance(): number {
   const insets = useSafeAreaInsets()
   const measured = useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
   const barHeight = Math.max(TAB_BAR_HEIGHT, measured)
-  return barHeight + TAB_BAR_BOTTOM_OFFSET + insets.bottom + TAB_BAR_FAB_OVERHANG + TAB_BAR_CLEARANCE_GAP
+  return (
+    barHeight + TAB_BAR_BOTTOM_OFFSET + insets.bottom + TAB_BAR_FAB_OVERHANG + TAB_BAR_CLEARANCE_GAP
+  )
 }

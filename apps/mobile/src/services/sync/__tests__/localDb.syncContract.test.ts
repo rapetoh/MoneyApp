@@ -86,10 +86,16 @@ describe.skipIf(!DatabaseSync)('localDb v1 -> v2 sync contract migration', () =>
     expect(queueCols).toContain('status')
     expect(queueCols).toContain('next_attempt_at')
 
-    const poisoned = db.raw.prepare("SELECT status FROM sync_queue WHERE entity_id = 'poisoned-1'").get() as {
+    const poisoned = db.raw
+      .prepare("SELECT status FROM sync_queue WHERE entity_id = 'poisoned-1'")
+      .get() as {
       status: string
     }
-    assert.equal(poisoned.status, 'dead', 'a pre-existing retry_count>=5 entry must carry forward as dead, not pending')
+    assert.equal(
+      poisoned.status,
+      'dead',
+      'a pre-existing retry_count>=5 entry must carry forward as dead, not pending',
+    )
 
     expect(tableColumns(db, 'categories')).toEqual([...CATEGORY_COLUMN_NAMES].sort())
     expect(tableColumns(db, 'budgets')).toEqual([...BUDGET_COLUMN_NAMES].sort())

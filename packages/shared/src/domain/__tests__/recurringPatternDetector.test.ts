@@ -228,8 +228,18 @@ describe('detectRecurringPatterns — relative amount tolerance (fix-plan 2.3)',
       transactions: [
         txn({ id: 'a', merchant: 'Amazon', amount: 12, transacted_at: '2026-01-01T12:00:00.000Z' }),
         txn({ id: 'b', merchant: 'Amazon', amount: 12, transacted_at: '2026-02-01T12:00:00.000Z' }),
-        txn({ id: 'c', merchant: 'Amazon', amount: 800, transacted_at: '2026-03-01T12:00:00.000Z' }),
-        txn({ id: 'd', merchant: 'Amazon', amount: 800, transacted_at: '2026-04-01T12:00:00.000Z' }),
+        txn({
+          id: 'c',
+          merchant: 'Amazon',
+          amount: 800,
+          transacted_at: '2026-03-01T12:00:00.000Z',
+        }),
+        txn({
+          id: 'd',
+          merchant: 'Amazon',
+          amount: 800,
+          transacted_at: '2026-04-01T12:00:00.000Z',
+        }),
       ],
       existingRules: [],
     })

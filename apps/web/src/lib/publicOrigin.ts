@@ -27,6 +27,11 @@ export function publicOrigin(request: Request): string {
   if (!host || !TRUSTED_HOST.some((re) => re.test(host))) return url.origin
   const forwardedProto = request.headers.get('x-forwarded-proto')?.split(',')[0]?.trim()
   const local = /^(127\.0\.0\.1|localhost):/.test(host)
-  const proto = forwardedProto === 'https' || forwardedProto === 'http' ? forwardedProto : local ? 'http' : 'https'
+  const proto =
+    forwardedProto === 'https' || forwardedProto === 'http'
+      ? forwardedProto
+      : local
+        ? 'http'
+        : 'https'
   return `${proto}://${host}`
 }

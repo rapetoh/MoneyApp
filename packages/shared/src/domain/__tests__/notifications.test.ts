@@ -207,7 +207,9 @@ describe('bill family', () => {
   })
 
   it('keys to the occurrence, so the same charge is never announced twice', () => {
-    const a = planNotifications(input({ rules: [rentRule] })).find((x) => x.kind === 'bill_tomorrow')!
+    const a = planNotifications(input({ rules: [rentRule] })).find(
+      (x) => x.kind === 'bill_tomorrow',
+    )!
     const b = planNotifications(
       input({ rules: [rentRule], nowUtc: '2026-09-15T20:00:00.000Z' }),
     ).find((x) => x.kind === 'bill_tomorrow')!
@@ -240,7 +242,9 @@ describe('bill family', () => {
     const out = planNotifications(
       input({
         rules: [{ ...rentRule, anchor_day: 10, starts_at: '2026-01-10T13:00:00.000Z' }],
-        transactions: [txn({ amount_in_profile_currency: 1450, transacted_at: '2026-09-10T15:00:00.000Z' })],
+        transactions: [
+          txn({ amount_in_profile_currency: 1450, transacted_at: '2026-09-10T15:00:00.000Z' }),
+        ],
       }),
     )
     expect(kinds(out)).not.toContain('bill_missing')
@@ -300,7 +304,13 @@ describe('budget family', () => {
   })
 
   it('names the category when a category budget goes over', () => {
-    const catBudget = { ...budget, id: 'b2', category_id: 'cat-1', amount: 100, category_name: 'Groceries' }
+    const catBudget = {
+      ...budget,
+      id: 'b2',
+      category_id: 'cat-1',
+      amount: 100,
+      category_name: 'Groceries',
+    }
     const txns = Array.from({ length: 8 }, () =>
       txn({ amount_in_profile_currency: 20, category_id: 'cat-1' } as never),
     )
@@ -331,7 +341,7 @@ describe('insight family', () => {
     expect(kinds(out)).not.toContain('weekly_recap')
   })
 
-  it('uses the reader\'s weekday, not UTC\'s', () => {
+  it("uses the reader's weekday, not UTC's", () => {
     // 22:00 UTC Sunday is 18:00 Sunday in New York but 10:00 MONDAY in
     // Auckland. A UTC weekday check sent every zone east of UTC their
     // "last week" recap on a Monday.
@@ -339,9 +349,9 @@ describe('insight family', () => {
       txn({ amount_in_profile_currency: 30, transacted_at: `2026-09-1${4 + i}T15:00:00.000Z` }),
     )
     const nowUtc = '2026-09-20T22:00:00.000Z'
-    expect(kinds(planNotifications(input({ nowUtc, transactions: txns, timeZone: 'America/New_York' })))).toContain(
-      'weekly_recap',
-    )
+    expect(
+      kinds(planNotifications(input({ nowUtc, transactions: txns, timeZone: 'America/New_York' }))),
+    ).toContain('weekly_recap')
     expect(
       kinds(planNotifications(input({ nowUtc, transactions: txns, timeZone: 'Pacific/Auckland' }))),
     ).not.toContain('weekly_recap')
@@ -369,7 +379,9 @@ describe('habit family', () => {
   })
 
   it('leads a lapsed user with their bills rather than a complaint', () => {
-    const out = planNotifications(input({ lastLoggedAt: '2026-09-01T18:00:00.000Z', rules: [rentRule] }))
+    const out = planNotifications(
+      input({ lastLoggedAt: '2026-09-01T18:00:00.000Z', rules: [rentRule] }),
+    )
     const c = out.find((x) => x.kind === 'winback_14')!
     expect(c.title).toMatch(/bills/i)
     expect(c.data.screen).toBe('recurring')
@@ -406,14 +418,19 @@ function state(over: Partial<GovernorState> = {}): GovernorState {
 describe('governor', () => {
   it('picks the highest priority candidate', () => {
     const chosen = govern(
-      [candidate(), candidate({ kind: 'bill_tomorrow', family: 'bill', priority: 85, dedupeKey: 'b' })],
+      [
+        candidate(),
+        candidate({ kind: 'bill_tomorrow', family: 'bill', priority: 85, dedupeKey: 'b' }),
+      ],
       state(),
     )
     expect(chosen!.kind).toBe('bill_tomorrow')
   })
 
   it('never repeats a claim already sent', () => {
-    expect(govern([candidate()], state({ alreadySent: new Set(['weekly_recap:2026-09-20']) }))).toBeNull()
+    expect(
+      govern([candidate()], state({ alreadySent: new Set(['weekly_recap:2026-09-20']) })),
+    ).toBeNull()
   })
 
   it('sends at most one a day', () => {
@@ -439,11 +456,18 @@ describe('governor', () => {
       dedupeKey: 'bi',
       transactional: true,
     })
-    expect(govern([billing], state({ prefs, sentToday: 1, sentLast7Days: 9 }))!.kind).toBe('billing_issue')
+    expect(govern([billing], state({ prefs, sentToday: 1, sentLast7Days: 9 }))!.kind).toBe(
+      'billing_issue',
+    )
   })
 
   it('stays silent during quiet hours, even for a failed payment', () => {
-    const billing = candidate({ family: 'money', priority: 100, dedupeKey: 'bi', transactional: true })
+    const billing = candidate({
+      family: 'money',
+      priority: 100,
+      dedupeKey: 'bi',
+      transactional: true,
+    })
     // 03:00 local. The sweep runs hourly and will offer it again at 08:00.
     expect(govern([billing], state({ localHour: 3 }))).toBeNull()
   })
@@ -455,7 +479,12 @@ describe('governor', () => {
   it('treats max_per_week 0 as transactional only', () => {
     const prefs = { ...DEFAULT_NOTIFICATION_PREFS, max_per_week: 0 }
     expect(govern([candidate()], state({ prefs }))).toBeNull()
-    const billing = candidate({ family: 'money', priority: 100, dedupeKey: 'bi', transactional: true })
+    const billing = candidate({
+      family: 'money',
+      priority: 100,
+      dedupeKey: 'bi',
+      transactional: true,
+    })
     expect(govern([billing], state({ prefs }))).not.toBeNull()
   })
 })

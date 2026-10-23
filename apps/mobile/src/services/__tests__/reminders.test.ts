@@ -82,7 +82,14 @@ vi.mock('react-native', () => ({ Platform: { OS: 'ios' } }))
 vi.mock('expo-localization', () => ({ getCalendars: () => [{ timeZone: 'UTC' }] }))
 
 const reminders = await import('../reminders')
-const { planReminders, rescheduleReminders, cancelAllReminders, enableCheckIn, shouldOfferPrime, needsPermissionRepair } = reminders
+const {
+  planReminders,
+  rescheduleReminders,
+  cancelAllReminders,
+  enableCheckIn,
+  shouldOfferPrime,
+  needsPermissionRepair,
+} = reminders
 
 function persistedIds(): string[] {
   const raw = state.store.get('reminders_scheduled_ids')
@@ -102,23 +109,42 @@ describe('planReminders', () => {
   // 12:00 in New York on Sep 19, 2026 (EDT, UTC-4).
   const now = new Date('2026-09-19T16:00:00Z')
   const checkIn = { enabled: true, hour: 20, minute: 0 }
-  const at8pmNY = (day: number) => new Date(`2026-09-${String(day).padStart(2, '0')}T20:00:00-04:00`)
+  const at8pmNY = (day: number) =>
+    new Date(`2026-09-${String(day).padStart(2, '0')}T20:00:00-04:00`)
 
   it('check-in: seven evenings in the phone zone, starting tonight when nothing was logged today', () => {
-    const plan = planReminders({ now, checkIn, quietNudges: true, lastLogAt: new Date('2026-09-18T13:00:00Z'), tz })
+    const plan = planReminders({
+      now,
+      checkIn,
+      quietNudges: true,
+      lastLogAt: new Date('2026-09-18T13:00:00Z'),
+      tz,
+    })
     expect(plan).toHaveLength(7)
     expect(plan[0].at).toEqual(at8pmNY(19))
     expect(plan[6].at).toEqual(at8pmNY(25))
   })
 
   it('check-in: skips tonight once something was logged today', () => {
-    const plan = planReminders({ now, checkIn, quietNudges: true, lastLogAt: new Date('2026-09-19T12:00:00Z'), tz })
+    const plan = planReminders({
+      now,
+      checkIn,
+      quietNudges: true,
+      lastLogAt: new Date('2026-09-19T12:00:00Z'),
+      tz,
+    })
     expect(plan).toHaveLength(6)
     expect(plan[0].at).toEqual(at8pmNY(20))
   })
 
   it('check-in: copy shifts on day 3 and day 7 of silence', () => {
-    const plan = planReminders({ now, checkIn, quietNudges: true, lastLogAt: new Date('2026-09-19T12:00:00Z'), tz })
+    const plan = planReminders({
+      now,
+      checkIn,
+      quietNudges: true,
+      lastLogAt: new Date('2026-09-19T12:00:00Z'),
+      tz,
+    })
     const kinds = plan.map((r) => r.kind)
     expect(kinds[0]).toBe('checkin')
     expect(kinds).toContain('quiet3')
@@ -133,8 +159,12 @@ describe('planReminders', () => {
   })
 
   it('nothing when nudges are off and there is no check-in, or nothing was ever logged', () => {
-    expect(planReminders({ now, checkIn: null, quietNudges: false, lastLogAt: now, tz })).toEqual([])
-    expect(planReminders({ now, checkIn: null, quietNudges: true, lastLogAt: null, tz })).toEqual([])
+    expect(planReminders({ now, checkIn: null, quietNudges: false, lastLogAt: now, tz })).toEqual(
+      [],
+    )
+    expect(planReminders({ now, checkIn: null, quietNudges: true, lastLogAt: null, tz })).toEqual(
+      [],
+    )
   })
 })
 
@@ -155,7 +185,11 @@ describe('scheduling never orphans a reminder', () => {
 
   it('a cancel interleaved with reschedules settles on zero or one full plan', async () => {
     const last = new Date(Date.now() - 3_600_000)
-    await Promise.all([rescheduleReminders('en', last), cancelAllReminders(), rescheduleReminders('en', last)])
+    await Promise.all([
+      rescheduleReminders('en', last),
+      cancelAllReminders(),
+      rescheduleReminders('en', last),
+    ])
     const ids = persistedIds()
     expect(state.scheduled.size).toBe(ids.length)
     for (const id of ids) expect(state.scheduled.has(id)).toBe(true)
@@ -297,4 +331,3 @@ describe('reinstall: keychain remembers, iOS forgot', () => {
     expect(await shouldOfferPrime()).toBe(false)
   })
 })
-

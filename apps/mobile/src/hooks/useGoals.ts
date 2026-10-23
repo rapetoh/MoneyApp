@@ -16,7 +16,10 @@ export type GoalContribution = Database['public']['Tables']['goal_contributions'
 const GOALS_CHANGED = 've:goals:changed'
 const emitGoals = (userId: string) => DeviceEventEmitter.emit(GOALS_CHANGED, userId)
 
-const EMPTY: { goals: SavingsGoal[]; contributions: GoalContribution[] } = { goals: [], contributions: [] }
+const EMPTY: { goals: SavingsGoal[]; contributions: GoalContribution[] } = {
+  goals: [],
+  contributions: [],
+}
 
 export function useGoals(userId: string | undefined) {
   const [data, setData, hasCached] = useCachedState(userId ? `goals:${userId}` : null, EMPTY)
@@ -32,13 +35,20 @@ export function useGoals(userId: string | undefined) {
         .eq('user_id', userId)
         .is('archived_at', null)
         .order('created_at', { ascending: true }),
-      supabase.from('goal_contributions').select('*').eq('user_id', userId).order('contributed_at', { ascending: true }),
+      supabase
+        .from('goal_contributions')
+        .select('*')
+        .eq('user_id', userId)
+        .order('contributed_at', { ascending: true }),
     ])
     const failure = g.error ?? c.error
     if (failure) {
       setError(failure.message)
     } else {
-      setData({ goals: (g.data ?? []) as SavingsGoal[], contributions: (c.data ?? []) as GoalContribution[] })
+      setData({
+        goals: (g.data ?? []) as SavingsGoal[],
+        contributions: (c.data ?? []) as GoalContribution[],
+      })
       setError(null)
     }
     setLoading(false)
@@ -66,15 +76,27 @@ export function useGoals(userId: string | undefined) {
     [fetch, userId],
   )
 
-  async function createGoal(fields: { name: string; target_amount: number; target_date: string | null; currency_code: string }) {
+  async function createGoal(fields: {
+    name: string
+    target_amount: number
+    target_date: string | null
+    currency_code: string
+  }) {
     if (!userId) return false
     const { error: e } = await supabase.from('savings_goals').insert({ user_id: userId, ...fields })
     return after(e)
   }
 
-  async function updateGoal(id: string, fields: { name?: string; target_amount?: number; target_date?: string | null }) {
+  async function updateGoal(
+    id: string,
+    fields: { name?: string; target_amount?: number; target_date?: string | null },
+  ) {
     if (!userId) return false
-    const { error: e } = await supabase.from('savings_goals').update(fields).eq('id', id).eq('user_id', userId)
+    const { error: e } = await supabase
+      .from('savings_goals')
+      .update(fields)
+      .eq('id', id)
+      .eq('user_id', userId)
     return after(e)
   }
 

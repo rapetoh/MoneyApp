@@ -48,7 +48,14 @@ export interface AskInsightsInput {
 }
 
 const MAX_INSIGHTS = 4
-const VALID_FREQ: ReadonlySet<string> = new Set(['daily', 'weekly', 'biweekly', 'monthly', 'quarterly', 'yearly'])
+const VALID_FREQ: ReadonlySet<string> = new Set([
+  'daily',
+  'weekly',
+  'biweekly',
+  'monthly',
+  'quarterly',
+  'yearly',
+])
 
 // ─── formatting ────────────────────────────────────────────────────────────
 
@@ -68,7 +75,9 @@ function fmtMoney(v: number, currency: string, locale: string): string {
 
 function fmtDate(instantIso: string, tz: string, locale: string): string {
   try {
-    return new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric', timeZone: tz }).format(new Date(instantIso))
+    return new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric', timeZone: tz }).format(
+      new Date(instantIso),
+    )
   } catch {
     return instantIso.slice(0, 10)
   }
@@ -91,7 +100,8 @@ function inSpan(iso: string, s: Span): boolean {
 }
 
 function amountOf(tx: AskMurmurTransaction): number | null {
-  return typeof tx.amount_in_profile_currency === 'number' && Number.isFinite(tx.amount_in_profile_currency)
+  return typeof tx.amount_in_profile_currency === 'number' &&
+    Number.isFinite(tx.amount_in_profile_currency)
     ? tx.amount_in_profile_currency
     : null
 }
@@ -134,7 +144,10 @@ function debitsByCategory(txns: AskMurmurTransaction[], span: Span): Map<string,
  *  cut at the same day-of-month (clamped) — "by this point in the month". */
 function sameSpanMonthsAgo(y: number, m: number, d: number, k: number, tz: string): Span {
   const target = addMonthsClamped(y, m, 1, -k)
-  const startIso = monthBounds(`${String(target.y).padStart(4, '0')}-${String(target.m).padStart(2, '0')}`, tz).start
+  const startIso = monthBounds(
+    `${String(target.y).padStart(4, '0')}-${String(target.m).padStart(2, '0')}`,
+    tz,
+  ).start
   const dim = new Date(Date.UTC(target.y, target.m, 0)).getUTCDate()
   const cut = addDays(target.y, target.m, Math.min(d, dim), 1)
   return {
@@ -151,11 +164,15 @@ export function computeAskInsights(input: AskInsightsInput): AskInsight[] {
   const now = localParts(input.now_utc, tz)
   const nowMs = Date.parse(input.now_utc)
   const money = (v: number) => fmtMoney(v, currency, locale)
-  const T = (key: string, params: Record<string, string | number> = {}) => fill(t(key, locale), params)
+  const T = (key: string, params: Record<string, string | number> = {}) =>
+    fill(t(key, locale), params)
   const monthKey = `${String(now.y).padStart(4, '0')}-${String(now.m).padStart(2, '0')}`
 
   const monthB = monthBounds(monthKey, tz)
-  const monthSpan: Span = { startMs: Date.parse(monthB.start), endMs: Date.parse(monthB.endExclusive) }
+  const monthSpan: Span = {
+    startMs: Date.parse(monthB.start),
+    endMs: Date.parse(monthB.endExclusive),
+  }
   const daysInMonth = new Date(Date.UTC(now.y, now.m, 0)).getUTCDate()
   const daysLeftInMonth = Math.max(1, daysInMonth - now.d + 1)
 
@@ -192,7 +209,8 @@ export function computeAskInsights(input: AskInsightsInput): AskInsight[] {
     (r) => r.direction === 'debit' && r.is_active !== false && VALID_FREQ.has(r.frequency),
   )
   const ruleAmount = (r: AskInsightRule) =>
-    typeof r.amount_in_profile_currency === 'number' && Number.isFinite(r.amount_in_profile_currency)
+    typeof r.amount_in_profile_currency === 'number' &&
+    Number.isFinite(r.amount_in_profile_currency)
       ? r.amount_in_profile_currency
       : r.amount
   const recurrenceOf = (r: AskInsightRule) =>
@@ -235,8 +253,16 @@ export function computeAskInsights(input: AskInsightsInput): AskInsight[] {
         if (!occ) continue
         const ms = Date.parse(occ.instant)
         if (ms > horizonMs) continue
-        if (!best || ms < Date.parse(best.instant) || (ms === Date.parse(best.instant) && ruleAmount(r) > best.amount)) {
-          best = { name: r.name?.trim() || t('ask.insight_unnamed_rule', locale), amount: ruleAmount(r), instant: occ.instant }
+        if (
+          !best ||
+          ms < Date.parse(best.instant) ||
+          (ms === Date.parse(best.instant) && ruleAmount(r) > best.amount)
+        ) {
+          best = {
+            name: r.name?.trim() || t('ask.insight_unnamed_rule', locale),
+            amount: ruleAmount(r),
+            instant: occ.instant,
+          }
         }
       } catch {
         /* skip */
@@ -249,13 +275,21 @@ export function computeAskInsights(input: AskInsightsInput): AskInsight[] {
         kind: 'upcoming_bill',
         score: 90,
         tone: left !== null && left < 0 ? 'alert' : 'watch',
-        title: T('ask.insight_upcoming_title', { name: best.name, amount: money(best.amount), date: fmtDate(best.instant, tz, locale) }),
+        title: T('ask.insight_upcoming_title', {
+          name: best.name,
+          amount: money(best.amount),
+          date: fmtDate(best.instant, tz, locale),
+        }),
         detail:
           left !== null
             ? T('ask.insight_upcoming_detail_income', { due: money(stillDue), left: money(left) })
             : T('ask.insight_upcoming_detail_noincome', { due: money(stillDue) }),
         question: T('ask.insight_upcoming_question'),
-        action: { label: T('ask.insight_upcoming_action'), intent: 'open_recurring', params: { name: best.name } },
+        action: {
+          label: T('ask.insight_upcoming_action'),
+          intent: 'open_recurring',
+          params: { name: best.name },
+        },
       })
     }
   }
@@ -288,7 +322,10 @@ export function computeAskInsights(input: AskInsightsInput): AskInsight[] {
         score: 95,
         tone: 'alert',
         title: T('ask.insight_budget_over_title', { over: money(Math.abs(b.remaining)) }),
-        detail: T('ask.insight_budget_over_detail', { days, period: t(`ask.period_${b.period}`, locale) }),
+        detail: T('ask.insight_budget_over_detail', {
+          days,
+          period: t(`ask.period_${b.period}`, locale),
+        }),
         question: T('ask.insight_budget_question'),
         action: { label: T('ask.insight_budget_action'), intent: 'set_budget' },
       })
@@ -300,10 +337,16 @@ export function computeAskInsights(input: AskInsightsInput): AskInsight[] {
         kind: 'budget_pace',
         score: tight ? 70 : 58,
         tone: tight ? 'watch' : 'good',
-        title: T(tight ? 'ask.insight_budget_tight_title' : 'ask.insight_budget_ok_title', { left: money(b.remaining), days }),
+        title: T(tight ? 'ask.insight_budget_tight_title' : 'ask.insight_budget_ok_title', {
+          left: money(b.remaining),
+          days,
+        }),
         detail:
           usualDaily !== null
-            ? T(tight ? 'ask.insight_budget_tight_detail' : 'ask.insight_budget_ok_detail', { pace: money(roundCents(pace)), usual: money(roundCents(usualDaily)) })
+            ? T(tight ? 'ask.insight_budget_tight_detail' : 'ask.insight_budget_ok_detail', {
+                pace: money(roundCents(pace)),
+                usual: money(roundCents(usualDaily)),
+              })
             : T('ask.insight_budget_pace_only', { pace: money(roundCents(pace)) }),
         question: T('ask.insight_budget_question'),
         action: { label: T('ask.insight_budget_action'), intent: 'set_budget' },
@@ -333,7 +376,10 @@ export function computeAskInsights(input: AskInsightsInput): AskInsight[] {
       kind: 'category_surge',
       score: 80 + Math.min(20, pctRounded / 5),
       tone: 'alert',
-      title: T('ask.insight_surge_title', { category: surge.category, amount: money(surge.amount) }),
+      title: T('ask.insight_surge_title', {
+        category: surge.category,
+        amount: money(surge.amount),
+      }),
       detail: T('ask.insight_surge_detail', { pct: pctRounded }),
       question: T('ask.insight_surge_question', { category: surge.category }),
       action: {
@@ -349,7 +395,11 @@ export function computeAskInsights(input: AskInsightsInput): AskInsight[] {
     const normalized = debitRules
       .map((r) => ({
         name: r.name?.trim() || t('ask.insight_unnamed_rule', locale),
-        monthly: monthlyEquivalent({ frequency: r.frequency as RecurringFrequency, interval: r.interval ?? 1, amount: ruleAmount(r) }),
+        monthly: monthlyEquivalent({
+          frequency: r.frequency as RecurringFrequency,
+          interval: r.interval ?? 1,
+          amount: ruleAmount(r),
+        }),
       }))
       .sort((a, b) => b.monthly - a.monthly)
     const total = roundCents(normalized.reduce((a, r) => a + r.monthly, 0))
@@ -360,7 +410,12 @@ export function computeAskInsights(input: AskInsightsInput): AskInsight[] {
           ? T('ask.insight_subs_title_one', { a: a.name, total: money(total) })
           : normalized.length === 2
             ? T('ask.insight_subs_title_two', { a: a.name, b: b.name, total: money(total) })
-            : T('ask.insight_subs_title_many', { a: a.name, b: b.name, n: normalized.length - 2, total: money(total) })
+            : T('ask.insight_subs_title_many', {
+                a: a.name,
+                b: b.name,
+                n: normalized.length - 2,
+                total: money(total),
+              })
       out.push({
         id: 'subs',
         kind: 'subscriptions',
@@ -392,7 +447,10 @@ export function computeAskInsights(input: AskInsightsInput): AskInsight[] {
         score: 50,
         tone: best.delta > 0 ? 'watch' : 'good',
         title: T('ask.insight_delta_title', { category: best.category }),
-        detail: T(best.delta > 0 ? 'ask.insight_delta_detail_up' : 'ask.insight_delta_detail_down', { delta: money(Math.abs(best.delta)) }),
+        detail: T(
+          best.delta > 0 ? 'ask.insight_delta_detail_up' : 'ask.insight_delta_detail_down',
+          { delta: money(Math.abs(best.delta)) },
+        ),
         question: T('ask.insight_delta_question', { category: best.category }),
         action: {
           label: T('ask.insight_surge_action'),
@@ -413,7 +471,10 @@ export function computeAskInsights(input: AskInsightsInput): AskInsight[] {
         score: 75,
         tone: 'alert',
         title: T('ask.insight_netflow_over_title', { over: money(over) }),
-        detail: T('ask.insight_netflow_over_detail', { spent: money(spentMtd), income: money(incomeBasis.value) }),
+        detail: T('ask.insight_netflow_over_detail', {
+          spent: money(spentMtd),
+          income: money(incomeBasis.value),
+        }),
         question: T('ask.insight_netflow_question'),
         action: null,
       })
@@ -423,8 +484,14 @@ export function computeAskInsights(input: AskInsightsInput): AskInsight[] {
         kind: 'net_flow',
         score: 45,
         tone: 'neutral',
-        title: T('ask.insight_netflow_title', { spent: money(spentMtd), income: money(incomeBasis.value) }),
-        detail: T('ask.insight_netflow_detail', { left: money(roundCents(incomeBasis.value - spentMtd)), days: daysLeftInMonth }),
+        title: T('ask.insight_netflow_title', {
+          spent: money(spentMtd),
+          income: money(incomeBasis.value),
+        }),
+        detail: T('ask.insight_netflow_detail', {
+          left: money(roundCents(incomeBasis.value - spentMtd)),
+          days: daysLeftInMonth,
+        }),
         question: T('ask.insight_netflow_question'),
         action: null,
       })
@@ -443,23 +510,33 @@ export function computeAskInsights(input: AskInsightsInput): AskInsight[] {
       const median = debits90[Math.floor(debits90.length / 2)]
       let best: AskMurmurTransaction | null = null
       for (const tx of usable) {
-        if (tx.direction !== 'debit' || tx.is_recurring || !inSpan(tx.transacted_at, weekSpan)) continue
+        if (tx.direction !== 'debit' || tx.is_recurring || !inSpan(tx.transacted_at, weekSpan))
+          continue
         const a = amountOf(tx) as number
         if (a < 100 || a < 3 * median) continue
         if (!best || a > (amountOf(best) as number)) best = tx
       }
       if (best && median > 0) {
         const a = amountOf(best) as number
-        const merchant = best.merchant?.trim() || best.category_name || t('ask.insight_unnamed_rule', locale)
+        const merchant =
+          best.merchant?.trim() || best.category_name || t('ask.insight_unnamed_rule', locale)
         out.push({
           id: `large:${best.transacted_at}`,
           kind: 'large_transaction',
           score: 60,
           tone: 'watch',
-          title: T('ask.insight_large_title', { merchant, amount: money(a), date: fmtDate(best.transacted_at, tz, locale) }),
+          title: T('ask.insight_large_title', {
+            merchant,
+            amount: money(a),
+            date: fmtDate(best.transacted_at, tz, locale),
+          }),
           detail: T('ask.insight_large_detail', { times: Math.round(a / median) }),
           question: T('ask.insight_large_question', { merchant }),
-          action: { label: T('ask.insight_large_action'), intent: 'show_transactions', params: { query: merchant } },
+          action: {
+            label: T('ask.insight_large_action'),
+            intent: 'show_transactions',
+            params: { query: merchant },
+          },
         })
       }
     }
@@ -474,18 +551,31 @@ export function computeAskInsights(input: AskInsightsInput): AskInsight[] {
 }
 
 /** Localized label + question for the intent chips under the insights. */
-export function askIntentChips(locale: Locale): Array<{ id: string; label: string; question: string }> {
+export function askIntentChips(
+  locale: Locale,
+): Array<{ id: string; label: string; question: string }> {
   return [
-    { id: 'budget', label: t('ask.intent_budget', locale), question: t('ask.intent_budget_q', locale) },
+    {
+      id: 'budget',
+      label: t('ask.intent_budget', locale),
+      question: t('ask.intent_budget_q', locale),
+    },
     { id: 'subs', label: t('ask.intent_subs', locale), question: t('ask.intent_subs_q', locale) },
-    { id: 'where', label: t('ask.intent_where', locale), question: t('ask.intent_where_q', locale) },
+    {
+      id: 'where',
+      label: t('ask.intent_where', locale),
+      question: t('ask.intent_where_q', locale),
+    },
     { id: 'plan', label: t('ask.intent_plan', locale), question: t('ask.intent_plan_q', locale) },
   ]
 }
 
 /** Localized fallback label for an action the model or an insight emitted
  *  without one. */
-export function askActionLabel(action: Pick<AskAction, 'intent' | 'label'>, locale: Locale): string {
+export function askActionLabel(
+  action: Pick<AskAction, 'intent' | 'label'>,
+  locale: Locale,
+): string {
   if (action.label?.trim()) return action.label
   switch (action.intent) {
     case 'show_transactions':

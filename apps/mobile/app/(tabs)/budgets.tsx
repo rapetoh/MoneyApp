@@ -15,7 +15,14 @@ import { BudgetRing } from '../../src/components/BudgetRing'
 import { GoalsSection } from '../../src/components/GoalsSection'
 import { BudgetEditorModal } from '../../src/components/BudgetEditorModal'
 import { Colors, Typography, useTabBarClearance } from '../../src/theme'
-import { t, localParts, daysBetween, formatMoney, merchantColor, categoryPalette } from '@voice-expense/shared'
+import {
+  t,
+  localParts,
+  daysBetween,
+  formatMoney,
+  merchantColor,
+  categoryPalette,
+} from '@voice-expense/shared'
 import type { Locale, Budget, BudgetPeriod } from '@voice-expense/shared'
 import { useNowInstant } from '../../src/hooks/useNowInstant'
 
@@ -56,11 +63,16 @@ function daysLeftInWindow(windowEndExclusive: string, nowIso: string, tz: string
 
 function periodLabel(period: string | undefined, locale: Locale): string {
   switch (period) {
-    case 'weekly': return t('home.budget_weekly', locale)
-    case 'biweekly': return t('home.budget_biweekly', locale)
-    case 'quarterly': return t('home.budget_quarterly', locale)
-    case 'yearly': return t('home.budget_yearly', locale)
-    default: return t('home.budget_monthly', locale)
+    case 'weekly':
+      return t('home.budget_weekly', locale)
+    case 'biweekly':
+      return t('home.budget_biweekly', locale)
+    case 'quarterly':
+      return t('home.budget_quarterly', locale)
+    case 'yearly':
+      return t('home.budget_yearly', locale)
+    default:
+      return t('home.budget_monthly', locale)
   }
 }
 
@@ -75,17 +87,37 @@ export default function BudgetsScreen() {
   // budget read used to look exactly like "no budget set" (`budget` stays
   // `null` either way), so the empty-state CTA below rendered for a
   // fetch failure as readily as for a genuinely unconfigured budget.
-  const { budget, error: budgetError, setBudget, refetch: refetchBudget } = useActiveBudget(user?.id)
-  const { budgets: categoryBudgets, saveCategoryBudget, removeCategoryBudget, refetch: refetchCategoryBudgets } = useCategoryBudgets(user?.id)
+  const {
+    budget,
+    error: budgetError,
+    setBudget,
+    refetch: refetchBudget,
+  } = useActiveBudget(user?.id)
+  const {
+    budgets: categoryBudgets,
+    saveCategoryBudget,
+    removeCategoryBudget,
+    refetch: refetchCategoryBudgets,
+  } = useCategoryBudgets(user?.id)
   const { categories, categoryMap } = useCategories(user?.id)
   const { rules: recurringRules, refetch: refetchRules } = useRecurringRules(user?.id)
-  const { refreshing, onRefresh } = useManualRefresh(user?.id, [refetchBudget, refetchCategoryBudgets, refetchRules])
+  const { refreshing, onRefresh } = useManualRefresh(user?.id, [
+    refetchBudget,
+    refetchCategoryBudgets,
+    refetchRules,
+  ])
   const [budgetModalVisible, setBudgetModalVisible] = useState(false)
   // Which budget the editor is working on: null = new (scope pickable),
   // otherwise an existing budget (scope locked to it).
   const [editing, setEditing] = useState<Budget | null>(null)
-  const openNewBudget = () => { setEditing(null); setBudgetModalVisible(true) }
-  const openEditBudget = (b: Budget) => { setEditing(b); setBudgetModalVisible(true) }
+  const openNewBudget = () => {
+    setEditing(null)
+    setBudgetModalVisible(true)
+  }
+  const openEditBudget = (b: Budget) => {
+    setEditing(b)
+    setBudgetModalVisible(true)
+  }
   // `?edit=1` — Ask Murmur's "Adjust budget" / "Set budget" action lands
   // here with the editor already open (docs/ask-murmur/SPEC.md §1.4).
   const params = useLocalSearchParams<{ edit?: string }>()
@@ -149,20 +181,28 @@ export default function BudgetsScreen() {
   )
 
   function onCategoryRowPress(b: Budget, name: string) {
-    Alert.alert(name, formatMoney(b.amount, b.currency_code, locale) + ' · ' + periodLabel(b.period, locale), [
-      { text: t('detail.edit', locale), onPress: () => openEditBudget(b) },
-      {
-        text: t('detail.delete', locale),
-        style: 'destructive',
-        onPress: () => {
-          Alert.alert(t('budgets.remove_confirm', locale), name, [
-            { text: t('common.cancel', locale), style: 'cancel' },
-            { text: t('detail.delete', locale), style: 'destructive', onPress: () => removeCategoryBudget(b.id) },
-          ])
+    Alert.alert(
+      name,
+      formatMoney(b.amount, b.currency_code, locale) + ' · ' + periodLabel(b.period, locale),
+      [
+        { text: t('detail.edit', locale), onPress: () => openEditBudget(b) },
+        {
+          text: t('detail.delete', locale),
+          style: 'destructive',
+          onPress: () => {
+            Alert.alert(t('budgets.remove_confirm', locale), name, [
+              { text: t('common.cancel', locale), style: 'cancel' },
+              {
+                text: t('detail.delete', locale),
+                style: 'destructive',
+                onPress: () => removeCategoryBudget(b.id),
+              },
+            ])
+          },
         },
-      },
-      { text: t('common.cancel', locale), style: 'cancel' },
-    ])
+        { text: t('common.cancel', locale), style: 'cancel' },
+      ],
+    )
   }
 
   const spent = (status?.spent ?? 0) + (status?.committed ?? 0)
@@ -181,7 +221,9 @@ export default function BudgetsScreen() {
         // to close the keyboard, so saving took two taps (Oct 8 2026).
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.ink3} />}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.ink3} />
+        }
       >
         {/* Header row. The "+" pill opens the shared BudgetEditorModal so the
             user can set or modify the global monthly budget from this tab
@@ -216,7 +258,11 @@ export default function BudgetsScreen() {
             broken fetch alike. */}
         {budgetError && !budget ? (
           <View style={styles.emptyHero}>
-            <Ionicons name="alert-circle-outline" size={32} color={Colors.destructive ?? '#A94646'} />
+            <Ionicons
+              name="alert-circle-outline"
+              size={32}
+              color={Colors.destructive ?? '#A94646'}
+            />
             <Text style={styles.emptyHeroTitle}>{t('common.load_failed', locale)}</Text>
             <Pressable
               style={({ pressed }) => [styles.ctaBtn, pressed && styles.ctaBtnPressed]}
@@ -247,7 +293,15 @@ export default function BudgetsScreen() {
                 <Text style={styles.heroOfText}>
                   {over ? t('budgets.over_by', locale) : t('budgets.left_of', locale)}{' '}
                 </Text>
-                <Money value={limit} currencyCode={currency} locale={locale} size={13} serif={false} sansWeight="600" muted />
+                <Money
+                  value={limit}
+                  currencyCode={currency}
+                  locale={locale}
+                  size={13}
+                  serif={false}
+                  sansWeight="600"
+                  muted
+                />
               </View>
               {/* The three labelled numbers (fix-plan 2.5) — "spent" from
                   posted transactions and "committed" from due-but-unposted
@@ -287,17 +341,14 @@ export default function BudgetsScreen() {
               )}
               <View style={[styles.pacePill, (over || tight) && styles.pacePillWarn]}>
                 <Text
-                  style={[
-                    styles.pacePillLabel,
-                    (over || tight) && styles.pacePillLabelWarn,
-                  ]}
+                  style={[styles.pacePillLabel, (over || tight) && styles.pacePillLabelWarn]}
                   numberOfLines={1}
                 >
                   {over
                     ? t('budgets.status_over', locale)
                     : tight
-                    ? t('budgets.status_tight', locale)
-                    : t('budgets.status_on_pace', locale)}
+                      ? t('budgets.status_tight', locale)
+                      : t('budgets.status_on_pace', locale)}
                 </Text>
               </View>
             </View>
@@ -321,7 +372,10 @@ export default function BudgetsScreen() {
         {/* By category — one row per active category budget */}
         <Text style={styles.sectionHead}>{t('budgets.by_category', locale)}</Text>
         {categoryRows.length === 0 ? (
-          <Pressable style={({ pressed }) => [styles.emptyCategoryCard, pressed && { opacity: 0.7 }]} onPress={openNewBudget}>
+          <Pressable
+            style={({ pressed }) => [styles.emptyCategoryCard, pressed && { opacity: 0.7 }]}
+            onPress={openNewBudget}
+          >
             <Text style={styles.emptyCategoryBody}>{t('budgets.by_category_empty', locale)}</Text>
             <Text style={styles.emptyCategoryLink}>{t('budgets.add_category_budget', locale)}</Text>
           </Pressable>
@@ -330,32 +384,62 @@ export default function BudgetsScreen() {
             {categoryRows.map((row, i) => {
               const over = row.pct > 1
               const near = !over && row.pct > 0.9
-              const barColor = over ? Colors.destructive : near ? '#B8860B' : categoryPalette(row.color).fg
+              const barColor = over
+                ? Colors.destructive
+                : near
+                  ? '#B8860B'
+                  : categoryPalette(row.color).fg
               return (
                 <Pressable
                   key={row.budget.id}
                   onPress={() => onCategoryRowPress(row.budget, row.name)}
-                  style={({ pressed }) => [styles.categoryRow, i > 0 && styles.categoryRowDivider, pressed && styles.categoryRowPressed]}
+                  style={({ pressed }) => [
+                    styles.categoryRow,
+                    i > 0 && styles.categoryRowDivider,
+                    pressed && styles.categoryRowPressed,
+                  ]}
                   accessibilityRole="button"
                   accessibilityLabel={`${row.name}, ${formatMoney(row.used, row.budget.currency_code, locale)} of ${formatMoney(row.cap, row.budget.currency_code, locale)}`}
                 >
                   <View style={styles.categoryTop}>
                     <View style={styles.categoryNameWrap}>
                       <View style={[styles.categoryDot, { backgroundColor: row.color }]} />
-                      <Text style={styles.categoryName} numberOfLines={1}>{row.name}</Text>
-                      <Text style={styles.categoryPeriod}>{periodLabel(row.budget.period, locale)}</Text>
+                      <Text style={styles.categoryName} numberOfLines={1}>
+                        {row.name}
+                      </Text>
+                      <Text style={styles.categoryPeriod}>
+                        {periodLabel(row.budget.period, locale)}
+                      </Text>
                     </View>
                     <View style={styles.categoryAmounts}>
-                      <Money value={row.used} size={15} serif={false} sansWeight="700" currencyCode={row.budget.currency_code} locale={locale} />
+                      <Money
+                        value={row.used}
+                        size={15}
+                        serif={false}
+                        sansWeight="700"
+                        currencyCode={row.budget.currency_code}
+                        locale={locale}
+                      />
                       <Text style={styles.categoryOf}>
                         {`/ ${formatMoney(row.cap, row.budget.currency_code, locale, { precision: 'whole' })}`}
                       </Text>
                     </View>
                   </View>
                   <View style={styles.categoryTrack}>
-                    <View style={[styles.categoryFill, { width: `${Math.min(row.pct, 1) * 100}%`, backgroundColor: barColor }]} />
+                    <View
+                      style={[
+                        styles.categoryFill,
+                        { width: `${Math.min(row.pct, 1) * 100}%`, backgroundColor: barColor },
+                      ]}
+                    />
                   </View>
-                  <Text style={[styles.categoryState, over && styles.categoryStateOver, near && styles.categoryStateNear]}>
+                  <Text
+                    style={[
+                      styles.categoryState,
+                      over && styles.categoryStateOver,
+                      near && styles.categoryStateNear,
+                    ]}
+                  >
                     {over
                       ? `${t('budgets.status_over', locale)} · ${formatMoney(row.used - row.cap, row.budget.currency_code, locale, { precision: 'whole' })} ${t('budgets.over_by', locale)}`
                       : near
@@ -383,12 +467,20 @@ export default function BudgetsScreen() {
         categories={categories}
         currency={currency}
         locale={locale}
-        onSave={async (amount: number, period: BudgetPeriod, categoryId: string | null, rollover: boolean) =>
+        onSave={async (
+          amount: number,
+          period: BudgetPeriod,
+          categoryId: string | null,
+          rollover: boolean,
+        ) =>
           categoryId
             ? saveCategoryBudget(categoryId, amount, period, currency, tz, rollover)
             : setBudget(amount, period, currency, tz, rollover)
         }
-        onClose={() => { setBudgetModalVisible(false); setEditing(null) }}
+        onClose={() => {
+          setBudgetModalVisible(false)
+          setEditing(null)
+        }}
       />
     </SafeAreaView>
   )
@@ -581,7 +673,12 @@ const styles = StyleSheet.create({
   categoryRow: { paddingHorizontal: 18, paddingVertical: 14 },
   categoryRowDivider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: Colors.line },
   categoryRowPressed: { backgroundColor: 'rgba(40,36,28,0.04)' },
-  categoryTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  categoryTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
   categoryNameWrap: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1 },
   categoryDot: { width: 8, height: 8, borderRadius: 4 },
   categoryName: {

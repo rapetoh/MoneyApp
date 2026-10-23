@@ -23,11 +23,12 @@ async function freshParseExpense(): Promise<typeof ParseExpenseFn> {
 function mockFetchReturning(rawResponse: Record<string, unknown>): void {
   vi.stubGlobal(
     'fetch',
-    vi.fn(async () =>
-      new Response(JSON.stringify(rawResponse), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      }),
+    vi.fn(
+      async () =>
+        new Response(JSON.stringify(rawResponse), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
     ),
   )
 }

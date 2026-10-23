@@ -106,32 +106,160 @@ const RECURRING_FREQUENCIES: ReadonlySet<RecurringFrequency> = new Set<Recurring
  *  currency syncs cleanly and then counts as $0 in every total because the
  *  FX snapshot has nothing to convert against. */
 export const ISO_4217_CODES: ReadonlySet<string> = new Set([
-  'AED', 'AFN', 'ALL', 'AMD', 'ANG', 'AOA', 'ARS', 'AUD', 'AWG', 'AZN',
-  'BAM', 'BBD', 'BDT', 'BGN', 'BHD', 'BIF', 'BMD', 'BND', 'BOB', 'BRL', 'BSD', 'BTN', 'BWP', 'BYN', 'BZD',
-  'CAD', 'CDF', 'CHF', 'CLP', 'CNY', 'COP', 'CRC', 'CUP', 'CVE', 'CZK',
-  'DJF', 'DKK', 'DOP', 'DZD',
-  'EGP', 'ERN', 'ETB', 'EUR',
-  'FJD', 'FKP',
-  'GBP', 'GEL', 'GHS', 'GIP', 'GMD', 'GNF', 'GTQ', 'GYD',
-  'HKD', 'HNL', 'HTG', 'HUF',
-  'IDR', 'ILS', 'INR', 'IQD', 'IRR', 'ISK',
-  'JMD', 'JOD', 'JPY',
-  'KES', 'KGS', 'KHR', 'KMF', 'KPW', 'KRW', 'KWD', 'KYD', 'KZT',
-  'LAK', 'LBP', 'LKR', 'LRD', 'LSL', 'LYD',
-  'MAD', 'MDL', 'MGA', 'MKD', 'MMK', 'MNT', 'MOP', 'MRU', 'MUR', 'MVR', 'MWK', 'MXN', 'MYR', 'MZN',
-  'NAD', 'NGN', 'NIO', 'NOK', 'NPR', 'NZD',
+  'AED',
+  'AFN',
+  'ALL',
+  'AMD',
+  'ANG',
+  'AOA',
+  'ARS',
+  'AUD',
+  'AWG',
+  'AZN',
+  'BAM',
+  'BBD',
+  'BDT',
+  'BGN',
+  'BHD',
+  'BIF',
+  'BMD',
+  'BND',
+  'BOB',
+  'BRL',
+  'BSD',
+  'BTN',
+  'BWP',
+  'BYN',
+  'BZD',
+  'CAD',
+  'CDF',
+  'CHF',
+  'CLP',
+  'CNY',
+  'COP',
+  'CRC',
+  'CUP',
+  'CVE',
+  'CZK',
+  'DJF',
+  'DKK',
+  'DOP',
+  'DZD',
+  'EGP',
+  'ERN',
+  'ETB',
+  'EUR',
+  'FJD',
+  'FKP',
+  'GBP',
+  'GEL',
+  'GHS',
+  'GIP',
+  'GMD',
+  'GNF',
+  'GTQ',
+  'GYD',
+  'HKD',
+  'HNL',
+  'HTG',
+  'HUF',
+  'IDR',
+  'ILS',
+  'INR',
+  'IQD',
+  'IRR',
+  'ISK',
+  'JMD',
+  'JOD',
+  'JPY',
+  'KES',
+  'KGS',
+  'KHR',
+  'KMF',
+  'KPW',
+  'KRW',
+  'KWD',
+  'KYD',
+  'KZT',
+  'LAK',
+  'LBP',
+  'LKR',
+  'LRD',
+  'LSL',
+  'LYD',
+  'MAD',
+  'MDL',
+  'MGA',
+  'MKD',
+  'MMK',
+  'MNT',
+  'MOP',
+  'MRU',
+  'MUR',
+  'MVR',
+  'MWK',
+  'MXN',
+  'MYR',
+  'MZN',
+  'NAD',
+  'NGN',
+  'NIO',
+  'NOK',
+  'NPR',
+  'NZD',
   'OMR',
-  'PAB', 'PEN', 'PGK', 'PHP', 'PKR', 'PLN', 'PYG',
+  'PAB',
+  'PEN',
+  'PGK',
+  'PHP',
+  'PKR',
+  'PLN',
+  'PYG',
   'QAR',
-  'RON', 'RSD', 'RUB', 'RWF',
-  'SAR', 'SBD', 'SCR', 'SDG', 'SEK', 'SGD', 'SHP', 'SLE', 'SOS', 'SRD', 'SSP', 'STN', 'SYP', 'SZL',
-  'THB', 'TJS', 'TMT', 'TND', 'TOP', 'TRY', 'TTD', 'TWD', 'TZS',
-  'UAH', 'UGX', 'USD', 'UYU', 'UZS',
-  'VES', 'VND', 'VUV',
+  'RON',
+  'RSD',
+  'RUB',
+  'RWF',
+  'SAR',
+  'SBD',
+  'SCR',
+  'SDG',
+  'SEK',
+  'SGD',
+  'SHP',
+  'SLE',
+  'SOS',
+  'SRD',
+  'SSP',
+  'STN',
+  'SYP',
+  'SZL',
+  'THB',
+  'TJS',
+  'TMT',
+  'TND',
+  'TOP',
+  'TRY',
+  'TTD',
+  'TWD',
+  'TZS',
+  'UAH',
+  'UGX',
+  'USD',
+  'UYU',
+  'UZS',
+  'VES',
+  'VND',
+  'VUV',
   'WST',
-  'XAF', 'XCD', 'XOF', 'XPF',
+  'XAF',
+  'XCD',
+  'XOF',
+  'XPF',
   'YER',
-  'ZAR', 'ZMW', 'ZWL',
+  'ZAR',
+  'ZMW',
+  'ZWL',
 ])
 
 /** Plain arrays, for building the `response_format: json_schema` enum lists
@@ -158,7 +286,10 @@ function trimmedStringOrNull(v: unknown): string | null {
 
 function checkAmount(raw: unknown): { value: number; error: ParseFieldError | null } {
   if (typeof raw !== 'number' || !Number.isFinite(raw)) {
-    return { value: 0, error: { field: 'amount', message: `expected a finite number, got ${JSON.stringify(raw)}` } }
+    return {
+      value: 0,
+      error: { field: 'amount', message: `expected a finite number, got ${JSON.stringify(raw)}` },
+    }
   }
   if (raw <= 0) {
     return { value: 0, error: { field: 'amount', message: `must be greater than 0, got ${raw}` } }
@@ -167,7 +298,10 @@ function checkAmount(raw: unknown): { value: number; error: ParseFieldError | nu
     return { value: 0, error: { field: 'amount', message: `must be less than 1e9, got ${raw}` } }
   }
   if (Math.abs(raw * 100 - Math.round(raw * 100)) > 1e-6) {
-    return { value: 0, error: { field: 'amount', message: `must have at most 2 decimal places, got ${raw}` } }
+    return {
+      value: 0,
+      error: { field: 'amount', message: `must have at most 2 decimal places, got ${raw}` },
+    }
   }
   return { value: raw, error: null }
 }
@@ -175,16 +309,28 @@ function checkAmount(raw: unknown): { value: number; error: ParseFieldError | nu
 function checkCurrency(raw: unknown): { value: string; error: ParseFieldError | null } {
   const normalized = typeof raw === 'string' ? raw.trim().toUpperCase() : ''
   if (!normalized || !ISO_4217_CODES.has(normalized)) {
-    return { value: '', error: { field: 'currency', message: `expected an ISO 4217 currency code, got ${JSON.stringify(raw)}` } }
+    return {
+      value: '',
+      error: {
+        field: 'currency',
+        message: `expected an ISO 4217 currency code, got ${JSON.stringify(raw)}`,
+      },
+    }
   }
   return { value: normalized, error: null }
 }
 
-function checkDirection(raw: unknown): { value: TransactionDirection; error: ParseFieldError | null } {
+function checkDirection(raw: unknown): {
+  value: TransactionDirection
+  error: ParseFieldError | null
+} {
   if (typeof raw !== 'string' || !DIRECTIONS.has(raw as TransactionDirection)) {
     return {
       value: 'debit',
-      error: { field: 'direction', message: `expected one of ${[...DIRECTIONS].join(', ')}, got ${JSON.stringify(raw)}` },
+      error: {
+        field: 'direction',
+        message: `expected one of ${[...DIRECTIONS].join(', ')}, got ${JSON.stringify(raw)}`,
+      },
     }
   }
   return { value: raw as TransactionDirection, error: null }
@@ -197,7 +343,10 @@ function checkFlowType(raw: unknown): { value: FlowType; error: ParseFieldError 
   if (typeof raw !== 'string' || !FLOW_TYPES.has(raw as FlowType)) {
     return {
       value: 'expense',
-      error: { field: 'flow_type', message: `expected one of ${[...FLOW_TYPES].join(', ')}, got ${JSON.stringify(raw)}` },
+      error: {
+        field: 'flow_type',
+        message: `expected one of ${[...FLOW_TYPES].join(', ')}, got ${JSON.stringify(raw)}`,
+      },
     }
   }
   return { value: raw as FlowType, error: null }
@@ -205,7 +354,10 @@ function checkFlowType(raw: unknown): { value: FlowType; error: ParseFieldError 
 
 /** `payment_method` is nullable everywhere it's used — `raw == null` is
  *  always valid regardless of `required`. */
-function checkPaymentMethod(raw: unknown): { value: PaymentMethod | null; error: ParseFieldError | null } {
+function checkPaymentMethod(raw: unknown): {
+  value: PaymentMethod | null
+  error: ParseFieldError | null
+} {
   if (raw == null) return { value: null, error: null }
   if (typeof raw !== 'string' || !PAYMENT_METHODS.has(raw as PaymentMethod)) {
     return {
@@ -221,9 +373,7 @@ function checkPaymentMethod(raw: unknown): { value: PaymentMethod | null; error:
 
 /** Discriminates `validateParsedExpense`'s return union. `ParsedExpense`
  *  never carries a `rejected` key, so this is a safe, exhaustive check. */
-export function isParseRejection(
-  value: ParsedExpense | ParseRejection,
-): value is ParseRejection {
+export function isParseRejection(value: ParsedExpense | ParseRejection): value is ParseRejection {
   return (value as ParseRejection).rejected === true
 }
 

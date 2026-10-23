@@ -19,13 +19,7 @@ import { createContext, useContext, type ReactNode } from 'react'
 
 const PlusContext = createContext<{ isPlus: boolean }>({ isPlus: false })
 
-export function PlusProvider({
-  isPlus,
-  children,
-}: {
-  isPlus: boolean
-  children: ReactNode
-}) {
+export function PlusProvider({ isPlus, children }: { isPlus: boolean; children: ReactNode }) {
   return <PlusContext.Provider value={{ isPlus }}>{children}</PlusContext.Provider>
 }
 

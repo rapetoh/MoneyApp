@@ -2,7 +2,13 @@
 import { useState, useMemo, useEffect, useCallback } from 'react'
 import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
-import { snapshotFx, localDay, monthBounds, merchantKey, merchantRuleName } from '@voice-expense/shared'
+import {
+  snapshotFx,
+  localDay,
+  monthBounds,
+  merchantKey,
+  merchantRuleName,
+} from '@voice-expense/shared'
 import type { Database } from '@voice-expense/shared'
 import { createClient } from '../../../lib/supabase/client'
 import { colors, font, radius } from '../../../lib/theme'
@@ -121,7 +127,11 @@ export default function TransactionsPage() {
   const monthParam = searchParams.get('month') ?? null
   const [transactions, setTransactions] = useState<Txn[]>([])
   const [categories, setCategories] = useState<Cat[]>([])
-  const [profile, setProfile] = useState<{ currency_code?: string; locale?: string; timezone?: string | null } | null>(null)
+  const [profile, setProfile] = useState<{
+    currency_code?: string
+    locale?: string
+    timezone?: string | null
+  } | null>(null)
   // Drives the realtime subscription's filter below — `load()` sets this
   // once `auth.getUser()` resolves.
   const [userId, setUserId] = useState<string | null>(null)
@@ -168,7 +178,9 @@ export default function TransactionsPage() {
   }, [filterParam])
 
   const load = useCallback(async () => {
-    const { data: { user } } = await supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
     if (!user) return
     setUserId(user.id)
     const [txns, cats, prof] = await Promise.all([
@@ -183,7 +195,11 @@ export default function TransactionsPage() {
         .select('id, name, color')
         .eq('user_id', user.id)
         .eq('is_archived', false),
-      supabase.from('profiles').select('currency_code, locale, timezone').eq('id', user.id).single(),
+      supabase
+        .from('profiles')
+        .select('currency_code, locale, timezone')
+        .eq('id', user.id)
+        .single(),
     ])
     // The transactions query is the one this whole page renders — a
     // failure there must not read as "no transactions match these
@@ -270,7 +286,9 @@ export default function TransactionsPage() {
 
   /** Resolves the form's category selection to an id — creating the
    *  category first when "+ New category" was picked (CROSS §1.3). */
-  async function resolveCategoryId(userId: string): Promise<{ id: string | null; error: string | null }> {
+  async function resolveCategoryId(
+    userId: string,
+  ): Promise<{ id: string | null; error: string | null }> {
     if (fCategoryId !== NEW_CATEGORY) return { id: fCategoryId || null, error: null }
     const name = fNewCatName.trim()
     if (!name) return { id: null, error: 'Enter a name for the new category' }
@@ -281,7 +299,12 @@ export default function TransactionsPage() {
     if (existing) return { id: existing.id, error: null }
     const { data, error } = await supabase
       .from('categories')
-      .insert({ user_id: userId, client_id: crypto.randomUUID(), name, name_normalized: normalized })
+      .insert({
+        user_id: userId,
+        client_id: crypto.randomUUID(),
+        name,
+        name_normalized: normalized,
+      })
       .select('id')
       .single()
     if (error || !data) return { id: null, error: error?.message ?? 'Could not create category' }
@@ -296,7 +319,9 @@ export default function TransactionsPage() {
     }
     setSaving(true)
     setFormError(null)
-    const { data: { user } } = await supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
     if (!user) {
       setSaving(false)
       setFormError('Not signed in')
@@ -348,12 +373,15 @@ export default function TransactionsPage() {
       // (migration 041): the phone files the next capture from it there.
       const key = merchantKey(shared.merchant)
       if (row && cat.id && cat.id !== row.category_id && key && shared.merchant) {
-        await supabase
-          .from('merchant_rules')
-          .upsert(
-            { user_id: user.id, merchant_key: key, merchant_name: merchantRuleName(shared.merchant), category_id: cat.id },
-            { onConflict: 'user_id,merchant_key' },
-          )
+        await supabase.from('merchant_rules').upsert(
+          {
+            user_id: user.id,
+            merchant_key: key,
+            merchant_name: merchantRuleName(shared.merchant),
+            category_id: cat.id,
+          },
+          { onConflict: 'user_id,merchant_key' },
+        )
       }
     } else {
       const id = crypto.randomUUID()
@@ -419,7 +447,9 @@ export default function TransactionsPage() {
     if (!window.confirm('Delete this transaction? It can be recovered for 30 days.')) return
     setSaving(true)
     setRowError(null)
-    const { data: { user } } = await supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
     if (!user) {
       setSaving(false)
       return
@@ -579,8 +609,9 @@ export default function TransactionsPage() {
           <div>
             <div style={styles.serifTitle}>{sourceSet.length} transactions</div>
             <div style={styles.subtitleLine}>
-              {subtitleLabel} · {counts.voice} voice · {counts.typed} typed · {counts.scan} scanned ·{' '}
-              {counts.shortcut} shortcut · {counts.notification} notification · {counts.recurring} recurring
+              {subtitleLabel} · {counts.voice} voice · {counts.typed} typed · {counts.scan} scanned
+              · {counts.shortcut} shortcut · {counts.notification} notification · {counts.recurring}{' '}
+              recurring
             </div>
           </div>
           <div style={styles.filterTabs}>
@@ -607,9 +638,7 @@ export default function TransactionsPage() {
 
         {showForm && (
           <div style={styles.formCard}>
-            <div style={styles.formTitle}>
-              {editingId ? 'Edit transaction' : 'New transaction'}
-            </div>
+            <div style={styles.formTitle}>{editingId ? 'Edit transaction' : 'New transaction'}</div>
             {formError && <div style={styles.formError}>{formError}</div>}
             <div style={styles.formRow}>
               <div style={styles.field}>
@@ -718,7 +747,12 @@ export default function TransactionsPage() {
             <div style={{ display: 'flex', gap: 8, justifyContent: 'space-between' }}>
               <div>
                 {editingId && (
-                  <button type="button" onClick={() => handleDelete(editingId)} disabled={saving} style={styles.deleteBtn}>
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(editingId)}
+                    disabled={saving}
+                    style={styles.deleteBtn}
+                  >
                     Delete
                   </button>
                 )}
@@ -727,7 +761,12 @@ export default function TransactionsPage() {
                 <button type="button" onClick={closeForm} style={styles.cancelBtn}>
                   Cancel
                 </button>
-                <button type="button" onClick={handleFormSave} disabled={saving} style={styles.saveBtn}>
+                <button
+                  type="button"
+                  onClick={handleFormSave}
+                  disabled={saving}
+                  style={styles.saveBtn}
+                >
                   {saving ? 'Saving…' : 'Save'}
                 </button>
               </div>
@@ -751,7 +790,11 @@ export default function TransactionsPage() {
             {loading ? (
               <div style={styles.empty}>Loading…</div>
             ) : loadError ? (
-              <ErrorState message="We couldn't load your transactions." detail={loadError} onRetry={load} />
+              <ErrorState
+                message="We couldn't load your transactions."
+                detail={loadError}
+                onRetry={load}
+              />
             ) : filtered.length === 0 ? (
               <div style={styles.empty}>No transactions match these filters.</div>
             ) : (
@@ -773,7 +816,8 @@ export default function TransactionsPage() {
                     className="row-hover"
                     style={{
                       ...styles.tableRow,
-                      borderBottom: i === filtered.length - 1 ? 'none' : `0.5px solid ${colors.line}`,
+                      borderBottom:
+                        i === filtered.length - 1 ? 'none' : `0.5px solid ${colors.line}`,
                     }}
                   >
                     <div style={styles.dateCell}>

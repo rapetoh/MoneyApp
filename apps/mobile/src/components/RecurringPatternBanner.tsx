@@ -45,12 +45,7 @@ interface Props {
   onAccept: (candidate: RecurringPatternCandidate) => Promise<boolean>
 }
 
-export function RecurringPatternBanner({
-  transactions,
-  existingRules,
-  locale,
-  onAccept,
-}: Props) {
+export function RecurringPatternBanner({ transactions, existingRules, locale, onAccept }: Props) {
   const [dismissedKeys, setDismissedKeys] = useState<Set<string> | null>(null)
   const [accepting, setAccepting] = useState(false)
 
@@ -127,9 +122,7 @@ export function RecurringPatternBanner({
           <View style={styles.iconTile}>
             <Ionicons name="repeat" size={14} color={Colors.accent} />
           </View>
-          <Text style={styles.eyebrow}>
-            {t('home.pattern_eyebrow', locale)}
-          </Text>
+          <Text style={styles.eyebrow}>{t('home.pattern_eyebrow', locale)}</Text>
           <Pressable
             onPress={handleDismiss}
             hitSlop={12}
@@ -147,10 +140,7 @@ export function RecurringPatternBanner({
             .replace('{frequency}', frequencyLabel)}
         </Text>
         <Text style={styles.body}>
-          {t('home.pattern_body', locale).replace(
-            '{count}',
-            String(candidate.occurrences),
-          )}
+          {t('home.pattern_body', locale).replace('{count}', String(candidate.occurrences))}
         </Text>
 
         <View style={styles.actions}>
@@ -174,9 +164,7 @@ export function RecurringPatternBanner({
             ) : (
               <>
                 <Ionicons name="add" size={14} color="#FFFFFF" />
-                <Text style={styles.acceptText}>
-                  {t('home.pattern_accept', locale)}
-                </Text>
+                <Text style={styles.acceptText}>{t('home.pattern_accept', locale)}</Text>
               </>
             )}
           </Tappable>
@@ -188,9 +176,7 @@ export function RecurringPatternBanner({
             accessibilityLabel={t('home.pattern_dismiss', locale)}
             style={({ pressed }) => [styles.notNowBtn, pressed && styles.pressedSoft]}
           >
-            <Text style={styles.notNowText}>
-              {t('home.pattern_dismiss', locale)}
-            </Text>
+            <Text style={styles.notNowText}>{t('home.pattern_dismiss', locale)}</Text>
           </Tappable>
         </View>
       </View>

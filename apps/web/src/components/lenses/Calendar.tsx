@@ -2,7 +2,12 @@
 import { useState } from 'react'
 import { colors, font } from '../../lib/theme'
 import { categoryPalette } from '@voice-expense/shared'
-import { type LensDay, type LensProps, buildCategoryColorMap, NEUTRAL_CATEGORY_COLOR } from './types'
+import {
+  type LensDay,
+  type LensProps,
+  buildCategoryColorMap,
+  NEUTRAL_CATEGORY_COLOR,
+} from './types'
 
 function fmt(value: number, currency: string, locale: string): string {
   return new Intl.NumberFormat(locale, {
@@ -37,7 +42,9 @@ export function CalendarLens({ props }: { props: LensProps }) {
     (best, d) => (best == null || d.spendTotal > best.spendTotal ? d : best),
     null,
   )
-  const defaultSel = isCurrentMonth ? props.todayIso : (heaviest?.isoDate ?? days[0]?.isoDate ?? props.todayIso)
+  const defaultSel = isCurrentMonth
+    ? props.todayIso
+    : (heaviest?.isoDate ?? days[0]?.isoDate ?? props.todayIso)
   const [sel, setSel] = useState(defaultSel)
 
   // Leading blanks so day 1 lands under its real weekday column
@@ -51,7 +58,10 @@ export function CalendarLens({ props }: { props: LensProps }) {
 
   const selDay = days.find((d) => d.isoDate === sel) ?? days[0]
   const selWeekday = selDay
-    ? new Date(selDay.windowStart).toLocaleDateString(props.locale, { weekday: 'long', timeZone: props.timezone })
+    ? new Date(selDay.windowStart).toLocaleDateString(props.locale, {
+        weekday: 'long',
+        timeZone: props.timezone,
+      })
     : ''
   const selMonthDay = selDay
     ? new Date(selDay.windowStart).toLocaleDateString(props.locale, {
@@ -64,7 +74,15 @@ export function CalendarLens({ props }: { props: LensProps }) {
   const selTotal = selDay?.spendTotal ?? 0
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 14, height: 600, fontFamily: font.sans }}>
+    <div
+      style={{
+        display: 'grid',
+        gridTemplateColumns: '1fr 320px',
+        gap: 14,
+        height: 600,
+        fontFamily: font.sans,
+      }}
+    >
       <div
         style={{
           background: '#fff',
@@ -93,7 +111,8 @@ export function CalendarLens({ props }: { props: LensProps }) {
                 <>
                   Heaviest:{' '}
                   <b style={{ color: colors.ink }}>
-                    {props.monthLabel} {heaviest.dayOfMonth} · {fmt(heaviest.spendTotal, props.currency, props.locale)}
+                    {props.monthLabel} {heaviest.dayOfMonth} ·{' '}
+                    {fmt(heaviest.spendTotal, props.currency, props.locale)}
                   </b>
                 </>
               ) : (
@@ -116,14 +135,26 @@ export function CalendarLens({ props }: { props: LensProps }) {
               {[0.18, 0.32, 0.46, 0.62, 0.82].map((v, i) => (
                 <div
                   key={i}
-                  style={{ width: 16, height: 12, borderRadius: 2, background: `rgba(63,90,62,${v})` }}
+                  style={{
+                    width: 16,
+                    height: 12,
+                    borderRadius: 2,
+                    background: `rgba(63,90,62,${v})`,
+                  }}
                 />
               ))}
             </div>
             <span>Heavy</span>
           </div>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 6, marginBottom: 8 }}>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(7, 1fr)',
+            gap: 6,
+            marginBottom: 8,
+          }}
+        >
           {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d) => (
             <div
               key={d}
@@ -238,7 +269,9 @@ export function CalendarLens({ props }: { props: LensProps }) {
         </div>
         <div style={{ overflow: 'auto', flex: 1 }}>
           {selTxns.map((t, i) => {
-            const c = categoryPalette((t.category_id && colorById[t.category_id]) || NEUTRAL_CATEGORY_COLOR)
+            const c = categoryPalette(
+              (t.category_id && colorById[t.category_id]) || NEUTRAL_CATEGORY_COLOR,
+            )
             return (
               <div
                 key={i}
@@ -279,7 +312,9 @@ export function CalendarLens({ props }: { props: LensProps }) {
                   >
                     {t.merchant ?? 'Unnamed'}
                   </div>
-                  <div style={{ fontSize: 11, color: colors.ink3 }}>{t.category_name ?? 'Uncategorized'}</div>
+                  <div style={{ fontSize: 11, color: colors.ink3 }}>
+                    {t.category_name ?? 'Uncategorized'}
+                  </div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   {/* Fix-plan 2.6 (calendar day-detail raw-amount site,
@@ -319,7 +354,9 @@ export function CalendarLens({ props }: { props: LensProps }) {
             )
           })}
           {selTxns.length === 0 && (
-            <div style={{ fontSize: 12, color: colors.ink3, padding: '20px 0', textAlign: 'center' }}>
+            <div
+              style={{ fontSize: 12, color: colors.ink3, padding: '20px 0', textAlign: 'center' }}
+            >
               No transactions on this day.
             </div>
           )}

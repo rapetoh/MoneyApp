@@ -40,7 +40,9 @@ async function domainsWithoutLogo(results: MerchantBatchResult[]): Promise<Merch
     results.map(async (r) => {
       if (!r.merchant_domain) return null
       try {
-        const res = await fetch(merchantLogoSrc(r.merchant_domain), { signal: AbortSignal.timeout(LOGO_CHECK_TIMEOUT_MS) })
+        const res = await fetch(merchantLogoSrc(r.merchant_domain), {
+          signal: AbortSignal.timeout(LOGO_CHECK_TIMEOUT_MS),
+        })
         return res.status === 404 ? r : null
       } catch {
         return null
@@ -78,10 +80,14 @@ export async function POST(req: NextRequest) {
     !Array.isArray(descriptors) ||
     descriptors.length === 0 ||
     descriptors.length > MERCHANT_BATCH_MAX ||
-    descriptors.some((d) => typeof d !== 'string' || !d.trim() || d.length > MERCHANT_DESCRIPTOR_MAX_LENGTH)
+    descriptors.some(
+      (d) => typeof d !== 'string' || !d.trim() || d.length > MERCHANT_DESCRIPTOR_MAX_LENGTH,
+    )
   ) {
     return Response.json(
-      { error: `descriptors must be 1 to ${MERCHANT_BATCH_MAX} non-empty strings of at most ${MERCHANT_DESCRIPTOR_MAX_LENGTH} characters` },
+      {
+        error: `descriptors must be 1 to ${MERCHANT_BATCH_MAX} non-empty strings of at most ${MERCHANT_DESCRIPTOR_MAX_LENGTH} characters`,
+      },
       { status: 400 },
     )
   }
@@ -106,7 +112,11 @@ export async function POST(req: NextRequest) {
         { role: 'user', content: JSON.stringify(descriptors) },
       ],
     })
-    const results = validateMerchantBatch(JSON.parse(completion.text), descriptors as string[], categories as string[])
+    const results = validateMerchantBatch(
+      JSON.parse(completion.text),
+      descriptors as string[],
+      categories as string[],
+    )
 
     // Every domain must actually show a logo. The model sometimes picks a
     // plausible domain the business does not use (Oct 9 2026: Albert Heijn
@@ -133,12 +143,17 @@ export async function POST(req: NextRequest) {
         ],
       }).catch(() => null)
       const fixed = retry
-        ? validateMerchantBatch(JSON.parse(retry.text), failing.map((r) => r.descriptor), categories as string[])
+        ? validateMerchantBatch(
+            JSON.parse(retry.text),
+            failing.map((r) => r.descriptor),
+            categories as string[],
+          )
         : []
       const stillFailing = new Set((await domainsWithoutLogo(fixed)).map((r) => r.descriptor))
       for (const f of failing) {
         const better = fixed.find((x) => x.descriptor === f.descriptor)
-        f.merchant_domain = better?.merchant_domain && !stillFailing.has(f.descriptor) ? better.merchant_domain : null
+        f.merchant_domain =
+          better?.merchant_domain && !stillFailing.has(f.descriptor) ? better.merchant_domain : null
       }
     }
 
@@ -149,7 +164,9 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     // Message and status only: the SDK error embeds the request body.
     const e = err as { status?: number; message?: string }
-    console.error(`[identify-merchants] OpenAI error (status=${e?.status ?? 'n/a'}): ${e?.message ?? String(err)}`)
+    console.error(
+      `[identify-merchants] OpenAI error (status=${e?.status ?? 'n/a'}): ${e?.message ?? String(err)}`,
+    )
     return Response.json({ error: 'AI identification failed' }, { status: 500 })
   }
 }

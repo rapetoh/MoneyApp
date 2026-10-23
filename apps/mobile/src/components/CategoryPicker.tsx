@@ -1,14 +1,5 @@
 import React, { useState } from 'react'
-import {
-  View,
-  Text,
-  Pressable,
-  Modal,
-  FlatList,
-  TextInput,
-  StyleSheet,
-  Alert,
-} from 'react-native'
+import { View, Text, Pressable, Modal, FlatList, TextInput, StyleSheet, Alert } from 'react-native'
 import type { Category, Locale } from '@voice-expense/shared'
 import { Colors, Typography, Spacing, Radius } from '../theme'
 import { merchantColor, t } from '@voice-expense/shared'
@@ -21,7 +12,11 @@ interface Props {
   locale?: Locale
 }
 
-function CategoryChip({ category, selected, onPress }: {
+function CategoryChip({
+  category,
+  selected,
+  onPress,
+}: {
   category: Category
   selected: boolean
   onPress: () => void
@@ -33,14 +28,25 @@ function CategoryChip({ category, selected, onPress }: {
       style={[styles.chip, selected && { backgroundColor: color + '22', borderColor: color }]}
     >
       <View style={[styles.chipDot, { backgroundColor: color }]} />
-      <Text style={[styles.chipLabel, selected && { color, fontFamily: Typography.fontFamily.sansSemiBold }]}>
+      <Text
+        style={[
+          styles.chipLabel,
+          selected && { color, fontFamily: Typography.fontFamily.sansSemiBold },
+        ]}
+      >
         {category.name}
       </Text>
     </Pressable>
   )
 }
 
-export function CategoryPicker({ categories, selectedId, onSelect, onCreateCategory, locale = 'en' }: Props) {
+export function CategoryPicker({
+  categories,
+  selectedId,
+  onSelect,
+  onCreateCategory,
+  locale = 'en',
+}: Props) {
   const [modalVisible, setModalVisible] = useState(false)
   const [newName, setNewName] = useState('')
   const [creating, setCreating] = useState(false)
@@ -64,13 +70,15 @@ export function CategoryPicker({ categories, selectedId, onSelect, onCreateCateg
 
   return (
     <>
-      <Pressable
-        style={styles.trigger}
-        onPress={() => setModalVisible(true)}
-      >
+      <Pressable style={styles.trigger} onPress={() => setModalVisible(true)}>
         {selected ? (
           <>
-            <View style={[styles.triggerDot, { backgroundColor: selected.color ?? merchantColor(selected.name) }]} />
+            <View
+              style={[
+                styles.triggerDot,
+                { backgroundColor: selected.color ?? merchantColor(selected.name) },
+              ]}
+            />
             <Text style={styles.triggerSelected}>{selected.name}</Text>
           </>
         ) : (
@@ -87,16 +95,23 @@ export function CategoryPicker({ categories, selectedId, onSelect, onCreateCateg
       >
         <View style={styles.modal}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle} numberOfLines={1}>{t('voice.category', locale)}</Text>
+            <Text style={styles.modalTitle} numberOfLines={1}>
+              {t('voice.category', locale)}
+            </Text>
             <Pressable onPress={() => setModalVisible(false)}>
-              <Text style={styles.modalClose} numberOfLines={1}>{t('common.done', locale)}</Text>
+              <Text style={styles.modalClose} numberOfLines={1}>
+                {t('common.done', locale)}
+              </Text>
             </Pressable>
           </View>
 
           {/* None option */}
           <Pressable
             style={[styles.listRow, !selectedId && styles.listRowSelected]}
-            onPress={() => { onSelect(null); setModalVisible(false) }}
+            onPress={() => {
+              onSelect(null)
+              setModalVisible(false)
+            }}
           >
             <Text style={styles.listRowLabel}>{t('common.none', locale)}</Text>
             {!selectedId && <Text style={styles.checkmark}>✓</Text>}
@@ -108,9 +123,17 @@ export function CategoryPicker({ categories, selectedId, onSelect, onCreateCateg
             renderItem={({ item }) => (
               <Pressable
                 style={[styles.listRow, selectedId === item.id && styles.listRowSelected]}
-                onPress={() => { onSelect(item.id); setModalVisible(false) }}
+                onPress={() => {
+                  onSelect(item.id)
+                  setModalVisible(false)
+                }}
               >
-                <View style={[styles.listDot, { backgroundColor: item.color ?? merchantColor(item.name) }]} />
+                <View
+                  style={[
+                    styles.listDot,
+                    { backgroundColor: item.color ?? merchantColor(item.name) },
+                  ]}
+                />
                 <Text style={styles.listRowLabel}>{item.name}</Text>
                 {selectedId === item.id && <Text style={styles.checkmark}>✓</Text>}
               </Pressable>
@@ -129,7 +152,10 @@ export function CategoryPicker({ categories, selectedId, onSelect, onCreateCateg
                     returnKeyType="done"
                   />
                   <Pressable
-                    style={[styles.createButton, (!newName.trim() || creating) && styles.createButtonDisabled]}
+                    style={[
+                      styles.createButton,
+                      (!newName.trim() || creating) && styles.createButtonDisabled,
+                    ]}
                     onPress={handleCreate}
                     disabled={!newName.trim() || creating}
                   >

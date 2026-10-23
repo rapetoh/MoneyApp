@@ -37,9 +37,15 @@ function parseMonthKey(raw: string | string[] | undefined): string | null {
   return `${match[1]}-${String(m).padStart(2, '0')}`
 }
 
-function monthKeyLabel(key: string, locale: string, opts: Intl.DateTimeFormatOptions = { month: 'long', year: 'numeric' }): string {
+function monthKeyLabel(
+  key: string,
+  locale: string,
+  opts: Intl.DateTimeFormatOptions = { month: 'long', year: 'numeric' },
+): string {
   const [y, m] = key.split('-').map(Number)
-  return new Intl.DateTimeFormat(locale, { ...opts, timeZone: 'UTC' }).format(new Date(Date.UTC(y, m - 1, 15)))
+  return new Intl.DateTimeFormat(locale, { ...opts, timeZone: 'UTC' }).format(
+    new Date(Date.UTC(y, m - 1, 15)),
+  )
 }
 
 function groupByDate(transactions: Transaction[], locale: Locale) {
@@ -84,7 +90,9 @@ export default function TransactionsScreen() {
   const [search, setSearch] = useState(typeof params.q === 'string' ? params.q : '')
   // Month scope — null = all time. Seeded by `?month=` (History calendar,
   // Ask Murmur actions); changed from the month chip in the header.
-  const [selectedMonth, setSelectedMonth] = useState<string | null>(() => parseMonthKey(params.month))
+  const [selectedMonth, setSelectedMonth] = useState<string | null>(() =>
+    parseMonthKey(params.month),
+  )
   const [monthSheetOpen, setMonthSheetOpen] = useState(false)
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null)
   const [view, setView] = useState<'expenses' | 'income'>('expenses')
@@ -133,7 +141,9 @@ export default function TransactionsScreen() {
         (txn) =>
           (txn.merchant ?? '').toLowerCase().includes(q) ||
           (txn.note ?? '').toLowerCase().includes(q) ||
-          (txn.category_id ? categoryMap[txn.category_id]?.name ?? '' : '').toLowerCase().includes(q),
+          (txn.category_id ? (categoryMap[txn.category_id]?.name ?? '') : '')
+            .toLowerCase()
+            .includes(q),
       )
     }
 
@@ -149,7 +159,8 @@ export default function TransactionsScreen() {
   // is looking at is stated, not implied.
   const summary = useMemo(() => {
     let total = 0
-    for (const tx of filtered) if (tx.amount_in_profile_currency != null) total += tx.amount_in_profile_currency
+    for (const tx of filtered)
+      if (tx.amount_in_profile_currency != null) total += tx.amount_in_profile_currency
     return { count: filtered.length, total }
   }, [filtered])
 
@@ -158,7 +169,9 @@ export default function TransactionsScreen() {
   }
 
   const pageTitle = t('more.transactions', locale)
-  const monthChipLabel = selectedMonth ? monthKeyLabel(selectedMonth, locale, { month: 'short', year: 'numeric' }) : t('transactions.all_time', locale)
+  const monthChipLabel = selectedMonth
+    ? monthKeyLabel(selectedMonth, locale, { month: 'short', year: 'numeric' })
+    : t('transactions.all_time', locale)
 
   return (
     <>
@@ -173,11 +186,7 @@ export default function TransactionsScreen() {
             style={({ pressed }) => [styles.backPill, pressed && styles.backPillPressed]}
             hitSlop={8}
           >
-            <Ionicons
-              name="chevron-back"
-              size={20}
-              color={Colors.ink2 ?? Colors.textSecondary}
-            />
+            <Ionicons name="chevron-back" size={20} color={Colors.ink2 ?? Colors.textSecondary} />
           </Pressable>
           <Text style={styles.pageTitle} numberOfLines={1}>
             {pageTitle}
@@ -185,165 +194,197 @@ export default function TransactionsScreen() {
           {/* Month scope — "All time" or "Aug 2026"; opens the month sheet. */}
           <Pressable
             onPress={() => setMonthSheetOpen(true)}
-            style={({ pressed }) => [styles.monthChip, selectedMonth && styles.monthChipActive, pressed && styles.backPillPressed]}
+            style={({ pressed }) => [
+              styles.monthChip,
+              selectedMonth && styles.monthChipActive,
+              pressed && styles.backPillPressed,
+            ]}
             hitSlop={6}
             accessibilityRole="button"
             accessibilityLabel={t('transactions.pick_month', locale)}
           >
-            <Ionicons name="calendar-outline" size={14} color={selectedMonth ? Colors.white : Colors.ink2} />
-            <Text style={[styles.monthChipText, selectedMonth && styles.monthChipTextActive]} numberOfLines={1}>
+            <Ionicons
+              name="calendar-outline"
+              size={14}
+              color={selectedMonth ? Colors.white : Colors.ink2}
+            />
+            <Text
+              style={[styles.monthChipText, selectedMonth && styles.monthChipTextActive]}
+              numberOfLines={1}
+            >
               {monthChipLabel}
             </Text>
-            <Ionicons name="chevron-down" size={12} color={selectedMonth ? Colors.white : Colors.ink3} />
+            <Ionicons
+              name="chevron-down"
+              size={12}
+              color={selectedMonth ? Colors.white : Colors.ink3}
+            />
           </Pressable>
         </View>
 
-      <View style={styles.header}>
-        {/* Expenses / Income — a full-width segmented control (iOS style:
+        <View style={styles.header}>
+          {/* Expenses / Income — a full-width segmented control (iOS style:
             quiet track, raised active pill). */}
-        <View style={styles.segment}>
-          {(['expenses', 'income'] as const).map((key) => {
-            const active = view === key
-            return (
-              <Pressable
-                key={key}
-                style={[styles.segmentTab, active && styles.segmentTabActive]}
-                onPress={() => { setView(key); setSelectedCategoryId(null) }}
-                accessibilityRole="button"
-                accessibilityState={{ selected: active }}
-              >
-                <Text style={[styles.segmentLabel, active && styles.segmentLabelActive]}>
-                  {t(key === 'expenses' ? 'home.expenses' : 'home.income', locale)}
-                </Text>
-              </Pressable>
-            )
-          })}
-        </View>
-        <Text style={styles.summaryLine}>
-          {selectedMonth ? monthKeyLabel(selectedMonth, locale) : t('transactions.all_time', locale)}
-          {' · '}
-          {t(summary.count === 1 ? 'transactions.count_one' : 'transactions.count_many', locale).replace('{count}', String(summary.count))}
-          {' · '}
-          {formatMoney(summary.total, currency, locale)}
-        </Text>
-
-        <TextInput
-          style={styles.search}
-          value={search}
-          onChangeText={setSearch}
-          placeholder={t('transactions.search', locale)}
-          placeholderTextColor={Colors.textMuted}
-          clearButtonMode="while-editing"
-        />
-
-        {/* Category filter pills — only relevant on expenses view */}
-        {view === 'expenses' && usedCategories.length > 0 && (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.pillRow}
-          >
-            <Pressable
-              style={[
-                styles.pill,
-                !selectedCategoryId && styles.pillActive,
-              ]}
-              onPress={() => setSelectedCategoryId(null)}
-            >
-              <Text style={[styles.pillLabel, !selectedCategoryId && styles.pillLabelActive]}>
-                {t('transactions.filter_all', locale)}
-              </Text>
-            </Pressable>
-            {usedCategories.map((cat) => {
-              const active = selectedCategoryId === cat.id
+          <View style={styles.segment}>
+            {(['expenses', 'income'] as const).map((key) => {
+              const active = view === key
               return (
                 <Pressable
-                  key={cat.id}
-                  style={[
-                    styles.pill,
-                    active && styles.pillActive,
-                  ]}
-                  onPress={() => toggleCategory(cat.id)}
+                  key={key}
+                  style={[styles.segmentTab, active && styles.segmentTabActive]}
+                  onPress={() => {
+                    setView(key)
+                    setSelectedCategoryId(null)
+                  }}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: active }}
                 >
-                  <View style={[styles.pillDot, { backgroundColor: cat.color ?? Colors.primary }]} />
-                  <Text style={[styles.pillLabel, active && styles.pillLabelActive]}>
-                    {cat.name}
+                  <Text style={[styles.segmentLabel, active && styles.segmentLabelActive]}>
+                    {t(key === 'expenses' ? 'home.expenses' : 'home.income', locale)}
                   </Text>
                 </Pressable>
               )
             })}
-          </ScrollView>
-        )}
-      </View>
-
-      {loading ? (
-        <ActivityIndicator color={Colors.primary} style={{ marginTop: Spacing['2xl'] }} />
-      ) : error && transactions.length === 0 ? (
-        // Error+retry state (fix-plan 2.13) — replaces "No transactions
-        // match these filters" for the case that string actually
-        // mislabels: a failed read, not a genuinely empty account. Gated
-        // on `transactions.length` (not `sections.length`) so a real
-        // zero-match search on data that *did* load keeps its own
-        // "No transactions match these filters" copy below.
-        // `useTransactions` exposes no `refetch`, so the best available
-        // retry is re-driving the same pull it already runs on mount.
-        <View style={styles.emptyState}>
-          <Ionicons name="alert-circle-outline" size={40} color={Colors.destructive ?? '#A94646'} />
-          <Text style={styles.emptyTitle}>{t('common.load_failed', locale)}</Text>
-          <Pressable
-            onPress={() => user?.id && syncManager.pullRemote(user.id)}
-            style={({ pressed }) => [styles.errorRetryBtn, pressed && styles.errorRetryBtnPressed]}
-          >
-            <Ionicons name="refresh" size={14} color="#FFFFFF" />
-            <Text style={styles.errorRetryText}>{t('common.retry', locale)}</Text>
-          </Pressable>
-        </View>
-      ) : sections.length === 0 ? (
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyIcon}>{search || selectedCategoryId ? '🔍' : '💸'}</Text>
-          <Text style={styles.emptyTitle}>
-            {search || selectedCategoryId
-              ? t('transactions.empty_search', locale)
-              : t('transactions.empty', locale)}
+          </View>
+          <Text style={styles.summaryLine}>
+            {selectedMonth
+              ? monthKeyLabel(selectedMonth, locale)
+              : t('transactions.all_time', locale)}
+            {' · '}
+            {t(
+              summary.count === 1 ? 'transactions.count_one' : 'transactions.count_many',
+              locale,
+            ).replace('{count}', String(summary.count))}
+            {' · '}
+            {formatMoney(summary.total, currency, locale)}
           </Text>
-        </View>
-      ) : (
-        <SectionList
-          sections={sections}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.listContent}
-          stickySectionHeadersEnabled={false}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.ink3} />}
-          renderSectionHeader={({ section: { title } }) => (
-            <Text style={styles.dateHeader}>{title}</Text>
-          )}
-          renderItem={({ item, index, section }) => {
-            const isFirst = index === 0
-            const isLast = index === section.data.length - 1
-            return (
-              <View
-                style={[
-                  styles.txnCard,
-                  isFirst && styles.txnCardFirst,
-                  isLast && styles.txnCardLast,
-                  !isLast && styles.txnCardMiddle,
-                ]}
+
+          <TextInput
+            style={styles.search}
+            value={search}
+            onChangeText={setSearch}
+            placeholder={t('transactions.search', locale)}
+            placeholderTextColor={Colors.textMuted}
+            clearButtonMode="while-editing"
+          />
+
+          {/* Category filter pills — only relevant on expenses view */}
+          {view === 'expenses' && usedCategories.length > 0 && (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.pillRow}
+            >
+              <Pressable
+                style={[styles.pill, !selectedCategoryId && styles.pillActive]}
+                onPress={() => setSelectedCategoryId(null)}
               >
-                {index > 0 && <View style={styles.divider} />}
-                <TransactionRow
-                  transaction={item}
-                  categoryName={item.category_id ? categoryMap[item.category_id]?.name : null}
-                  currency={currency}
-                  locale={locale}
-                  onPress={() => router.push(`/transaction/${item.id}`)}
-                />
-              </View>
-            )
-          }}
-          renderSectionFooter={() => <View style={styles.sectionGap} />}
-          showsVerticalScrollIndicator={false}
-        />
-      )}
+                <Text style={[styles.pillLabel, !selectedCategoryId && styles.pillLabelActive]}>
+                  {t('transactions.filter_all', locale)}
+                </Text>
+              </Pressable>
+              {usedCategories.map((cat) => {
+                const active = selectedCategoryId === cat.id
+                return (
+                  <Pressable
+                    key={cat.id}
+                    style={[styles.pill, active && styles.pillActive]}
+                    onPress={() => toggleCategory(cat.id)}
+                  >
+                    <View
+                      style={[styles.pillDot, { backgroundColor: cat.color ?? Colors.primary }]}
+                    />
+                    <Text style={[styles.pillLabel, active && styles.pillLabelActive]}>
+                      {cat.name}
+                    </Text>
+                  </Pressable>
+                )
+              })}
+            </ScrollView>
+          )}
+        </View>
+
+        {loading ? (
+          <ActivityIndicator color={Colors.primary} style={{ marginTop: Spacing['2xl'] }} />
+        ) : error && transactions.length === 0 ? (
+          // Error+retry state (fix-plan 2.13) — replaces "No transactions
+          // match these filters" for the case that string actually
+          // mislabels: a failed read, not a genuinely empty account. Gated
+          // on `transactions.length` (not `sections.length`) so a real
+          // zero-match search on data that *did* load keeps its own
+          // "No transactions match these filters" copy below.
+          // `useTransactions` exposes no `refetch`, so the best available
+          // retry is re-driving the same pull it already runs on mount.
+          <View style={styles.emptyState}>
+            <Ionicons
+              name="alert-circle-outline"
+              size={40}
+              color={Colors.destructive ?? '#A94646'}
+            />
+            <Text style={styles.emptyTitle}>{t('common.load_failed', locale)}</Text>
+            <Pressable
+              onPress={() => user?.id && syncManager.pullRemote(user.id)}
+              style={({ pressed }) => [
+                styles.errorRetryBtn,
+                pressed && styles.errorRetryBtnPressed,
+              ]}
+            >
+              <Ionicons name="refresh" size={14} color="#FFFFFF" />
+              <Text style={styles.errorRetryText}>{t('common.retry', locale)}</Text>
+            </Pressable>
+          </View>
+        ) : sections.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyIcon}>{search || selectedCategoryId ? '🔍' : '💸'}</Text>
+            <Text style={styles.emptyTitle}>
+              {search || selectedCategoryId
+                ? t('transactions.empty_search', locale)
+                : t('transactions.empty', locale)}
+            </Text>
+          </View>
+        ) : (
+          <SectionList
+            sections={sections}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={styles.listContent}
+            stickySectionHeadersEnabled={false}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                tintColor={Colors.ink3}
+              />
+            }
+            renderSectionHeader={({ section: { title } }) => (
+              <Text style={styles.dateHeader}>{title}</Text>
+            )}
+            renderItem={({ item, index, section }) => {
+              const isFirst = index === 0
+              const isLast = index === section.data.length - 1
+              return (
+                <View
+                  style={[
+                    styles.txnCard,
+                    isFirst && styles.txnCardFirst,
+                    isLast && styles.txnCardLast,
+                    !isLast && styles.txnCardMiddle,
+                  ]}
+                >
+                  {index > 0 && <View style={styles.divider} />}
+                  <TransactionRow
+                    transaction={item}
+                    categoryName={item.category_id ? categoryMap[item.category_id]?.name : null}
+                    currency={currency}
+                    locale={locale}
+                    onPress={() => router.push(`/transaction/${item.id}`)}
+                  />
+                </View>
+              )
+            }}
+            renderSectionFooter={() => <View style={styles.sectionGap} />}
+            showsVerticalScrollIndicator={false}
+          />
+        )}
       </SafeAreaView>
 
       <BottomSheet
@@ -421,9 +462,19 @@ const styles = StyleSheet.create({
     maxWidth: 150,
   },
   monthChipActive: { backgroundColor: Colors.ink, borderColor: Colors.ink },
-  monthChipText: { fontSize: 13, fontWeight: '600', color: Colors.ink2, fontFamily: Typography.fontFamily.sansSemiBold },
+  monthChipText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: Colors.ink2,
+    fontFamily: Typography.fontFamily.sansSemiBold,
+  },
   monthChipTextActive: { color: Colors.white },
-  header: { paddingHorizontal: Spacing.base, paddingTop: Spacing.sm, paddingBottom: Spacing.md, gap: Spacing.md },
+  header: {
+    paddingHorizontal: Spacing.base,
+    paddingTop: Spacing.sm,
+    paddingBottom: Spacing.md,
+    gap: Spacing.md,
+  },
   segment: {
     flexDirection: 'row',
     backgroundColor: Colors.surface2,
@@ -470,7 +521,11 @@ const styles = StyleSheet.create({
   },
   monthOptionActive: { backgroundColor: Colors.accentSoft },
   monthOptionText: { fontSize: 15.5, color: Colors.ink, fontFamily: Typography.fontFamily.sans },
-  monthOptionTextActive: { color: Colors.accent, fontFamily: Typography.fontFamily.sansSemiBold, fontWeight: '600' },
+  monthOptionTextActive: {
+    color: Colors.accent,
+    fontFamily: Typography.fontFamily.sansSemiBold,
+    fontWeight: '600',
+  },
   search: {
     backgroundColor: Colors.card,
     borderRadius: Radius.full ?? 999,

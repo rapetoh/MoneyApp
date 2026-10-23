@@ -137,7 +137,11 @@ export default function SetupScreen() {
           style={({ pressed }) => [styles.cta, (pressed || saving) && styles.ctaPressed]}
           accessibilityRole="button"
         >
-          {saving ? <ActivityIndicator color={Colors.white} /> : <Text style={styles.ctaText}>{t('onboarding.setup.cta', locale)}</Text>}
+          {saving ? (
+            <ActivityIndicator color={Colors.white} />
+          ) : (
+            <Text style={styles.ctaText}>{t('onboarding.setup.cta', locale)}</Text>
+          )}
         </Pressable>
       </View>
 
@@ -201,7 +205,11 @@ function Row({
     <Pressable
       onPress={onPress}
       disabled={!onPress}
-      style={({ pressed }) => [styles.row, !last && styles.rowDivider, pressed && onPress && { opacity: 0.6 }]}
+      style={({ pressed }) => [
+        styles.row,
+        !last && styles.rowDivider,
+        pressed && onPress && { opacity: 0.6 },
+      ]}
       accessibilityRole={onPress ? 'button' : undefined}
     >
       <View style={styles.rowIcon}>
@@ -217,9 +225,20 @@ function Row({
   )
 }
 
-function PickRow({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) {
+function PickRow({
+  label,
+  selected,
+  onPress,
+}: {
+  label: string
+  selected: boolean
+  onPress: () => void
+}) {
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => [styles.pickRow, pressed && { opacity: 0.6 }]}>
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [styles.pickRow, pressed && { opacity: 0.6 }]}
+    >
       <Text style={styles.pickLabel}>{label}</Text>
       {selected && <Ionicons name="checkmark" size={18} color={Colors.accent} />}
     </Pressable>
@@ -238,7 +257,13 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: Colors.ink,
   },
-  lead: { marginTop: 10, fontSize: 15, lineHeight: 22, color: Colors.ink3, fontFamily: Typography.fontFamily.sans },
+  lead: {
+    marginTop: 10,
+    fontSize: 15,
+    lineHeight: 22,
+    color: Colors.ink3,
+    fontFamily: Typography.fontFamily.sans,
+  },
   card: {
     marginTop: 28,
     backgroundColor: Colors.surface,
@@ -257,11 +282,33 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  rowLabel: { fontSize: 15, color: Colors.ink, fontFamily: Typography.fontFamily.sansSemiBold, fontWeight: '600' },
-  rowHint: { marginTop: 2, fontSize: 12.5, color: Colors.ink4, fontFamily: Typography.fontFamily.sans },
+  rowLabel: {
+    fontSize: 15,
+    color: Colors.ink,
+    fontFamily: Typography.fontFamily.sansSemiBold,
+    fontWeight: '600',
+  },
+  rowHint: {
+    marginTop: 2,
+    fontSize: 12.5,
+    color: Colors.ink4,
+    fontFamily: Typography.fontFamily.sans,
+  },
   rowValue: { fontSize: 15, color: Colors.ink2, fontFamily: Typography.fontFamily.sans },
-  note: { marginTop: 18, flexDirection: 'row', alignItems: 'flex-start', gap: 8, paddingHorizontal: 2 },
-  noteText: { flex: 1, fontSize: 12.5, lineHeight: 18, color: Colors.ink4, fontFamily: Typography.fontFamily.sans },
+  note: {
+    marginTop: 18,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    paddingHorizontal: 2,
+  },
+  noteText: {
+    flex: 1,
+    fontSize: 12.5,
+    lineHeight: 18,
+    color: Colors.ink4,
+    fontFamily: Typography.fontFamily.sans,
+  },
   footer: { paddingHorizontal: 28, paddingTop: 10, paddingBottom: 8 },
   error: {
     color: Colors.destructive,
@@ -270,9 +317,20 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     fontFamily: Typography.fontFamily.sansSemiBold,
   },
-  cta: { height: 56, borderRadius: 28, backgroundColor: Colors.ink, alignItems: 'center', justifyContent: 'center' },
+  cta: {
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: Colors.ink,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   ctaPressed: { opacity: 0.85 },
-  ctaText: { color: Colors.white, fontSize: 17, fontWeight: '600', fontFamily: Typography.fontFamily.sansSemiBold },
+  ctaText: {
+    color: Colors.white,
+    fontSize: 17,
+    fontWeight: '600',
+    fontFamily: Typography.fontFamily.sansSemiBold,
+  },
   pickRow: {
     flexDirection: 'row',
     alignItems: 'center',

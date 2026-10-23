@@ -15,7 +15,12 @@ import { View, Text, Pressable, StyleSheet, ScrollView } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors, Typography, Spacing, Radius } from '../theme'
 import { syncManager } from '../services/sync/SyncManager'
-import { getDeadLetterEntries, clearDeadLetterEntry, retryDeadLetterEntry, type QueueEntry } from '../services/sync/syncQueue'
+import {
+  getDeadLetterEntries,
+  clearDeadLetterEntry,
+  retryDeadLetterEntry,
+  type QueueEntry,
+} from '../services/sync/syncQueue'
 import { t, type Locale } from '@voice-expense/shared'
 
 export function SyncFailureBanner({ locale = 'en' }: { locale?: Locale }) {
@@ -65,7 +70,10 @@ export function SyncFailureBanner({ locale = 'en' }: { locale?: Locale }) {
   // Same "N item(s) couldn't sync" phrasing used for both the visible pill
   // and its accessibility label — one string, not two independently
   // maintained tenses of the same fact (audit 01-F29/08-F48, fix-plan 4.2).
-  const itemWord = t(deadCount === 1 ? 'settings.sync_item_singular' : 'settings.sync_item_plural', locale)
+  const itemWord = t(
+    deadCount === 1 ? 'settings.sync_item_singular' : 'settings.sync_item_plural',
+    locale,
+  )
   const failureMessage = `${deadCount} ${itemWord}`
 
   return (
@@ -98,7 +106,11 @@ export function SyncFailureBanner({ locale = 'en' }: { locale?: Locale }) {
                 <Pressable onPress={() => handleRetry(entry.id)} hitSlop={8} style={styles.action}>
                   <Text style={styles.actionText}>{t('common.retry', locale)}</Text>
                 </Pressable>
-                <Pressable onPress={() => handleDiscard(entry.id)} hitSlop={8} style={styles.action}>
+                <Pressable
+                  onPress={() => handleDiscard(entry.id)}
+                  hitSlop={8}
+                  style={styles.action}
+                >
                   <Text style={styles.discardText}>{t('settings.sync_discard', locale)}</Text>
                 </Pressable>
               </View>

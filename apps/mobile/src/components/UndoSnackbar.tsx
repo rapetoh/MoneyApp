@@ -21,13 +21,7 @@ interface Props {
  * reverses the just-performed action. Spec: docs/DESIGN.md §3 Motion +
  * §5 Today · Undo snackbar state.
  */
-export function UndoSnackbar({
-  message,
-  onUndo,
-  onDismiss,
-  undoLabel,
-  durationMs = 4000,
-}: Props) {
+export function UndoSnackbar({ message, onUndo, onDismiss, undoLabel, durationMs = 4000 }: Props) {
   const progress = useRef(new Animated.Value(0)).current
   const dismissed = useRef(false)
   // Was a third independent copy of the tab-bar's `14 + 68` constants
@@ -77,7 +71,11 @@ export function UndoSnackbar({
         <Text style={styles.message} numberOfLines={2}>
           {message}
         </Text>
-        <Pressable onPress={handleUndo} hitSlop={8} style={({ pressed }) => pressed && styles.undoPressed}>
+        <Pressable
+          onPress={handleUndo}
+          hitSlop={8}
+          style={({ pressed }) => pressed && styles.undoPressed}
+        >
           <Text style={styles.undoLabel}>{undoLabel}</Text>
         </Pressable>
       </View>

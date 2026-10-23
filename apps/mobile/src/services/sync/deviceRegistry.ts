@@ -60,7 +60,10 @@ function devicePlatform(): 'ios' | 'android' | 'web' {
 }
 
 function deviceDisplayName(): string {
-  return Constants.deviceName || (Platform.OS === 'ios' ? 'iPhone' : Platform.OS === 'android' ? 'Android device' : 'Device')
+  return (
+    Constants.deviceName ||
+    (Platform.OS === 'ios' ? 'iPhone' : Platform.OS === 'android' ? 'Android device' : 'Device')
+  )
 }
 
 /**

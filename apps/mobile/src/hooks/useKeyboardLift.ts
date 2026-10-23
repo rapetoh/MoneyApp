@@ -46,7 +46,12 @@ export function computeKeyboardOverlap(measuredBottomY: number, keyboardScreenY:
   return Math.max(measuredBottomY - keyboardScreenY, 0)
 }
 
-export function useKeyboardLift(targetRef: React.RefObject<{ measureInWindow: (cb: (x: number, y: number, w: number, h: number) => void) => void } | null>, active = true): Animated.Value {
+export function useKeyboardLift(
+  targetRef: React.RefObject<{
+    measureInWindow: (cb: (x: number, y: number, w: number, h: number) => void) => void
+  } | null>,
+  active = true,
+): Animated.Value {
   const lift = useRef(new Animated.Value(0)).current
 
   useEffect(() => {

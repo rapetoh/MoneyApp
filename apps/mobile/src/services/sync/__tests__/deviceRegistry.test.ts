@@ -31,8 +31,13 @@ const supabaseMocks = vi.hoisted(() => ({
 }))
 vi.mock('../../../lib/supabase', () => ({ supabase: { from: supabaseMocks.from } }))
 
-const { getDeviceId, registerDevice, touchDeviceSynced, getDeviceLastSynced, __resetDeviceRegistryForTests } =
-  await import('../deviceRegistry')
+const {
+  getDeviceId,
+  registerDevice,
+  touchDeviceSynced,
+  getDeviceLastSynced,
+  __resetDeviceRegistryForTests,
+} = await import('../deviceRegistry')
 
 /** Chainable stub mirroring supabase-js's thenable query builder closely
  *  enough for these tests. */
@@ -91,9 +96,14 @@ describe('registerDevice', () => {
 describe('touchDeviceSynced', () => {
   it('updates last_synced_at scoped to this device id and user id', async () => {
     const updateSpy = vi.fn(() => chain({ data: null, error: null }))
-    supabaseMocks.from.mockReturnValue({ update: updateSpy, eq: () => chain({ data: null, error: null }) })
+    supabaseMocks.from.mockReturnValue({
+      update: updateSpy,
+      eq: () => chain({ data: null, error: null }),
+    })
     await touchDeviceSynced('user-1')
-    expect(updateSpy).toHaveBeenCalledWith(expect.objectContaining({ last_synced_at: expect.any(String) }))
+    expect(updateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ last_synced_at: expect.any(String) }),
+    )
   })
 })
 

@@ -63,5 +63,7 @@ export type Transaction = Omit<TransactionRow, keyof NarrowedTransactionColumns>
 export type TransactionInsert = Omit<TransactionInsertRow, keyof NarrowedTransactionColumns> &
   Partial<Pick<NarrowedTransactionColumns, 'payment_method' | 'recurring_frequency'>> &
   Pick<NarrowedTransactionColumns, 'direction' | 'source'>
-export type TransactionUpdate = Partial<Omit<TransactionUpdateRow, keyof NarrowedTransactionColumns>> &
+export type TransactionUpdate = Partial<
+  Omit<TransactionUpdateRow, keyof NarrowedTransactionColumns>
+> &
   Partial<NarrowedTransactionColumns> & { id: string }

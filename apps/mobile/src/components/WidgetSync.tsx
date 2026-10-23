@@ -62,7 +62,10 @@ export function WidgetSync() {
     if (!user?.id || !profile) return null
     const day = localDay(nowInstant, tz)
     const spent = transactions
-      .filter((tx) => !tx.is_deleted && tx.direction === 'debit' && localDay(tx.transacted_at, tz) === day)
+      .filter(
+        (tx) =>
+          !tx.is_deleted && tx.direction === 'debit' && localDay(tx.transacted_at, tz) === day,
+      )
       .reduce((sum, tx) => sum + aggAmount(tx), 0)
 
     const status = budgetStatusFor(budget, transactions, rules, tz)
@@ -84,7 +87,8 @@ export function WidgetSync() {
         status && budget
           ? {
               amount: short(Math.abs(status.remaining)),
-              label: status.remaining < 0 ? t('home.over_budget_suffix', locale) : t(periodKey, locale),
+              label:
+                status.remaining < 0 ? t('home.over_budget_suffix', locale) : t(periodKey, locale),
               over: status.remaining < 0,
               endsAt: status.window.endExclusive,
               freshAmount: short(budget.amount),

@@ -221,11 +221,45 @@ function monthsAgoWindow(y: number, m: number, d: number, tz: string, n: number)
 /** Every argument each tool accepts — `resolveToolCall` rejects anything
  *  else with a self-correcting error rather than dropping it. */
 const TOOL_ARG_NAMES: Record<string, Set<string>> = {
-  total: new Set(['window', 'start_date', 'end_date', 'direction', 'category_name', 'merchant_contains', 'rule_name']),
+  total: new Set([
+    'window',
+    'start_date',
+    'end_date',
+    'direction',
+    'category_name',
+    'merchant_contains',
+    'rule_name',
+  ]),
   sum_by_category: new Set(['window', 'start_date', 'end_date', 'direction', 'merchant_contains']),
-  top_merchants: new Set(['window', 'start_date', 'end_date', 'direction', 'category_name', 'merchant_contains', 'limit']),
-  series: new Set(['window', 'start_date', 'end_date', 'bucket', 'direction', 'category_name', 'merchant_contains']),
-  list_transactions: new Set(['window', 'start_date', 'end_date', 'direction', 'category_name', 'merchant_contains', 'rule_name', 'min_amount', 'limit']),
+  top_merchants: new Set([
+    'window',
+    'start_date',
+    'end_date',
+    'direction',
+    'category_name',
+    'merchant_contains',
+    'limit',
+  ]),
+  series: new Set([
+    'window',
+    'start_date',
+    'end_date',
+    'bucket',
+    'direction',
+    'category_name',
+    'merchant_contains',
+  ]),
+  list_transactions: new Set([
+    'window',
+    'start_date',
+    'end_date',
+    'direction',
+    'category_name',
+    'merchant_contains',
+    'rule_name',
+    'min_amount',
+    'limit',
+  ]),
   recurring_total: new Set(['direction']),
   recurring_in_window: new Set(['window', 'start_date', 'end_date', 'direction']),
   arith: new Set(['op', 'a', 'b']),
@@ -271,7 +305,10 @@ export function buildWindows(nowUtcStr: string, tz: string): Record<WindowName, 
 
   const yday = addDays(y, m, d, -1)
   const nowIso = civilDateTimeToInstant(y, m, d, 12, 0, 0, resolvedTz)
-  const lastWeekAnchor = (() => { const p = addDays(y, m, d, -7); return civilDateTimeToInstant(p.y, p.m, p.d, 12, 0, 0, resolvedTz) })()
+  const lastWeekAnchor = (() => {
+    const p = addDays(y, m, d, -7)
+    return civilDateTimeToInstant(p.y, p.m, p.d, 12, 0, 0, resolvedTz)
+  })()
   const thisWeekB = weekBounds(nowIso, resolvedTz)
   const lastWeekB = weekBounds(lastWeekAnchor, resolvedTz)
   const qStartM = Math.floor((m - 1) / 3) * 3 + 1
@@ -293,8 +330,15 @@ export function buildWindows(nowUtcStr: string, tz: string): Record<WindowName, 
     last90Days: trailingDaysWindow(y, m, d, resolvedTz, 90),
     last6Months: monthsAgoWindow(y, m, d, resolvedTz, 5),
     last12Months: monthsAgoWindow(y, m, d, resolvedTz, 11),
-    nextMonth: (() => { const nm = addMonthsClamped(y, m, 1, 1); return monthWindow(nm.y, nm.m, resolvedTz) })(),
-    next30Days: (() => { const start = dayWindow(y, m, d, resolvedTz).start; const e = addDays(y, m, d, 30); return { start, end: toDate(civilDateTimeToInstant(e.y, e.m, e.d, 0, 0, 0, resolvedTz)) } })(),
+    nextMonth: (() => {
+      const nm = addMonthsClamped(y, m, 1, 1)
+      return monthWindow(nm.y, nm.m, resolvedTz)
+    })(),
+    next30Days: (() => {
+      const start = dayWindow(y, m, d, resolvedTz).start
+      const e = addDays(y, m, d, 30)
+      return { start, end: toDate(civilDateTimeToInstant(e.y, e.m, e.d, 0, 0, 0, resolvedTz)) }
+    })(),
     // Placeholder — a 'custom' filter is resolved from its own dates by
     // `resolveWindow`; this entry only keeps the record shape total.
     custom: { start: new Date(0), end: new Date(0) },
@@ -311,33 +355,50 @@ function quarterWindow(y: number, qStartM: number, tz: string): DateWindow {
 
 const CIVIL_DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/
 
-function parseCivilDate(v: unknown, field: string): { y: number; m: number; d: number } | undefined {
+function parseCivilDate(
+  v: unknown,
+  field: string,
+): { y: number; m: number; d: number } | undefined {
   if (v == null || v === '') return undefined
   const m = typeof v === 'string' ? CIVIL_DATE_RE.exec(v.trim()) : null
   if (!m) throw new Error(`"${field}" must be a civil date YYYY-MM-DD; got ${JSON.stringify(v)}`)
-  const y = Number(m[1]), mo = Number(m[2]), d = Number(m[3])
+  const y = Number(m[1]),
+    mo = Number(m[2]),
+    d = Number(m[3])
   const dim = new Date(Date.UTC(y, mo, 0)).getUTCDate()
-  if (mo < 1 || mo > 12 || d < 1 || d > dim) throw new Error(`"${field}" is not a real calendar date: ${v}`)
+  if (mo < 1 || mo > 12 || d < 1 || d > dim)
+    throw new Error(`"${field}" is not a real calendar date: ${v}`)
   return { y, m: mo, d }
 }
 
 /** The window a filter names — a named window, or for 'custom' the
  *  inclusive civil range [start_date, end_date] in the user's zone. */
-function resolveWindow(filter: RowFilter, windows: Record<WindowName, DateWindow>, ctx: ToolContext): DateWindow {
+function resolveWindow(
+  filter: RowFilter,
+  windows: Record<WindowName, DateWindow>,
+  ctx: ToolContext,
+): DateWindow {
   if (filter.window !== 'custom') return windows[filter.window]
   if (!filter.start_date || !filter.end_date) {
-    throw new Error('window "custom" requires both "start_date" and "end_date" (YYYY-MM-DD, inclusive)')
+    throw new Error(
+      'window "custom" requires both "start_date" and "end_date" (YYYY-MM-DD, inclusive)',
+    )
   }
   const tz = resolveTz(ctx.tz)
-  const s = filter.start_date, e = filter.end_date
+  const s = filter.start_date,
+    e = filter.end_date
   const next = addDays(e.y, e.m, e.d, 1)
   const start = toDate(civilDateTimeToInstant(s.y, s.m, s.d, 0, 0, 0, tz))
   const end = toDate(civilDateTimeToInstant(next.y, next.m, next.d, 0, 0, 0, tz))
-  if (end.getTime() <= start.getTime()) throw new Error('"end_date" must be on or after "start_date"')
+  if (end.getTime() <= start.getTime())
+    throw new Error('"end_date" must be on or after "start_date"')
   return { start, end }
 }
 
-function inWindow<T extends { transacted_at?: string | null }>(arr: readonly T[], w: DateWindow): T[] {
+function inWindow<T extends { transacted_at?: string | null }>(
+  arr: readonly T[],
+  w: DateWindow,
+): T[] {
   if (!w || !(w.start instanceof Date) || !(w.end instanceof Date)) return []
   const startMs = w.start.getTime()
   const endMs = w.end.getTime()
@@ -416,7 +477,11 @@ function txBelongsToRule(t: AskMurmurTransaction, rule: AskMurmurRecurringRuleV2
   const rn = (rule.name ?? '').trim().toLowerCase()
   const mn = (t.merchant ?? '').trim().toLowerCase()
   if (rn && mn && (mn.includes(rn) || rn.includes(mn))) return true
-  return !!t.is_recurring && t.direction === rule.direction && Math.abs((t.amount_in_profile_currency ?? NaN) - rule.amount) < 0.005
+  return (
+    !!t.is_recurring &&
+    t.direction === rule.direction &&
+    Math.abs((t.amount_in_profile_currency ?? NaN) - rule.amount) < 0.005
+  )
 }
 
 interface FilteredRows {
@@ -487,7 +552,17 @@ function parseTotalArgs(args: Record<string, unknown>): TotalArgs {
  *  one month of data). `days_with_data` counts civil days from the earliest
  *  transaction (or the window start, whichever is later) to the window end
  *  (or now); `months_covered` is that in months, rounded to one decimal. */
-function coverageFor(ctx: ToolContext, w: DateWindow): { window_start: string; window_end: string; data_starts: string | null; days_with_data: number; months_covered: number; window_fully_covered: boolean } {
+function coverageFor(
+  ctx: ToolContext,
+  w: DateWindow,
+): {
+  window_start: string
+  window_end: string
+  data_starts: string | null
+  days_with_data: number
+  months_covered: number
+  window_fully_covered: boolean
+} {
   const tz = resolveTz(ctx.tz)
   let earliest: number | null = null
   for (const t of ctx.transactions ?? []) {
@@ -508,7 +583,11 @@ function coverageFor(ctx: ToolContext, w: DateWindow): { window_start: string; w
   }
 }
 
-function totalTool(args: TotalArgs, ctx: ToolContext, windows: Record<WindowName, DateWindow>): unknown {
+function totalTool(
+  args: TotalArgs,
+  ctx: ToolContext,
+  windows: Record<WindowName, DateWindow>,
+): unknown {
   const { rows, pendingCount } = filterRows(ctx, windows, args)
   const total = rows.reduce((acc, t) => acc + amountOf(t), 0)
   return {
@@ -521,7 +600,10 @@ function totalTool(args: TotalArgs, ctx: ToolContext, windows: Record<WindowName
 
 // ─── sum_by_category ────────────────────────────────────────────────────
 
-interface SumByCategoryArgs extends Pick<RowFilter, 'window' | 'start_date' | 'end_date' | 'direction' | 'merchant_contains'> {}
+interface SumByCategoryArgs extends Pick<
+  RowFilter,
+  'window' | 'start_date' | 'end_date' | 'direction' | 'merchant_contains'
+> {}
 
 function parseSumByCategoryArgs(args: Record<string, unknown>): SumByCategoryArgs {
   return {
@@ -539,7 +621,13 @@ function sumByCategoryTool(
   windows: Record<WindowName, DateWindow>,
 ): unknown {
   const direction = args.direction ?? 'debit'
-  const { rows, pendingCount } = filterRows(ctx, windows, { window: args.window, start_date: args.start_date, end_date: args.end_date, direction, merchant_contains: args.merchant_contains })
+  const { rows, pendingCount } = filterRows(ctx, windows, {
+    window: args.window,
+    start_date: args.start_date,
+    end_date: args.end_date,
+    direction,
+    merchant_contains: args.merchant_contains,
+  })
   const byCat = new Map<string, { total: number; count: number }>()
   for (const t of rows) {
     const key = t.category_name || 'Uncategorized'
@@ -612,14 +700,19 @@ function topMerchantsTool(
 const SERIES_BUCKETS = ['day', 'week', 'month', 'weekday'] as const
 type SeriesBucket = (typeof SERIES_BUCKETS)[number]
 
-interface SeriesArgs extends Pick<RowFilter, 'window' | 'start_date' | 'end_date' | 'direction' | 'category_name' | 'merchant_contains'> {
+interface SeriesArgs extends Pick<
+  RowFilter,
+  'window' | 'start_date' | 'end_date' | 'direction' | 'category_name' | 'merchant_contains'
+> {
   bucket: SeriesBucket
 }
 
 function parseSeriesArgs(args: Record<string, unknown>): SeriesArgs {
   const bucket = args.bucket
   if (typeof bucket !== 'string' || !(SERIES_BUCKETS as readonly string[]).includes(bucket)) {
-    throw new Error(`"bucket" must be one of ${SERIES_BUCKETS.join(', ')}; got ${JSON.stringify(bucket)}`)
+    throw new Error(
+      `"bucket" must be one of ${SERIES_BUCKETS.join(', ')}; got ${JSON.stringify(bucket)}`,
+    )
   }
   return {
     window: parseWindowName(args.window),
@@ -632,10 +725,21 @@ function parseSeriesArgs(args: Record<string, unknown>): SeriesArgs {
   }
 }
 
-function seriesTool(args: SeriesArgs, ctx: ToolContext, windows: Record<WindowName, DateWindow>): unknown {
+function seriesTool(
+  args: SeriesArgs,
+  ctx: ToolContext,
+  windows: Record<WindowName, DateWindow>,
+): unknown {
   const direction = args.direction ?? 'debit'
   const tz = resolveTz(ctx.tz)
-  const { rows, pendingCount } = filterRows(ctx, windows, { window: args.window, start_date: args.start_date, end_date: args.end_date, direction, category_name: args.category_name, merchant_contains: args.merchant_contains })
+  const { rows, pendingCount } = filterRows(ctx, windows, {
+    window: args.window,
+    start_date: args.start_date,
+    end_date: args.end_date,
+    direction,
+    category_name: args.category_name,
+    merchant_contains: args.merchant_contains,
+  })
 
   const byBucket = new Map<string, { total: number; count: number; order: number }>()
   for (const t of rows) {
@@ -672,7 +776,11 @@ function seriesTool(args: SeriesArgs, ctx: ToolContext, windows: Record<WindowNa
     .sort((a, b) => a.order - b.order)
     .map(({ order: _order, ...rest }) => rest)
 
-  return { points, pending_conversion_count: pendingCount, coverage: coverageFor(ctx, resolveWindow(args, windows, ctx)) }
+  return {
+    points,
+    pending_conversion_count: pendingCount,
+    coverage: coverageFor(ctx, resolveWindow(args, windows, ctx)),
+  }
 }
 
 // ─── list_transactions ──────────────────────────────────────────────────
@@ -712,9 +820,15 @@ function listTransactionsTool(
 ): unknown {
   const tz = resolveTz(ctx.tz)
   const { rows, pendingCount } = filterRows(ctx, windows, args)
-  const matched = (args.min_amount !== undefined ? rows.filter((t) => amountOf(t) >= (args.min_amount as number)) : rows)
+  const matched = (
+    args.min_amount !== undefined
+      ? rows.filter((t) => amountOf(t) >= (args.min_amount as number))
+      : rows
+  )
     .slice()
-    .sort((a, b) => (a.transacted_at < b.transacted_at ? 1 : a.transacted_at > b.transacted_at ? -1 : 0))
+    .sort((a, b) =>
+      a.transacted_at < b.transacted_at ? 1 : a.transacted_at > b.transacted_at ? -1 : 0,
+    )
   const total = roundCents(matched.reduce((acc, t) => acc + amountOf(t), 0))
   return {
     transactions: matched.slice(0, args.limit).map((t) => ({
@@ -740,7 +854,11 @@ function listTransactionsTool(
 // "next month ≈ $5,416.67" was the biweekly monthly-equivalent average;
 // September actually has two paydays → $5,000.
 
-function recurringInWindowTool(args: Record<string, unknown>, ctx: ToolContext, windows: Record<WindowName, DateWindow>): unknown {
+function recurringInWindowTool(
+  args: Record<string, unknown>,
+  ctx: ToolContext,
+  windows: Record<WindowName, DateWindow>,
+): unknown {
   const filter: RowFilter = {
     window: parseWindowName(args.window),
     start_date: parseCivilDate(args.start_date, 'start_date'),
@@ -752,13 +870,29 @@ function recurringInWindowTool(args: Record<string, unknown>, ctx: ToolContext, 
   const rules = (ctx.recurring_rules as AskMurmurRecurringRuleV2[]).filter(
     (r) => (!direction || r.direction === direction) && VALID_FREQUENCIES.has(r.frequency),
   )
-  const perRule: Array<{ name: string; direction: string; amount: number; occurrences: number; dates: string[]; total: number; has_schedule: boolean }> = []
+  const perRule: Array<{
+    name: string
+    direction: string
+    amount: number
+    occurrences: number
+    dates: string[]
+    total: number
+    has_schedule: boolean
+  }> = []
   let missingSchedule = 0
   for (const r of rules) {
     const name = r.name?.trim() || 'Unnamed'
     if (!r.starts_at) {
       missingSchedule += 1
-      perRule.push({ name, direction: r.direction, amount: roundCents(r.amount), occurrences: 0, dates: [], total: 0, has_schedule: false })
+      perRule.push({
+        name,
+        direction: r.direction,
+        amount: roundCents(r.amount),
+        occurrences: 0,
+        dates: [],
+        total: 0,
+        has_schedule: false,
+      })
       continue
     }
     try {
@@ -777,13 +911,30 @@ function recurringInWindowTool(args: Record<string, unknown>, ctx: ToolContext, 
         tz,
         { limit: 400 },
       )
-      perRule.push({ name, direction: r.direction, amount: roundCents(r.amount), occurrences: occ.length, dates: occ.map((o) => o.occurrenceDate), total: roundCents(occ.length * r.amount), has_schedule: true })
+      perRule.push({
+        name,
+        direction: r.direction,
+        amount: roundCents(r.amount),
+        occurrences: occ.length,
+        dates: occ.map((o) => o.occurrenceDate),
+        total: roundCents(occ.length * r.amount),
+        has_schedule: true,
+      })
     } catch {
       missingSchedule += 1
-      perRule.push({ name, direction: r.direction, amount: roundCents(r.amount), occurrences: 0, dates: [], total: 0, has_schedule: false })
+      perRule.push({
+        name,
+        direction: r.direction,
+        amount: roundCents(r.amount),
+        occurrences: 0,
+        dates: [],
+        total: 0,
+        has_schedule: false,
+      })
     }
   }
-  const sum = (d: 'debit' | 'credit') => roundCents(perRule.filter((p) => p.direction === d).reduce((a, p) => a + p.total, 0))
+  const sum = (d: 'debit' | 'credit') =>
+    roundCents(perRule.filter((p) => p.direction === d).reduce((a, p) => a + p.total, 0))
   return {
     window_start: localDay(w.start.toISOString(), tz),
     window_end_exclusive: localDay(w.end.toISOString(), tz),
@@ -882,7 +1033,11 @@ function recurringTotalTool(args: RecurringTotalArgs, ctx: ToolContext): unknown
         amount: roundCents(r.amount),
         frequency: r.frequency,
         monthly_amount: roundCents(
-          monthlyEquivalent({ frequency: r.frequency as RecurringFrequency, interval: 1, amount: r.amount }),
+          monthlyEquivalent({
+            frequency: r.frequency as RecurringFrequency,
+            interval: 1,
+            amount: r.amount,
+          }),
         ),
         charged_this_month: paid,
       }
@@ -890,7 +1045,9 @@ function recurringTotalTool(args: RecurringTotalArgs, ctx: ToolContext): unknown
     .sort((a, b) => b.monthly_amount - a.monthly_amount)
   const monthly_total = roundCents(normalized.reduce((acc, r) => acc + r.monthly_amount, 0))
   const still_due_this_month = normalized.filter((r) => !r.charged_this_month)
-  const still_due_this_month_total = roundCents(still_due_this_month.reduce((acc, r) => acc + r.monthly_amount, 0))
+  const still_due_this_month_total = roundCents(
+    still_due_this_month.reduce((acc, r) => acc + r.monthly_amount, 0),
+  )
 
   // Next occurrence per rule within 30 days — only for rules that carry
   // their recurrence fields (the rebuilt clients send them; an older client
@@ -915,7 +1072,11 @@ function recurringTotalTool(args: RecurringTotalArgs, ctx: ToolContext): unknown
         tz,
       )
       if (!occ || Date.parse(occ.instant) > horizonMs) continue
-      upcoming.push({ name: r.name?.trim() || 'Unnamed', amount: roundCents(r.amount), due_date: occ.occurrenceDate })
+      upcoming.push({
+        name: r.name?.trim() || 'Unnamed',
+        amount: roundCents(r.amount),
+        due_date: occ.occurrenceDate,
+      })
     } catch {
       /* malformed rule — skip */
     }
@@ -928,7 +1089,10 @@ function recurringTotalTool(args: RecurringTotalArgs, ctx: ToolContext): unknown
     annual_total: roundCents(monthly_total * 12),
     // For "will I make it to the end of the month" / "what's left after
     // bills": only these are not yet in this month's spending total.
-    still_due_this_month: still_due_this_month.map((r) => ({ name: r.name, monthly_amount: r.monthly_amount })),
+    still_due_this_month: still_due_this_month.map((r) => ({
+      name: r.name,
+      monthly_amount: r.monthly_amount,
+    })),
     still_due_this_month_total,
     // Next 30 days, soonest first (civil dates in the user's zone).
     upcoming,
@@ -998,8 +1162,14 @@ function compareTool(args: { a: ComparePayload; b: ComparePayload }) {
 const WINDOW_ENUM_DESCRIPTION =
   'Named window (see the system prompt for the list), or "custom" with start_date + end_date for anything else (a named month, "the first week of July"). Prefer a named window when one matches exactly.'
 const CUSTOM_DATE_PROPS = {
-  start_date: { type: 'string', description: 'With window "custom": first day, inclusive, YYYY-MM-DD (user zone).' },
-  end_date: { type: 'string', description: 'With window "custom": last day, inclusive, YYYY-MM-DD (user zone).' },
+  start_date: {
+    type: 'string',
+    description: 'With window "custom": first day, inclusive, YYYY-MM-DD (user zone).',
+  },
+  end_date: {
+    type: 'string',
+    description: 'With window "custom": last day, inclusive, YYYY-MM-DD (user zone).',
+  },
 }
 
 export const TOOLS = [
@@ -1028,7 +1198,11 @@ export const TOOLS = [
             type: 'string',
             description: 'Case-insensitive substring match on merchant name, e.g. "starbucks".',
           },
-          rule_name: { type: 'string', description: 'Only rows that belong to this recurring rule (by the stored link, then by name), e.g. "20 LLC". Use for "how much did <rule> pay me / cost me".' },
+          rule_name: {
+            type: 'string',
+            description:
+              'Only rows that belong to this recurring rule (by the stored link, then by name), e.g. "20 LLC". Use for "how much did <rule> pay me / cost me".',
+          },
         },
         additionalProperties: false,
       },
@@ -1053,7 +1227,8 @@ export const TOOLS = [
           },
           merchant_contains: {
             type: 'string',
-            description: 'Case-insensitive substring match on merchant name, e.g. "coffee", "uber".',
+            description:
+              'Case-insensitive substring match on merchant name, e.g. "coffee", "uber".',
           },
         },
         additionalProperties: false,
@@ -1075,11 +1250,13 @@ export const TOOLS = [
           direction: { type: 'string', enum: ['debit', 'credit'], description: 'Default "debit".' },
           category_name: {
             type: 'string',
-            description: 'Optional exact category name to narrow to, e.g. top merchants within "Food & Dining".',
+            description:
+              'Optional exact category name to narrow to, e.g. top merchants within "Food & Dining".',
           },
           merchant_contains: {
             type: 'string',
-            description: 'Case-insensitive substring match on merchant name, e.g. "coffee", "uber".',
+            description:
+              'Case-insensitive substring match on merchant name, e.g. "coffee", "uber".',
           },
           limit: { type: 'number', description: 'Max merchants to return, 1–20. Default 5.' },
         },
@@ -1131,11 +1308,25 @@ export const TOOLS = [
         properties: {
           window: { type: 'string', enum: WINDOW_NAMES, description: WINDOW_ENUM_DESCRIPTION },
           ...CUSTOM_DATE_PROPS,
-          direction: { type: 'string', enum: ['debit', 'credit'], description: 'Omit for both. "debit" = spend, "credit" = income.' },
+          direction: {
+            type: 'string',
+            enum: ['debit', 'credit'],
+            description: 'Omit for both. "debit" = spend, "credit" = income.',
+          },
           category_name: { type: 'string', description: 'Exact category name to filter to.' },
-          merchant_contains: { type: 'string', description: 'Case-insensitive substring match on merchant name.' },
-          rule_name: { type: 'string', description: 'Only rows that belong to this recurring rule (stored link first, then name), e.g. "20 LLC" — the right way to list the payments behind a rule.' },
-          min_amount: { type: 'number', description: 'Only rows at or above this amount (profile currency).' },
+          merchant_contains: {
+            type: 'string',
+            description: 'Case-insensitive substring match on merchant name.',
+          },
+          rule_name: {
+            type: 'string',
+            description:
+              'Only rows that belong to this recurring rule (stored link first, then name), e.g. "20 LLC" — the right way to list the payments behind a rule.',
+          },
+          min_amount: {
+            type: 'number',
+            description: 'Only rows at or above this amount (profile currency).',
+          },
           limit: { type: 'number', description: 'Max rows to return, 1–25. Default 12.' },
         },
         additionalProperties: false,
@@ -1189,7 +1380,11 @@ export const TOOLS = [
         type: 'object',
         required: ['op', 'a', 'b'],
         properties: {
-          op: { type: 'string', enum: ARITH_OPS, description: 'percent_of = a ÷ b × 100 ("a is what percent of b").' },
+          op: {
+            type: 'string',
+            enum: ARITH_OPS,
+            description: 'percent_of = a ÷ b × 100 ("a is what percent of b").',
+          },
           a: { type: 'number' },
           b: { type: 'number' },
         },
@@ -1207,8 +1402,14 @@ export const TOOLS = [
         type: 'object',
         required: ['available', 'cost'],
         properties: {
-          available: { type: 'number', description: 'Money available for the purchase, in the profile currency.' },
-          cost: { type: 'number', description: 'Price of the item (the user\'s figure or your stated typical price).' },
+          available: {
+            type: 'number',
+            description: 'Money available for the purchase, in the profile currency.',
+          },
+          cost: {
+            type: 'number',
+            description: "Price of the item (the user's figure or your stated typical price).",
+          },
         },
         additionalProperties: false,
       },
@@ -1230,7 +1431,10 @@ export const TOOLS = [
             type: 'object',
             required: ['label', 'value'],
             properties: {
-              label: { type: 'string', description: 'What this value represents, e.g. "Food & Dining (90d)"' },
+              label: {
+                type: 'string',
+                description: 'What this value represents, e.g. "Food & Dining (90d)"',
+              },
               value: { type: 'number' },
             },
             additionalProperties: false,
@@ -1362,10 +1566,18 @@ export function trustedNumbersFromCalls(calls: ToolCallRecord[]): Set<number> {
 export function comparisonsFromCalls(
   calls: ToolCallRecord[],
 ): Array<{ a: ComparePayload; b: ComparePayload; direction: 'a_greater' | 'b_greater' | 'equal' }> {
-  const out: Array<{ a: ComparePayload; b: ComparePayload; direction: 'a_greater' | 'b_greater' | 'equal' }> = []
+  const out: Array<{
+    a: ComparePayload
+    b: ComparePayload
+    direction: 'a_greater' | 'b_greater' | 'equal'
+  }> = []
   for (const c of calls) {
     if (!c.ok || c.name !== 'compare') continue
-    const r = c.result as { a: ComparePayload; b: ComparePayload; direction: 'a_greater' | 'b_greater' | 'equal' }
+    const r = c.result as {
+      a: ComparePayload
+      b: ComparePayload
+      direction: 'a_greater' | 'b_greater' | 'equal'
+    }
     if (r && r.a && r.b && r.direction) out.push(r)
   }
   return out
@@ -1538,7 +1750,9 @@ export function buildDataOverview(ctx: ToolContext): AskMurmurDataOverview {
     has_transactions_last_month: inWindow(txns, w.lastMonth).length > 0,
     has_transactions_last_30_days: inWindow(txns, w.last30Days).length > 0,
     has_transactions_last_90_days: inWindow(txns, w.last90Days).length > 0,
-    years_present: Array.from(years).sort((a, b) => a - b).slice(0, 5),
+    years_present: Array.from(years)
+      .sort((a, b) => a - b)
+      .slice(0, 5),
     categories,
     merchants,
   }

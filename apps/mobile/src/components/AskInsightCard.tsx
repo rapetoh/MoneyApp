@@ -24,10 +24,7 @@ export const KIND_ICON: Record<AskInsightKind, keyof typeof Ionicons.glyphMap> =
 
 /** Route an insight's action chip. Shared by Ask (which also handles
  *  model-emitted actions through the same switch) and Insights. */
-export function performAskAction(
-  router: { push: (href: never) => void },
-  action: AskAction,
-): void {
+export function performAskAction(router: { push: (href: never) => void }, action: AskAction): void {
   const push = router.push as (href: unknown) => void
   const p = action.params ?? {}
   switch (action.intent) {
@@ -76,13 +73,19 @@ export function AskInsightCard({
           ? { fg: Colors.accent, bg: Colors.accentSoft }
           : { fg: Colors.ink2, bg: Colors.surface2 }
   return (
-    <Pressable onPress={onAsk} style={({ pressed }) => [styles.insightCard, pressed && styles.insightPressed]} accessibilityRole="button">
+    <Pressable
+      onPress={onAsk}
+      style={({ pressed }) => [styles.insightCard, pressed && styles.insightPressed]}
+      accessibilityRole="button"
+    >
       <View style={styles.insightTop}>
         <View style={[styles.insightIcon, { backgroundColor: tone.bg }]}>
           <Ionicons name={KIND_ICON[insight.kind]} size={17} color={tone.fg} />
         </View>
         <View style={styles.insightBody}>
-          <Text style={[styles.insightKind, { color: tone.fg }]}>{t(`ask.kind_${insight.kind}`, locale)}</Text>
+          <Text style={[styles.insightKind, { color: tone.fg }]}>
+            {t(`ask.kind_${insight.kind}`, locale)}
+          </Text>
           <Text style={styles.insightTitle}>{insight.title}</Text>
           <Text style={styles.insightDetail}>{insight.detail}</Text>
         </View>
@@ -95,7 +98,11 @@ export function AskInsightCard({
           </Text>
         </View>
         {insight.action && (
-          <Pressable onPress={() => onAction(insight.action as AskAction)} hitSlop={6} style={({ pressed }) => [styles.insightActionChip, pressed && styles.insightPressed]}>
+          <Pressable
+            onPress={() => onAction(insight.action as AskAction)}
+            hitSlop={6}
+            style={({ pressed }) => [styles.insightActionChip, pressed && styles.insightPressed]}
+          >
             <Text style={styles.insightActionText}>{askActionLabel(insight.action, locale)}</Text>
           </Pressable>
         )}
@@ -117,7 +124,14 @@ const styles = StyleSheet.create({
   },
   insightPressed: { opacity: 0.85 },
   insightTop: { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
-  insightIcon: { width: 36, height: 36, borderRadius: 11, alignItems: 'center', justifyContent: 'center', marginTop: 1 },
+  insightIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 1,
+  },
   insightBody: { flex: 1, gap: 3 },
   insightKind: {
     fontSize: 10.5,
@@ -126,8 +140,19 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     fontFamily: Typography.fontFamily.sansBold,
   },
-  insightTitle: { fontFamily: Typography.fontFamily.serif, fontSize: 17, lineHeight: 22, letterSpacing: -0.2, color: Colors.ink },
-  insightDetail: { fontSize: 13.5, lineHeight: 19, color: Colors.ink3, fontFamily: Typography.fontFamily.sans },
+  insightTitle: {
+    fontFamily: Typography.fontFamily.serif,
+    fontSize: 17,
+    lineHeight: 22,
+    letterSpacing: -0.2,
+    color: Colors.ink,
+  },
+  insightDetail: {
+    fontSize: 13.5,
+    lineHeight: 19,
+    color: Colors.ink3,
+    fontFamily: Typography.fontFamily.sans,
+  },
   insightFooter: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -138,7 +163,22 @@ const styles = StyleSheet.create({
     borderTopColor: Hairline.color,
   },
   insightAskRow: { flexDirection: 'row', alignItems: 'center', gap: 7, flex: 1 },
-  insightAsk: { fontSize: 12.5, color: Colors.ink3, fontFamily: Typography.fontFamily.sans, flex: 1 },
-  insightActionChip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, backgroundColor: Colors.accentSoft },
-  insightActionText: { fontSize: 12, fontWeight: '700', color: Colors.accent, fontFamily: Typography.fontFamily.sansBold },
+  insightAsk: {
+    fontSize: 12.5,
+    color: Colors.ink3,
+    fontFamily: Typography.fontFamily.sans,
+    flex: 1,
+  },
+  insightActionChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: Colors.accentSoft,
+  },
+  insightActionText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: Colors.accent,
+    fontFamily: Typography.fontFamily.sansBold,
+  },
 })

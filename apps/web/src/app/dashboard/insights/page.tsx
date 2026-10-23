@@ -58,7 +58,13 @@ function monthKey(y: number, m: number): string {
  *  used only to hand a real `Date` to `toLocaleDateString` for display
  *  labels. Never used for range math (fix-plan 1.3 — every boundary
  *  below is a `period.ts` instant, not a `Date` getter). */
-function monthLabel(y: number, m: number, tz: string, locale: string, opts: Intl.DateTimeFormatOptions): string {
+function monthLabel(
+  y: number,
+  m: number,
+  tz: string,
+  locale: string,
+  opts: Intl.DateTimeFormatOptions,
+): string {
   const instant = civilDateTimeToInstant(y, m, 15, 12, 0, 0, tz)
   return new Date(instant).toLocaleDateString(locale, { ...opts, timeZone: tz })
 }
@@ -74,16 +80,33 @@ function Heatmap({ matrix }: { matrix: number[][] }) {
   const max = Math.max(...paired.flat(), 1)
   return (
     <div>
-      <div style={{ display: 'grid', gridTemplateColumns: `16px repeat(${hourPairs.length}, 1fr)`, gap: 2 }}>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: `16px repeat(${hourPairs.length}, 1fr)`,
+          gap: 2,
+        }}
+      >
         <div />
         {hourPairs.map((h) => (
-          <div key={h} style={{ fontSize: 8, color: colors.ink4, textAlign: 'center', fontWeight: 600 }}>
+          <div
+            key={h}
+            style={{ fontSize: 8, color: colors.ink4, textAlign: 'center', fontWeight: 600 }}
+          >
             {h}
           </div>
         ))}
         {days.map((d, di) => (
           <div key={di} style={{ display: 'contents' }}>
-            <div style={{ fontSize: 9, color: colors.ink4, fontWeight: 600, display: 'flex', alignItems: 'center' }}>
+            <div
+              style={{
+                fontSize: 9,
+                color: colors.ink4,
+                fontWeight: 600,
+                display: 'flex',
+                alignItems: 'center',
+              }}
+            >
               {d}
             </div>
             {hourPairs.map((_, hi) => {
@@ -108,7 +131,9 @@ function Heatmap({ matrix }: { matrix: number[][] }) {
 
 export default async function InsightsPage() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
   const [profile, transactions, categories, budgets, recurringRows] = await Promise.all([
@@ -118,7 +143,9 @@ export default async function InsightsPage() {
     getActiveBudgets(supabase, user.id),
     supabase
       .from('recurring_rules')
-      .select('frequency, interval, starts_at, ends_at, anchor_day, anchor_weekday, anchor_time, amount, direction, is_active')
+      .select(
+        'frequency, interval, starts_at, ends_at, anchor_day, anchor_weekday, anchor_time, amount, direction, is_active',
+      )
       .eq('user_id', user.id)
       .eq('is_active', true)
       .then((r) => r.data ?? []),
@@ -159,8 +186,8 @@ export default async function InsightsPage() {
     direction: t.direction,
     transacted_at: t.transacted_at,
     category_id: t.category_id,
-    category_name: t.category_id ? catMap[t.category_id]?.name ?? null : null,
-    category_kind: t.category_id ? catMap[t.category_id]?.kind ?? null : null,
+    category_name: t.category_id ? (catMap[t.category_id]?.name ?? null) : null,
+    category_kind: t.category_id ? (catMap[t.category_id]?.kind ?? null) : null,
     is_recurring: t.is_recurring,
   })
 
@@ -183,16 +210,25 @@ export default async function InsightsPage() {
     for (const t of txns) {
       if (t.transacted_at < bounds.start || t.transacted_at >= bounds.endExclusive) continue
       if (t.amount_in_profile_currency == null) continue
-      const kind = resolveCategoryKind(t.category_id ? catMap[t.category_id]?.name : null, t.category_kind)
+      const kind = resolveCategoryKind(
+        t.category_id ? catMap[t.category_id]?.name : null,
+        t.category_kind,
+      )
       if (!isSpend(t, kind)) continue
       total += t.amount_in_profile_currency
     }
-    monthlyTotals.push({ label: monthLabel(target.y, target.m, tz, locale, { month: 'short' }), total, key })
+    monthlyTotals.push({
+      label: monthLabel(target.y, target.m, tz, locale, { month: 'short' }),
+      total,
+      key,
+    })
   }
   // The subtitle claims a 6-month scope, so count only what's inside it
   // — every transaction from the first of those 6 months through now.
   const sixMonthStart = monthBounds(monthlyTotals[0].key, tz).start
-  const sixMonthCount = txns.filter((t) => t.transacted_at >= sixMonthStart && t.transacted_at < nowInstant).length
+  const sixMonthCount = txns.filter(
+    (t) => t.transacted_at >= sixMonthStart && t.transacted_at < nowInstant,
+  ).length
 
   const currentTotal = monthlyTotals[monthlyTotals.length - 1].total
   const showPace = forecast.confident
@@ -224,10 +260,9 @@ export default async function InsightsPage() {
   // "by <last day of month>" label for the pace annotation.
   const nextMonth = addMonthsClamped(now.y, now.m, 1, 1)
   const lastDay = addDays(nextMonth.y, nextMonth.m, 1, -1)
-  const lastDayLabel = new Date(civilDateTimeToInstant(lastDay.y, lastDay.m, lastDay.d, 12, 0, 0, tz)).toLocaleDateString(
-    locale,
-    { month: 'short', day: 'numeric', timeZone: tz },
-  )
+  const lastDayLabel = new Date(
+    civilDateTimeToInstant(lastDay.y, lastDay.m, lastDay.d, 12, 0, 0, tz),
+  ).toLocaleDateString(locale, { month: 'short', day: 'numeric', timeZone: tz })
 
   const overall = budgets.find((b: any) => b.category_id === null)
   const overallBudget = overall?.amount ?? null
@@ -249,8 +284,8 @@ export default async function InsightsPage() {
     transacted_at: t.transacted_at,
     merchant: t.merchant,
     category_id: t.category_id,
-    category_name: t.category_id ? catMap[t.category_id]?.name ?? null : null,
-    category_kind: t.category_id ? catMap[t.category_id]?.kind ?? null : null,
+    category_name: t.category_id ? (catMap[t.category_id]?.name ?? null) : null,
+    category_kind: t.category_id ? (catMap[t.category_id]?.kind ?? null) : null,
   }))
 
   const detected = patterns(patternTxns, ninetyDayWindow, tz)
@@ -258,18 +293,23 @@ export default async function InsightsPage() {
   const categoryPattern = detected.find((p) => p.kind === 'category_share')
   const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
   const fmtCurrency = (v: number) =>
-    new Intl.NumberFormat(locale, { style: 'currency', currency, maximumFractionDigits: 0 }).format(v)
+    new Intl.NumberFormat(locale, { style: 'currency', currency, maximumFractionDigits: 0 }).format(
+      v,
+    )
 
   const patternClaims: string[] = []
   if (weekdayPattern?.confident && weekdayPattern.data) {
     const idx = weekdayPattern.data.weekdayIndex as number
     const avg = weekdayPattern.data.average as number
-    patternClaims.push(`${dayNames[idx]} is your heaviest day - avg ${fmtCurrency(avg)} per ${dayNames[idx]}.`)
+    patternClaims.push(
+      `${dayNames[idx]} is your heaviest day - avg ${fmtCurrency(avg)} per ${dayNames[idx]}.`,
+    )
   }
   if (categoryPattern?.confident && categoryPattern.data) {
     const categoryId = categoryPattern.data.categoryId as string
     const share = categoryPattern.data.share as number
-    const name = categoryId === '__uncategorized__' ? 'Uncategorized' : catMap[categoryId]?.name ?? 'Other'
+    const name =
+      categoryId === '__uncategorized__' ? 'Uncategorized' : (catMap[categoryId]?.name ?? 'Other')
     patternClaims.push(`${name} is ${Math.round(share * 100)}% of your spend in the last 90 days.`)
   }
   // Trend direction: last complete month vs. the prior complete months'
@@ -283,17 +323,24 @@ export default async function InsightsPage() {
     if (priorAvg > 0) {
       const pct = Math.round(((last - priorAvg) / priorAvg) * 100)
       if (Math.abs(pct) >= 8) {
-        patternClaims.push(`Last month ran ${Math.abs(pct)}% ${pct > 0 ? 'higher' : 'lower'} than the prior average.`)
+        patternClaims.push(
+          `Last month ran ${Math.abs(pct)}% ${pct > 0 ? 'higher' : 'lower'} than the prior average.`,
+        )
       }
     }
   }
 
   const merchants = topMerchants(patternTxns, ninetyDayWindow, 5)
-  const merchantRows = (merchants.data?.merchants ?? []) as Array<{ merchant: string; amount: number }>
+  const merchantRows = (merchants.data?.merchants ?? []) as Array<{
+    merchant: string
+    amount: number
+  }>
   const topMax = merchantRows[0]?.amount ?? 1
 
   const heat = heatmap(patternTxns, ninetyDayWindow, tz)
-  const heatMatrix = (heat.data?.matrix as number[][] | undefined) ?? Array.from({ length: 7 }, () => new Array(24).fill(0))
+  const heatMatrix =
+    (heat.data?.matrix as number[][] | undefined) ??
+    Array.from({ length: 7 }, () => new Array(24).fill(0))
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -304,7 +351,15 @@ export default async function InsightsPage() {
           {/* Matches the sidebar label, the toolbar title above, and the
               mobile tab - was "Forecast & patterns", a third variant of
               this destination's name (audit 08-F44, fix-plan 4.2). */}
-          <div style={{ fontFamily: font.serif, fontSize: 28, fontWeight: 500, color: colors.ink, letterSpacing: -0.6 }}>
+          <div
+            style={{
+              fontFamily: font.serif,
+              fontSize: 28,
+              fontWeight: 500,
+              color: colors.ink,
+              letterSpacing: -0.6,
+            }}
+          >
             Insights
           </div>
           <div style={{ fontSize: 13, color: colors.ink3, marginTop: 2 }}>
@@ -321,7 +376,14 @@ export default async function InsightsPage() {
             border: `0.5px solid ${colors.line}`,
           }}
         >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'flex-start',
+              marginBottom: 8,
+            }}
+          >
             <div>
               <div
                 style={{
@@ -334,7 +396,15 @@ export default async function InsightsPage() {
               >
                 Monthly total · forecast
               </div>
-              <div style={{ marginTop: 6, display: 'flex', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' }}>
+              <div
+                style={{
+                  marginTop: 6,
+                  display: 'flex',
+                  alignItems: 'baseline',
+                  gap: 12,
+                  flexWrap: 'wrap',
+                }}
+              >
                 <Money value={currentTotal} currency={currency} locale={locale} size={34} />
                 <span style={{ fontSize: 13, color: colors.ink3 }}>
                   spent so far in {monthLabel(now.y, now.m, tz, locale, { month: 'long' })}
@@ -342,9 +412,14 @@ export default async function InsightsPage() {
                 {showPace && (
                   <span style={{ fontSize: 13, color: colors.ink3 }}>
                     · at this pace:{' '}
-                    <b style={{ color: colors.ink }}>{fmtCurrency(projectedCurrent)}</b> by {lastDayLabel}
+                    <b style={{ color: colors.ink }}>{fmtCurrency(projectedCurrent)}</b> by{' '}
+                    {lastDayLabel}
                     {forecast.range && (
-                      <> (likely {fmtCurrency(forecast.range.low)}–{fmtCurrency(forecast.range.high)})</>
+                      <>
+                        {' '}
+                        (likely {fmtCurrency(forecast.range.low)}–{fmtCurrency(forecast.range.high)}
+                        )
+                      </>
                     )}
                   </span>
                 )}
@@ -362,17 +437,37 @@ export default async function InsightsPage() {
                       borderRadius: 6,
                     }}
                   >
-                    {projectedDelta < 0 ? '↓' : '↑'} {Math.abs(projectedDelta)}% vs {forecast.sampleMonths}-mo avg
+                    {projectedDelta < 0 ? '↓' : '↑'} {Math.abs(projectedDelta)}% vs{' '}
+                    {forecast.sampleMonths}-mo avg
                   </span>
                 )}
               </div>
             </div>
-            <div style={{ display: 'flex', gap: 14, fontSize: 11, color: colors.ink3, fontWeight: 600 }}>
+            <div
+              style={{
+                display: 'flex',
+                gap: 14,
+                fontSize: 11,
+                color: colors.ink3,
+                fontWeight: 600,
+              }}
+            >
               <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                <span style={{ width: 10, height: 10, borderRadius: 3, background: colors.accent }} /> Actual
+                <span
+                  style={{ width: 10, height: 10, borderRadius: 3, background: colors.accent }}
+                />{' '}
+                Actual
               </span>
               <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                <span style={{ width: 10, height: 10, borderRadius: 3, background: '#7A5A1C', opacity: 0.5 }} />
+                <span
+                  style={{
+                    width: 10,
+                    height: 10,
+                    borderRadius: 3,
+                    background: '#7A5A1C',
+                    opacity: 0.5,
+                  }}
+                />
                 Forecast
               </span>
               {overallBudget != null && (
@@ -435,7 +530,10 @@ export default async function InsightsPage() {
                   // category bucket (fix-plan 4.4).
                   const fg = merchantColor(r.merchant)
                   return (
-                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12 }}>
+                    <div
+                      key={i}
+                      style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12 }}
+                    >
                       <div
                         style={{
                           width: 90,
@@ -468,7 +566,14 @@ export default async function InsightsPage() {
                         />
                       </div>
                       <div style={{ width: 64, textAlign: 'right' }}>
-                        <Money value={r.amount} currency={currency} locale={locale} size={12} serif={false} bold={600} />
+                        <Money
+                          value={r.amount}
+                          currency={currency}
+                          locale={locale}
+                          size={12}
+                          serif={false}
+                          bold={600}
+                        />
                       </div>
                     </div>
                   )
@@ -476,7 +581,10 @@ export default async function InsightsPage() {
               )}
             </div>
           </Card>
-          <Card title="Heatmap · weekday × hour" right={<span style={styles.windowTag}>last 90 days</span>}>
+          <Card
+            title="Heatmap · weekday × hour"
+            right={<span style={styles.windowTag}>last 90 days</span>}
+          >
             {!heat.confident ? (
               <div style={{ fontSize: 12, color: colors.ink3 }}>Not enough data yet.</div>
             ) : (

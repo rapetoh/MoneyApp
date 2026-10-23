@@ -218,17 +218,29 @@ describe('tool: total — new named windows and custom ranges (Aug 15 gaps)', ()
     expect(call('total', { window: 'lastQuarter' })).toMatchObject({ count: 2, total: 55 })
   })
   it('custom: "April 11–15" catches exactly the Apr 11 and Apr 14 rows', () => {
-    expect(call('total', { window: 'custom', start_date: '2026-04-11', end_date: '2026-04-15' })).toMatchObject({ count: 2, total: 70 })
+    expect(
+      call('total', { window: 'custom', start_date: '2026-04-11', end_date: '2026-04-15' }),
+    ).toMatchObject({ count: 2, total: 70 })
   })
   it('custom: a named month ("April") equals lastMonth', () => {
-    expect(call('total', { window: 'custom', start_date: '2026-04-01', end_date: '2026-04-30' })).toEqual(call('total', { window: 'lastMonth' }))
+    expect(
+      call('total', { window: 'custom', start_date: '2026-04-01', end_date: '2026-04-30' }),
+    ).toEqual(call('total', { window: 'lastMonth' }))
   })
   it('custom without dates / with an impossible date / reversed range → self-correcting errors', () => {
     expect(resolveToolCall('total', { window: 'custom' }, ctx).ok).toBe(false)
-    const bad = resolveToolCall('total', { window: 'custom', start_date: '2026-02-30', end_date: '2026-03-01' }, ctx)
+    const bad = resolveToolCall(
+      'total',
+      { window: 'custom', start_date: '2026-02-30', end_date: '2026-03-01' },
+      ctx,
+    )
     expect(bad.ok).toBe(false)
     expect(bad.ok || bad.error).toMatch(/calendar date/)
-    const rev = resolveToolCall('total', { window: 'custom', start_date: '2026-04-15', end_date: '2026-04-11' }, ctx)
+    const rev = resolveToolCall(
+      'total',
+      { window: 'custom', start_date: '2026-04-15', end_date: '2026-04-11' },
+      ctx,
+    )
     expect(rev.ok).toBe(false)
   })
 })
@@ -257,7 +269,15 @@ describe('tool: recurring_total — charged vs still due this month', () => {
       ...ctxWithRules,
       transactions: [
         ...transactions,
-        { amount: 55, amount_in_profile_currency: 55, direction: 'debit', merchant: 'Netflix', category_name: 'Subscriptions', transacted_at: '2026-05-02T12:00:00Z', is_recurring: true },
+        {
+          amount: 55,
+          amount_in_profile_currency: 55,
+          direction: 'debit',
+          merchant: 'Netflix',
+          category_name: 'Subscriptions',
+          transacted_at: '2026-05-02T12:00:00Z',
+          is_recurring: true,
+        },
       ],
     }
     const out = (resolveToolCall('recurring_total', {}, c2) as { ok: true; result: any }).result
@@ -324,10 +344,14 @@ describe('tool: recurring_total', () => {
 
 describe('tool: compare', () => {
   it('reports a_greater / b_greater / equal correctly', () => {
-    expect(call('compare', { a: { label: 'A', value: 10 }, b: { label: 'B', value: 5 } })).toMatchObject({
+    expect(
+      call('compare', { a: { label: 'A', value: 10 }, b: { label: 'B', value: 5 } }),
+    ).toMatchObject({
       direction: 'a_greater',
     })
-    expect(call('compare', { a: { label: 'A', value: 5 }, b: { label: 'B', value: 10 } })).toMatchObject({
+    expect(
+      call('compare', { a: { label: 'A', value: 5 }, b: { label: 'B', value: 10 } }),
+    ).toMatchObject({
       direction: 'b_greater',
     })
   })
@@ -354,9 +378,23 @@ describe('TOOLS catalog', () => {
 
 describe('tool: list_transactions (rebuild — "what were those exactly?")', () => {
   it('returns the rows behind a filtered figure, newest first, with count + total', () => {
-    const r = resolveToolCall('list_transactions', { window: 'thisYear', direction: 'debit', limit: 3 }, ctx)
+    const r = resolveToolCall(
+      'list_transactions',
+      { window: 'thisYear', direction: 'debit', limit: 3 },
+      ctx,
+    )
     expect(r.ok).toBe(true)
-    const res = (r as { ok: true; result: { transactions: Array<{ date: string; amount: number }>; count: number; total: number; truncated: boolean } }).result
+    const res = (
+      r as {
+        ok: true
+        result: {
+          transactions: Array<{ date: string; amount: number }>
+          count: number
+          total: number
+          truncated: boolean
+        }
+      }
+    ).result
     expect(res.transactions).toHaveLength(3)
     expect(res.count).toBeGreaterThan(3)
     expect(res.truncated).toBe(true)
@@ -376,9 +414,27 @@ describe('tool: list_transactions (rebuild — "what were those exactly?")', () 
 
 describe('tool: arith (rebuild — ratios without model arithmetic)', () => {
   it('percent_of, divide, subtract are exact and rounded to 2 dp', () => {
-    expect((resolveToolCall('arith', { op: 'percent_of', a: 450, b: 5416.67 }, ctx) as { result: { result: number } }).result.result).toBe(8.31)
-    expect((resolveToolCall('arith', { op: 'divide', a: 763, b: 16 }, ctx) as { result: { result: number } }).result.result).toBe(47.69)
-    expect((resolveToolCall('arith', { op: 'subtract', a: 1331, b: 881 }, ctx) as { result: { result: number } }).result.result).toBe(450)
+    expect(
+      (
+        resolveToolCall('arith', { op: 'percent_of', a: 450, b: 5416.67 }, ctx) as {
+          result: { result: number }
+        }
+      ).result.result,
+    ).toBe(8.31)
+    expect(
+      (
+        resolveToolCall('arith', { op: 'divide', a: 763, b: 16 }, ctx) as {
+          result: { result: number }
+        }
+      ).result.result,
+    ).toBe(47.69)
+    expect(
+      (
+        resolveToolCall('arith', { op: 'subtract', a: 1331, b: 881 }, ctx) as {
+          result: { result: number }
+        }
+      ).result.result,
+    ).toBe(450)
   })
   it('rejects a bad op and division by zero with self-correcting errors', () => {
     expect(resolveToolCall('arith', { op: 'pow', a: 1, b: 2 }, ctx).ok).toBe(false)
@@ -388,11 +444,15 @@ describe('tool: arith (rebuild — ratios without model arithmetic)', () => {
 
 describe('tool: can_afford (rebuild — the yes/no is deterministic)', () => {
   it('fits when available ≥ cost, else reports the shortfall', () => {
-    const yes = resolveToolCall('can_afford', { available: 1584, cost: 1200 }, ctx) as { result: { fits: boolean; left_after: number; verdict: string } }
+    const yes = resolveToolCall('can_afford', { available: 1584, cost: 1200 }, ctx) as {
+      result: { fits: boolean; left_after: number; verdict: string }
+    }
     expect(yes.result.fits).toBe(true)
     expect(yes.result.left_after).toBe(384)
     expect(yes.result.verdict).toBe('fits')
-    const no = resolveToolCall('can_afford', { available: 300, cost: 499 }, ctx) as { result: { fits: boolean; shortfall: number } }
+    const no = resolveToolCall('can_afford', { available: 300, cost: 499 }, ctx) as {
+      result: { fits: boolean; shortfall: number }
+    }
     expect(no.result.fits).toBe(false)
     expect(no.result.shortfall).toBe(199)
   })
@@ -414,31 +474,98 @@ describe('rule ↔ transaction link, coverage, calendar projection (owner verifi
     ...ctx,
     now_utc: now,
     transactions: [
-      { amount: 1500, amount_in_profile_currency: 1500, direction: 'credit', merchant: 'The20', category_name: 'Business & Work', transacted_at: '2026-08-12T01:07:00Z', is_recurring: true, recurring_rule_id: 'rule-the20' },
-      { amount: 1000, amount_in_profile_currency: 1000, direction: 'credit', merchant: 'The20 MSP', category_name: 'Business & Work', transacted_at: '2026-08-12T01:15:00Z', is_recurring: true, recurring_rule_id: 'rule-20llc' },
-      { amount: 160, amount_in_profile_currency: 160, direction: 'debit', merchant: 'Best Buy', category_name: 'Shopping', transacted_at: '2026-08-16T01:04:00Z', is_recurring: false },
+      {
+        amount: 1500,
+        amount_in_profile_currency: 1500,
+        direction: 'credit',
+        merchant: 'The20',
+        category_name: 'Business & Work',
+        transacted_at: '2026-08-12T01:07:00Z',
+        is_recurring: true,
+        recurring_rule_id: 'rule-the20',
+      },
+      {
+        amount: 1000,
+        amount_in_profile_currency: 1000,
+        direction: 'credit',
+        merchant: 'The20 MSP',
+        category_name: 'Business & Work',
+        transacted_at: '2026-08-12T01:15:00Z',
+        is_recurring: true,
+        recurring_rule_id: 'rule-20llc',
+      },
+      {
+        amount: 160,
+        amount_in_profile_currency: 160,
+        direction: 'debit',
+        merchant: 'Best Buy',
+        category_name: 'Shopping',
+        transacted_at: '2026-08-16T01:04:00Z',
+        is_recurring: false,
+      },
     ],
     recurring_rules: [
-      { id: 'rule-the20', name: 'The20', amount: 1500, direction: 'credit', frequency: 'biweekly', interval: 1, starts_at: '2026-08-12T01:07:00Z', ends_at: null },
-      { id: 'rule-20llc', name: '20 LLC', amount: 1000, direction: 'credit', frequency: 'biweekly', interval: 1, starts_at: '2026-08-12T01:15:00Z', ends_at: null },
+      {
+        id: 'rule-the20',
+        name: 'The20',
+        amount: 1500,
+        direction: 'credit',
+        frequency: 'biweekly',
+        interval: 1,
+        starts_at: '2026-08-12T01:07:00Z',
+        ends_at: null,
+      },
+      {
+        id: 'rule-20llc',
+        name: '20 LLC',
+        amount: 1000,
+        direction: 'credit',
+        frequency: 'biweekly',
+        interval: 1,
+        starts_at: '2026-08-12T01:15:00Z',
+        ends_at: null,
+      },
     ],
   }
   it('rule_name resolves by the stored link — "20 LLC" is the The20 MSP deposit, not nothing', () => {
-    const r = resolveToolCall('list_transactions', { window: 'thisMonth', rule_name: '20 LLC' }, linked) as { ok: true; result: { transactions: Array<{ merchant: string }>; total: number } }
+    const r = resolveToolCall(
+      'list_transactions',
+      { window: 'thisMonth', rule_name: '20 LLC' },
+      linked,
+    ) as { ok: true; result: { transactions: Array<{ merchant: string }>; total: number } }
     expect(r.result.transactions.map((t) => t.merchant)).toEqual(['The20 MSP'])
     expect(r.result.total).toBe(1000)
-    const t20 = resolveToolCall('total', { window: 'thisMonth', rule_name: 'The20' }, linked) as { ok: true; result: { total: number; count: number } }
+    const t20 = resolveToolCall('total', { window: 'thisMonth', rule_name: 'The20' }, linked) as {
+      ok: true
+      result: { total: number; count: number }
+    }
     expect(t20.result).toMatchObject({ total: 1500, count: 1 })
   })
   it('coverage exposes that "last12Months" is only ~5 days of data', () => {
-    const r = resolveToolCall('total', { window: 'last12Months', direction: 'credit' }, linked) as { ok: true; result: { total: number; coverage: { data_starts: string; months_covered: number; window_fully_covered: boolean } } }
+    const r = resolveToolCall('total', { window: 'last12Months', direction: 'credit' }, linked) as {
+      ok: true
+      result: {
+        total: number
+        coverage: { data_starts: string; months_covered: number; window_fully_covered: boolean }
+      }
+    }
     expect(r.result.total).toBe(2500)
     expect(r.result.coverage.data_starts).toBe('2026-08-11')
     expect(r.result.coverage.window_fully_covered).toBe(false)
     expect(r.result.coverage.months_covered).toBeLessThan(1)
   })
   it('recurring_in_window gives the calendar answer for next month (two biweekly paydays → $5,000)', () => {
-    const r = resolveToolCall('recurring_in_window', { window: 'nextMonth', direction: 'credit' }, linked) as { ok: true; result: { expected_income_total: number; rules: Array<{ name: string; occurrences: number; dates: string[] }> } }
+    const r = resolveToolCall(
+      'recurring_in_window',
+      { window: 'nextMonth', direction: 'credit' },
+      linked,
+    ) as {
+      ok: true
+      result: {
+        expected_income_total: number
+        rules: Array<{ name: string; occurrences: number; dates: string[] }>
+      }
+    }
     expect(r.result.expected_income_total).toBe(5000)
     const the20 = r.result.rules.find((x) => x.name === 'The20')!
     expect(the20.occurrences).toBe(2)
@@ -451,32 +578,55 @@ describe('tool: recurring_total — upcoming occurrences (rebuild)', () => {
     const withRules = {
       ...ctx,
       recurring_rules: [
-        { name: 'Netflix', amount: 14, direction: 'debit' as const, frequency: 'monthly', interval: 1, starts_at: '2026-01-22T12:00:00Z', ends_at: null },
-        { name: 'Gym', amount: 30, direction: 'debit' as const, frequency: 'monthly', interval: 1, starts_at: '2026-01-05T12:00:00Z', ends_at: null },
+        {
+          name: 'Netflix',
+          amount: 14,
+          direction: 'debit' as const,
+          frequency: 'monthly',
+          interval: 1,
+          starts_at: '2026-01-22T12:00:00Z',
+          ends_at: null,
+        },
+        {
+          name: 'Gym',
+          amount: 30,
+          direction: 'debit' as const,
+          frequency: 'monthly',
+          interval: 1,
+          starts_at: '2026-01-05T12:00:00Z',
+          ends_at: null,
+        },
         { name: 'Legacy', amount: 9, direction: 'debit' as const, frequency: 'monthly' },
       ],
     }
-    const r = resolveToolCall('recurring_total', {}, withRules) as { ok: true; result: { upcoming: Array<{ name: string; due_date: string }> } }
+    const r = resolveToolCall('recurring_total', {}, withRules) as {
+      ok: true
+      result: { upcoming: Array<{ name: string; due_date: string }> }
+    }
     expect(r.ok).toBe(true)
     // ctx now = 2026-05-03 Chicago → Gym May 5, Netflix May 22; the legacy rule has no dates.
-    expect(r.result.upcoming.map((u) => `${u.name} ${u.due_date}`)).toEqual(['Gym 2026-05-05', 'Netflix 2026-05-22'])
+    expect(r.result.upcoming.map((u) => `${u.name} ${u.due_date}`)).toEqual([
+      'Gym 2026-05-05',
+      'Netflix 2026-05-22',
+    ])
   })
 })
 
 describe('there is no code-execution surface (fix-plan 2.10 done-when)', () => {
   it('"run_query" is not a registered tool — a JS-injection attempt cannot even dispatch', () => {
-    const r = resolveToolCall(
-      'run_query',
-      { code: "Object.prototype.pwned = 1; return 1;" },
-      ctx,
-    )
+    const r = resolveToolCall('run_query', { code: 'Object.prototype.pwned = 1; return 1;' }, ctx)
     expect(r.ok).toBe(false)
   })
   it('Object.prototype is untouched after every tool in the catalog has been called once', () => {
     for (const tool of TOOLS) {
       resolveToolCall(
         tool.function.name,
-        { window: 'thisYear', bucket: 'month', a: { label: 'a', value: 1 }, b: { label: 'b', value: 2 } },
+        {
+          window: 'thisYear',
+          bucket: 'month',
+          a: { label: 'a', value: 1 },
+          b: { label: 'b', value: 2 },
+        },
         ctx,
       )
     }
@@ -578,7 +728,11 @@ describe('currency mixing (fix-plan 2.10 done-when)', () => {
     }
     const total = resolveToolCall('total', { window: 'lastMonth' }, pendingCtx)
     expect(total.ok).toBe(true)
-    expect(total.ok && total.result).toMatchObject({ total: 100, count: 1, pending_conversion_count: 1 })
+    expect(total.ok && total.result).toMatchObject({
+      total: 100,
+      count: 1,
+      pending_conversion_count: 1,
+    })
   })
 })
 
@@ -593,12 +747,20 @@ describe('parseLocaleNumber via the validator on a fake response', () => {
       },
     ]
     const response = {
-      verdict: { text: 'You spent <b>$20,000</b> on housing this year.', sentiment: 'neutral' as const },
+      verdict: {
+        text: 'You spent <b>$20,000</b> on housing this year.',
+        sentiment: 'neutral' as const,
+      },
       actions: [],
       attribution: { transaction_count: 8 },
       out_of_scope: false,
     }
-    const v = validateAskMurmurResponseAgainstCalls(response, calls, 'how much on housing this year', null)
+    const v = validateAskMurmurResponseAgainstCalls(
+      response,
+      calls,
+      'how much on housing this year',
+      null,
+    )
     expect(v.soft_issues).toEqual([])
   })
 

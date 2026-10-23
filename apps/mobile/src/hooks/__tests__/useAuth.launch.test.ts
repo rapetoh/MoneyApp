@@ -23,7 +23,10 @@ const h = vi.hoisted(() => ({
 vi.mock('../../lib/supabase', () => ({
   supabase: { auth: { getSession: h.getSession, onAuthStateChange: h.onAuthStateChange } },
 }))
-vi.mock('../../services/reminders', () => ({ cancelAllReminders: async () => {}, REMINDER_SECURE_KEYS: [] }))
+vi.mock('../../services/reminders', () => ({
+  cancelAllReminders: async () => {},
+  REMINDER_SECURE_KEYS: [],
+}))
 vi.mock('../../services/pushTokens', () => ({ unregisterPushToken: async () => {} }))
 
 /** The exact shape of the restore step, lifted out of the hook so it can be
@@ -31,7 +34,8 @@ vi.mock('../../services/pushTokens', () => ({ unregisterPushToken: async () => {
 async function restoreSession(): Promise<{ session: unknown; loading: boolean }> {
   let session: unknown = undefined
   let loading = true
-  await h.getSession()
+  await h
+    .getSession()
     .then(({ data }: { data: { session: unknown } }) => {
       session = data.session
       loading = false
@@ -64,7 +68,9 @@ describe('session restore', () => {
 
   it('settles, signed out, when the keychain read rejects', async () => {
     // The real failure: expo-secure-store's getValueWithKeyAsync throwing.
-    h.getSession.mockRejectedValue(new Error("Calling the 'getValueWithKeyAsync' function has failed"))
+    h.getSession.mockRejectedValue(
+      new Error("Calling the 'getValueWithKeyAsync' function has failed"),
+    )
     const r = await restoreSession()
     // The assertion that matters. Before the fix this stayed true forever.
     expect(r.loading).toBe(false)

@@ -78,7 +78,9 @@ export function readCapturePrefs(): CapturePrefs | null {
       locale: (typeof raw.locale === 'string' ? raw.locale : 'en') as Locale,
       timezone: typeof raw.timezone === 'string' && raw.timezone ? raw.timezone : 'UTC',
       categories: Array.isArray(raw.categories)
-        ? (raw.categories as Category[]).filter((c) => c && typeof c.id === 'string' && typeof c.name === 'string')
+        ? (raw.categories as Category[]).filter(
+            (c) => c && typeof c.id === 'string' && typeof c.name === 'string',
+          )
         : [],
     }
   } catch {

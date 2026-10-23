@@ -73,8 +73,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  title: { fontSize: 15, color: Colors.ink, fontFamily: Typography.fontFamily.sansSemiBold, fontWeight: '600' },
-  body: { marginTop: 3, fontSize: 13, lineHeight: 19, color: Colors.ink3, fontFamily: Typography.fontFamily.sans },
+  title: {
+    fontSize: 15,
+    color: Colors.ink,
+    fontFamily: Typography.fontFamily.sansSemiBold,
+    fontWeight: '600',
+  },
+  body: {
+    marginTop: 3,
+    fontSize: 13,
+    lineHeight: 19,
+    color: Colors.ink3,
+    fontFamily: Typography.fontFamily.sans,
+  },
   ctaRow: { marginTop: 10, flexDirection: 'row', alignItems: 'center', gap: 5 },
-  cta: { fontSize: 13.5, color: Colors.accent, fontFamily: Typography.fontFamily.sansBold, fontWeight: '700' },
+  cta: {
+    fontSize: 13.5,
+    color: Colors.accent,
+    fontFamily: Typography.fontFamily.sansBold,
+    fontWeight: '700',
+  },
 })

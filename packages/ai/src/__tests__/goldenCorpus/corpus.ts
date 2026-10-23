@@ -298,20 +298,20 @@ const EN_ROWS: GoldenCorpusRow[] = [
   // distinct from plain 'income' so a future refund-specific surface
   // (e.g. netting refunds out of a merchant's spend total) has a real
   // signal to key off, not just the direction.
-  passingRow(
-    'en-refund',
-    'en',
-    'Amazon refunded me $34.20 for a return',
-    { direction: 'credit', amount: 34.2, isRecurringSuggestion: false, flowType: 'refund' },
-  ),
+  passingRow('en-refund', 'en', 'Amazon refunded me $34.20 for a return', {
+    direction: 'credit',
+    amount: 34.2,
+    isRecurringSuggestion: false,
+    flowType: 'refund',
+  }),
   // flowType pinned 'reimbursement' (fix-plan 2.9a: "'X paid me back' →
   // inflow").
-  passingRow(
-    'en-roommate',
-    'en',
-    'Got $75 back from my roommate for utilities',
-    { direction: 'credit', amount: 75, isRecurringSuggestion: false, flowType: 'reimbursement' },
-  ),
+  passingRow('en-roommate', 'en', 'Got $75 back from my roommate for utilities', {
+    direction: 'credit',
+    amount: 75,
+    isRecurringSuggestion: false,
+    flowType: 'reimbursement',
+  }),
   // flowType pinned 'transfer_out' (fix-plan 2.9a: "investment
   // contributions ... → outflow" — the 401k companion to the Schwab
   // headline row, same rule, a different recurring cadence).
@@ -326,28 +326,28 @@ const EN_ROWS: GoldenCorpusRow[] = [
   // outflow" — prompt.ts's "expense" bullet now names this explicitly so
   // the model doesn't reach for "transfer_out" or misfire toward
   // "income" on a topic-vocabulary guess).
-  passingRow(
-    'en-atm',
-    'en',
-    'Took $60 out of the ATM',
-    { direction: 'debit', amount: 60, isRecurringSuggestion: false, flowType: 'expense' },
-  ),
+  passingRow('en-atm', 'en', 'Took $60 out of the ATM', {
+    direction: 'debit',
+    amount: 60,
+    isRecurringSuggestion: false,
+    flowType: 'expense',
+  }),
   // flowType pinned 'expense' (fix-plan 2.9a: "credit-card and loan
   // payments ... → outflow").
-  passingRow(
-    'en-amex',
-    'en',
-    'Paid off $420.55 on my Amex this month',
-    { direction: 'debit', amount: 420.55, isRecurringSuggestion: false, flowType: 'expense' },
-  ),
+  passingRow('en-amex', 'en', 'Paid off $420.55 on my Amex this month', {
+    direction: 'debit',
+    amount: 420.55,
+    isRecurringSuggestion: false,
+    flowType: 'expense',
+  }),
   // flowType pinned 'refund' (fix-plan 2.9a: "cashback ... → inflow" —
   // previously entirely unrepresented in the corpus).
-  passingRow(
-    'en-cashback',
-    'en',
-    'Got $15 cashback from my credit card this month',
-    { direction: 'credit', amount: 15, isRecurringSuggestion: false, flowType: 'refund' },
-  ),
+  passingRow('en-cashback', 'en', 'Got $15 cashback from my credit card this month', {
+    direction: 'credit',
+    amount: 15,
+    isRecurringSuggestion: false,
+    flowType: 'refund',
+  }),
   // flowType pinned 'transfer_in' (fix-plan 2.9a: "transfers both
   // directions" — the inbound half of the Schwab row above; previously
   // entirely unrepresented in the corpus).
@@ -429,7 +429,7 @@ const FR_ROWS: GoldenCorpusRow[] = [
   passingRow(
     'fr-loyer',
     'fr',
-    "Mon loyer est de 980 € par mois",
+    'Mon loyer est de 980 € par mois',
     { direction: 'debit', amount: 980, isRecurringSuggestion: true },
     { currency: 'EUR', category_suggestion: 'Logement' },
   ),
@@ -478,7 +478,7 @@ const FR_ROWS: GoldenCorpusRow[] = [
     amount: 3.8,
     isRecurringSuggestion: false,
   }),
-  passingRow("fr-uber", 'fr', "J'ai payé 45,60 € pour un Uber", {
+  passingRow('fr-uber', 'fr', "J'ai payé 45,60 € pour un Uber", {
     direction: 'debit',
     amount: 45.6,
     isRecurringSuggestion: false,

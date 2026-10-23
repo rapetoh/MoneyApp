@@ -14,7 +14,15 @@ function tx(
   direction: 'debit' | 'credit' = 'debit',
   is_recurring = false,
 ): AskMurmurTransaction {
-  return { amount, amount_in_profile_currency: amount, direction, merchant, category_name, transacted_at: iso, is_recurring }
+  return {
+    amount,
+    amount_in_profile_currency: amount,
+    direction,
+    merchant,
+    category_name,
+    transacted_at: iso,
+    is_recurring,
+  }
 }
 
 const base = {
@@ -54,10 +62,46 @@ const thisMonth: AskMurmurTransaction[] = [
 ]
 
 const rules: AskInsightRule[] = [
-  { name: 'Netflix', amount: 14, direction: 'debit', frequency: 'monthly', interval: 1, starts_at: '2026-01-22T12:00:00Z', ends_at: null, is_active: true },
-  { name: 'Xtream', amount: 42, direction: 'debit', frequency: 'monthly', interval: 1, starts_at: '2026-01-03T12:00:00Z', ends_at: null, is_active: true },
-  { name: 'Charles Schwab', amount: 300, direction: 'debit', frequency: 'monthly', interval: 1, starts_at: '2026-01-03T12:00:00Z', ends_at: null, is_active: true },
-  { name: 'The20', amount: 2500, direction: 'credit', frequency: 'monthly', interval: 1, starts_at: '2026-01-01T12:00:00Z', ends_at: null, is_active: true },
+  {
+    name: 'Netflix',
+    amount: 14,
+    direction: 'debit',
+    frequency: 'monthly',
+    interval: 1,
+    starts_at: '2026-01-22T12:00:00Z',
+    ends_at: null,
+    is_active: true,
+  },
+  {
+    name: 'Xtream',
+    amount: 42,
+    direction: 'debit',
+    frequency: 'monthly',
+    interval: 1,
+    starts_at: '2026-01-03T12:00:00Z',
+    ends_at: null,
+    is_active: true,
+  },
+  {
+    name: 'Charles Schwab',
+    amount: 300,
+    direction: 'debit',
+    frequency: 'monthly',
+    interval: 1,
+    starts_at: '2026-01-03T12:00:00Z',
+    ends_at: null,
+    is_active: true,
+  },
+  {
+    name: 'The20',
+    amount: 2500,
+    direction: 'credit',
+    frequency: 'monthly',
+    interval: 1,
+    starts_at: '2026-01-01T12:00:00Z',
+    ends_at: null,
+    is_active: true,
+  },
 ]
 
 describe('computeAskInsights', () => {
@@ -69,18 +113,30 @@ describe('computeAskInsights', () => {
   })
 
   it('names the next bill with its date and what is left this month', () => {
-    const out = computeAskInsights({ ...base, transactions: [...groceriesPriorMonths, ...thisMonth], rules })
+    const out = computeAskInsights({
+      ...base,
+      transactions: [...groceriesPriorMonths, ...thisMonth],
+      rules,
+    })
     const up = out.find((i) => i.kind === 'upcoming_bill')
     expect(up).toBeDefined()
     expect(up!.title).toBe('Netflix $14 due Aug 22')
     // still due between Aug 16 and month end: Netflix 14 (Xtream/Schwab already
     // occurred on the 3rd). income 2500 − spent (120+95+88+42+300+500+12+9+14+28+15 = 1223) − 14 = 1263
     expect(up!.detail).toBe('With $14 of bills still due, that leaves $1,263 this month.')
-    expect(up!.action).toEqual({ label: 'Review recurring', intent: 'open_recurring', params: { name: 'Netflix' } })
+    expect(up!.action).toEqual({
+      label: 'Review recurring',
+      intent: 'open_recurring',
+      params: { name: 'Netflix' },
+    })
   })
 
   it('flags the groceries surge against the same day-span of prior months', () => {
-    const out = computeAskInsights({ ...base, transactions: [...groceriesPriorMonths, ...thisMonth], rules })
+    const out = computeAskInsights({
+      ...base,
+      transactions: [...groceriesPriorMonths, ...thisMonth],
+      rules,
+    })
     const s = out.find((i) => i.kind === 'category_surge')
     expect(s).toBeDefined()
     // MTD groceries 303 vs avg by-the-16th of (102, 103, 100) = 101.67 → +198%
@@ -95,7 +151,11 @@ describe('computeAskInsights', () => {
   })
 
   it('totals subscriptions and names the top two', () => {
-    const out = computeAskInsights({ ...base, transactions: [...groceriesPriorMonths, ...thisMonth], rules })
+    const out = computeAskInsights({
+      ...base,
+      transactions: [...groceriesPriorMonths, ...thisMonth],
+      rules,
+    })
     const s = out.find((i) => i.kind === 'subscriptions')
     // 300 + 42 + 14 = 356 monthly; ranking may push it out of the top 4, so
     // check via a rules-only account too.
@@ -108,17 +168,34 @@ describe('computeAskInsights', () => {
 
   it('reports budget pace from the app-computed budget block', () => {
     const budget: AskMurmurBudget = {
-      amount: 2000, currency: 'USD', period: 'monthly', category_name: null,
-      period_start: '2026-08-01T05:00:00Z', period_end: '2026-09-01T05:00:00Z',
-      spent: 1223, committed: 14, remaining: 763, days_left: 16,
+      amount: 2000,
+      currency: 'USD',
+      period: 'monthly',
+      category_name: null,
+      period_start: '2026-08-01T05:00:00Z',
+      period_end: '2026-09-01T05:00:00Z',
+      spent: 1223,
+      committed: 14,
+      remaining: 763,
+      days_left: 16,
     }
-    const out = computeAskInsights({ ...base, budget, transactions: [...groceriesPriorMonths, ...thisMonth], rules })
+    const out = computeAskInsights({
+      ...base,
+      budget,
+      transactions: [...groceriesPriorMonths, ...thisMonth],
+      rules,
+    })
     const b = out.find((i) => i.kind === 'budget_pace')
     expect(b).toBeDefined()
     expect(b!.title).toMatch(/\$763 left for 16 days/)
     expect(b!.action?.intent).toBe('set_budget')
 
-    const over = computeAskInsights({ ...base, budget: { ...budget, remaining: -120 }, transactions: [...groceriesPriorMonths, ...thisMonth], rules })
+    const over = computeAskInsights({
+      ...base,
+      budget: { ...budget, remaining: -120 },
+      transactions: [...groceriesPriorMonths, ...thisMonth],
+      rules,
+    })
     const ob = over.find((i) => i.kind === 'budget_pace')!
     expect(ob.title).toBe('Over budget by $120')
     expect(ob.tone).toBe('alert')
@@ -126,29 +203,56 @@ describe('computeAskInsights', () => {
   })
 
   it('spots a large one-off purchase and never a recurring charge', () => {
-    const out = computeAskInsights({ ...base, transactions: [...groceriesPriorMonths, ...thisMonth], rules })
+    const out = computeAskInsights({
+      ...base,
+      transactions: [...groceriesPriorMonths, ...thisMonth],
+      rules,
+    })
     const l = out.find((i) => i.kind === 'large_transaction')
     // Louis Vuitton 500 vs a median debit around 49 → ≥ 3× and ≥ 100.
     // May be ranked below the top four; check on a quieter account.
-    const quiet = computeAskInsights({ ...base, monthly_income: null, transactions: [...groceriesPriorMonths, ...thisMonth.filter((t) => t.category_name !== 'Groceries')], rules: [] })
+    const quiet = computeAskInsights({
+      ...base,
+      monthly_income: null,
+      transactions: [
+        ...groceriesPriorMonths,
+        ...thisMonth.filter((t) => t.category_name !== 'Groceries'),
+      ],
+      rules: [],
+    })
     const found = l ?? quiet.find((i) => i.kind === 'large_transaction')
     expect(found).toBeDefined()
     expect(found!.title).toBe('Louis Vuitton $500 on Aug 15')
-    expect(found!.action).toEqual({ label: 'See transaction', intent: 'show_transactions', params: { query: 'Louis Vuitton' } })
+    expect(found!.action).toEqual({
+      label: 'See transaction',
+      intent: 'show_transactions',
+      params: { query: 'Louis Vuitton' },
+    })
   })
 
   it('ranks by score, dedups by kind and caps at four', () => {
-    const out = computeAskInsights({ ...base, transactions: [...groceriesPriorMonths, ...thisMonth], rules })
+    const out = computeAskInsights({
+      ...base,
+      transactions: [...groceriesPriorMonths, ...thisMonth],
+      rules,
+    })
     expect(out.length).toBeLessThanOrEqual(4)
     expect(new Set(out.map((i) => i.kind)).size).toBe(out.length)
-    for (let i = 1; i < out.length; i++) expect(out[i - 1].score).toBeGreaterThanOrEqual(out[i].score)
+    for (let i = 1; i < out.length; i++)
+      expect(out[i - 1].score).toBeGreaterThanOrEqual(out[i].score)
     // The surge (score ~100) and the upcoming bill (90) lead.
     expect(out[0].kind).toBe('category_surge')
     expect(out[1].kind).toBe('upcoming_bill')
   })
 
   it('formats in the user locale', () => {
-    const out = computeAskInsights({ ...base, locale: 'fr', currency: 'EUR', transactions: [...groceriesPriorMonths, ...thisMonth], rules })
+    const out = computeAskInsights({
+      ...base,
+      locale: 'fr',
+      currency: 'EUR',
+      transactions: [...groceriesPriorMonths, ...thisMonth],
+      rules,
+    })
     const up = out.find((i) => i.kind === 'upcoming_bill')!
     expect(up.title).toContain('Netflix')
     expect(up.title).toContain('€')

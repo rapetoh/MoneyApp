@@ -63,7 +63,10 @@ function subscribe(key: string, fn: Listener): () => void {
  * until the first `setValue` for that key in this process, which is the
  * one moment a hook should report `loading`.
  */
-export function useCachedState<T>(key: string | null, fallback: T): [T, (value: T) => void, boolean] {
+export function useCachedState<T>(
+  key: string | null,
+  fallback: T,
+): [T, (value: T) => void, boolean] {
   const [, force] = useReducer((n: number) => n + 1, 0)
 
   useEffect(() => {

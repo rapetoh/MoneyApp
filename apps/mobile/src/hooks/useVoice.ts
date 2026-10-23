@@ -1,9 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { Animated } from 'react-native'
-import {
-  ExpoSpeechRecognitionModule,
-  useSpeechRecognitionEvent,
-} from 'expo-speech-recognition'
+import { ExpoSpeechRecognitionModule, useSpeechRecognitionEvent } from 'expo-speech-recognition'
 import { parseExpense } from '@voice-expense/ai'
 import { supabase } from '../lib/supabase'
 import { getApiUrl } from './useApiUrl'
@@ -109,10 +106,18 @@ export function useVoice(
   const currencyRef = useRef(userCurrency)
   const localeRef = useRef(userLocale)
   const timezoneRef = useRef(userTimezone)
-  useEffect(() => { categoriesRef.current = userCategories }, [userCategories])
-  useEffect(() => { currencyRef.current = userCurrency }, [userCurrency])
-  useEffect(() => { localeRef.current = userLocale }, [userLocale])
-  useEffect(() => { timezoneRef.current = userTimezone }, [userTimezone])
+  useEffect(() => {
+    categoriesRef.current = userCategories
+  }, [userCategories])
+  useEffect(() => {
+    currencyRef.current = userCurrency
+  }, [userCurrency])
+  useEffect(() => {
+    localeRef.current = userLocale
+  }, [userLocale])
+  useEffect(() => {
+    timezoneRef.current = userTimezone
+  }, [userTimezone])
 
   // Interim results (shown in real-time while speaking)
   useSpeechRecognitionEvent('result', (event) => {
@@ -192,43 +197,40 @@ export function useVoice(
     setState('error')
   })
 
-  const runParse = useCallback(
-    async (text: string) => {
-      const gen = sessionGenRef.current
-      setState('processing')
-      parseStartRef.current = Date.now()
-      try {
-        const { data: sessionData } = await supabase.auth.getSession()
-        const token = sessionData?.session?.access_token ?? ''
-        const userId = sessionData?.session?.user?.id
+  const runParse = useCallback(async (text: string) => {
+    const gen = sessionGenRef.current
+    setState('processing')
+    parseStartRef.current = Date.now()
+    try {
+      const { data: sessionData } = await supabase.auth.getSession()
+      const token = sessionData?.session?.access_token ?? ''
+      const userId = sessionData?.session?.user?.id
 
-        const apiBaseUrl = await getApiUrl()
-        const result = await parseExpense({
-          transcript: text,
-          locale: localeRef.current as any,
-          currency: currencyRef.current,
-          categories: categoriesRef.current,
-          apiBaseUrl,
-          authToken: token,
-          userId,
-          todayCivilDate: localDay(new Date().toISOString(), timezoneRef.current),
-        })
+      const apiBaseUrl = await getApiUrl()
+      const result = await parseExpense({
+        transcript: text,
+        locale: localeRef.current as any,
+        currency: currencyRef.current,
+        categories: categoriesRef.current,
+        apiBaseUrl,
+        authToken: token,
+        userId,
+        todayCivilDate: localDay(new Date().toISOString(), timezoneRef.current),
+      })
 
-        // A newer session (inject / reset / fresh recording) superseded
-        // this parse while it was in flight — drop it.
-        if (gen !== sessionGenRef.current) return
-        setParseDurationMs(Date.now() - parseStartRef.current)
-        setParsedExpense(result)
-        setState('done')
-      } catch (err) {
-        if (gen !== sessionGenRef.current) return
-        console.warn('[voice] parse failed', err instanceof Error ? err.message : err)
-        setErrorMessage('parse-failed')
-        setState('error')
-      }
-    },
-    [],
-  )
+      // A newer session (inject / reset / fresh recording) superseded
+      // this parse while it was in flight — drop it.
+      if (gen !== sessionGenRef.current) return
+      setParseDurationMs(Date.now() - parseStartRef.current)
+      setParsedExpense(result)
+      setState('done')
+    } catch (err) {
+      if (gen !== sessionGenRef.current) return
+      console.warn('[voice] parse failed', err instanceof Error ? err.message : err)
+      setErrorMessage('parse-failed')
+      setState('error')
+    }
+  }, [])
 
   const startListening = useCallback(async (locale: string) => {
     // First-run audit C2: once the user declines Microphone or Speech

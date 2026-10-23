@@ -12,7 +12,12 @@
 import { supabase } from '../lib/supabase'
 import { getDb } from './sync/localDb'
 import { DataEvents } from '../events/dataEvents'
-import { merchantKey, merchantRuleName, learnedCategoryFor, type MerchantRule } from '@voice-expense/shared'
+import {
+  merchantKey,
+  merchantRuleName,
+  learnedCategoryFor,
+  type MerchantRule,
+} from '@voice-expense/shared'
 
 export type StoredMerchantRule = MerchantRule & { id?: string; updated_at?: string }
 
@@ -23,7 +28,10 @@ const metaKey = (userId: string) => `merchant_rules:${userId}`
 async function readLocal(userId: string): Promise<StoredMerchantRule[] | null> {
   try {
     const db = await getDb()
-    const row = await db.getFirstAsync<{ value: string }>('SELECT value FROM sync_meta WHERE key = ?', [metaKey(userId)])
+    const row = await db.getFirstAsync<{ value: string }>(
+      'SELECT value FROM sync_meta WHERE key = ?',
+      [metaKey(userId)],
+    )
     if (!row) return null
     const parsed = JSON.parse(row.value) as unknown
     return Array.isArray(parsed) ? (parsed as StoredMerchantRule[]) : null
@@ -35,7 +43,10 @@ async function readLocal(userId: string): Promise<StoredMerchantRule[] | null> {
 async function writeLocal(userId: string, rules: StoredMerchantRule[]): Promise<void> {
   try {
     const db = await getDb()
-    await db.runAsync('INSERT OR REPLACE INTO sync_meta (key, value) VALUES (?, ?)', [metaKey(userId), JSON.stringify(rules)])
+    await db.runAsync('INSERT OR REPLACE INTO sync_meta (key, value) VALUES (?, ?)', [
+      metaKey(userId),
+      JSON.stringify(rules),
+    ])
   } catch {
     /* the server copy is the source of truth; next load retries */
   }
@@ -110,7 +121,10 @@ export async function learnMerchantCategory(
   await writeLocal(userId, next)
   const { error } = await supabase
     .from('merchant_rules')
-    .upsert({ user_id: userId, merchant_key: key, merchant_name: name, category_id: categoryId }, { onConflict: 'user_id,merchant_key' })
+    .upsert(
+      { user_id: userId, merchant_key: key, merchant_name: name, category_id: categoryId },
+      { onConflict: 'user_id,merchant_key' },
+    )
   if (!error) {
     void loadMerchantRules(userId, true)
     DataEvents.emitMerchantRules(userId)
@@ -120,7 +134,11 @@ export async function learnMerchantCategory(
 
 /** Forget one learned merchant (Settings, "Learned categories"). */
 export async function forgetMerchantRule(userId: string, key: string): Promise<boolean> {
-  const { error } = await supabase.from('merchant_rules').delete().eq('user_id', userId).eq('merchant_key', key)
+  const { error } = await supabase
+    .from('merchant_rules')
+    .delete()
+    .eq('user_id', userId)
+    .eq('merchant_key', key)
   if (error) return false
   const next = (memory.get(userId) ?? []).filter((r) => r.merchant_key !== key)
   memory.set(userId, next)

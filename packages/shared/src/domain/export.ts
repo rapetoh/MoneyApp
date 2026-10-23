@@ -156,7 +156,15 @@ export function buildExport(input: BuildExportInput): ExportResult {
   const to = parseLocalDayStrict(input.dateTo)
   const startInstant = civilDateTimeToInstant(from.y, from.m, from.d, 0, 0, 0, tz)
   const dayAfterTo = addDays(to.y, to.m, to.d, 1)
-  const endExclusiveInstant = civilDateTimeToInstant(dayAfterTo.y, dayAfterTo.m, dayAfterTo.d, 0, 0, 0, tz)
+  const endExclusiveInstant = civilDateTimeToInstant(
+    dayAfterTo.y,
+    dayAfterTo.m,
+    dayAfterTo.d,
+    0,
+    0,
+    0,
+    tz,
+  )
 
   const inRange = input.transactions.filter(
     (t) => t.transacted_at >= startInstant && t.transacted_at < endExclusiveInstant,
@@ -171,7 +179,7 @@ export function buildExport(input: BuildExportInput): ExportResult {
         date: localDay(t.transacted_at, tz),
         time: `${pad2(parts.hour)}:${pad2(parts.minute)}`,
         merchant: t.merchant ?? '',
-        category: t.category_id ? catNameById.get(t.category_id) ?? '' : '',
+        category: t.category_id ? (catNameById.get(t.category_id) ?? '') : '',
         direction: t.direction,
         amount: t.amount,
         currency: t.currency_code || input.profile.currency_code,
@@ -191,7 +199,7 @@ export function buildExport(input: BuildExportInput): ExportResult {
       direction: t.direction,
       transacted_at: t.transacted_at,
       category_id: t.category_id,
-      category_name: t.category_id ? catNameById.get(t.category_id) ?? null : null,
+      category_name: t.category_id ? (catNameById.get(t.category_id) ?? null) : null,
       category_kind: t.category_kind ?? null,
     })),
   )

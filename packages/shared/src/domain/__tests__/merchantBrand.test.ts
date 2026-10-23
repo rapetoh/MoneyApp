@@ -4,7 +4,11 @@
  * Chase/Wallet strings.
  */
 import { describe, expect, it } from 'vitest'
-import { cleanMerchantDescriptor, brandDomainForMerchant, normalizeMerchantCase } from '../merchantBrand'
+import {
+  cleanMerchantDescriptor,
+  brandDomainForMerchant,
+  normalizeMerchantCase,
+} from '../merchantBrand'
 
 describe('cleanMerchantDescriptor', () => {
   it.each([
@@ -76,7 +80,11 @@ describe('normalizeMerchantCase', () => {
 
 // Oct 5 2026: "711594-Mcgrath Volkswa" was saved as the merchant with a "7"
 // letter tile. The cleaner is the instant fallback while the AI answers.
-import { cleanMerchantDescriptor as clean, normalizeMerchantDomain, merchantLogoSrc } from '../merchantBrand'
+import {
+  cleanMerchantDescriptor as clean,
+  normalizeMerchantDomain,
+  merchantLogoSrc,
+} from '../merchantBrand'
 
 describe('card descriptors the cleaner must handle', () => {
   it.each([

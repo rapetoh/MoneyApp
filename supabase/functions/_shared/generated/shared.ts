@@ -85,7 +85,8 @@ function tzOffsetMsAt(epochMs, tz) {
   const fields = civilFieldsAt(epochMs, tz);
   const get = (type) => {
     const found = fields[type];
-    if (found === void 0 || Number.isNaN(found)) throw new Error(`period.ts: Intl did not return a "${type}" part for tz "${tz}"`);
+    if (found === void 0 || Number.isNaN(found))
+      throw new Error(`period.ts: Intl did not return a "${type}" part for tz "${tz}"`);
     return found;
   };
   const asIfUtc = Date.UTC(
@@ -396,9 +397,7 @@ function roundCents(amount) {
 }
 
 // packages/shared/src/domain/money.ts
-var DEFAULT_TRANSFER_CATEGORY_NAMES = /* @__PURE__ */ new Set([
-  "Savings & Investing"
-]);
+var DEFAULT_TRANSFER_CATEGORY_NAMES = /* @__PURE__ */ new Set(["Savings & Investing"]);
 function resolveCategoryKind(categoryName, explicitKind) {
   if (explicitKind != null) return explicitKind;
   if (categoryName != null && DEFAULT_TRANSFER_CATEGORY_NAMES.has(categoryName)) {
@@ -419,7 +418,15 @@ function isSpend(txn, categoryKind) {
 function resolveBudgetAnchor(startsAt, tz) {
   const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(startsAt);
   if (!dateOnly) return startsAt;
-  return civilDateTimeToInstant(Number(dateOnly[1]), Number(dateOnly[2]), Number(dateOnly[3]), 0, 0, 0, tz);
+  return civilDateTimeToInstant(
+    Number(dateOnly[1]),
+    Number(dateOnly[2]),
+    Number(dateOnly[3]),
+    0,
+    0,
+    0,
+    tz
+  );
 }
 function budgetStatus(budget, txns, rules, tz, atInstantIso = (/* @__PURE__ */ new Date()).toISOString()) {
   const anchor = resolveBudgetAnchor(budget.starts_at, tz);
@@ -434,7 +441,10 @@ function budgetStatus(budget, txns, rules, tz, atInstantIso = (/* @__PURE__ */ n
   const postedCountByRule = /* @__PURE__ */ new Map();
   for (const t2 of scoped) {
     if (t2.recurring_rule_id) {
-      postedCountByRule.set(t2.recurring_rule_id, (postedCountByRule.get(t2.recurring_rule_id) ?? 0) + 1);
+      postedCountByRule.set(
+        t2.recurring_rule_id,
+        (postedCountByRule.get(t2.recurring_rule_id) ?? 0) + 1
+      );
     }
     const categoryKind = resolveCategoryKind(t2.category_name, t2.category_kind);
     if (!isSpend(t2, categoryKind)) continue;
@@ -489,7 +499,9 @@ function rolloverCarry(budget, txns, tz, anchor, current) {
     if (budget.category_id != null && t2.category_id !== budget.category_id) continue;
     if (t2.amount_in_profile_currency == null) continue;
     if (!isSpend(t2, resolveCategoryKind(t2.category_name, t2.category_kind))) continue;
-    const idx = windows.findIndex((w) => t2.transacted_at >= w.start && t2.transacted_at < w.endExclusive);
+    const idx = windows.findIndex(
+      (w) => t2.transacted_at >= w.start && t2.transacted_at < w.endExclusive
+    );
     if (idx >= 0) spentByWindow[idx] += Math.round(t2.amount_in_profile_currency * 100);
   }
   const amountCents = Math.round(budget.amount * 100);
@@ -500,7 +512,14 @@ function rolloverCarry(budget, txns, tz, anchor, current) {
 
 // packages/shared/src/domain/askInsights.ts
 var MAX_INSIGHTS = 4;
-var VALID_FREQ = /* @__PURE__ */ new Set(["daily", "weekly", "biweekly", "monthly", "quarterly", "yearly"]);
+var VALID_FREQ = /* @__PURE__ */ new Set([
+  "daily",
+  "weekly",
+  "biweekly",
+  "monthly",
+  "quarterly",
+  "yearly"
+]);
 function fmtMoney(v, currency, locale) {
   const whole = Math.abs(v - Math.round(v)) < 5e-3;
   try {
@@ -516,7 +535,9 @@ function fmtMoney(v, currency, locale) {
 }
 function fmtDate(instantIso, tz, locale) {
   try {
-    return new Intl.DateTimeFormat(locale, { month: "short", day: "numeric", timeZone: tz }).format(new Date(instantIso));
+    return new Intl.DateTimeFormat(locale, { month: "short", day: "numeric", timeZone: tz }).format(
+      new Date(instantIso)
+    );
   } catch {
     return instantIso.slice(0, 10);
   }
@@ -564,7 +585,10 @@ function debitsByCategory(txns, span) {
 }
 function sameSpanMonthsAgo(y, m, d, k, tz) {
   const target = addMonthsClamped(y, m, 1, -k);
-  const startIso = monthBounds(`${String(target.y).padStart(4, "0")}-${String(target.m).padStart(2, "0")}`, tz).start;
+  const startIso = monthBounds(
+    `${String(target.y).padStart(4, "0")}-${String(target.m).padStart(2, "0")}`,
+    tz
+  ).start;
   const dim = new Date(Date.UTC(target.y, target.m, 0)).getUTCDate();
   const cut = addDays(target.y, target.m, Math.min(d, dim), 1);
   return {
@@ -581,7 +605,10 @@ function computeAskInsights(input) {
   const T = (key, params = {}) => fill(t(key, locale), params);
   const monthKey = `${String(now.y).padStart(4, "0")}-${String(now.m).padStart(2, "0")}`;
   const monthB = monthBounds(monthKey, tz);
-  const monthSpan = { startMs: Date.parse(monthB.start), endMs: Date.parse(monthB.endExclusive) };
+  const monthSpan = {
+    startMs: Date.parse(monthB.start),
+    endMs: Date.parse(monthB.endExclusive)
+  };
   const daysInMonth = new Date(Date.UTC(now.y, now.m, 0)).getUTCDate();
   const daysLeftInMonth = Math.max(1, daysInMonth - now.d + 1);
   const out = [];
@@ -639,7 +666,11 @@ function computeAskInsights(input) {
         const ms = Date.parse(occ.instant);
         if (ms > horizonMs) continue;
         if (!best || ms < Date.parse(best.instant) || ms === Date.parse(best.instant) && ruleAmount(r) > best.amount) {
-          best = { name: r.name?.trim() || t("ask.insight_unnamed_rule", locale), amount: ruleAmount(r), instant: occ.instant };
+          best = {
+            name: r.name?.trim() || t("ask.insight_unnamed_rule", locale),
+            amount: ruleAmount(r),
+            instant: occ.instant
+          };
         }
       } catch {
       }
@@ -651,10 +682,18 @@ function computeAskInsights(input) {
         kind: "upcoming_bill",
         score: 90,
         tone: left !== null && left < 0 ? "alert" : "watch",
-        title: T("ask.insight_upcoming_title", { name: best.name, amount: money2(best.amount), date: fmtDate(best.instant, tz, locale) }),
+        title: T("ask.insight_upcoming_title", {
+          name: best.name,
+          amount: money2(best.amount),
+          date: fmtDate(best.instant, tz, locale)
+        }),
         detail: left !== null ? T("ask.insight_upcoming_detail_income", { due: money2(stillDue), left: money2(left) }) : T("ask.insight_upcoming_detail_noincome", { due: money2(stillDue) }),
         question: T("ask.insight_upcoming_question"),
-        action: { label: T("ask.insight_upcoming_action"), intent: "open_recurring", params: { name: best.name } }
+        action: {
+          label: T("ask.insight_upcoming_action"),
+          intent: "open_recurring",
+          params: { name: best.name }
+        }
       });
     }
   }
@@ -683,7 +722,10 @@ function computeAskInsights(input) {
         score: 95,
         tone: "alert",
         title: T("ask.insight_budget_over_title", { over: money2(Math.abs(b.remaining)) }),
-        detail: T("ask.insight_budget_over_detail", { days, period: t(`ask.period_${b.period}`, locale) }),
+        detail: T("ask.insight_budget_over_detail", {
+          days,
+          period: t(`ask.period_${b.period}`, locale)
+        }),
         question: T("ask.insight_budget_question"),
         action: { label: T("ask.insight_budget_action"), intent: "set_budget" }
       });
@@ -695,8 +737,14 @@ function computeAskInsights(input) {
         kind: "budget_pace",
         score: tight ? 70 : 58,
         tone: tight ? "watch" : "good",
-        title: T(tight ? "ask.insight_budget_tight_title" : "ask.insight_budget_ok_title", { left: money2(b.remaining), days }),
-        detail: usualDaily !== null ? T(tight ? "ask.insight_budget_tight_detail" : "ask.insight_budget_ok_detail", { pace: money2(roundCents(pace)), usual: money2(roundCents(usualDaily)) }) : T("ask.insight_budget_pace_only", { pace: money2(roundCents(pace)) }),
+        title: T(tight ? "ask.insight_budget_tight_title" : "ask.insight_budget_ok_title", {
+          left: money2(b.remaining),
+          days
+        }),
+        detail: usualDaily !== null ? T(tight ? "ask.insight_budget_tight_detail" : "ask.insight_budget_ok_detail", {
+          pace: money2(roundCents(pace)),
+          usual: money2(roundCents(usualDaily))
+        }) : T("ask.insight_budget_pace_only", { pace: money2(roundCents(pace)) }),
         question: T("ask.insight_budget_question"),
         action: { label: T("ask.insight_budget_action"), intent: "set_budget" }
       });
@@ -723,7 +771,10 @@ function computeAskInsights(input) {
       kind: "category_surge",
       score: 80 + Math.min(20, pctRounded / 5),
       tone: "alert",
-      title: T("ask.insight_surge_title", { category: surge.category, amount: money2(surge.amount) }),
+      title: T("ask.insight_surge_title", {
+        category: surge.category,
+        amount: money2(surge.amount)
+      }),
       detail: T("ask.insight_surge_detail", { pct: pctRounded }),
       question: T("ask.insight_surge_question", { category: surge.category }),
       action: {
@@ -736,12 +787,21 @@ function computeAskInsights(input) {
   {
     const normalized = debitRules.map((r) => ({
       name: r.name?.trim() || t("ask.insight_unnamed_rule", locale),
-      monthly: monthlyEquivalent({ frequency: r.frequency, interval: r.interval ?? 1, amount: ruleAmount(r) })
+      monthly: monthlyEquivalent({
+        frequency: r.frequency,
+        interval: r.interval ?? 1,
+        amount: ruleAmount(r)
+      })
     })).sort((a, b) => b.monthly - a.monthly);
     const total = roundCents(normalized.reduce((a, r) => a + r.monthly, 0));
     if (normalized.length >= 2 || total >= 50) {
       const [a, b] = normalized;
-      const title = normalized.length === 1 ? T("ask.insight_subs_title_one", { a: a.name, total: money2(total) }) : normalized.length === 2 ? T("ask.insight_subs_title_two", { a: a.name, b: b.name, total: money2(total) }) : T("ask.insight_subs_title_many", { a: a.name, b: b.name, n: normalized.length - 2, total: money2(total) });
+      const title = normalized.length === 1 ? T("ask.insight_subs_title_one", { a: a.name, total: money2(total) }) : normalized.length === 2 ? T("ask.insight_subs_title_two", { a: a.name, b: b.name, total: money2(total) }) : T("ask.insight_subs_title_many", {
+        a: a.name,
+        b: b.name,
+        n: normalized.length - 2,
+        total: money2(total)
+      });
       out.push({
         id: "subs",
         kind: "subscriptions",
@@ -771,7 +831,10 @@ function computeAskInsights(input) {
         score: 50,
         tone: best.delta > 0 ? "watch" : "good",
         title: T("ask.insight_delta_title", { category: best.category }),
-        detail: T(best.delta > 0 ? "ask.insight_delta_detail_up" : "ask.insight_delta_detail_down", { delta: money2(Math.abs(best.delta)) }),
+        detail: T(
+          best.delta > 0 ? "ask.insight_delta_detail_up" : "ask.insight_delta_detail_down",
+          { delta: money2(Math.abs(best.delta)) }
+        ),
         question: T("ask.insight_delta_question", { category: best.category }),
         action: {
           label: T("ask.insight_surge_action"),
@@ -790,7 +853,10 @@ function computeAskInsights(input) {
         score: 75,
         tone: "alert",
         title: T("ask.insight_netflow_over_title", { over: money2(over) }),
-        detail: T("ask.insight_netflow_over_detail", { spent: money2(spentMtd), income: money2(incomeBasis.value) }),
+        detail: T("ask.insight_netflow_over_detail", {
+          spent: money2(spentMtd),
+          income: money2(incomeBasis.value)
+        }),
         question: T("ask.insight_netflow_question"),
         action: null
       });
@@ -800,8 +866,14 @@ function computeAskInsights(input) {
         kind: "net_flow",
         score: 45,
         tone: "neutral",
-        title: T("ask.insight_netflow_title", { spent: money2(spentMtd), income: money2(incomeBasis.value) }),
-        detail: T("ask.insight_netflow_detail", { left: money2(roundCents(incomeBasis.value - spentMtd)), days: daysLeftInMonth }),
+        title: T("ask.insight_netflow_title", {
+          spent: money2(spentMtd),
+          income: money2(incomeBasis.value)
+        }),
+        detail: T("ask.insight_netflow_detail", {
+          left: money2(roundCents(incomeBasis.value - spentMtd)),
+          days: daysLeftInMonth
+        }),
         question: T("ask.insight_netflow_question"),
         action: null
       });
@@ -815,7 +887,8 @@ function computeAskInsights(input) {
       const median = debits90[Math.floor(debits90.length / 2)];
       let best = null;
       for (const tx of usable) {
-        if (tx.direction !== "debit" || tx.is_recurring || !inSpan(tx.transacted_at, weekSpan)) continue;
+        if (tx.direction !== "debit" || tx.is_recurring || !inSpan(tx.transacted_at, weekSpan))
+          continue;
         const a = amountOf(tx);
         if (a < 100 || a < 3 * median) continue;
         if (!best || a > amountOf(best)) best = tx;
@@ -828,10 +901,18 @@ function computeAskInsights(input) {
           kind: "large_transaction",
           score: 60,
           tone: "watch",
-          title: T("ask.insight_large_title", { merchant, amount: money2(a), date: fmtDate(best.transacted_at, tz, locale) }),
+          title: T("ask.insight_large_title", {
+            merchant,
+            amount: money2(a),
+            date: fmtDate(best.transacted_at, tz, locale)
+          }),
           detail: T("ask.insight_large_detail", { times: Math.round(a / median) }),
           question: T("ask.insight_large_question", { merchant }),
-          action: { label: T("ask.insight_large_action"), intent: "show_transactions", params: { query: merchant } }
+          action: {
+            label: T("ask.insight_large_action"),
+            intent: "show_transactions",
+            params: { query: merchant }
+          }
         });
       }
     }
@@ -963,7 +1044,9 @@ function planNotifications(input) {
     const rec = recurrenceOf(r);
     if (!rec) continue;
     try {
-      const occ = occurrencesInWindow(rec, nowUtc, new Date(nowMs + 7 * DAY_MS).toISOString(), tz, { limit: 20 });
+      const occ = occurrencesInWindow(rec, nowUtc, new Date(nowMs + 7 * DAY_MS).toISOString(), tz, {
+        limit: 20
+      });
       for (const o of occ) {
         upcoming.push({
           name: r.name?.trim() || t("ask.insight_unnamed_rule", locale),
@@ -987,7 +1070,9 @@ function planNotifications(input) {
     const rec = recurrenceOf(r);
     if (!rec) continue;
     try {
-      const occ = occurrencesInWindow(rec, nowUtc, new Date(monthEnd).toISOString(), tz, { limit: 40 });
+      const occ = occurrencesInWindow(rec, nowUtc, new Date(monthEnd).toISOString(), tz, {
+        limit: 40
+      });
       stillDue += occ.length * ruleAmount(r);
     } catch {
     }
@@ -1041,7 +1126,13 @@ function planNotifications(input) {
     if (!rec) continue;
     let occ;
     try {
-      occ = occurrencesInWindow(rec, new Date(nowMs - 9 * DAY_MS).toISOString(), new Date(nowMs - 2 * DAY_MS).toISOString(), tz, { limit: 5 });
+      occ = occurrencesInWindow(
+        rec,
+        new Date(nowMs - 9 * DAY_MS).toISOString(),
+        new Date(nowMs - 2 * DAY_MS).toISOString(),
+        tz,
+        { limit: 5 }
+      );
     } catch {
       continue;
     }
@@ -1062,7 +1153,9 @@ function planNotifications(input) {
       kind: "bill_missing",
       dedupeKey: `bill_missing:${String(r.id ?? r.name)}:${last.occurrenceDate}`,
       priority: PRIORITY.bill_missing,
-      title: T("notif.bill_missing_title", { name: r.name?.trim() || t("ask.insight_unnamed_rule", locale) }),
+      title: T("notif.bill_missing_title", {
+        name: r.name?.trim() || t("ask.insight_unnamed_rule", locale)
+      }),
       body: T("notif.bill_missing_body", { amount: m(amount) }),
       data: { screen: "recurring", rule: String(r.id ?? "") },
       urgency: "active"
@@ -1081,7 +1174,10 @@ function planNotifications(input) {
       continue;
     }
     const windowKey = String(status.window.start ?? "").slice(0, 10);
-    const daysLeft = Math.max(0, Math.ceil((Date.parse(String(status.window.endExclusive)) - nowMs) / DAY_MS));
+    const daysLeft = Math.max(
+      0,
+      Math.ceil((Date.parse(String(status.window.endExclusive)) - nowMs) / DAY_MS)
+    );
     const isCategory = b.category_id != null;
     if (status.pct >= 1) {
       out.push({
@@ -1089,7 +1185,10 @@ function planNotifications(input) {
         kind: isCategory ? "budget_category_over" : "budget_over",
         dedupeKey: `${isCategory ? "budget_category_over" : "budget_over"}:${b.id}:${windowKey}`,
         priority: isCategory ? PRIORITY.budget_category_over : PRIORITY.budget_over,
-        title: isCategory ? T("notif.budget_category_over_title", { category: b.category_name ?? "", over: m(Math.abs(status.remaining)) }) : T("notif.budget_over_title", { over: m(Math.abs(status.remaining)) }),
+        title: isCategory ? T("notif.budget_category_over_title", {
+          category: b.category_name ?? "",
+          over: m(Math.abs(status.remaining))
+        }) : T("notif.budget_over_title", { over: m(Math.abs(status.remaining)) }),
         body: T("notif.budget_over_body", { days: daysLeft }),
         data: { screen: "budgets", budget: b.id },
         urgency: "active"
@@ -1173,7 +1272,11 @@ function planNotifications(input) {
         dedupeKey: `weekly_recap:${localDay(nowUtc, tz)}`,
         priority: PRIORITY.weekly_recap,
         title: T("notif.weekly_recap_title", { amount: m(total) }),
-        body: top && top[0] ? T("notif.weekly_recap_body_top", { count: weekTxns.length, category: top[0], amount: m(roundCents(top[1])) }) : T("notif.weekly_recap_body", { count: weekTxns.length }),
+        body: top && top[0] ? T("notif.weekly_recap_body_top", {
+          count: weekTxns.length,
+          category: top[0],
+          amount: m(roundCents(top[1]))
+        }) : T("notif.weekly_recap_body", { count: weekTxns.length }),
         data: { screen: "insights" },
         urgency: "passive"
       });

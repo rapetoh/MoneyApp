@@ -176,8 +176,7 @@ export default function RootLayout() {
     const prevSegmentGroup = prevSegmentRef.current
     const inAuthGroup = segmentGroup === '(auth)'
     const inOnboardingGroup = segmentGroup === '(onboarding)'
-    const justLeftOnboarding =
-      prevSegmentGroup === '(onboarding)' && !inOnboardingGroup
+    const justLeftOnboarding = prevSegmentGroup === '(onboarding)' && !inOnboardingGroup
 
     // Password recovery (fix-plan 3.2 / audit 08-F7) is the one (auth)
     // screen this gate must leave alone. `exchangeCodeForSession` there
@@ -289,157 +288,157 @@ export default function RootLayout() {
       {ready && (
         <UndoProvider key="app">
           <VoiceSessionProvider>
-          {/* Apple Pay capture consumer — saves queued Wallet transactions
+            {/* Apple Pay capture consumer — saves queued Wallet transactions
               silently (native App Intent + deep link), see
               src/services/walletCapture.ts. Renders nothing. */}
-          <WalletCaptureDrain />
-          {/* Home-screen and lock-screen widgets: publishes spent today and
+            <WalletCaptureDrain />
+            {/* Home-screen and lock-screen widgets: publishes spent today and
               budget left to the shared App Group. Renders nothing. */}
-          <WidgetSync />
-          <StatusBar style="dark" backgroundColor="#FBFAF7" />
-          <Stack screenOptions={{ headerShown: false }}>
-            {/* Top-level groups swap on auth / onboarding boundaries via
+            <WidgetSync />
+            <StatusBar style="dark" backgroundColor="#FBFAF7" />
+            <Stack screenOptions={{ headerShown: false }}>
+              {/* Top-level groups swap on auth / onboarding boundaries via
                 `router.replace` - a cross-fade there, not a horizontal push:
                 signing in or finishing onboarding is a change of world, not a
                 step deeper into the same one. Every other screen keeps the
                 native push (card) / sheet (modal) transition. */}
-            <Stack.Screen name="(auth)" options={{ animation: 'fade' }} />
-            <Stack.Screen name="(onboarding)" options={{ animation: 'fade' }} />
-            <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
-            {/* Transient redirect routes (render nothing, replace
+              <Stack.Screen name="(auth)" options={{ animation: 'fade' }} />
+              <Stack.Screen name="(onboarding)" options={{ animation: 'fade' }} />
+              <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
+              {/* Transient redirect routes (render nothing, replace
                 themselves on focus): the Shortcuts deep link and the
                 catch-all for unknown URLs. `none` so a warm deep link
                 doesn't slide an empty card in before the redirect. */}
-            <Stack.Screen name="shortcut" options={{ animation: 'none' }} />
-            <Stack.Screen name="+not-found" options={{ animation: 'none' }} />
-            <Stack.Screen
-              name="transaction/[id]"
-              options={{
-                headerShown: true,
-                headerTitle: t('nav.transaction', locale),
-                headerBackTitle: t('common.back', locale),
-                presentation: 'card',
-              }}
-            />
-            <Stack.Screen
-              name="transaction/new"
-              options={{
-                // Quick entry draws its own Cancel · title · mic header
-                // (artboard 11, docs/voice redesign), so the native modal
-                // header is suppressed.
-                headerShown: false,
-                presentation: 'modal',
-              }}
-            />
-            <Stack.Screen
-              name="transaction/edit"
-              options={{
-                headerShown: true,
-                headerTitle: t('nav.edit_transaction', locale),
-                headerBackTitle: t('common.back', locale),
-                presentation: 'modal',
-              }}
-            />
-            <Stack.Screen
-              name="recurring"
-              options={{
-                headerShown: true,
-                headerTitle: t('recurring.title', locale),
-                headerBackTitle: t('common.back', locale),
-                presentation: 'card',
-              }}
-            />
-            <Stack.Screen
-              name="more/transactions"
-              options={{
-                headerShown: false,
-                presentation: 'card',
-              }}
-            />
-            <Stack.Screen
-              name="more/settings"
-              options={{
-                headerShown: true,
-                headerTitle: t('settings.title', locale),
-                headerBackTitle: t('common.back', locale),
-                presentation: 'card',
-              }}
-            />
-            <Stack.Screen
-              name="more/privacy"
-              options={{
-                headerShown: true,
-                headerTitle: t('more.privacy', locale),
-                headerBackTitle: t('common.back', locale),
-                presentation: 'card',
-              }}
-            />
-            <Stack.Screen
-              name="more/ask"
-              options={{
-                headerShown: true,
-                headerTitle: t('more.ask', locale),
-                headerBackTitle: t('common.back', locale),
-                presentation: 'card',
-              }}
-            />
-            <Stack.Screen
-              name="more/help"
-              options={{
-                headerShown: true,
-                headerTitle: t('more.help', locale),
-                headerBackTitle: t('common.back', locale),
-                presentation: 'card',
-              }}
-            />
-            <Stack.Screen
-              name="more/apple-pay-setup"
-              options={{
-                headerShown: true,
-                headerTitle: t('settings.apple_pay_capture', locale),
-                headerBackTitle: t('common.back', locale),
-                presentation: 'card',
-              }}
-            />
-            <Stack.Screen
-              name="more/import"
-              options={{
-                headerShown: true,
-                headerTitle: t('import.settings', locale),
-                headerBackTitle: t('common.back', locale),
-                presentation: 'card',
-              }}
-            />
-            <Stack.Screen
-              name="more/learned"
-              options={{
-                headerShown: true,
-                headerTitle: t('rules.title', locale),
-                headerBackTitle: t('common.back', locale),
-                presentation: 'card',
-              }}
-            />
-            <Stack.Screen
-              name="more/siri"
-              options={{
-                headerShown: true,
-                headerTitle: t('settings.siri', locale),
-                headerBackTitle: t('common.back', locale),
-                presentation: 'card',
-              }}
-            />
-            <Stack.Screen
-              name="more/paywall"
-              options={{
-                // Paywall owns its own dark chrome (close button lives in the screen).
-                headerShown: false,
-                presentation: 'modal',
-              }}
-            />
-          </Stack>
-          {/* App-wide failure surface for the sync outbox (fix-plan 1.6 point
+              <Stack.Screen name="shortcut" options={{ animation: 'none' }} />
+              <Stack.Screen name="+not-found" options={{ animation: 'none' }} />
+              <Stack.Screen
+                name="transaction/[id]"
+                options={{
+                  headerShown: true,
+                  headerTitle: t('nav.transaction', locale),
+                  headerBackTitle: t('common.back', locale),
+                  presentation: 'card',
+                }}
+              />
+              <Stack.Screen
+                name="transaction/new"
+                options={{
+                  // Quick entry draws its own Cancel · title · mic header
+                  // (artboard 11, docs/voice redesign), so the native modal
+                  // header is suppressed.
+                  headerShown: false,
+                  presentation: 'modal',
+                }}
+              />
+              <Stack.Screen
+                name="transaction/edit"
+                options={{
+                  headerShown: true,
+                  headerTitle: t('nav.edit_transaction', locale),
+                  headerBackTitle: t('common.back', locale),
+                  presentation: 'modal',
+                }}
+              />
+              <Stack.Screen
+                name="recurring"
+                options={{
+                  headerShown: true,
+                  headerTitle: t('recurring.title', locale),
+                  headerBackTitle: t('common.back', locale),
+                  presentation: 'card',
+                }}
+              />
+              <Stack.Screen
+                name="more/transactions"
+                options={{
+                  headerShown: false,
+                  presentation: 'card',
+                }}
+              />
+              <Stack.Screen
+                name="more/settings"
+                options={{
+                  headerShown: true,
+                  headerTitle: t('settings.title', locale),
+                  headerBackTitle: t('common.back', locale),
+                  presentation: 'card',
+                }}
+              />
+              <Stack.Screen
+                name="more/privacy"
+                options={{
+                  headerShown: true,
+                  headerTitle: t('more.privacy', locale),
+                  headerBackTitle: t('common.back', locale),
+                  presentation: 'card',
+                }}
+              />
+              <Stack.Screen
+                name="more/ask"
+                options={{
+                  headerShown: true,
+                  headerTitle: t('more.ask', locale),
+                  headerBackTitle: t('common.back', locale),
+                  presentation: 'card',
+                }}
+              />
+              <Stack.Screen
+                name="more/help"
+                options={{
+                  headerShown: true,
+                  headerTitle: t('more.help', locale),
+                  headerBackTitle: t('common.back', locale),
+                  presentation: 'card',
+                }}
+              />
+              <Stack.Screen
+                name="more/apple-pay-setup"
+                options={{
+                  headerShown: true,
+                  headerTitle: t('settings.apple_pay_capture', locale),
+                  headerBackTitle: t('common.back', locale),
+                  presentation: 'card',
+                }}
+              />
+              <Stack.Screen
+                name="more/import"
+                options={{
+                  headerShown: true,
+                  headerTitle: t('import.settings', locale),
+                  headerBackTitle: t('common.back', locale),
+                  presentation: 'card',
+                }}
+              />
+              <Stack.Screen
+                name="more/learned"
+                options={{
+                  headerShown: true,
+                  headerTitle: t('rules.title', locale),
+                  headerBackTitle: t('common.back', locale),
+                  presentation: 'card',
+                }}
+              />
+              <Stack.Screen
+                name="more/siri"
+                options={{
+                  headerShown: true,
+                  headerTitle: t('settings.siri', locale),
+                  headerBackTitle: t('common.back', locale),
+                  presentation: 'card',
+                }}
+              />
+              <Stack.Screen
+                name="more/paywall"
+                options={{
+                  // Paywall owns its own dark chrome (close button lives in the screen).
+                  headerShown: false,
+                  presentation: 'modal',
+                }}
+              />
+            </Stack>
+            {/* App-wide failure surface for the sync outbox (fix-plan 1.6 point
               4) — renders nothing unless something is dead-lettered. */}
-          <SyncFailureBanner locale={locale} />
+            <SyncFailureBanner locale={locale} />
           </VoiceSessionProvider>
         </UndoProvider>
       )}

@@ -69,13 +69,7 @@ function ActionBtn({
 }
 
 // Circular pill used for the top-left back + top-right dots buttons.
-function HeaderPill({
-  onPress,
-  children,
-}: {
-  onPress?: () => void
-  children: React.ReactNode
-}) {
+function HeaderPill({ onPress, children }: { onPress?: () => void; children: React.ReactNode }) {
   return (
     <Pressable
       onPress={onPress}
@@ -94,26 +88,40 @@ function HeaderPill({
 function humanSource(source: string | null | undefined, locale: Locale): string | null {
   if (!source) return null
   switch (source) {
-    case 'voice': return t('source.voice', locale)
-    case 'manual': return t('source.manual', locale)
-    case 'scan': return t('source.scan', locale)
-    case 'shortcut': return t('source.shortcut', locale)
-    case 'notification_listener': return t('source.notification', locale)
-    case 'recurring_generated': return t('source.recurring', locale)
-    case 'import': return t('source.import', locale)
-    default: return source
+    case 'voice':
+      return t('source.voice', locale)
+    case 'manual':
+      return t('source.manual', locale)
+    case 'scan':
+      return t('source.scan', locale)
+    case 'shortcut':
+      return t('source.shortcut', locale)
+    case 'notification_listener':
+      return t('source.notification', locale)
+    case 'recurring_generated':
+      return t('source.recurring', locale)
+    case 'import':
+      return t('source.import', locale)
+    default:
+      return source
   }
 }
 
 function humanPayment(method: string | null | undefined, locale: Locale): string | null {
   if (!method) return null
   switch (method) {
-    case 'cash': return t('payment.cash', locale)
-    case 'credit_card': return t('payment.credit_card', locale)
-    case 'debit_card': return t('payment.debit_card', locale)
-    case 'digital_wallet': return t('payment.digital_wallet', locale)
-    case 'bank_transfer': return t('payment.bank_transfer', locale)
-    default: return method.replace('_', ' ')
+    case 'cash':
+      return t('payment.cash', locale)
+    case 'credit_card':
+      return t('payment.credit_card', locale)
+    case 'debit_card':
+      return t('payment.debit_card', locale)
+    case 'digital_wallet':
+      return t('payment.digital_wallet', locale)
+    case 'bank_transfer':
+      return t('payment.bank_transfer', locale)
+    default:
+      return method.replace('_', ' ')
   }
 }
 
@@ -236,11 +244,14 @@ export default function TransactionDetailScreen() {
     }
   }
 
-  const dateLine = new Date(txn.transacted_at).toLocaleDateString(locale, {
-    weekday: 'long',
-    month: 'short',
-    day: 'numeric',
-  }) + ' · ' + new Date(txn.transacted_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+  const dateLine =
+    new Date(txn.transacted_at).toLocaleDateString(locale, {
+      weekday: 'long',
+      month: 'short',
+      day: 'numeric',
+    }) +
+    ' · ' +
+    new Date(txn.transacted_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
 
   return (
     <>
@@ -269,12 +280,14 @@ export default function TransactionDetailScreen() {
               categoryName={categoryName}
               categoryColor={category?.color}
             />
-            <Text style={styles.merchantName}>{txn.merchant ?? t('transactions.unknown', locale)}</Text>
+            <Text style={styles.merchantName}>
+              {txn.merchant ?? t('transactions.unknown', locale)}
+            </Text>
             <View style={styles.heroAmount}>
               <Money
                 value={amountSign * txn.amount}
                 size={56}
-                color={isCredit ? Colors.income : Colors.ink ?? Colors.text}
+                color={isCredit ? Colors.income : (Colors.ink ?? Colors.text)}
                 currencyCode={txn.currency_code || currency}
                 locale={locale}
               />
@@ -293,14 +306,8 @@ export default function TransactionDetailScreen() {
                 user can still see the state without going to Edit. */}
             {txn.is_recurring && (
               <View style={styles.recurringChip}>
-                <Ionicons
-                  name="repeat"
-                  size={12}
-                  color={Colors.accent ?? Colors.primary}
-                />
-                <Text style={styles.recurringChipLabel}>
-                  {recurringChipParts.join(' · ')}
-                </Text>
+                <Ionicons name="repeat" size={12} color={Colors.accent ?? Colors.primary} />
+                <Text style={styles.recurringChipLabel}>{recurringChipParts.join(' · ')}</Text>
               </View>
             )}
           </View>
@@ -308,9 +315,16 @@ export default function TransactionDetailScreen() {
           {/* Fields */}
           <View style={styles.fieldsCard}>
             <DetailRow label={t('detail.date', locale)} value={dateLine} />
-            <DetailRow label={t('detail.payment', locale)} value={humanPayment(txn.payment_method, locale)} />
+            <DetailRow
+              label={t('detail.payment', locale)}
+              value={humanPayment(txn.payment_method, locale)}
+            />
             <DetailRow label={t('detail.note', locale)} value={txn.note} />
-            <DetailRow label={t('detail.logged_via', locale)} value={humanSource(txn.source, locale)} last />
+            <DetailRow
+              label={t('detail.logged_via', locale)}
+              value={humanSource(txn.source, locale)}
+              last
+            />
           </View>
 
           {/* Actions row — Edit + Delete. Split / Re-record from the mockup

@@ -88,8 +88,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  title: { marginTop: 22, fontFamily: Typography.fontFamily.serif, fontSize: 30, color: Colors.ink, fontWeight: '500' },
-  body: { marginTop: 8, fontSize: 15, color: Colors.ink3, fontFamily: Typography.fontFamily.sans, textAlign: 'center' },
+  title: {
+    marginTop: 22,
+    fontFamily: Typography.fontFamily.serif,
+    fontSize: 30,
+    color: Colors.ink,
+    fontWeight: '500',
+  },
+  body: {
+    marginTop: 8,
+    fontSize: 15,
+    color: Colors.ink3,
+    fontFamily: Typography.fontFamily.sans,
+    textAlign: 'center',
+  },
   cta: {
     marginTop: 28,
     height: 52,
@@ -99,5 +111,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  ctaText: { color: Colors.white, fontSize: 16, fontWeight: '600', fontFamily: Typography.fontFamily.sansSemiBold },
+  ctaText: {
+    color: Colors.white,
+    fontSize: 16,
+    fontWeight: '600',
+    fontFamily: Typography.fontFamily.sansSemiBold,
+  },
 })

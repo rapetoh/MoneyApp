@@ -98,11 +98,7 @@ function resolveVariant(variant: MurmurVariant): PaletteResolved {
   }
 }
 
-export function MurmurMark({
-  size = 56,
-  variant = 'cream',
-  style,
-}: MurmurMarkProps) {
+export function MurmurMark({ size = 56, variant = 'cream', style }: MurmurMarkProps) {
   const palette = resolveVariant(variant)
 
   // On a tile, scale the 160-grid so the coin lands on the icon keyline
@@ -146,12 +142,7 @@ export function MurmurMark({
     : null
 
   const Coin = (
-    <Svg
-      width={markSize}
-      height={markSize}
-      viewBox="0 0 160 160"
-      style={tile ? undefined : style}
-    >
+    <Svg width={markSize} height={markSize} viewBox="0 0 160 160" style={tile ? undefined : style}>
       {gradient && (
         <Defs>
           <RadialGradient id="murmurCoin" cx="35%" cy="30%" r="90%">
@@ -177,8 +168,24 @@ export function MurmurMark({
           <Circle cx={80} cy={80} r={62} fill={coinFill} />
           {gradient && (
             <>
-              <Circle cx={80} cy={80} r={62} fill="none" stroke={TOKENS.cream} strokeWidth={1} opacity={0.18} />
-              <Circle cx={80} cy={80} r={50} fill="none" stroke={TOKENS.cream} strokeWidth={1} opacity={0.18} />
+              <Circle
+                cx={80}
+                cy={80}
+                r={62}
+                fill="none"
+                stroke={TOKENS.cream}
+                strokeWidth={1}
+                opacity={0.18}
+              />
+              <Circle
+                cx={80}
+                cy={80}
+                r={50}
+                fill="none"
+                stroke={TOKENS.cream}
+                strokeWidth={1}
+                opacity={0.18}
+              />
             </>
           )}
           {Waves}

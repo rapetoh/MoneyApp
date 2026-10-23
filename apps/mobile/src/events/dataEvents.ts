@@ -21,44 +21,38 @@ export const DataEvents = {
   emitTransactions: (userId: string) =>
     DeviceEventEmitter.emit(DataEvents.TRANSACTIONS_CHANGED, userId),
 
-  emitBudget: (userId: string) =>
-    DeviceEventEmitter.emit(DataEvents.BUDGET_CHANGED, userId),
+  emitBudget: (userId: string) => DeviceEventEmitter.emit(DataEvents.BUDGET_CHANGED, userId),
 
-  emitProfile: (userId: string) =>
-    DeviceEventEmitter.emit(DataEvents.PROFILE_CHANGED, userId),
+  emitProfile: (userId: string) => DeviceEventEmitter.emit(DataEvents.PROFILE_CHANGED, userId),
 
   emitMerchantRules: (userId: string) =>
     DeviceEventEmitter.emit(DataEvents.MERCHANT_RULES_CHANGED, userId),
 
   onMerchantRules: (userId: string, handler: () => void) => {
-    const sub = DeviceEventEmitter.addListener(
-      DataEvents.MERCHANT_RULES_CHANGED,
-      (uid: string) => { if (uid === userId) handler() },
-    )
+    const sub = DeviceEventEmitter.addListener(DataEvents.MERCHANT_RULES_CHANGED, (uid: string) => {
+      if (uid === userId) handler()
+    })
     return () => sub.remove()
   },
 
   onTransactions: (userId: string, handler: () => void) => {
-    const sub = DeviceEventEmitter.addListener(
-      DataEvents.TRANSACTIONS_CHANGED,
-      (uid: string) => { if (uid === userId) handler() },
-    )
+    const sub = DeviceEventEmitter.addListener(DataEvents.TRANSACTIONS_CHANGED, (uid: string) => {
+      if (uid === userId) handler()
+    })
     return () => sub.remove()
   },
 
   onBudget: (userId: string, handler: () => void) => {
-    const sub = DeviceEventEmitter.addListener(
-      DataEvents.BUDGET_CHANGED,
-      (uid: string) => { if (uid === userId) handler() },
-    )
+    const sub = DeviceEventEmitter.addListener(DataEvents.BUDGET_CHANGED, (uid: string) => {
+      if (uid === userId) handler()
+    })
     return () => sub.remove()
   },
 
   onProfile: (userId: string, handler: () => void) => {
-    const sub = DeviceEventEmitter.addListener(
-      DataEvents.PROFILE_CHANGED,
-      (uid: string) => { if (uid === userId) handler() },
-    )
+    const sub = DeviceEventEmitter.addListener(DataEvents.PROFILE_CHANGED, (uid: string) => {
+      if (uid === userId) handler()
+    })
     return () => sub.remove()
   },
 }

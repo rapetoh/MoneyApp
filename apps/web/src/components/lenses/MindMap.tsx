@@ -124,11 +124,7 @@ function clamp(v: number, lo: number, hi: number): number {
 /** "$42/mo", "$60/wk", "$1,500/yr", "$100 every 2 wk" — how a rule is
  *  billed, in its own currency (never the monthly equivalent, which is
  *  what the card total already says). */
-function cadenceLabel(
-  amount: string,
-  frequency: RecurringFrequency,
-  interval: number,
-): string {
+function cadenceLabel(amount: string, frequency: RecurringFrequency, interval: number): string {
   const unit: Record<RecurringFrequency, string> = {
     daily: 'day',
     weekly: 'wk',
@@ -255,12 +251,8 @@ function buildBranches(p: LensProps): Branch[] {
   // transfer-kind category (Savings & Investing) is neither spend nor
   // income, so it must never appear in either of these two lists.
   const spendDebits = monthDebits(p).filter((t) => isSpend(t, t.category_kind))
-  const incomeCredits = monthCredits(p).filter(
-    (t) => classifyFlow(t, t.category_kind) === 'income',
-  )
-  const transferTxns = monthTxns(p).filter(
-    (t) => classifyFlow(t, t.category_kind) === 'transfer',
-  )
+  const incomeCredits = monthCredits(p).filter((t) => classifyFlow(t, t.category_kind) === 'income')
+  const transferTxns = monthTxns(p).filter((t) => classifyFlow(t, t.category_kind) === 'transfer')
 
   const incomeSubs = categorySubs('income', incomeCredits, fmt, 3, catColor)
   const expenseSubs = categorySubs('expense', spendDebits, fmt, 4, catColor)
@@ -424,7 +416,15 @@ function layoutBranches(
             leaves.push({ leaf: i < m.limit ? m.s.leaves[i] : null, x: lx, y: ly })
           }
         }
-        subs.push({ sub: m.s, x: sx, y: sy, height: m.height, limit: m.limit, hidden: m.hidden, leaves })
+        subs.push({
+          sub: m.s,
+          x: sx,
+          y: sy,
+          height: m.height,
+          limit: m.limit,
+          hidden: m.hidden,
+          leaves,
+        })
         cursor += m.height + SUB_GAP
       }
     }
@@ -487,7 +487,15 @@ export function MindMapLens({ props, displayName }: { props: LensProps; displayN
     /** Set once a real pan happened; the click that follows pointerup
      *  is swallowed so a drag that ended over a node doesn't toggle it. */
     didPan: boolean
-  }>({ pointerId: null, startX: 0, startY: 0, startTx: 0, startTy: 0, panning: false, didPan: false })
+  }>({
+    pointerId: null,
+    startX: 0,
+    startY: 0,
+    startTx: 0,
+    startTy: 0,
+    panning: false,
+    didPan: false,
+  })
   const PAN_THRESHOLD_PX = 4
 
   // Fit the whole tree — as currently folded — into the viewport, like
@@ -962,10 +970,20 @@ export function MindMapLens({ props, displayName }: { props: LensProps; displayN
                           fontFamily: font.sans,
                         }}
                         title={
-                          !hasLeaves ? s.label : expanded ? `Collapse ${s.label}` : `Expand ${s.label}`
+                          !hasLeaves
+                            ? s.label
+                            : expanded
+                              ? `Collapse ${s.label}`
+                              : `Expand ${s.label}`
                         }
                       >
-                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <span
+                          style={{
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
                           {s.label}
                         </span>
                         {hasLeaves && (
@@ -1030,7 +1048,9 @@ export function MindMapLens({ props, displayName }: { props: LensProps; displayN
                             >
                               {lp.leaf.title}
                             </span>
-                            <span style={{ color: colors.ink3, fontWeight: 500 }}>{lp.leaf.amount}</span>
+                            <span style={{ color: colors.ink3, fontWeight: 500 }}>
+                              {lp.leaf.amount}
+                            </span>
                           </div>
                         ) : (
                           // "+N more" terminator — same slot geometry as a

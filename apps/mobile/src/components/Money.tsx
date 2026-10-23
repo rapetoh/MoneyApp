@@ -67,9 +67,14 @@ export function Money({
   style,
 }: Props) {
   const isNeg = value < 0
-  const { symbol, symbolFirst, integer, decimal, fraction } = formatMoneyParts(value, currencyCode, locale)
+  const { symbol, symbolFirst, integer, decimal, fraction } = formatMoneyParts(
+    value,
+    currencyCode,
+    locale,
+  )
 
-  const resolvedColor = color ?? (muted ? Colors.ink3 ?? Colors.textSecondary : Colors.ink ?? Colors.text)
+  const resolvedColor =
+    color ?? (muted ? (Colors.ink3 ?? Colors.textSecondary) : (Colors.ink ?? Colors.text))
   const family = serif ? Typography.fontFamily.serif : Typography.fontFamily.sansSemiBold
   const weight: TextStyle['fontWeight'] = serif ? '500' : sansWeight
   const letterSpacing = serif ? -0.5 : -0.8
@@ -106,7 +111,12 @@ export function Money({
       {isNeg && '−'}
       {symbolFirst && <Text style={glyphStyle}>{symbol}</Text>}
       {integer}
-      {(decimal || fraction) && <Text style={{ opacity: 0.55 }}>{decimal}{fraction}</Text>}
+      {(decimal || fraction) && (
+        <Text style={{ opacity: 0.55 }}>
+          {decimal}
+          {fraction}
+        </Text>
+      )}
       {!symbolFirst && <Text style={glyphStyle}>{' ' + symbol}</Text>}
     </Text>
   )

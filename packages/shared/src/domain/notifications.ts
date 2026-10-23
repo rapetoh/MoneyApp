@@ -34,7 +34,12 @@
 import type { AskMurmurBudget, AskMurmurTransaction } from '../types/ai'
 import type { Locale } from '../i18n'
 import { t } from '../i18n'
-import { budgetStatus, type BudgetStatusInput, type BudgetStatusRule, type BudgetStatusTransaction } from './budget'
+import {
+  budgetStatus,
+  type BudgetStatusInput,
+  type BudgetStatusRule,
+  type BudgetStatusTransaction,
+} from './budget'
 import { computeAskInsights, type AskInsightRule } from './askInsights'
 import { occurrencesInWindow } from './recurrence'
 import { roundCents } from '../utils/currency'
@@ -155,7 +160,8 @@ function fill(template: string, params: Record<string, string | number>): string
 }
 
 function amountOf(tx: AskMurmurTransaction): number | null {
-  return typeof tx.amount_in_profile_currency === 'number' && Number.isFinite(tx.amount_in_profile_currency)
+  return typeof tx.amount_in_profile_currency === 'number' &&
+    Number.isFinite(tx.amount_in_profile_currency)
     ? tx.amount_in_profile_currency
     : null
 }
@@ -181,7 +187,8 @@ export function planNotifications(input: NotificationPlanInput): NotificationCan
   const nowMs = Date.parse(nowUtc)
   if (!Number.isFinite(nowMs)) return []
 
-  const T = (key: string, params: Record<string, string | number> = {}) => fill(t(key, locale), params)
+  const T = (key: string, params: Record<string, string | number> = {}) =>
+    fill(t(key, locale), params)
   const m = (v: number) => money(v, currency, locale)
   const out: NotificationCandidate[] = []
 
@@ -261,7 +268,8 @@ export function planNotifications(input: NotificationPlanInput): NotificationCan
     (r) => r.direction === 'debit' && r.is_active !== false && r.starts_at,
   )
   const ruleAmount = (r: AskInsightRule & Partial<BudgetStatusRule>) =>
-    typeof r.amount_in_profile_currency === 'number' && Number.isFinite(r.amount_in_profile_currency)
+    typeof r.amount_in_profile_currency === 'number' &&
+    Number.isFinite(r.amount_in_profile_currency)
       ? r.amount_in_profile_currency
       : r.amount
   const recurrenceOf = (r: AskInsightRule & Partial<BudgetStatusRule>) =>
@@ -291,7 +299,9 @@ export function planNotifications(input: NotificationPlanInput): NotificationCan
     const rec = recurrenceOf(r)
     if (!rec) continue
     try {
-      const occ = occurrencesInWindow(rec, nowUtc, new Date(nowMs + 7 * DAY_MS).toISOString(), tz, { limit: 20 })
+      const occ = occurrencesInWindow(rec, nowUtc, new Date(nowMs + 7 * DAY_MS).toISOString(), tz, {
+        limit: 20,
+      })
       for (const o of occ) {
         upcoming.push({
           name: r.name?.trim() || t('ask.insight_unnamed_rule', locale),
@@ -320,7 +330,9 @@ export function planNotifications(input: NotificationPlanInput): NotificationCan
     const rec = recurrenceOf(r)
     if (!rec) continue
     try {
-      const occ = occurrencesInWindow(rec, nowUtc, new Date(monthEnd).toISOString(), tz, { limit: 40 })
+      const occ = occurrencesInWindow(rec, nowUtc, new Date(monthEnd).toISOString(), tz, {
+        limit: 40,
+      })
       stillDue += occ.length * ruleAmount(r)
     } catch {
       /* skip */
@@ -340,8 +352,13 @@ export function planNotifications(input: NotificationPlanInput): NotificationCan
     return sum + (amountOf(tx) ?? 0)
   }, 0)
   const incomeBasis =
-    incomeThisMonth > 0 ? incomeThisMonth : input.monthlyIncome && input.monthlyIncome > 0 ? input.monthlyIncome : null
-  const leftAfterBills = incomeBasis !== null ? roundCents(incomeBasis - spentThisMonth - stillDue) : null
+    incomeThisMonth > 0
+      ? incomeThisMonth
+      : input.monthlyIncome && input.monthlyIncome > 0
+        ? input.monthlyIncome
+        : null
+  const leftAfterBills =
+    incomeBasis !== null ? roundCents(incomeBasis - spentThisMonth - stillDue) : null
 
   // The single most valuable message in the catalogue: a bill lands
   // within about a day, and here is what remains once it does.
@@ -389,7 +406,13 @@ export function planNotifications(input: NotificationPlanInput): NotificationCan
     if (!rec) continue
     let occ
     try {
-      occ = occurrencesInWindow(rec, new Date(nowMs - 9 * DAY_MS).toISOString(), new Date(nowMs - 2 * DAY_MS).toISOString(), tz, { limit: 5 })
+      occ = occurrencesInWindow(
+        rec,
+        new Date(nowMs - 9 * DAY_MS).toISOString(),
+        new Date(nowMs - 2 * DAY_MS).toISOString(),
+        tz,
+        { limit: 5 },
+      )
     } catch {
       continue
     }
@@ -412,7 +435,9 @@ export function planNotifications(input: NotificationPlanInput): NotificationCan
       kind: 'bill_missing',
       dedupeKey: `bill_missing:${String(r.id ?? r.name)}:${last.occurrenceDate}`,
       priority: PRIORITY.bill_missing,
-      title: T('notif.bill_missing_title', { name: r.name?.trim() || t('ask.insight_unnamed_rule', locale) }),
+      title: T('notif.bill_missing_title', {
+        name: r.name?.trim() || t('ask.insight_unnamed_rule', locale),
+      }),
       body: T('notif.bill_missing_body', { amount: m(amount) }),
       data: { screen: 'recurring', rule: String(r.id ?? '') },
       urgency: 'active',
@@ -435,7 +460,10 @@ export function planNotifications(input: NotificationPlanInput): NotificationCan
       continue
     }
     const windowKey = String(status.window.start ?? '').slice(0, 10)
-    const daysLeft = Math.max(0, Math.ceil((Date.parse(String(status.window.endExclusive)) - nowMs) / DAY_MS))
+    const daysLeft = Math.max(
+      0,
+      Math.ceil((Date.parse(String(status.window.endExclusive)) - nowMs) / DAY_MS),
+    )
     const isCategory = b.category_id != null
 
     if (status.pct >= 1) {
@@ -445,7 +473,10 @@ export function planNotifications(input: NotificationPlanInput): NotificationCan
         dedupeKey: `${isCategory ? 'budget_category_over' : 'budget_over'}:${b.id}:${windowKey}`,
         priority: isCategory ? PRIORITY.budget_category_over : PRIORITY.budget_over,
         title: isCategory
-          ? T('notif.budget_category_over_title', { category: b.category_name ?? '', over: m(Math.abs(status.remaining)) })
+          ? T('notif.budget_category_over_title', {
+              category: b.category_name ?? '',
+              over: m(Math.abs(status.remaining)),
+            })
           : T('notif.budget_over_title', { over: m(Math.abs(status.remaining)) }),
         body: T('notif.budget_over_body', { days: daysLeft }),
         data: { screen: 'budgets', budget: b.id },
@@ -531,7 +562,10 @@ export function planNotifications(input: NotificationPlanInput): NotificationCan
   if (isSunday) {
     const weekStart = nowMs - 7 * DAY_MS
     const weekTxns = input.transactions.filter(
-      (tx) => tx.direction === 'debit' && Date.parse(tx.transacted_at) >= weekStart && amountOf(tx) !== null,
+      (tx) =>
+        tx.direction === 'debit' &&
+        Date.parse(tx.transacted_at) >= weekStart &&
+        amountOf(tx) !== null,
     )
     if (weekTxns.length >= 5) {
       const total = roundCents(weekTxns.reduce((s, tx) => s + (amountOf(tx) ?? 0), 0))
@@ -550,7 +584,11 @@ export function planNotifications(input: NotificationPlanInput): NotificationCan
         title: T('notif.weekly_recap_title', { amount: m(total) }),
         body:
           top && top[0]
-            ? T('notif.weekly_recap_body_top', { count: weekTxns.length, category: top[0], amount: m(roundCents(top[1])) })
+            ? T('notif.weekly_recap_body_top', {
+                count: weekTxns.length,
+                category: top[0],
+                amount: m(roundCents(top[1])),
+              })
             : T('notif.weekly_recap_body', { count: weekTxns.length }),
         data: { screen: 'insights' },
         urgency: 'passive',
@@ -650,7 +688,10 @@ export function inQuietHours(hour: number, start: number, end: number): boolean 
  * hour and most hours have nothing worth saying. Nothing here ever
  * reaches for a lower-priority candidate to fill a slot.
  */
-export function govern(candidates: NotificationCandidate[], state: GovernorState): NotificationCandidate | null {
+export function govern(
+  candidates: NotificationCandidate[],
+  state: GovernorState,
+): NotificationCandidate | null {
   const { prefs } = state
 
   const eligible = candidates.filter((c) => {

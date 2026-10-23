@@ -1,5 +1,14 @@
 import { useMemo, useState } from 'react'
-import { ScrollView, View, Text, StyleSheet, ActivityIndicator, Pressable, RefreshControl, Platform } from 'react-native'
+import {
+  ScrollView,
+  View,
+  Text,
+  StyleSheet,
+  ActivityIndicator,
+  Pressable,
+  RefreshControl,
+  Platform,
+} from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
@@ -83,10 +92,18 @@ function groupForToday(txns: Transaction[], locale: Locale, nowIso: string, tz: 
   const yestInstant = civilDateTimeToInstant(yestCivil.y, yestCivil.m, yestCivil.d, 12, 0, 0, tz)
   const yestDayIso = localDay(yestInstant, tz)
   const cutoffCivil = addDays(today.y, today.m, today.d, -(FEED_DAYS - 1))
-  const cutoffDayIso = localDay(civilDateTimeToInstant(cutoffCivil.y, cutoffCivil.m, cutoffCivil.d, 12, 0, 0, tz), tz)
+  const cutoffDayIso = localDay(
+    civilDateTimeToInstant(cutoffCivil.y, cutoffCivil.m, cutoffCivil.d, 12, 0, 0, tz),
+    tz,
+  )
 
   // Newest first; bucket by civil day.
-  const live = txns.filter((t) => !t.is_deleted).slice().sort((a, b) => (a.transacted_at < b.transacted_at ? 1 : a.transacted_at > b.transacted_at ? -1 : 0))
+  const live = txns
+    .filter((t) => !t.is_deleted)
+    .slice()
+    .sort((a, b) =>
+      a.transacted_at < b.transacted_at ? 1 : a.transacted_at > b.transacted_at ? -1 : 0,
+    )
   const buckets = new Map<string, { label: string; items: Transaction[] }>()
   let rowsInWindow = 0
   for (const txn of live) {
@@ -102,7 +119,12 @@ function groupForToday(txns: Transaction[], locale: Locale, nowIso: string, tz: 
     } else if (dayIso === yestDayIso) {
       label = `${t('transactions.yesterday', locale)} · ${d.toLocaleDateString(locale, { weekday: 'long', timeZone: tz })}`
     } else {
-      label = d.toLocaleDateString(locale, { weekday: 'long', month: 'long', day: 'numeric', timeZone: tz })
+      label = d.toLocaleDateString(locale, {
+        weekday: 'long',
+        month: 'long',
+        day: 'numeric',
+        timeZone: tz,
+      })
     }
     const bucket = buckets.get(dayIso) ?? { label, items: [] }
     bucket.items.push(txn)
@@ -166,10 +188,20 @@ export default function TodayScreen() {
   // already expose `error`; this screen is the one that wasn't consuming
   // it, so a failed read rendered identically to "no transactions yet" /
   // "no budget set" instead of a real error-with-retry state.
-  const { transactions, loading, error: transactionsError, createTransaction } = useTransactions(user?.id)
+  const {
+    transactions,
+    loading,
+    error: transactionsError,
+    createTransaction,
+  } = useTransactions(user?.id)
   const { categoryMap } = useCategories(user?.id)
   const { profile, updateProfile } = useProfile(user?.id)
-  const { budget, error: budgetError, setBudget, refetch: refetchBudget } = useActiveBudget(user?.id)
+  const {
+    budget,
+    error: budgetError,
+    setBudget,
+    refetch: refetchBudget,
+  } = useActiveBudget(user?.id)
   const { rules: recurringRules, createRule, updateRule } = useRecurringRules(user?.id)
   const { refreshing, onRefresh } = useManualRefresh(user?.id, [refetchBudget])
   const router = useRouter()
@@ -215,17 +247,28 @@ export default function TodayScreen() {
     [transactions, locale, nowInstant, tz],
   )
   const liveCount = useMemo(() => transactions.filter((x) => !x.is_deleted).length, [transactions])
-  const weekly = useMemo(() => weeklySpendBars(transactions, nowInstant, tz), [transactions, nowInstant, tz])
+  const weekly = useMemo(
+    () => weeklySpendBars(transactions, nowInstant, tz),
+    [transactions, nowInstant, tz],
+  )
   const todayDow = useMemo(() => localParts(nowInstant, tz).weekdayIndex, [nowInstant, tz])
   const daysLeft = useMemo(() => daysLeftInMonth(nowInstant, tz), [nowInstant, tz])
   const monthLabel = useMemo(
-    () => new Date(nowInstant).toLocaleDateString(locale, { month: 'long', timeZone: tz }).toUpperCase(),
+    () =>
+      new Date(nowInstant)
+        .toLocaleDateString(locale, { month: 'long', timeZone: tz })
+        .toUpperCase(),
     [locale, tz, nowInstant],
   )
   const spentToday = useMemo(() => {
     const todayDayIso = localDay(nowInstant, tz)
     return transactions
-      .filter((tx) => !tx.is_deleted && tx.direction === 'debit' && localDay(tx.transacted_at, tz) === todayDayIso)
+      .filter(
+        (tx) =>
+          !tx.is_deleted &&
+          tx.direction === 'debit' &&
+          localDay(tx.transacted_at, tz) === todayDayIso,
+      )
       .reduce((sum, tx) => sum + aggAmount(tx), 0)
   }, [transactions, nowInstant, tz])
 
@@ -246,11 +289,12 @@ export default function TodayScreen() {
   // "$0 left this month · 16 days to go"). Caption and countdown follow the
   // budget's own period/window, not the calendar month.
   const leftThisPeriod = budgetStatus ? budgetStatus.remaining : null
-  const budgetPeriodKey = budget?.period === 'weekly'
-    ? 'home.left_this_week'
-    : budget?.period === 'monthly'
-      ? 'home.left_this_month'
-      : 'home.left_this_period'
+  const budgetPeriodKey =
+    budget?.period === 'weekly'
+      ? 'home.left_this_week'
+      : budget?.period === 'monthly'
+        ? 'home.left_this_month'
+        : 'home.left_this_period'
   const budgetDaysLeft = useMemo(() => {
     if (!budgetStatus) return daysLeft
     const now = localParts(nowInstant, tz)
@@ -335,7 +379,9 @@ export default function TodayScreen() {
       <ScrollView
         contentContainerStyle={[styles.content, { paddingBottom: tabBarClearance }]}
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.ink3} />}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.ink3} />
+        }
       >
         {/* Header — APRIL / Today + manual entry + Ask Murmur + History.
             The + pill (voice redesign) is the old manual flow's new home:
@@ -349,7 +395,9 @@ export default function TodayScreen() {
           <View style={styles.headerActions}>
             {isTrialActive(profile) && (
               <Pressable
-                onPress={() => router.push({ pathname: '/more/paywall', params: { origin: 'trial_chip' } })}
+                onPress={() =>
+                  router.push({ pathname: '/more/paywall', params: { origin: 'trial_chip' } })
+                }
                 style={({ pressed }) => [styles.trialChip, pressed && { opacity: 0.7 }]}
                 accessibilityRole="button"
               >
@@ -360,25 +408,30 @@ export default function TodayScreen() {
               </Pressable>
             )}
             <Pressable
-              style={({ pressed }) => [styles.headerIconBtn, pressed && styles.headerIconBtnPressed]}
+              style={({ pressed }) => [
+                styles.headerIconBtn,
+                pressed && styles.headerIconBtnPressed,
+              ]}
               onPress={() => router.push('/transaction/new')}
               accessibilityLabel={t('nav.add_expense', locale)}
             >
               <Ionicons name="add" size={20} color={Colors.ink2 ?? Colors.textSecondary} />
             </Pressable>
             <Pressable
-              style={({ pressed }) => [styles.headerIconBtn, pressed && styles.headerIconBtnPressed]}
+              style={({ pressed }) => [
+                styles.headerIconBtn,
+                pressed && styles.headerIconBtnPressed,
+              ]}
               onPress={() => router.push('/more/ask')}
               accessibilityLabel={t('ask.title', locale)}
             >
-              <Ionicons
-                name="sparkles"
-                size={18}
-                color={Colors.accent ?? Colors.primary}
-              />
+              <Ionicons name="sparkles" size={18} color={Colors.accent ?? Colors.primary} />
             </Pressable>
             <Pressable
-              style={({ pressed }) => [styles.headerIconBtn, pressed && styles.headerIconBtnPressed]}
+              style={({ pressed }) => [
+                styles.headerIconBtn,
+                pressed && styles.headerIconBtnPressed,
+              ]}
               onPress={() => router.push('/more/transactions')}
               accessibilityLabel={t('more.transactions', locale)}
             >
@@ -394,9 +447,16 @@ export default function TodayScreen() {
         {budgetError && !budget ? (
           <Pressable
             onPress={refetchBudget}
-            style={({ pressed }) => [styles.budgetErrorLine, pressed && styles.budgetErrorLinePressed]}
+            style={({ pressed }) => [
+              styles.budgetErrorLine,
+              pressed && styles.budgetErrorLinePressed,
+            ]}
           >
-            <Ionicons name="alert-circle-outline" size={14} color={Colors.destructive ?? '#A94646'} />
+            <Ionicons
+              name="alert-circle-outline"
+              size={14}
+              color={Colors.destructive ?? '#A94646'}
+            />
             <Text style={styles.budgetErrorText}>
               {t('common.load_failed', locale)} · {t('common.retry', locale)}
             </Text>
@@ -405,16 +465,26 @@ export default function TodayScreen() {
           leftThisPeriod != null && (
             <View style={styles.budgetLine}>
               <Text style={styles.budgetLeft}>
-                <Text style={[styles.budgetLeftAccent, leftThisPeriod < 0 && styles.budgetOverAccent]}>
+                <Text
+                  style={[styles.budgetLeftAccent, leftThisPeriod < 0 && styles.budgetOverAccent]}
+                >
                   {formatBudgetShort(Math.abs(leftThisPeriod), currency, locale)}
                 </Text>
                 <Text style={styles.budgetLeftRest}>
                   {' '}
-                  {leftThisPeriod < 0 ? t('home.over_budget_suffix', locale) : t(budgetPeriodKey, locale)}
+                  {leftThisPeriod < 0
+                    ? t('home.over_budget_suffix', locale)
+                    : t(budgetPeriodKey, locale)}
                 </Text>
               </Text>
               <Text style={styles.budgetRight}>
-                {budgetDaysLeft} {t(leftThisPeriod < 0 && budget?.period === 'weekly' ? 'home.days_left_week' : 'home.days_to_go', locale)}
+                {budgetDaysLeft}{' '}
+                {t(
+                  leftThisPeriod < 0 && budget?.period === 'weekly'
+                    ? 'home.days_left_week'
+                    : 'home.days_to_go',
+                  locale,
+                )}
               </Text>
             </View>
           )
@@ -441,7 +511,9 @@ export default function TodayScreen() {
             locale={locale}
             collapsed={firstRun.checklistCollapsed}
             onToggleCollapsed={firstRun.toggleChecklistCollapsed}
-            onRemove={() => updateProfile({ start_checklist_dismissed_at: new Date().toISOString() })}
+            onRemove={() =>
+              updateProfile({ start_checklist_dismissed_at: new Date().toISOString() })
+            }
           />
         )}
 
@@ -461,11 +533,18 @@ export default function TodayScreen() {
           <ActivityIndicator color={Colors.primary} style={styles.loading} />
         ) : transactionsError && sections.length === 0 ? (
           <View style={styles.errorState}>
-            <Ionicons name="alert-circle-outline" size={32} color={Colors.destructive ?? '#A94646'} />
+            <Ionicons
+              name="alert-circle-outline"
+              size={32}
+              color={Colors.destructive ?? '#A94646'}
+            />
             <Text style={styles.errorTitle}>{t('common.load_failed', locale)}</Text>
             <Pressable
               onPress={() => user?.id && syncManager.pullRemote(user.id)}
-              style={({ pressed }) => [styles.errorRetryBtn, pressed && styles.errorRetryBtnPressed]}
+              style={({ pressed }) => [
+                styles.errorRetryBtn,
+                pressed && styles.errorRetryBtnPressed,
+              ]}
             >
               <Ionicons name="refresh" size={14} color="#FFFFFF" />
               <Text style={styles.errorRetryText}>{t('common.retry', locale)}</Text>
@@ -527,7 +606,9 @@ export default function TodayScreen() {
         initialRollover={budget?.rollover ?? false}
         currency={currency}
         locale={locale}
-        onSave={(amount, period, _categoryId, rollover) => setBudget(amount, period, currency, tz, rollover)}
+        onSave={(amount, period, _categoryId, rollover) =>
+          setBudget(amount, period, currency, tz, rollover)
+        }
         onClose={() => setBudgetModal(false)}
       />
       <IncomeEditorModal

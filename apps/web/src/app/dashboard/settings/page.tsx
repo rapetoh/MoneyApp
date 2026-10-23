@@ -10,17 +10,29 @@ import { usePlus } from '../../../lib/plus'
 import { PlusRefreshButton } from '../../../components/PlusRefreshButton'
 import { changeCurrency } from '../../../lib/changeCurrency'
 import { formatRelativeSync } from '../../../lib/relativeTime'
-import { SUPPORT_EMAIL, SUPPORT_MAILTO, describePlus, PLUS_MANAGE_URL_APPLE, type Profile } from '@voice-expense/shared'
+import {
+  SUPPORT_EMAIL,
+  SUPPORT_MAILTO,
+  describePlus,
+  PLUS_MANAGE_URL_APPLE,
+  type Profile,
+} from '@voice-expense/shared'
 
 /** `devices.platform` -> a human label (fix-plan 3.7's real device rows). */
 function platformLabel(platform: string): string {
   switch (platform) {
-    case 'ios': return 'iPhone'
-    case 'android': return 'Android'
-    case 'web': return 'Web'
-    case 'desktop_mac': return 'Mac'
-    case 'desktop_win': return 'Windows'
-    default: return platform
+    case 'ios':
+      return 'iPhone'
+    case 'android':
+      return 'Android'
+    case 'web':
+      return 'Web'
+    case 'desktop_mac':
+      return 'Mac'
+    case 'desktop_win':
+      return 'Windows'
+    default:
+      return platform
   }
 }
 
@@ -32,14 +44,7 @@ const LOCALES = [
   { value: 'pt', label: 'Portugu\u00eas' },
 ]
 
-type SectionKey =
-  | 'account'
-  | 'sync'
-  | 'plan'
-  | 'privacy'
-  | 'voice'
-  | 'export'
-  | 'about'
+type SectionKey = 'account' | 'sync' | 'plan' | 'privacy' | 'voice' | 'export' | 'about'
 
 const SECTIONS: Array<{ key: SectionKey; label: string }> = [
   { key: 'account', label: 'Account' },
@@ -82,7 +87,12 @@ export default function SettingsPage() {
   // "devices this account has signed into", which for most users today
   // means their phone.
   const [devices, setDevices] = useState<
-    Array<{ id: string; platform: string; device_name: string | null; last_synced_at: string | null }>
+    Array<{
+      id: string
+      platform: string
+      device_name: string | null
+      last_synced_at: string | null
+    }>
   >([])
   const [email, setEmail] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -115,9 +125,10 @@ export default function SettingsPage() {
   // is `null` until the first batch reports back.
   const [txnCount, setTxnCount] = useState(0)
   const [currencyConverting, setCurrencyConverting] = useState(false)
-  const [currencyProgress, setCurrencyProgress] = useState<{ converted: number; total: number } | null>(
-    null,
-  )
+  const [currencyProgress, setCurrencyProgress] = useState<{
+    converted: number
+    total: number
+  } | null>(null)
   const [currencyError, setCurrencyError] = useState<string | null>(null)
   // Stored as a string so the input behaves like a normal text field
   // (empty allowed, no spinner artifacts). Parsed on save — empty
@@ -148,7 +159,9 @@ export default function SettingsPage() {
     // capturing click listener on any same-origin `<a>` is the
     // route-change half of the guard.
     function handleClickCapture(e: MouseEvent) {
-      const anchor = (e.target as HTMLElement | null)?.closest('a[href]') as HTMLAnchorElement | null
+      const anchor = (e.target as HTMLElement | null)?.closest(
+        'a[href]',
+      ) as HTMLAnchorElement | null
       if (!anchor) return
       let url: URL
       try {
@@ -211,7 +224,8 @@ export default function SettingsPage() {
       setProfile(data as Profile)
       const loadedDisplayName = data.display_name ?? ''
       const loadedLocale = data.locale ?? 'en'
-      const loadedMonthlyIncomeInput = data.monthly_income != null ? String(data.monthly_income) : ''
+      const loadedMonthlyIncomeInput =
+        data.monthly_income != null ? String(data.monthly_income) : ''
       setDisplayName(loadedDisplayName)
       setCurrency(data.currency_code ?? 'USD')
       setLocale(loadedLocale)
@@ -279,14 +293,19 @@ export default function SettingsPage() {
     } = await supabase.auth.getUser()
     if (!user) return
 
-    const [{ data: transactions }, { data: categories }, { data: budgets }, { data: rules }, { data: merchantRules }] =
-      await Promise.all([
-        supabase.from('transactions').select('*').eq('user_id', user.id).order('transacted_at'),
-        supabase.from('categories').select('*').eq('user_id', user.id),
-        supabase.from('budgets').select('*').eq('user_id', user.id),
-        supabase.from('recurring_rules').select('*').eq('user_id', user.id),
-        supabase.from('merchant_rules').select('*').eq('user_id', user.id),
-      ])
+    const [
+      { data: transactions },
+      { data: categories },
+      { data: budgets },
+      { data: rules },
+      { data: merchantRules },
+    ] = await Promise.all([
+      supabase.from('transactions').select('*').eq('user_id', user.id).order('transacted_at'),
+      supabase.from('categories').select('*').eq('user_id', user.id),
+      supabase.from('budgets').select('*').eq('user_id', user.id),
+      supabase.from('recurring_rules').select('*').eq('user_id', user.id),
+      supabase.from('merchant_rules').select('*').eq('user_id', user.id),
+    ])
 
     const exported_at = new Date().toISOString()
     const blob = new Blob(
@@ -399,7 +418,9 @@ export default function SettingsPage() {
     setCurrencyError(null)
     setCurrencyConverting(true)
     setCurrencyProgress(null)
-    const result = await changeCurrency(supabase, newCode, (progress) => setCurrencyProgress(progress))
+    const result = await changeCurrency(supabase, newCode, (progress) =>
+      setCurrencyProgress(progress),
+    )
     setCurrencyConverting(false)
     setCurrencyProgress(null)
 
@@ -427,13 +448,27 @@ export default function SettingsPage() {
   const { isPlus } = usePlus()
   const plan = describePlus(profile)
   const fmtPlanDate = (iso: string | null) =>
-    iso ? new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '-'
+    iso
+      ? new Date(iso).toLocaleDateString(undefined, {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric',
+        })
+      : '-'
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
       <Toolbar title="Settings" />
       <div style={styles.page}>
-        <div style={{ fontFamily: font.serif, fontSize: 28, fontWeight: 500, color: colors.ink, letterSpacing: -0.6 }}>
+        <div
+          style={{
+            fontFamily: font.serif,
+            fontSize: 28,
+            fontWeight: 500,
+            color: colors.ink,
+            letterSpacing: -0.6,
+          }}
+        >
           Settings
         </div>
 
@@ -442,7 +477,12 @@ export default function SettingsPage() {
           // 08-F21 family) — this page has no other loading/empty gate,
           // so a failed read used to leave every field silently showing
           // its default value with no indication anything failed.
-          <ErrorState compact message="We couldn't load your settings." detail={loadError} onRetry={load} />
+          <ErrorState
+            compact
+            message="We couldn't load your settings."
+            detail={loadError}
+            onRetry={load}
+          />
         )}
 
         <div style={styles.layout}>
@@ -475,10 +515,7 @@ export default function SettingsPage() {
           {/* Right column — stacked section cards. The sub-nav scrolls
               between them. */}
           <div style={styles.cardsCol}>
-            <SettingsCard
-              title="Account"
-              refCb={(el) => (sectionRefs.current.account = el)}
-            >
+            <SettingsCard title="Account" refCb={(el) => (sectionRefs.current.account = el)}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
                 <div
                   style={{
@@ -564,7 +601,8 @@ export default function SettingsPage() {
                       {LOCALES.find((l) => l.value === locale)?.label ?? locale}
                     </div>
                     <div style={{ fontSize: 11, color: colors.ink3, marginTop: 4 }}>
-                      The web dashboard is English-only for now. Change your language from the mobile app.
+                      The web dashboard is English-only for now. Change your language from the
+                      mobile app.
                     </div>
                   </div>
                 </div>
@@ -574,12 +612,22 @@ export default function SettingsPage() {
                     Ask Murmur for affordability reasoning. */}
                 <div style={styles.field}>
                   <label style={styles.label}>Monthly income ({currency})</label>
-                  <div style={{ ...styles.input, background: 'transparent', display: 'flex', alignItems: 'center' }}>
+                  <div
+                    style={{
+                      ...styles.input,
+                      background: 'transparent',
+                      display: 'flex',
+                      alignItems: 'center',
+                    }}
+                  >
                     {monthlyIncomeInput ? monthlyIncomeInput : 'Not set'}
                   </div>
                   <div style={{ fontSize: 12, color: colors.ink3, marginTop: 6 }}>
                     Comes from your recurring income.{' '}
-                    <a href="/dashboard/recurring" style={{ color: colors.accent, fontWeight: 600 }}>
+                    <a
+                      href="/dashboard/recurring"
+                      style={{ color: colors.accent, fontWeight: 600 }}
+                    >
                       Manage it in Recurring
                     </a>
                     . Used by Ask Murmur for affordability and savings rate.
@@ -595,10 +643,7 @@ export default function SettingsPage() {
               </form>
             </SettingsCard>
 
-            <SettingsCard
-              title="Sync & devices"
-              refCb={(el) => (sectionRefs.current.sync = el)}
-            >
+            <SettingsCard title="Sync & devices" refCb={(el) => (sectionRefs.current.sync = el)}>
               {/* Fix-plan 3.7: real `devices` rows, populated by mobile's
                   `deviceRegistry.ts` on sign-in and stamped with
                   `last_synced_at` on every successful drain, replacing the
@@ -634,10 +679,7 @@ export default function SettingsPage() {
                   here for the user to set directly. Falls back to the
                   browser's own resolved zone for the render before that
                   capture has landed, so this never shows a stale 'UTC'. */}
-              <SettingRow
-                label="Time zone"
-                sub={profile?.timezone || deviceTimeZone || '-'}
-              />
+              <SettingRow label="Time zone" sub={profile?.timezone || deviceTimeZone || '-'} />
               <div
                 style={{
                   marginTop: 10,
@@ -650,7 +692,8 @@ export default function SettingsPage() {
                   fontFamily: font.sans,
                 }}
               >
-                Encrypted in transit and at rest, protected by row-level security tied to your account. Murmur stores your transactions but never connects to your bank.
+                Encrypted in transit and at rest, protected by row-level security tied to your
+                account. Murmur stores your transactions but never connects to your bank.
               </div>
             </SettingsCard>
 
@@ -666,9 +709,13 @@ export default function SettingsPage() {
               refCb={(el) => (sectionRefs.current.plan = el)}
               right={
                 isPlus ? (
-                  <Tag color={colors.accent} bg={colors.accentSoft}>PLUS</Tag>
+                  <Tag color={colors.accent} bg={colors.accentSoft}>
+                    PLUS
+                  </Tag>
                 ) : (
-                  <Tag color="#7A4A22" bg="#F2E5D5">FREE</Tag>
+                  <Tag color="#7A4A22" bg="#F2E5D5">
+                    FREE
+                  </Tag>
                 )
               }
             >
@@ -699,7 +746,12 @@ export default function SettingsPage() {
                       href={PLUS_MANAGE_URL_APPLE}
                       target="_blank"
                       rel="noreferrer"
-                      style={{ fontFamily: font.sans, fontSize: 12, fontWeight: 600, color: colors.accent }}
+                      style={{
+                        fontFamily: font.sans,
+                        fontSize: 12,
+                        fontWeight: 600,
+                        color: colors.accent,
+                      }}
                     >
                       Manage on Apple
                     </a>
@@ -723,18 +775,16 @@ export default function SettingsPage() {
                   }}
                 >
                   <span>
-                    Subscribe in the Murmur app on your iPhone (Settings → Subscription). Plans, prices and the
-                    free trial are shown there; your account unlocks everywhere, including here.
+                    Subscribe in the Murmur app on your iPhone (Settings → Subscription). Plans,
+                    prices and the free trial are shown there; your account unlocks everywhere,
+                    including here.
                   </span>
                   <PlusRefreshButton compact />
                 </div>
               )}
             </SettingsCard>
 
-            <SettingsCard
-              title="Privacy"
-              refCb={(el) => (sectionRefs.current.privacy = el)}
-            >
+            <SettingsCard title="Privacy" refCb={(el) => (sectionRefs.current.privacy = el)}>
               {/* The policy documents, then the GDPR controls. The old
                   "Anonymous usage analytics: Not collected." / "Crash
                   reporting: Not collected." rows were cut Sep 2 2026 on
@@ -797,10 +847,7 @@ export default function SettingsPage() {
               />
             </SettingsCard>
 
-            <SettingsCard
-              title="Voice & language"
-              refCb={(el) => (sectionRefs.current.voice = el)}
-            >
+            <SettingsCard title="Voice & language" refCb={(el) => (sectionRefs.current.voice = el)}>
               {/* Fix-plan 3.5 / audit 02-F4, 02-F16: speech-to-text runs on
                   the phone (true), but the resulting text is sent to our
                   server and to OpenAI to extract the amount, merchant and
@@ -827,10 +874,7 @@ export default function SettingsPage() {
               />
             </SettingsCard>
 
-            <SettingsCard
-              title="Export"
-              refCb={(el) => (sectionRefs.current.export = el)}
-            >
+            <SettingsCard title="Export" refCb={(el) => (sectionRefs.current.export = el)}>
               {/* Same label mobile's Settings row uses for this feature
                   (audit 08-F44), distinct from the Privacy card's "Export
                   all my data" above, which is a different, free, complete
@@ -847,10 +891,7 @@ export default function SettingsPage() {
               />
             </SettingsCard>
 
-            <SettingsCard
-              title="About"
-              refCb={(el) => (sectionRefs.current.about = el)}
-            >
+            <SettingsCard title="About" refCb={(el) => (sectionRefs.current.about = el)}>
               <SettingRow
                 label="Version"
                 sub="Murmur · desktop companion"
@@ -870,10 +911,7 @@ export default function SettingsPage() {
                   label="Help & contact"
                   sub={SUPPORT_EMAIL}
                   right={
-                    <a
-                      href={SUPPORT_MAILTO}
-                      style={styles.linkBtn}
-                    >
+                    <a href={SUPPORT_MAILTO} style={styles.linkBtn}>
                       Email
                     </a>
                   }
@@ -921,23 +959,21 @@ function SettingRow({
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '4px 0' }}>
       <div style={{ flex: 1 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: colors.ink, fontFamily: font.sans }}>{label}</div>
-        {sub && <div style={{ fontSize: 12, color: colors.ink3, marginTop: 2, fontFamily: font.sans }}>{sub}</div>}
+        <div style={{ fontSize: 13, fontWeight: 600, color: colors.ink, fontFamily: font.sans }}>
+          {label}
+        </div>
+        {sub && (
+          <div style={{ fontSize: 12, color: colors.ink3, marginTop: 2, fontFamily: font.sans }}>
+            {sub}
+          </div>
+        )}
       </div>
       {right}
     </div>
   )
 }
 
-function Tag({
-  children,
-  color,
-  bg,
-}: {
-  children: React.ReactNode
-  color: string
-  bg: string
-}) {
+function Tag({ children, color, bg }: { children: React.ReactNode; color: string; bg: string }) {
   return (
     <span
       style={{

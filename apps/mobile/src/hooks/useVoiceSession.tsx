@@ -1,4 +1,13 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react'
 import { Alert, BackHandler } from 'react-native'
 import { getLocales } from 'expo-localization'
 import { useRouter } from 'expo-router'
@@ -27,7 +36,6 @@ interface VoiceSessionApi {
 }
 
 const VoiceSessionContext = createContext<VoiceSessionApi | null>(null)
-
 
 /**
  * Root-level owner of the voice capture loop (docs/voice redesign, artboards
@@ -58,7 +66,11 @@ export function VoiceSessionProvider({ children }: { children: ReactNode }) {
   // French, Spanish and Portuguese speaker talk to an English recognizer.
   // The shared rule treats a value that doesn't match the app language as
   // the untouched default and derives it from language + device region.
-  const speechLocale = effectiveVoiceLanguage(profile?.voice_language, locale, getLocales()[0]?.regionCode)
+  const speechLocale = effectiveVoiceLanguage(
+    profile?.voice_language,
+    locale,
+    getLocales()[0]?.regionCode,
+  )
   const categoryNames = useMemo(() => categories.map((c) => c.name), [categories])
 
   const voice = useVoice(currency, categoryNames, locale, timezone)
@@ -91,7 +103,7 @@ export function VoiceSessionProvider({ children }: { children: ReactNode }) {
       setSource(src)
       voice.injectParsed(parsed)
     },
-     
+
     [voice.injectParsed],
   )
 
@@ -100,16 +112,19 @@ export function VoiceSessionProvider({ children }: { children: ReactNode }) {
   // This is the app's single subscribing call site (Settings mounts the
   // hook without a callback, for permission state only).
   useNotificationListener(
-    useCallback((parsed: ParsedExpense) => presentParsed(parsed, 'notification_listener'), [presentParsed]),
+    useCallback(
+      (parsed: ParsedExpense) => presentParsed(parsed, 'notification_listener'),
+      [presentParsed],
+    ),
   )
 
-  const overlayVisible = voice.state === 'listening' || voice.state === 'processing' || voice.state === 'error'
+  const overlayVisible =
+    voice.state === 'listening' || voice.state === 'processing' || voice.state === 'error'
   const sheetVisible = voice.state === 'done' && voice.parsedExpense !== null
 
   const dismissAll = useCallback(() => {
     voice.reset()
     setSource('voice')
-     
   }, [voice.reset])
 
   // Hardware back closes the capture surface instead of popping navigation —
@@ -164,9 +179,10 @@ export function VoiceSessionProvider({ children }: { children: ReactNode }) {
 
     const savedId = result.id
     haptic.success()
-    const label = expense.merchant?.trim()
-      || categories.find((c) => c.id === expense.categoryId)?.name
-      || t(expense.direction === 'credit' ? 'voice.income_label' : 'voice.expense', locale)
+    const label =
+      expense.merchant?.trim() ||
+      categories.find((c) => c.id === expense.categoryId)?.name ||
+      t(expense.direction === 'credit' ? 'voice.income_label' : 'voice.expense', locale)
     showUndo({
       message: `${t('voice.saved', locale)} · ${label} ${formatMoney(expense.amount, expense.currency, locale)}`,
       undoLabel: t('common.undo', locale),
@@ -182,7 +198,6 @@ export function VoiceSessionProvider({ children }: { children: ReactNode }) {
     voice.reset()
     setSource('voice')
     voice.startListening(speechLocale)
-     
   }, [voice.reset, voice.startListening, speechLocale])
 
   const handleKeyboard = useCallback(() => {
@@ -192,7 +207,10 @@ export function VoiceSessionProvider({ children }: { children: ReactNode }) {
 
   const parsed = voice.parsedExpense
 
-  const api = useMemo<VoiceSessionApi>(() => ({ openVoice, presentParsed }), [openVoice, presentParsed])
+  const api = useMemo<VoiceSessionApi>(
+    () => ({ openVoice, presentParsed }),
+    [openVoice, presentParsed],
+  )
 
   // Both layers sit inside <Presence> so they glide in over the current
   // screen and glide out on cancel / save — and stay mounted (frozen on
@@ -206,7 +224,13 @@ export function VoiceSessionProvider({ children }: { children: ReactNode }) {
       <Presence visible={overlayVisible}>
         {overlayVisible ? (
           <VoiceCaptureOverlay
-            phase={voice.state === 'listening' ? 'listening' : voice.state === 'processing' ? 'processing' : 'error'}
+            phase={
+              voice.state === 'listening'
+                ? 'listening'
+                : voice.state === 'processing'
+                  ? 'processing'
+                  : 'error'
+            }
             transcript={voice.interimTranscript || voice.transcript}
             errorMessage={voice.errorMessage}
             volumeLevel={voice.volumeLevel}

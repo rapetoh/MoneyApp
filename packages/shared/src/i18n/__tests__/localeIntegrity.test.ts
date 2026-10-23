@@ -65,7 +65,9 @@ describe('packages/shared/src/i18n/locales/*.json have no duplicate keys', () =>
       // locale file is exactly the kind of thing this test exists to catch.
       expect(() => JSON.parse(text)).not.toThrow()
       const issues = findDuplicateJsonKeys(text)
-      const summary = issues.map((i) => `  line ${i.line}: "${i.key}"${i.path ? ` (in ${i.path})` : ''}`)
+      const summary = issues.map(
+        (i) => `  line ${i.line}: "${i.key}"${i.path ? ` (in ${i.path})` : ''}`,
+      )
       expect(issues, `duplicate keys in ${file}:\n${summary.join('\n')}`).toHaveLength(0)
     })
   }

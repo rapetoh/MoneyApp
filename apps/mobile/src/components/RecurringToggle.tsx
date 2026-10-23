@@ -5,7 +5,14 @@ import { t } from '@voice-expense/shared'
 import type { Locale } from '@voice-expense/shared'
 import type { RecurringFrequency } from '@voice-expense/shared'
 
-const FREQUENCIES: RecurringFrequency[] = ['daily', 'weekly', 'biweekly', 'monthly', 'quarterly', 'yearly']
+const FREQUENCIES: RecurringFrequency[] = [
+  'daily',
+  'weekly',
+  'biweekly',
+  'monthly',
+  'quarterly',
+  'yearly',
+]
 
 const FREQ_KEY: Record<RecurringFrequency, string> = {
   daily: 'recurring.daily',
@@ -43,7 +50,9 @@ export function RecurringToggle({
       {/* Toggle row */}
       <View style={[styles.toggleRow, compact && styles.toggleRowCompact]}>
         <View style={styles.labelGroup}>
-          <Text style={[styles.label, compact && styles.labelCompact]}>{t('recurring.toggle', locale)}</Text>
+          <Text style={[styles.label, compact && styles.labelCompact]}>
+            {t('recurring.toggle', locale)}
+          </Text>
           {aiDetected && isRecurring && (
             <View style={styles.aiBadge}>
               <Text style={styles.aiBadgeText}>{t('recurring.ai_badge', locale)}</Text>

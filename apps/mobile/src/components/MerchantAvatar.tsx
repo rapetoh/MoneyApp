@@ -70,9 +70,10 @@ export function MerchantAvatar({
   // guaranteed-≥4.5:1-vs-white derivation the chart tints use, not the
   // raw value (fix-plan 4.4 / audit 01-F28). Otherwise deterministic
   // merchant color, whose palette is chosen for the same guarantee.
-  const bgColor = !hasMerchant && hasCategory && categoryColor
-    ? categoryPalette(categoryColor).fg
-    : merchantColor(fallbackSource)
+  const bgColor =
+    !hasMerchant && hasCategory && categoryColor
+      ? categoryPalette(categoryColor).fg
+      : merchantColor(fallbackSource)
 
   // Only attempt a favicon fetch when we actually have a merchant name. Using
   // the category as a domain guess (e.g. guessDomain("Rent") → "rent.com")
@@ -88,14 +89,17 @@ export function MerchantAvatar({
   // a letter under a logo.
   return (
     <View
-      style={[
-        styles.avatar,
-        { width: size, height: size, borderRadius, backgroundColor: bgColor },
-      ]}
+      style={[styles.avatar, { width: size, height: size, borderRadius, backgroundColor: bgColor }]}
     >
       <Text style={[styles.initial, { fontSize: size * 0.38 }]}>{initial}</Text>
       {logoUrl && (
-        <Animated.View style={[StyleSheet.absoluteFill, styles.logoGround, { borderRadius, opacity: logoOpacity }]}>
+        <Animated.View
+          style={[
+            StyleSheet.absoluteFill,
+            styles.logoGround,
+            { borderRadius, opacity: logoOpacity },
+          ]}
+        >
           <Image
             source={{ uri: logoUrl }}
             style={[StyleSheet.absoluteFill, { borderRadius }]}
@@ -103,7 +107,11 @@ export function MerchantAvatar({
             cachePolicy="memory-disk"
             transition={0}
             onLoad={() => {
-              Animated.timing(logoOpacity, { toValue: 1, duration: 140, useNativeDriver: true }).start()
+              Animated.timing(logoOpacity, {
+                toValue: 1,
+                duration: 140,
+                useNativeDriver: true,
+              }).start()
             }}
             onError={() => setLogoFailed(true)}
             accessibilityIgnoresInvertColors

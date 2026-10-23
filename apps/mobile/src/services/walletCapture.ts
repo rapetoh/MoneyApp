@@ -87,7 +87,9 @@ export function takeQueuedCaptures(): WalletCaptureEntry[] {
         e.hint === 'income' ? 'income' : e.hint === 'expense' ? 'expense' : ''
       // A spoken entry carries no amount field worth reading; a Wallet one
       // must have it (even empty) or the line is not one of ours.
-      const usable = typeof e.id === 'string' && (kind === 'phrase' ? phrase !== '' : typeof e.amount === 'string')
+      const usable =
+        typeof e.id === 'string' &&
+        (kind === 'phrase' ? phrase !== '' : typeof e.amount === 'string')
       if (usable) {
         out.push({
           id: e.id as string,

@@ -50,7 +50,9 @@ export function TrialBanner({ profile, locale }: { profile: Profile | null; loca
         title={title}
         body={t('trial.ending_body', locale)}
         cta={t('trial.keep', locale)}
-        onPress={() => router.push({ pathname: '/more/paywall', params: { origin: 'trial_ending' } })}
+        onPress={() =>
+          router.push({ pathname: '/more/paywall', params: { origin: 'trial_ending' } })
+        }
       />
     )
   }
@@ -133,8 +135,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  title: { flex: 1, fontSize: 15, color: Colors.ink, fontFamily: Typography.fontFamily.sansSemiBold, fontWeight: '600' },
-  body: { marginTop: 8, fontSize: 13, lineHeight: 19, color: Colors.ink3, fontFamily: Typography.fontFamily.sans },
+  title: {
+    flex: 1,
+    fontSize: 15,
+    color: Colors.ink,
+    fontFamily: Typography.fontFamily.sansSemiBold,
+    fontWeight: '600',
+  },
+  body: {
+    marginTop: 8,
+    fontSize: 13,
+    lineHeight: 19,
+    color: Colors.ink3,
+    fontFamily: Typography.fontFamily.sans,
+  },
   cta: {
     marginTop: 14,
     height: 44,
@@ -143,5 +157,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  ctaText: { color: Colors.white, fontSize: 15, fontWeight: '600', fontFamily: Typography.fontFamily.sansSemiBold },
+  ctaText: {
+    color: Colors.white,
+    fontSize: 15,
+    fontWeight: '600',
+    fontFamily: Typography.fontFamily.sansSemiBold,
+  },
 })

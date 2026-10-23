@@ -56,8 +56,18 @@ function PulsingDot() {
   useEffect(() => {
     const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(scale, { toValue: 1.35, duration: 700, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-        Animated.timing(scale, { toValue: 1, duration: 700, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(scale, {
+          toValue: 1.35,
+          duration: 700,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(scale, {
+          toValue: 1,
+          duration: 700,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
       ]),
     )
     loop.start()
@@ -76,8 +86,18 @@ function BlinkingCursor() {
   useEffect(() => {
     const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(opacity, { toValue: 0, duration: 500, easing: Easing.step0, useNativeDriver: true }),
-        Animated.timing(opacity, { toValue: 1, duration: 500, easing: Easing.step0, useNativeDriver: true }),
+        Animated.timing(opacity, {
+          toValue: 0,
+          duration: 500,
+          easing: Easing.step0,
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacity, {
+          toValue: 1,
+          duration: 500,
+          easing: Easing.step0,
+          useNativeDriver: true,
+        }),
       ]),
     )
     loop.start()
@@ -90,7 +110,12 @@ function BlinkingCursor() {
 function AmountChip({ label }: { label: string }) {
   const anim = useRef(new Animated.Value(0)).current
   useEffect(() => {
-    Animated.timing(anim, { toValue: 1, duration: 320, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start()
+    Animated.timing(anim, {
+      toValue: 1,
+      duration: 320,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start()
   }, [anim])
   return (
     <Animated.View
@@ -98,7 +123,9 @@ function AmountChip({ label }: { label: string }) {
         styles.amountChip,
         {
           opacity: anim,
-          transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [14, 0] }) }],
+          transform: [
+            { translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [14, 0] }) },
+          ],
         },
       ]}
     >
@@ -135,9 +162,7 @@ export function VoiceCaptureOverlay({
   const reduceMotion = useReduceMotion()
   const [elapsed, setElapsed] = useState(0)
   const listening = phase === 'listening'
-  const rise = reduceMotion
-    ? 0
-    : presence.interpolate({ inputRange: [0, 1], outputRange: [22, 0] })
+  const rise = reduceMotion ? 0 : presence.interpolate({ inputRange: [0, 1], outputRange: [22, 0] })
 
   useEffect(() => {
     if (!listening) return
@@ -158,7 +183,10 @@ export function VoiceCaptureOverlay({
     'no-transcript': {
       icon: 'mic-outline' as const,
       title: t('voice.nothing_heard_title', locale),
-      body: t('voice.nothing_heard_body', locale).replace('{example}', t('welcome.demo_transcript', locale)),
+      body: t('voice.nothing_heard_body', locale).replace(
+        '{example}',
+        t('welcome.demo_transcript', locale),
+      ),
       action: t('common.retry', locale),
       tone: 'calm' as const,
     },
@@ -201,7 +229,10 @@ export function VoiceCaptureOverlay({
           a picture frame - build 9's mistake). Inner halo flares with
           the mic level. */}
       {phase !== 'error' && (
-        <Animated.View style={[StyleSheet.absoluteFill, { opacity: presence }]} pointerEvents="none">
+        <Animated.View
+          style={[StyleSheet.absoluteFill, { opacity: presence }]}
+          pointerEvents="none"
+        >
           <VoiceEdgeGlow level={volumeLevel} active={phase === 'listening'} />
         </Animated.View>
       )}

@@ -5,7 +5,11 @@ import { useAuth } from '../../src/hooks/useAuth'
 import { useProfile } from '../../src/hooks/useProfile'
 import { useVoiceSession } from '../../src/hooks/useVoiceSession'
 import { Colors } from '../../src/theme'
-import { ISO_4217_CODES, PAYMENT_METHOD_VALUES, deriveDirectionFromFlowType } from '@voice-expense/ai'
+import {
+  ISO_4217_CODES,
+  PAYMENT_METHOD_VALUES,
+  deriveDirectionFromFlowType,
+} from '@voice-expense/ai'
 import type { PaymentMethod } from '@voice-expense/shared'
 
 /**
@@ -56,7 +60,6 @@ export default function RecordBridge() {
         return
       }
       openVoice()
-       
     }, [params.tab, params._nonce]),
   )
 

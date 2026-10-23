@@ -1,7 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AppState } from 'react-native'
 import type { Locale, Transaction } from '@voice-expense/shared'
-import { dismissPrime, enableCheckIn, needsPermissionRepair, rescheduleReminders, shouldOfferPrime } from '../services/reminders'
+import {
+  dismissPrime,
+  enableCheckIn,
+  needsPermissionRepair,
+  rescheduleReminders,
+  shouldOfferPrime,
+} from '../services/reminders'
 
 /** When the user last logged something themselves (auto-generated
  *  recurring rows don't count: they happen without the user; nor do rows
@@ -20,7 +26,13 @@ export function lastLogTime(transactions: Transaction[]): Date | null {
 export function loggedExpenseCount(transactions: Transaction[]): number {
   let n = 0
   for (const t of transactions) {
-    if (!t.is_deleted && t.direction === 'debit' && t.source !== 'recurring_generated' && t.source !== 'import') n++
+    if (
+      !t.is_deleted &&
+      t.direction === 'debit' &&
+      t.source !== 'recurring_generated' &&
+      t.source !== 'import'
+    )
+      n++
   }
   return n
 }

@@ -17,7 +17,8 @@ import { APP_STORE_ID, APP_STORE_URL, plusDeepLink } from '../../lib/links'
  */
 export const metadata: Metadata = {
   title: 'Murmur Plus',
-  description: 'Open Murmur on your iPhone to start Plus. Your account unlocks on the web and the desktop app too.',
+  description:
+    'Open Murmur on your iPhone to start Plus. Your account unlocks on the web and the desktop app too.',
   itunes: { appId: APP_STORE_ID, appArgument: plusDeepLink('web_qr') },
 }
 
@@ -37,8 +38,8 @@ export default async function PlusPage() {
           <>
             <h1 className="mpp-title">Start Plus in Murmur</h1>
             <p className="mpp-body">
-              Plus adds the web and desktop apps, Ask Murmur, recurring detection and reports. Start it in the app;
-              your account unlocks everywhere.
+              Plus adds the web and desktop apps, Ask Murmur, recurring detection and reports. Start
+              it in the app; your account unlocks everywhere.
             </p>
             <a className="mpp-btn" href={plusDeepLink('web_qr')}>
               Open Murmur
@@ -51,8 +52,8 @@ export default async function PlusPage() {
           <>
             <h1 className="mpp-title">Open this on your iPhone</h1>
             <p className="mpp-body">
-              Plus is sold in the Murmur iPhone app. Scan the code with your iPhone camera; it opens Murmur
-              straight on Plus.
+              Plus is sold in the Murmur iPhone app. Scan the code with your iPhone camera; it opens
+              Murmur straight on Plus.
             </p>
             <div className="mpp-qr">
               <PlusQr size={168} />

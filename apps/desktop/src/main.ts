@@ -1,4 +1,12 @@
-import { app, BrowserWindow, shell, Menu, dialog, utilityProcess, type UtilityProcess } from 'electron'
+import {
+  app,
+  BrowserWindow,
+  shell,
+  Menu,
+  dialog,
+  utilityProcess,
+  type UtilityProcess,
+} from 'electron'
 import { createServer } from 'node:net'
 import { join } from 'node:path'
 import { existsSync } from 'node:fs'
@@ -69,7 +77,11 @@ const EXTERNAL_SIGN_IN_WINDOW_MS = 20 * 60 * 1000
 function isAuthFlowStart(targetUrl: string): boolean {
   try {
     const u = new URL(targetUrl)
-    return u.protocol === 'https:' && u.hostname.endsWith('.supabase.co') && u.pathname.startsWith('/auth/v1/authorize')
+    return (
+      u.protocol === 'https:' &&
+      u.hostname.endsWith('.supabase.co') &&
+      u.pathname.startsWith('/auth/v1/authorize')
+    )
   } catch {
     return false
   }
@@ -102,7 +114,9 @@ function finishExternalSignIn(req: http.IncomingMessage, res: http.ServerRespons
   // The app window does the code exchange right after this, so the tab
   // only says where to look, never that sign-in already succeeded.
   const title = ok ? 'Go back to Murmur' : 'Sign-in did not finish'
-  const body = ok ? 'Murmur is finishing your sign-in. You can close this tab.' : 'Go back to Murmur and try again.'
+  const body = ok
+    ? 'Murmur is finishing your sign-in. You can close this tab.'
+    : 'Go back to Murmur and try again.'
   res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' })
   res.end(
     `<!doctype html><html><head><meta charset="utf-8"><title>${title}</title><meta name="viewport" content="width=device-width,initial-scale=1"></head>` +
@@ -178,13 +192,10 @@ function findFreePort(): Promise<number> {
 
 function probe(port: number, path = '/'): Promise<boolean> {
   return new Promise((resolve) => {
-    const req = http.get(
-      { host: HOSTNAME, port, path, timeout: 1500 },
-      (res) => {
-        res.resume()
-        resolve(true)
-      }
-    )
+    const req = http.get({ host: HOSTNAME, port, path, timeout: 1500 }, (res) => {
+      res.resume()
+      resolve(true)
+    })
     req.on('error', () => resolve(false))
     req.on('timeout', () => {
       req.destroy()
@@ -232,7 +243,12 @@ function forwardableHeaders(headers: http.IncomingHttpHeaders): http.OutgoingHtt
 }
 
 function proxyTo(
-  target: { transport: typeof http | typeof https; hostname: string; port: number; keepHost?: boolean },
+  target: {
+    transport: typeof http | typeof https
+    hostname: string
+    port: number
+    keepHost?: boolean
+  },
   req: http.IncomingMessage,
   res: http.ServerResponse,
 ) {
@@ -303,7 +319,7 @@ async function startEmbeddedServer(): Promise<number> {
   if (!existsSync(entry)) {
     throw new Error(
       `Embedded Next server bundle missing at ${entry}. ` +
-        `Run "npm --prefix apps/desktop run build:web" first.`
+        `Run "npm --prefix apps/desktop run build:web" first.`,
     )
   }
 
@@ -507,15 +523,18 @@ function startAutoUpdater(): void {
     const win = BrowserWindow.getAllWindows()[0]
     const message = `Murmur ${info.version} is ready. It installs the next time you quit the app.`
     if (win) {
-      dialog.showMessageBox(win, {
-        type: 'info',
-        message: 'Update ready',
-        detail: message,
-        buttons: ['OK', 'Restart now'],
-        defaultId: 0,
-      }).then(({ response }) => {
-        if (response === 1) autoUpdater.quitAndInstall()
-      }).catch(() => undefined)
+      dialog
+        .showMessageBox(win, {
+          type: 'info',
+          message: 'Update ready',
+          detail: message,
+          buttons: ['OK', 'Restart now'],
+          defaultId: 0,
+        })
+        .then(({ response }) => {
+          if (response === 1) autoUpdater.quitAndInstall()
+        })
+        .catch(() => undefined)
     }
   })
   autoUpdater.on('error', (err) => {

@@ -1,6 +1,11 @@
 import React from 'react'
 import { colors, font } from '../../lib/theme'
-import { type LensProps, toSummarizable, buildCategoryColorMap, NEUTRAL_CATEGORY_COLOR } from './types'
+import {
+  type LensProps,
+  toSummarizable,
+  buildCategoryColorMap,
+  NEUTRAL_CATEGORY_COLOR,
+} from './types'
 import { addMonthsClamped, monthBounds, summarize, categoryPalette } from '@voice-expense/shared'
 
 // 6-month × category grid. Rows = categories. Cols = trailing 6 months.
@@ -50,7 +55,10 @@ function buildMonths(anchorMonthIso: string, tz: string, locale: string): MonthC
     const target = addMonthsClamped(y, m, 1, -i)
     const iso = `${String(target.y).padStart(4, '0')}-${String(target.m).padStart(2, '0')}`
     const bounds = monthBounds(iso, tz)
-    const label = new Date(bounds.start).toLocaleDateString(locale, { month: 'short', timeZone: tz })
+    const label = new Date(bounds.start).toLocaleDateString(locale, {
+      month: 'short',
+      timeZone: tz,
+    })
     out.push({ label, start: bounds.start, endExclusive: bounds.endExclusive })
   }
   return out
@@ -89,7 +97,9 @@ export function MatrixLens({ props }: { props: LensProps }) {
   // own row, everything past that folds into one "Other · N categories"
   // row instead of being silently dropped — see this file's header
   // comment for why that's what makes `Total` agree with the Overview.
-  const rankedIds = [...catIds].sort((a, b) => matrix[b][months.length - 1] - matrix[a][months.length - 1])
+  const rankedIds = [...catIds].sort(
+    (a, b) => matrix[b][months.length - 1] - matrix[a][months.length - 1],
+  )
   const topIds = rankedIds.slice(0, 8)
   const otherIds = rankedIds.slice(8)
   const otherRow = months.map((_, mi) => otherIds.reduce((s, id) => s + matrix[id][mi], 0))
@@ -187,7 +197,14 @@ export function MatrixLens({ props }: { props: LensProps }) {
         fontFamily: font.sans,
       }}
     >
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: 14,
+        }}
+      >
         <div>
           <div
             style={{
@@ -244,7 +261,12 @@ export function MatrixLens({ props }: { props: LensProps }) {
         </div>
 
         {topIds.map((id) =>
-          renderRow(id, nameById[id], categoryPalette(colorById[id] || NEUTRAL_CATEGORY_COLOR).fg, matrix[id]),
+          renderRow(
+            id,
+            nameById[id],
+            categoryPalette(colorById[id] || NEUTRAL_CATEGORY_COLOR).fg,
+            matrix[id],
+          ),
         )}
         {/* Everything past the top 8, folded into one row rather than
             dropped - this is what makes `Total` below agree with the
@@ -291,7 +313,9 @@ export function MatrixLens({ props }: { props: LensProps }) {
         <div />
       </div>
       {topIds.length === 0 && !hasOther && (
-        <div style={{ fontSize: 13, color: colors.ink3, padding: '40px 20px', textAlign: 'center' }}>
+        <div
+          style={{ fontSize: 13, color: colors.ink3, padding: '40px 20px', textAlign: 'center' }}
+        >
           Not enough history yet to draw a 6-month matrix.
         </div>
       )}
@@ -309,7 +333,14 @@ function Sparkline({ values, color }: { values: number[]; color: string }) {
   const path = values.map((v, i) => `${i === 0 ? 'M' : 'L'}${x(i)},${y(v)}`).join(' ')
   return (
     <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
-      <path d={path} fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path
+        d={path}
+        fill="none"
+        stroke={color}
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   )
 }

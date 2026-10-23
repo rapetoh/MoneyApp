@@ -1,6 +1,12 @@
 import type { Database } from './database.types'
 
-export type RecurringFrequency = 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'quarterly' | 'yearly'
+export type RecurringFrequency =
+  | 'daily'
+  | 'weekly'
+  | 'biweekly'
+  | 'monthly'
+  | 'quarterly'
+  | 'yearly'
 
 // `direction` and `frequency` carry CHECK constraints the generated type
 // can't see, so they come back as bare `string` — narrowed here.

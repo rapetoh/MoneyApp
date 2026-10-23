@@ -132,7 +132,11 @@ export default function PaywallScreen() {
     await refetch()
     setBusy(null)
     if (outcome.kind === 'purchased') {
-      track('purchase_done', { plan: current.plan, trial: !!current.trialDays, origin: origin ?? 'feature' })
+      track('purchase_done', {
+        plan: current.plan,
+        trial: !!current.trialDays,
+        origin: origin ?? 'feature',
+      })
       goBack(router)
     } else if (outcome.kind === 'pending') {
       Alert.alert(t('paywall.eyebrow', locale), t('paywall.pending', locale))
@@ -635,7 +639,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
   },
   notNow: { height: 44, alignItems: 'center', justifyContent: 'center', marginTop: 2 },
-  notNowText: { color: Colors.white, fontSize: 16, fontWeight: '600', fontFamily: Typography.fontFamily.sansSemiBold, opacity: 0.85 },
+  notNowText: {
+    color: Colors.white,
+    fontSize: 16,
+    fontWeight: '600',
+    fontFamily: Typography.fontFamily.sansSemiBold,
+    opacity: 0.85,
+  },
   linksRow: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -65,7 +65,10 @@ export function useNotificationPrefs(userId: string | undefined) {
       setPrefs(next)
       const { error } = await supabase
         .from('notification_prefs')
-        .upsert({ user_id: userId, ...next, updated_at: new Date().toISOString() }, { onConflict: 'user_id' })
+        .upsert(
+          { user_id: userId, ...next, updated_at: new Date().toISOString() },
+          { onConflict: 'user_id' },
+        )
       if (error) {
         setPrefs(previous)
         return false

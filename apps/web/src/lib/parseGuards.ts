@@ -37,7 +37,10 @@ export const MAX_TRANSCRIPT_LENGTH = 4000
  * entire body into memory first regardless of what the handler goes on to
  * reject.
  */
-export function contentLengthExceeds(req: { headers: { get(name: string): string | null } }, maxBytes: number): boolean {
+export function contentLengthExceeds(
+  req: { headers: { get(name: string): string | null } },
+  maxBytes: number,
+): boolean {
   const raw = req.headers.get('content-length')
   if (!raw) return false // absent/chunked — the per-field checks after JSON.parse still apply
   const bytes = Number(raw)

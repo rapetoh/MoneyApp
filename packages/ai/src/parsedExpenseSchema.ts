@@ -33,7 +33,10 @@ export const PARSED_EXPENSE_JSON_SCHEMA = {
     type: 'object',
     additionalProperties: false,
     properties: {
-      amount: { type: 'number', description: 'Positive amount, no currency symbol, at most 2 decimal places.' },
+      amount: {
+        type: 'number',
+        description: 'Positive amount, no currency symbol, at most 2 decimal places.',
+      },
       currency: { type: 'string', description: 'ISO 4217 currency code, e.g. USD.' },
       flow_type: { type: 'string', enum: [...FLOW_TYPE_VALUES] },
       merchant: { type: ['string', 'null'] },
@@ -46,7 +49,10 @@ export const PARSED_EXPENSE_JSON_SCHEMA = {
       needs_clarification: { type: 'boolean' },
       clarifying_question: { type: ['string', 'null'] },
       is_recurring_suggestion: { type: 'boolean' },
-      recurring_frequency_suggestion: { type: ['string', 'null'], enum: [...RECURRING_FREQUENCY_VALUES, null] },
+      recurring_frequency_suggestion: {
+        type: ['string', 'null'],
+        enum: [...RECURRING_FREQUENCY_VALUES, null],
+      },
     },
     required: [
       'amount',

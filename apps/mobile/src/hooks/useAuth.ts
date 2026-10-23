@@ -139,7 +139,9 @@ export function useAuth() {
         setLoading(false)
       })
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session)
       setUser(session?.user ?? null)
     })
@@ -170,7 +172,10 @@ export async function signInWithEmail(email: string, password: string) {
  * redirect allow-list for Google sign-in.
  */
 export async function signUpWithEmail(email: string, password: string) {
-  const emailRedirectTo = AuthSession.makeRedirectUri({ scheme: 'voiceexpense', path: 'auth/callback' })
+  const emailRedirectTo = AuthSession.makeRedirectUri({
+    scheme: 'voiceexpense',
+    path: 'auth/callback',
+  })
   return supabase.auth.signUp({ email, password, options: { emailRedirectTo } })
 }
 
@@ -202,7 +207,9 @@ export async function updatePassword(password: string) {
 export async function signOut() {
   // Capture the session before anything below can invalidate it — this
   // is the only chance to know who was signed in.
-  const { data: { session } } = await supabase.auth.getSession()
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
 
   // Run the local teardown unconditionally, *before* touching the
   // network. Even with scope: 'local', supabase-js's `_signOut` still

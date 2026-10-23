@@ -59,7 +59,12 @@ export const ASK_RESUME_WINDOW_MS = 12 * 60 * 60 * 1000
 export function deriveTitle(question: string, max = 60): string {
   const trimmed = question.trim().replace(/\s+/g, ' ')
   if (trimmed.length <= max) return trimmed.replace(/[.!?]+$/, '')
-  return trimmed.slice(0, max - 1).replace(/\s+\S*$/, '').replace(/[.!?]+$/, '') + '…'
+  return (
+    trimmed
+      .slice(0, max - 1)
+      .replace(/\s+\S*$/, '')
+      .replace(/[.!?]+$/, '') + '…'
+  )
 }
 
 // ─── Legacy → v2 ────────────────────────────────────────────────────────────
@@ -83,7 +88,11 @@ export function legacyResponseToReply(r: AskMurmurResponse): AskReply {
       actions.push({
         label: a.label,
         intent: 'show_transactions',
-        params: a.params?.category_name ? { category_name: a.params.category_name } : a.params?.merchant ? { merchant: a.params.merchant } : undefined,
+        params: a.params?.category_name
+          ? { category_name: a.params.category_name }
+          : a.params?.merchant
+            ? { merchant: a.params.merchant }
+            : undefined,
       })
     } else if (a.intent === 'set_budget') {
       actions.push({ label: a.label, intent: 'set_budget', params: a.params })
@@ -101,10 +110,13 @@ export function legacyResponseToReply(r: AskMurmurResponse): AskReply {
 }
 
 /** The reply to render for a stored assistant row, whichever shape it holds. */
-export function replyFromStored(response: AskReply | AskMurmurResponse | null | undefined): AskReply | null {
+export function replyFromStored(
+  response: AskReply | AskMurmurResponse | null | undefined,
+): AskReply | null {
   if (!response || typeof response !== 'object') return null
   if (isReply(response)) return response
-  if ((response as AskMurmurResponse).verdict) return legacyResponseToReply(response as AskMurmurResponse)
+  if ((response as AskMurmurResponse).verdict)
+    return legacyResponseToReply(response as AskMurmurResponse)
   return null
 }
 
@@ -115,7 +127,10 @@ export interface AskThread {
   messages: AskMessageRow[]
 }
 
-async function loadMessages(supabase: SupabaseClient, conversationId: string): Promise<AskMessageRow[]> {
+async function loadMessages(
+  supabase: SupabaseClient,
+  conversationId: string,
+): Promise<AskMessageRow[]> {
   const { data, error } = await supabase
     .from('ask_messages')
     .select('*')
@@ -170,7 +185,10 @@ export async function loadConversation(
     .maybeSingle()
   if (error) throw new Error(`[ask-storage] loadConversation failed: ${error.message}`)
   if (!data) return null
-  return { conversation: data as AskConversationRow, messages: await loadMessages(supabase, conversationId) }
+  return {
+    conversation: data as AskConversationRow,
+    messages: await loadMessages(supabase, conversationId),
+  }
 }
 
 export async function listConversations(
@@ -255,4 +273,3 @@ export async function appendAssistantMessage(
   }
   return data as AskMessageRow
 }
-

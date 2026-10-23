@@ -41,7 +41,10 @@ export function UndoProvider({ children }: { children: ReactNode }) {
     setPending(null)
   }, [])
 
-  const value = useMemo<UndoContextValue>(() => ({ showUndo, dismissUndo }), [showUndo, dismissUndo])
+  const value = useMemo<UndoContextValue>(
+    () => ({ showUndo, dismissUndo }),
+    [showUndo, dismissUndo],
+  )
 
   return (
     <UndoContext.Provider value={value}>

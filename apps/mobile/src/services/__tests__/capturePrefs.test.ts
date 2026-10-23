@@ -81,7 +81,12 @@ describe('capturePrefs', () => {
   })
 
   it('forgets on sign-out, so the next account starts clean', () => {
-    rememberCapturePrefs({ currency: 'GBP', locale: 'en', timezone: 'Europe/London', categories: CATS })
+    rememberCapturePrefs({
+      currency: 'GBP',
+      locale: 'en',
+      timezone: 'Europe/London',
+      categories: CATS,
+    })
     clearCapturePrefs()
     expect(readCapturePrefs()).toBeNull()
   })
@@ -92,13 +97,19 @@ describe('capturePrefs', () => {
     rememberCapturePrefs({ currency: 'USD', locale: 'en', timezone: 'UTC', categories: CATS })
     expect(readCapturePrefs()?.categories).toHaveLength(2)
     // A renamed category is worth a rewrite; the same list is not.
-    const renamed = [{ id: 'c1', name: 'Food' }, { id: 'c2', name: 'Transport' }] as typeof CATS
+    const renamed = [
+      { id: 'c1', name: 'Food' },
+      { id: 'c2', name: 'Transport' },
+    ] as typeof CATS
     rememberCapturePrefs({ currency: 'USD', locale: 'en', timezone: 'UTC', categories: renamed })
     expect(readCapturePrefs()?.categories[0].name).toBe('Food')
   })
 
   it('drops junk entries in a hand-edited file', () => {
-    store = JSON.stringify({ currency: 'USD', categories: [{ id: 'c1', name: 'Groceries' }, { id: 7 }, null] })
+    store = JSON.stringify({
+      currency: 'USD',
+      categories: [{ id: 'c1', name: 'Groceries' }, { id: 7 }, null],
+    })
     expect(readCapturePrefs()?.categories).toEqual([{ id: 'c1', name: 'Groceries' }])
   })
 })

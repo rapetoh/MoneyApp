@@ -13,7 +13,12 @@ import {
   type ToolContext,
 } from '@voice-expense/ai/server'
 import { localDay } from '@voice-expense/shared'
-import type { AskMurmurRequest, AskMurmurResponse, AskMurmurTransaction, AskMurmurBudget } from '@voice-expense/shared'
+import type {
+  AskMurmurRequest,
+  AskMurmurResponse,
+  AskMurmurTransaction,
+  AskMurmurBudget,
+} from '@voice-expense/shared'
 import type { NextRequest } from 'next/server'
 import { getOpenAIEnv } from '../../../../lib/env'
 import { resolveNowUtc, resolveTimeZone } from './timeZone'
@@ -94,7 +99,8 @@ export async function POST(req: NextRequest) {
     .map((t) => ({
       ...t,
       amount_in_profile_currency:
-        typeof t.amount_in_profile_currency === 'number' && Number.isFinite(t.amount_in_profile_currency)
+        typeof t.amount_in_profile_currency === 'number' &&
+        Number.isFinite(t.amount_in_profile_currency)
           ? t.amount_in_profile_currency
           : null,
     }))
@@ -108,8 +114,10 @@ export async function POST(req: NextRequest) {
         .map((h) => {
           if (!h || typeof h !== 'object') return null
           const turn = h as { question?: unknown; answer?: unknown }
-          const q = typeof turn.question === 'string' ? turn.question.slice(0, MAX_HISTORY_FIELD_LEN) : ''
-          const a = typeof turn.answer === 'string' ? turn.answer.slice(0, MAX_HISTORY_FIELD_LEN) : ''
+          const q =
+            typeof turn.question === 'string' ? turn.question.slice(0, MAX_HISTORY_FIELD_LEN) : ''
+          const a =
+            typeof turn.answer === 'string' ? turn.answer.slice(0, MAX_HISTORY_FIELD_LEN) : ''
           if (!q || !a) return null
           return { question: q, answer: a }
         })
@@ -210,7 +218,9 @@ export async function POST(req: NextRequest) {
     // failures; everything else ships.
     const reasons = validation.comparison_direction_violations.slice()
     if (verdictTooShort) {
-      reasons.push('previous attempt returned an empty verdict; this is not allowed. Run run_query for the data the question needs and write the answer using those numbers.')
+      reasons.push(
+        'previous attempt returned an empty verdict; this is not allowed. Run run_query for the data the question needs and write the answer using those numbers.',
+      )
     }
     if (dataMismatch) {
       reasons.push(dataMismatch)
@@ -272,11 +282,15 @@ export async function POST(req: NextRequest) {
       await new Promise((r) => setTimeout(r, waitMs))
       try {
         const again = await runConversation(askReq, ctx, [], overview)
-        console.log(`[ask-murmur] ok outcome=after_429 tool_calls=${again.calls.length} ms=${Date.now() - startedAt}`)
+        console.log(
+          `[ask-murmur] ok outcome=after_429 tool_calls=${again.calls.length} ms=${Date.now() - startedAt}`,
+        )
         return Response.json(again.response)
       } catch (err2) {
         const e2 = err2 as { status?: number; message?: string }
-        console.error(`[ask-murmur] still failing after 429 wait (status=${e2?.status ?? 'n/a'}): ${e2?.message ?? String(err2)}`)
+        console.error(
+          `[ask-murmur] still failing after 429 wait (status=${e2?.status ?? 'n/a'}): ${e2?.message ?? String(err2)}`,
+        )
         return Response.json(
           { error: 'busy', retry_after_seconds: 5 },
           { status: 503, headers: { 'Retry-After': '5' } },
@@ -328,18 +342,34 @@ function parseBudget(raw: unknown): AskMurmurBudget | null {
   if (!raw || typeof raw !== 'object') return null
   const b = raw as Record<string, unknown>
   const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : null)
-  const amount = num(b.amount), spent = num(b.spent), committed = num(b.committed), remaining = num(b.remaining), days_left = num(b.days_left)
+  const amount = num(b.amount),
+    spent = num(b.spent),
+    committed = num(b.committed),
+    remaining = num(b.remaining),
+    days_left = num(b.days_left)
   const period = b.period
   const PERIODS = ['weekly', 'biweekly', 'monthly', 'quarterly', 'yearly'] as const
-  if (amount === null || spent === null || committed === null || remaining === null || days_left === null) return null
+  if (
+    amount === null ||
+    spent === null ||
+    committed === null ||
+    remaining === null ||
+    days_left === null
+  )
+    return null
   if (typeof period !== 'string' || !(PERIODS as readonly string[]).includes(period)) return null
   if (typeof b.period_start !== 'string' || typeof b.period_end !== 'string') return null
   return {
-    amount, spent, committed, remaining,
+    amount,
+    spent,
+    committed,
+    remaining,
     days_left: Math.max(0, Math.trunc(days_left)),
     period: period as AskMurmurBudget['period'],
-    currency: typeof b.currency === 'string' && b.currency ? b.currency.slice(0, 3).toUpperCase() : 'USD',
-    category_name: typeof b.category_name === 'string' && b.category_name ? b.category_name.slice(0, 80) : null,
+    currency:
+      typeof b.currency === 'string' && b.currency ? b.currency.slice(0, 3).toUpperCase() : 'USD',
+    category_name:
+      typeof b.category_name === 'string' && b.category_name ? b.category_name.slice(0, 80) : null,
     period_start: b.period_start.slice(0, 40),
     period_end: b.period_end.slice(0, 40),
   }
@@ -355,7 +385,8 @@ function trustedFigures(req: AskMurmurRequest, overview: AskMurmurDataOverview):
     overview.total_debit,
     overview.total_credit,
   ]
-  if (req.budget) out.push(req.budget.amount, req.budget.spent, req.budget.committed, req.budget.remaining)
+  if (req.budget)
+    out.push(req.budget.amount, req.budget.spent, req.budget.committed, req.budget.remaining)
   return out
 }
 
@@ -370,13 +401,37 @@ function trustedFigures(req: AskMurmurRequest, overview: AskMurmurDataOverview):
 //      week"…) and no tool call queried that window → retry.
 
 const PERIOD_PHRASES: Array<{ re: RegExp; windows: string[]; label: string }> = [
-  { re: /\blast\s+month\b|\bprevious\s+month\b|\bmois\s+dernier\b|\bmes\s+pasado\b|\bm[êe]s\s+passado\b/i, windows: ['lastMonth', 'custom'], label: 'last month' },
+  {
+    re: /\blast\s+month\b|\bprevious\s+month\b|\bmois\s+dernier\b|\bmes\s+pasado\b|\bm[êe]s\s+passado\b/i,
+    windows: ['lastMonth', 'custom'],
+    label: 'last month',
+  },
   { re: /\bthis\s+month\b|\bce\s+mois/i, windows: ['thisMonth', 'custom'], label: 'this month' },
-  { re: /\byesterday\b|\bhier\b|\bayer\b|\bontem\b/i, windows: ['yesterday', 'custom'], label: 'yesterday' },
-  { re: /\blast\s+week\b|\bsemaine\s+derni[eè]re\b|\bsemana\s+pasada\b|\bsemana\s+passada\b/i, windows: ['lastWeek', 'last7Days', 'custom'], label: 'last week' },
-  { re: /\bthis\s+week\b|\bcette\s+semaine\b|\besta\s+semana\b/i, windows: ['thisWeek', 'last7Days', 'custom'], label: 'this week' },
-  { re: /\blast\s+year\b|\bann[ée]e\s+derni[eè]re\b|\ba[ñn]o\s+pasado\b|\bano\s+passado\b/i, windows: ['lastYear', 'last12Months', 'custom'], label: 'last year' },
-  { re: /\bthis\s+year\b|\bcette\s+ann[ée]e\b|\beste\s+a[ñn]o\b|\beste\s+ano\b/i, windows: ['thisYear', 'last12Months', 'custom'], label: 'this year' },
+  {
+    re: /\byesterday\b|\bhier\b|\bayer\b|\bontem\b/i,
+    windows: ['yesterday', 'custom'],
+    label: 'yesterday',
+  },
+  {
+    re: /\blast\s+week\b|\bsemaine\s+derni[eè]re\b|\bsemana\s+pasada\b|\bsemana\s+passada\b/i,
+    windows: ['lastWeek', 'last7Days', 'custom'],
+    label: 'last week',
+  },
+  {
+    re: /\bthis\s+week\b|\bcette\s+semaine\b|\besta\s+semana\b/i,
+    windows: ['thisWeek', 'last7Days', 'custom'],
+    label: 'this week',
+  },
+  {
+    re: /\blast\s+year\b|\bann[ée]e\s+derni[eè]re\b|\ba[ñn]o\s+pasado\b|\bano\s+passado\b/i,
+    windows: ['lastYear', 'last12Months', 'custom'],
+    label: 'last year',
+  },
+  {
+    re: /\bthis\s+year\b|\bcette\s+ann[ée]e\b|\beste\s+a[ñn]o\b|\beste\s+ano\b/i,
+    windows: ['thisYear', 'last12Months', 'custom'],
+    label: 'this year',
+  },
   { re: /\btoday\b|\baujourd/i, windows: ['today', 'custom'], label: 'today' },
 ]
 
@@ -393,7 +448,11 @@ function windowsQueried(calls: ToolCallRecord[]): Set<string> {
 /** Non-null when the question names a period and no successful tool call
  *  queried a window that could answer for it. Skips greetings/refusals
  *  (no numbers) and answers that made no claim about that period. */
-function detectWindowMismatch(question: string, response: AskMurmurResponse, calls: ToolCallRecord[]): string | null {
+function detectWindowMismatch(
+  question: string,
+  response: AskMurmurResponse,
+  calls: ToolCallRecord[],
+): string | null {
   if (response.out_of_scope) return null
   if (!/\d/.test(response.verdict.text) && !response.breakdown && !response.chart) return null
   const queried = windowsQueried(calls)
@@ -410,14 +469,18 @@ function detectWindowMismatch(question: string, response: AskMurmurResponse, cal
 
 /** Non-null when a numeric answer was produced with no successful tool call
  *  and the validator could not trace its figures. */
-function detectUngrounded(response: AskMurmurResponse, calls: ToolCallRecord[], softIssues: string[]): string | null {
+function detectUngrounded(
+  response: AskMurmurResponse,
+  calls: ToolCallRecord[],
+  softIssues: string[],
+): string | null {
   if (response.out_of_scope) return null
   const okCalls = calls.filter((c) => c.ok).length
   const untraced = softIssues.filter((i) => /not traced to a tool call/.test(i))
   if (okCalls === 0 && untraced.length > 0) {
     return (
       `previous attempt quoted figures without calling any tool (${untraced.slice(0, 3).join('; ')}). ` +
-      'Every number must come from a tool result, the data overview, the BUDGET block, or the user\'s own words - call the tools now.'
+      "Every number must come from a tool result, the data overview, the BUDGET block, or the user's own words - call the tools now."
     )
   }
   return null
@@ -440,7 +503,11 @@ const STALL_RE =
   /\b(to (?:determine|answer|assess|figure out|check|see|know|find out)|we need to|i need to|i(?:'|’)ll need|i (?:will|can|could|would) (?:check|look|analy[sz]e|calculate|compare|review|need)|let me|let(?:'|’)s (?:take a look|look|start|begin)|would you like me to|shall i|do you want me to|first,? (?:i|we)|i(?:'|’)d need|please (?:provide|share|tell)|could you (?:tell|clarify|specify|share)|can you (?:tell|clarify|specify|share))\b/i
 
 function normalizeVerdict(text: string): string {
-  return text.replace(/<\/?b>/g, '').replace(/\s+/g, ' ').trim().toLowerCase()
+  return text
+    .replace(/<\/?b>/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase()
 }
 
 /** Non-null when the answer is a stall (narration/permission-seeking with
@@ -535,7 +602,8 @@ function detectDataMismatch(
       subsetVar: 'transactions_last_30_days',
     },
     {
-      phrase: /\blast\s+90\s*days?\b|\bpast\s+90\s*days?\b|\bquarter\b|\blast\s+3\s*months?\b|\bpast\s+3\s*months?\b/,
+      phrase:
+        /\blast\s+90\s*days?\b|\bpast\s+90\s*days?\b|\bquarter\b|\blast\s+3\s*months?\b|\bpast\s+3\s*months?\b/,
       flag: overview.has_transactions_last_90_days,
       label: 'last 90 days',
       subsetVar: 'transactions_last_90_days',
@@ -634,7 +702,7 @@ async function runConversation(
         if (DEBUG_TRACE) {
           const argPreview =
             name === 'run_query' && args && typeof args === 'object'
-              ? (args as { code?: string }).code?.slice(0, 240) ?? ''
+              ? ((args as { code?: string }).code?.slice(0, 240) ?? '')
               : JSON.stringify(args).slice(0, 240)
           const resultPreview = JSON.stringify(
             resolved.ok ? resolved.result : { error: resolved.error },
@@ -644,9 +712,7 @@ async function runConversation(
         messages.push({
           role: 'tool',
           tool_call_id: tc.id,
-          content: JSON.stringify(
-            resolved.ok ? resolved.result : { error: resolved.error },
-          ),
+          content: JSON.stringify(resolved.ok ? resolved.result : { error: resolved.error }),
         })
       }
       continue

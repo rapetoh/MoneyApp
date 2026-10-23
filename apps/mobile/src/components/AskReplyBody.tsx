@@ -26,7 +26,11 @@ export function AskReplyBody({
 }) {
   const tokens = useMemo(() => splitInlineBold(reply.text), [reply.text])
   const accent =
-    reply.sentiment === 'negative' ? Colors.unclear : reply.sentiment === 'positive' ? Colors.accent : Colors.ink
+    reply.sentiment === 'negative'
+      ? Colors.unclear
+      : reply.sentiment === 'positive'
+        ? Colors.accent
+        : Colors.ink
   return (
     <View style={styles.col}>
       <View style={styles.textCard}>
@@ -79,7 +83,15 @@ function iconFor(a: AskAction): keyof typeof Ionicons.glyphMap {
   }
 }
 
-function BlockView({ block, locale, currency }: { block: AskBlock; locale: Locale; currency: string }) {
+function BlockView({
+  block,
+  locale,
+  currency,
+}: {
+  block: AskBlock
+  locale: Locale
+  currency: string
+}) {
   switch (block.type) {
     case 'figure':
       return (
@@ -98,7 +110,9 @@ function BlockView({ block, locale, currency }: { block: AskBlock; locale: Local
               <Text style={[styles.rowLabel, r.muted && styles.muted]} numberOfLines={2}>
                 {r.label}
               </Text>
-              <Text style={[styles.rowValue, r.accent && styles.accent, r.muted && styles.muted]}>{r.value}</Text>
+              <Text style={[styles.rowValue, r.accent && styles.accent, r.muted && styles.muted]}>
+                {r.value}
+              </Text>
             </View>
           ))}
         </View>
@@ -148,9 +162,11 @@ function formatDay(isoDay: string, locale: string): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(isoDay)
   if (!m) return isoDay
   try {
-    return new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric', timeZone: 'UTC' }).format(
-      new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]))),
-    )
+    return new Intl.DateTimeFormat(locale, {
+      month: 'short',
+      day: 'numeric',
+      timeZone: 'UTC',
+    }).format(new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]))))
   } catch {
     return isoDay
   }
@@ -218,21 +234,72 @@ const styles = StyleSheet.create({
     lineHeight: 38,
   },
   sub: { marginTop: 4, fontSize: 13, color: Colors.ink3, fontFamily: Typography.fontFamily.sans },
-  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', paddingVertical: 7 },
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
+    paddingVertical: 7,
+  },
   rowDivider: { borderBottomWidth: Hairline.width, borderBottomColor: Hairline.color },
-  rowLabel: { flex: 1, marginRight: 12, fontSize: 13.5, color: Colors.ink2, fontFamily: Typography.fontFamily.sans },
-  rowValue: { fontFamily: Typography.fontFamily.serif, fontSize: 15.5, fontWeight: '700', color: Colors.ink, letterSpacing: -0.3 },
+  rowLabel: {
+    flex: 1,
+    marginRight: 12,
+    fontSize: 13.5,
+    color: Colors.ink2,
+    fontFamily: Typography.fontFamily.sans,
+  },
+  rowValue: {
+    fontFamily: Typography.fontFamily.serif,
+    fontSize: 15.5,
+    fontWeight: '700',
+    color: Colors.ink,
+    letterSpacing: -0.3,
+  },
   accent: { color: Colors.accent },
   muted: { color: Colors.ink4 },
   txRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, gap: 12 },
   txMain: { flex: 1 },
-  txMerchant: { fontSize: 14, color: Colors.ink, fontWeight: '600', fontFamily: Typography.fontFamily.sansSemiBold },
-  txMeta: { fontSize: 12, color: Colors.ink4, marginTop: 2, fontFamily: Typography.fontFamily.sans },
-  txAmount: { fontFamily: Typography.fontFamily.serif, fontSize: 15, fontWeight: '700', color: Colors.ink },
+  txMerchant: {
+    fontSize: 14,
+    color: Colors.ink,
+    fontWeight: '600',
+    fontFamily: Typography.fontFamily.sansSemiBold,
+  },
+  txMeta: {
+    fontSize: 12,
+    color: Colors.ink4,
+    marginTop: 2,
+    fontFamily: Typography.fontFamily.sans,
+  },
+  txAmount: {
+    fontFamily: Typography.fontFamily.serif,
+    fontSize: 15,
+    fontWeight: '700',
+    color: Colors.ink,
+  },
   step: { flexDirection: 'row', gap: 10, paddingVertical: 6, alignItems: 'flex-start' },
-  stepNum: { width: 22, height: 22, borderRadius: 11, backgroundColor: Colors.accentSoft, alignItems: 'center', justifyContent: 'center', marginTop: 1 },
-  stepNumText: { fontSize: 12, fontWeight: '700', color: Colors.accent, fontFamily: Typography.fontFamily.sansBold },
-  stepText: { flex: 1, fontSize: 14, lineHeight: 20, color: Colors.ink2, fontFamily: Typography.fontFamily.sans },
+  stepNum: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: Colors.accentSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 1,
+  },
+  stepNumText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: Colors.accent,
+    fontFamily: Typography.fontFamily.sansBold,
+  },
+  stepText: {
+    flex: 1,
+    fontSize: 14,
+    lineHeight: 20,
+    color: Colors.ink2,
+    fontFamily: Typography.fontFamily.sans,
+  },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   actionChip: {
     flexDirection: 'row',
@@ -243,6 +310,11 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     backgroundColor: Colors.accentSoft,
   },
-  actionText: { fontSize: 13, fontWeight: '600', color: Colors.accent, fontFamily: Typography.fontFamily.sansSemiBold },
+  actionText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: Colors.accent,
+    fontFamily: Typography.fontFamily.sansSemiBold,
+  },
   pressed: { opacity: 0.6 },
 })

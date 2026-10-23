@@ -1,5 +1,14 @@
 import { useMemo, useState } from 'react'
-import { View, Text, StyleSheet, ScrollView, Pressable, Alert, Switch, ActivityIndicator } from 'react-native'
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  Pressable,
+  Alert,
+  Switch,
+  ActivityIndicator,
+} from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
@@ -69,12 +78,22 @@ export default function ImportScreen() {
 
   const [file, setFile] = useState<Loaded | null>(null)
   const [includeDuplicates, setIncludeDuplicates] = useState(false)
-  const [progress, setProgress] = useState<{ phase: ImportPhase; done: number; total: number } | null>(null)
+  const [progress, setProgress] = useState<{
+    phase: ImportPhase
+    done: number
+    total: number
+  } | null>(null)
   const [result, setResult] = useState<{ count: number; held: number } | null>(null)
 
   async function pick() {
     const res = await DocumentPicker.getDocumentAsync({
-      type: ['text/csv', 'text/comma-separated-values', 'text/plain', 'application/vnd.ms-excel', 'public.comma-separated-values-text'],
+      type: [
+        'text/csv',
+        'text/comma-separated-values',
+        'text/plain',
+        'application/vnd.ms-excel',
+        'public.comma-separated-values-text',
+      ],
       copyToCacheDirectory: true,
     })
     if (res.canceled || !res.assets?.[0]) return
@@ -89,15 +108,31 @@ export default function ImportScreen() {
       const header = hasHeaderRow(cells)
       const mapping = detectColumns(cells, header)
       const body = cells.slice(header ? 1 : 0)
-      const dateOrder = detectDateOrder(mapping.date != null ? body.map((r) => r[mapping.date!] ?? '') : [], locale)
+      const dateOrder = detectDateOrder(
+        mapping.date != null ? body.map((r) => r[mapping.date!] ?? '') : [],
+        locale,
+      )
       const amountCells = body.flatMap((r) =>
-        [mapping.amount, mapping.debit, mapping.credit].filter((i): i is number => i != null).map((i) => r[i] ?? ''),
+        [mapping.amount, mapping.debit, mapping.credit]
+          .filter((i): i is number => i != null)
+          .map((i) => r[i] ?? ''),
       )
       const decimalMark = detectDecimalMark(amountCells)
-      const signs = mapping.amount != null
-        ? body.map((r) => parseAmount(r[mapping.amount!] ?? '', decimalMark)).filter((n): n is number => n != null)
-        : []
-      setFile({ name: asset.name, cells, header, mapping, dateOrder, decimalMark, sign: detectSignConvention(signs) })
+      const signs =
+        mapping.amount != null
+          ? body
+              .map((r) => parseAmount(r[mapping.amount!] ?? '', decimalMark))
+              .filter((n): n is number => n != null)
+          : []
+      setFile({
+        name: asset.name,
+        cells,
+        header,
+        mapping,
+        dateOrder,
+        decimalMark,
+        sign: detectSignConvention(signs),
+      })
       setResult(null)
     } catch {
       Alert.alert(t('import.read_failed_title', locale), t('import.read_failed_body', locale))
@@ -109,7 +144,11 @@ export default function ImportScreen() {
     const built = buildImportRows(file.cells, file)
     const existing = transactions
       .filter((x) => !x.is_deleted)
-      .map((x) => ({ day: localDay(x.transacted_at, tz), amount: x.amount, direction: x.direction }))
+      .map((x) => ({
+        day: localDay(x.transacted_at, tz),
+        amount: x.amount,
+        direction: x.direction,
+      }))
     const held = findDuplicates(built.rows, existing)
     const toImport = includeDuplicates ? built.rows : built.rows.filter((r) => !held.has(r.line))
     const days = built.rows.map((r) => r.day).sort()
@@ -120,7 +159,12 @@ export default function ImportScreen() {
     if (!file) return [] as string[]
     const width = Math.max(...file.cells.slice(0, 10).map((r) => r.length))
     return Array.from({ length: width }, (_, i) =>
-      file.header && file.cells[0][i] ? file.cells[0][i] : `${t('import.column', locale)} ${i + 1}: ${file.cells[file.header ? 1 : 0]?.[i] ?? ''}`.slice(0, 40),
+      file.header && file.cells[0][i]
+        ? file.cells[0][i]
+        : `${t('import.column', locale)} ${i + 1}: ${file.cells[file.header ? 1 : 0]?.[i] ?? ''}`.slice(
+            0,
+            40,
+          ),
     )
   }, [file, locale])
 
@@ -138,7 +182,14 @@ export default function ImportScreen() {
     }))
     Alert.alert(t(`import.role_${key}`, locale), undefined, [
       ...options,
-      ...(optional ? [{ text: t('import.none', locale), onPress: () => setFile({ ...file, mapping: { ...file.mapping, [key]: null } }) }] : []),
+      ...(optional
+        ? [
+            {
+              text: t('import.none', locale),
+              onPress: () => setFile({ ...file, mapping: { ...file.mapping, [key]: null } }),
+            },
+          ]
+        : []),
       { text: t('common.cancel', locale), style: 'cancel' as const },
     ])
   }
@@ -218,14 +269,18 @@ export default function ImportScreen() {
             <Text style={styles.body}>{t('import.body', locale)}</Text>
           </View>
           <View style={styles.card}>
-            {(['import.point_sources', 'import.point_names', 'import.point_duplicates'] as const).map((k, i) => (
+            {(
+              ['import.point_sources', 'import.point_names', 'import.point_duplicates'] as const
+            ).map((k, i) => (
               <View key={k} style={[styles.point, i === 2 && styles.pointLast]}>
                 <Ionicons name="checkmark-circle" size={16} color={Colors.accent} />
                 <Text style={styles.pointText}>{t(k, locale)}</Text>
               </View>
             ))}
           </View>
-          <Text style={styles.note}>{t('import.currency_note', locale).replace('{currency}', currency)}</Text>
+          <Text style={styles.note}>
+            {t('import.currency_note', locale).replace('{currency}', currency)}
+          </Text>
           <Pressable style={styles.primary} onPress={pick} testID="import-pick">
             <Text style={styles.primaryText}>{t('import.choose', locale)}</Text>
           </Pressable>
@@ -251,39 +306,52 @@ export default function ImportScreen() {
     <SafeAreaView style={styles.safe} edges={['bottom', 'left', 'right']}>
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.hero}>
-          <Text style={styles.fileName} numberOfLines={1}>{file.name}</Text>
-          <Text style={styles.title}>
-            {plural('import.found', reading.rows.length, locale)}
+          <Text style={styles.fileName} numberOfLines={1}>
+            {file.name}
           </Text>
-          {reading.first && (
-            <Text style={styles.body}>{`${reading.first} → ${reading.last}`}</Text>
-          )}
+          <Text style={styles.title}>{plural('import.found', reading.rows.length, locale)}</Text>
+          {reading.first && <Text style={styles.body}>{`${reading.first} → ${reading.last}`}</Text>}
         </View>
 
         <View style={styles.card}>
-          {roles.filter((r) => !r.hidden).map((r, i, arr) => (
-            <Pressable
-              key={r.key}
-              onPress={() => chooseColumn(r.key, r.optional)}
-              style={[styles.mapRow, i === arr.length - 1 && styles.pointLast]}
-              accessibilityRole="button"
-            >
-              <Text style={styles.mapRole}>{t(`import.role_${r.key}`, locale)}</Text>
-              <Text style={styles.mapValue} numberOfLines={1}>
-                {m[r.key] != null ? columnNames[m[r.key]!] : t('import.none', locale)}
-              </Text>
-              <Ionicons name="chevron-forward" size={14} color={Colors.ink4} />
-            </Pressable>
-          ))}
+          {roles
+            .filter((r) => !r.hidden)
+            .map((r, i, arr) => (
+              <Pressable
+                key={r.key}
+                onPress={() => chooseColumn(r.key, r.optional)}
+                style={[styles.mapRow, i === arr.length - 1 && styles.pointLast]}
+                accessibilityRole="button"
+              >
+                <Text style={styles.mapRole}>{t(`import.role_${r.key}`, locale)}</Text>
+                <Text style={styles.mapValue} numberOfLines={1}>
+                  {m[r.key] != null ? columnNames[m[r.key]!] : t('import.none', locale)}
+                </Text>
+                <Ionicons name="chevron-forward" size={14} color={Colors.ink4} />
+              </Pressable>
+            ))}
         </View>
 
         {!pairMode && (
           <View>
             <Text style={styles.label}>{t('import.signs', locale)}</Text>
             <View style={styles.chips}>
-              {(['negative_is_expense', 'all_expenses', 'all_income', 'positive_is_expense'] as const).map((s) => (
-                <Pressable key={s} onPress={() => setFile({ ...file, sign: s })} style={[styles.chip, file.sign === s && styles.chipOn]}>
-                  <Text style={[styles.chipText, file.sign === s && styles.chipTextOn]}>{t(`import.sign_${s}`, locale)}</Text>
+              {(
+                [
+                  'negative_is_expense',
+                  'all_expenses',
+                  'all_income',
+                  'positive_is_expense',
+                ] as const
+              ).map((s) => (
+                <Pressable
+                  key={s}
+                  onPress={() => setFile({ ...file, sign: s })}
+                  style={[styles.chip, file.sign === s && styles.chipOn]}
+                >
+                  <Text style={[styles.chipText, file.sign === s && styles.chipTextOn]}>
+                    {t(`import.sign_${s}`, locale)}
+                  </Text>
                 </Pressable>
               ))}
             </View>
@@ -294,8 +362,14 @@ export default function ImportScreen() {
           <Text style={styles.label}>{t('import.date_order', locale)}</Text>
           <View style={styles.chips}>
             {(['mdy', 'dmy', 'ymd'] as const).map((o) => (
-              <Pressable key={o} onPress={() => setFile({ ...file, dateOrder: o })} style={[styles.chip, file.dateOrder === o && styles.chipOn]}>
-                <Text style={[styles.chipText, file.dateOrder === o && styles.chipTextOn]}>{t(`import.order_${o}`, locale)}</Text>
+              <Pressable
+                key={o}
+                onPress={() => setFile({ ...file, dateOrder: o })}
+                style={[styles.chip, file.dateOrder === o && styles.chipOn]}
+              >
+                <Text style={[styles.chipText, file.dateOrder === o && styles.chipTextOn]}>
+                  {t(`import.order_${o}`, locale)}
+                </Text>
               </Pressable>
             ))}
           </View>
@@ -305,23 +379,46 @@ export default function ImportScreen() {
           <Text style={styles.label}>{t('import.preview', locale)}</Text>
           <View style={styles.card}>
             {reading.rows.slice(0, 5).map((r, i) => (
-              <View key={r.line} style={[styles.previewRow, i === Math.min(5, reading.rows.length) - 1 && styles.pointLast]}>
+              <View
+                key={r.line}
+                style={[
+                  styles.previewRow,
+                  i === Math.min(5, reading.rows.length) - 1 && styles.pointLast,
+                ]}
+              >
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.previewDesc} numberOfLines={1}>{r.description || '-'}</Text>
-                  <Text style={styles.previewDay}>{r.day}{reading.held.has(r.line) ? ` · ${t('import.already', locale)}` : ''}</Text>
+                  <Text style={styles.previewDesc} numberOfLines={1}>
+                    {r.description || '-'}
+                  </Text>
+                  <Text style={styles.previewDay}>
+                    {r.day}
+                    {reading.held.has(r.line) ? ` · ${t('import.already', locale)}` : ''}
+                  </Text>
                 </View>
-                <Text style={[styles.previewAmount, r.direction === 'credit' && { color: Colors.accent }]}>
+                <Text
+                  style={[
+                    styles.previewAmount,
+                    r.direction === 'credit' && { color: Colors.accent },
+                  ]}
+                >
                   {fmtSigned(r.amount, r.direction)}
                 </Text>
               </View>
             ))}
-            {reading.rows.length === 0 && <Text style={styles.body}>{t('import.nothing', locale)}</Text>}
+            {reading.rows.length === 0 && (
+              <Text style={styles.body}>{t('import.nothing', locale)}</Text>
+            )}
           </View>
         </View>
 
         {reading.held.size > 0 && (
           <View style={styles.switchRow}>
-            <Pressable style={{ flex: 1 }} onPress={() => setIncludeDuplicates((v) => !v)} accessibilityElementsHidden importantForAccessibility="no">
+            <Pressable
+              style={{ flex: 1 }}
+              onPress={() => setIncludeDuplicates((v) => !v)}
+              accessibilityElementsHidden
+              importantForAccessibility="no"
+            >
               <Text style={styles.switchText}>
                 {plural('import.held', reading.held.size, locale)}
               </Text>
@@ -335,10 +432,17 @@ export default function ImportScreen() {
           </View>
         )}
         {reading.skipped.length > 0 && (
-          <Text style={styles.note}>{plural('import.skipped', reading.skipped.length, locale)}</Text>
+          <Text style={styles.note}>
+            {plural('import.skipped', reading.skipped.length, locale)}
+          </Text>
         )}
 
-        <Pressable style={[styles.primary, !canImport && { opacity: 0.4 }]} disabled={!canImport} onPress={run} testID="import-run">
+        <Pressable
+          style={[styles.primary, !canImport && { opacity: 0.4 }]}
+          disabled={!canImport}
+          onPress={run}
+          testID="import-run"
+        >
           <Text style={styles.primaryText}>
             {plural('import.run', reading.toImport.length, locale)}
           </Text>
@@ -357,34 +461,143 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
   hero: { gap: 8, paddingTop: 4 },
   heroIcon: {
-    width: 40, height: 40, borderRadius: 12, backgroundColor: Colors.accentSoft,
-    alignItems: 'center', justifyContent: 'center', marginBottom: 4,
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: Colors.accentSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
   },
-  title: { fontFamily: Typography.fontFamily.serif, fontSize: 26, fontWeight: '500', letterSpacing: -0.5, color: Colors.ink, textAlign: 'left' },
-  body: { fontFamily: Typography.fontFamily.sans, fontSize: Typography.size.base, color: Colors.textSecondary, lineHeight: 22 },
+  title: {
+    fontFamily: Typography.fontFamily.serif,
+    fontSize: 26,
+    fontWeight: '500',
+    letterSpacing: -0.5,
+    color: Colors.ink,
+    textAlign: 'left',
+  },
+  body: {
+    fontFamily: Typography.fontFamily.sans,
+    fontSize: Typography.size.base,
+    color: Colors.textSecondary,
+    lineHeight: 22,
+  },
   fileName: { fontFamily: Typography.fontFamily.sansSemiBold, fontSize: 12.5, color: Colors.ink3 },
-  card: { backgroundColor: Colors.surface ?? Colors.card, borderRadius: Radius.card, paddingHorizontal: Spacing.base, paddingVertical: 4 },
-  point: { flexDirection: 'row', gap: 10, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(40,36,28,0.10)' },
+  card: {
+    backgroundColor: Colors.surface ?? Colors.card,
+    borderRadius: Radius.card,
+    paddingHorizontal: Spacing.base,
+    paddingVertical: 4,
+  },
+  point: {
+    flexDirection: 'row',
+    gap: 10,
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(40,36,28,0.10)',
+  },
   pointLast: { borderBottomWidth: 0 },
-  pointText: { flex: 1, fontFamily: Typography.fontFamily.sans, fontSize: 14, lineHeight: 20, color: Colors.ink2 },
-  note: { fontFamily: Typography.fontFamily.sans, fontSize: 12.5, lineHeight: 18, color: Colors.ink3 },
-  primary: { backgroundColor: Colors.ink, borderRadius: 999, paddingVertical: 15, alignItems: 'center', alignSelf: 'stretch' },
-  primaryText: { fontFamily: Typography.fontFamily.sansSemiBold, fontSize: 15.5, color: Colors.background },
+  pointText: {
+    flex: 1,
+    fontFamily: Typography.fontFamily.sans,
+    fontSize: 14,
+    lineHeight: 20,
+    color: Colors.ink2,
+  },
+  note: {
+    fontFamily: Typography.fontFamily.sans,
+    fontSize: 12.5,
+    lineHeight: 18,
+    color: Colors.ink3,
+  },
+  primary: {
+    backgroundColor: Colors.ink,
+    borderRadius: 999,
+    paddingVertical: 15,
+    alignItems: 'center',
+    alignSelf: 'stretch',
+  },
+  primaryText: {
+    fontFamily: Typography.fontFamily.sansSemiBold,
+    fontSize: 15.5,
+    color: Colors.background,
+  },
   secondary: { alignItems: 'center', paddingVertical: 6 },
-  secondaryText: { fontFamily: Typography.fontFamily.sansSemiBold, fontSize: 14, color: Colors.ink3 },
-  mapRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 13, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(40,36,28,0.10)' },
-  mapRole: { width: 110, fontFamily: Typography.fontFamily.sansSemiBold, fontSize: 14, color: Colors.ink },
-  mapValue: { flex: 1, fontFamily: Typography.fontFamily.sans, fontSize: 14, color: Colors.ink3, textAlign: 'right' },
-  label: { marginBottom: 8, fontSize: 11, fontWeight: '700', letterSpacing: 0.6, textTransform: 'uppercase', color: Colors.ink4, fontFamily: Typography.fontFamily.sansBold },
+  secondaryText: {
+    fontFamily: Typography.fontFamily.sansSemiBold,
+    fontSize: 14,
+    color: Colors.ink3,
+  },
+  mapRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 13,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(40,36,28,0.10)',
+  },
+  mapRole: {
+    width: 110,
+    fontFamily: Typography.fontFamily.sansSemiBold,
+    fontSize: 14,
+    color: Colors.ink,
+  },
+  mapValue: {
+    flex: 1,
+    fontFamily: Typography.fontFamily.sans,
+    fontSize: 14,
+    color: Colors.ink3,
+    textAlign: 'right',
+  },
+  label: {
+    marginBottom: 8,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+    color: Colors.ink4,
+    fontFamily: Typography.fontFamily.sansBold,
+  },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, backgroundColor: Colors.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(40,36,28,0.14)' },
+  chip: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: Colors.surface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(40,36,28,0.14)',
+  },
   chipOn: { backgroundColor: Colors.accentSoft, borderColor: Colors.accent },
   chipText: { fontFamily: Typography.fontFamily.sans, fontSize: 13, color: Colors.ink2 },
   chipTextOn: { fontFamily: Typography.fontFamily.sansSemiBold, color: Colors.accent },
-  previewRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 11, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(40,36,28,0.10)' },
+  previewRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 11,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(40,36,28,0.10)',
+  },
   previewDesc: { fontFamily: Typography.fontFamily.sansSemiBold, fontSize: 14, color: Colors.ink },
-  previewDay: { fontFamily: Typography.fontFamily.sans, fontSize: 12, color: Colors.ink3, marginTop: 2 },
-  previewAmount: { fontFamily: Typography.fontFamily.sansSemiBold, fontSize: 14, color: Colors.ink, fontVariant: ['tabular-nums'] },
+  previewDay: {
+    fontFamily: Typography.fontFamily.sans,
+    fontSize: 12,
+    color: Colors.ink3,
+    marginTop: 2,
+  },
+  previewAmount: {
+    fontFamily: Typography.fontFamily.sansSemiBold,
+    fontSize: 14,
+    color: Colors.ink,
+    fontVariant: ['tabular-nums'],
+  },
   switchRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  switchText: { flex: 1, fontFamily: Typography.fontFamily.sans, fontSize: 13.5, lineHeight: 19, color: Colors.ink2 },
+  switchText: {
+    flex: 1,
+    fontFamily: Typography.fontFamily.sans,
+    fontSize: 13.5,
+    lineHeight: 19,
+    color: Colors.ink2,
+  },
 })

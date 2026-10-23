@@ -88,7 +88,11 @@ describe('validateParsedExpense — the four regression cases from the fix plan'
     // rejected for the missing `flow_type`, and a `direction` full of
     // garbage does not itself produce a `direction` field error, because
     // nothing checks it anymore.
-    const result = validateParsedExpense({ ...VALID, flow_type: undefined, direction: 'not-a-real-direction' })
+    const result = validateParsedExpense({
+      ...VALID,
+      flow_type: undefined,
+      direction: 'not-a-real-direction',
+    })
     expect(isParseRejection(result)).toBe(true)
     if (isParseRejection(result)) {
       expect(result.errors.some((e) => e.field === 'direction')).toBe(false)
@@ -104,7 +108,7 @@ describe('validateParsedExpense — the four regression cases from the fix plan'
     }
   })
 
-  it('the fix plan\'s worked rejection example fails at the boundary, not at save time', () => {
+  it("the fix plan's worked rejection example fails at the boundary, not at save time", () => {
     // Adapted for the flow_type contract (fix-plan item 1.7, part 1): the
     // plan's own example named `direction: "expense"` as one of four
     // sibling failures alongside a bad payment_method/confidence/currency.
@@ -138,7 +142,9 @@ describe('validateParsedExpense — amount', () => {
 
   it('rejects amounts at or above 1e9', () => {
     expect(isParseRejection(validateParsedExpense({ ...VALID, amount: 1e9 }))).toBe(true)
-    expect(isParseRejection(validateParsedExpense({ ...VALID, amount: 999_999_999.99 }))).toBe(false)
+    expect(isParseRejection(validateParsedExpense({ ...VALID, amount: 999_999_999.99 }))).toBe(
+      false,
+    )
   })
 
   it('rejects amounts with more than 2 decimal places', () => {
@@ -187,14 +193,17 @@ describe('validateParsedExpense — flow_type → direction derivation', () => {
     ['transfer_in', 'credit'],
     ['refund', 'credit'],
     ['reimbursement', 'credit'],
-  ] as const)('flow_type %s derives direction %s end-to-end through the validator', (flowType, expectedDirection) => {
-    const result = validateParsedExpense({ ...VALID, flow_type: flowType })
-    expect(isParseRejection(result)).toBe(false)
-    if (!isParseRejection(result)) {
-      expect(result.flow_type).toBe(flowType)
-      expect(result.direction).toBe(expectedDirection)
-    }
-  })
+  ] as const)(
+    'flow_type %s derives direction %s end-to-end through the validator',
+    (flowType, expectedDirection) => {
+      const result = validateParsedExpense({ ...VALID, flow_type: flowType })
+      expect(isParseRejection(result)).toBe(false)
+      if (!isParseRejection(result)) {
+        expect(result.flow_type).toBe(flowType)
+        expect(result.direction).toBe(expectedDirection)
+      }
+    },
+  )
 
   it('rejects a flow_type outside the enum, e.g. the old direction value "debit" itself', () => {
     // "debit"/"credit" were the old (removed) direction enum's values —
@@ -281,7 +290,9 @@ describe('validateParsedExpense — confidence (clamped, never a rejection reaso
 
 describe('validateParsedExpense — transacted_at', () => {
   it('rejects an unparseable date string', () => {
-    expect(isParseRejection(validateParsedExpense({ ...VALID, transacted_at: 'yesterday-ish' }))).toBe(true)
+    expect(
+      isParseRejection(validateParsedExpense({ ...VALID, transacted_at: 'yesterday-ish' })),
+    ).toBe(true)
   })
 
   it('rejects a missing transacted_at', () => {
@@ -291,7 +302,9 @@ describe('validateParsedExpense — transacted_at', () => {
   })
 
   it('accepts a parseable ISO instant', () => {
-    expect(isParseRejection(validateParsedExpense({ ...VALID, transacted_at: '2026-08-08T14:39:14Z' }))).toBe(false)
+    expect(
+      isParseRejection(validateParsedExpense({ ...VALID, transacted_at: '2026-08-08T14:39:14Z' })),
+    ).toBe(false)
   })
 })
 
@@ -306,7 +319,10 @@ describe('validateParsedExpense — note length cap', () => {
   })
 
   it('honors a custom maxNoteLength option', () => {
-    const result = validateParsedExpense({ ...VALID, note: 'a fairly short note' }, { maxNoteLength: 5 })
+    const result = validateParsedExpense(
+      { ...VALID, note: 'a fairly short note' },
+      { maxNoteLength: 5 },
+    )
     expect(isParseRejection(result)).toBe(false)
     if (!isParseRejection(result)) expect(result.note).toBe('a fai')
   })
@@ -385,7 +401,10 @@ describe('validateTransactionWriteFields — the third boundary (createTransacti
   })
 
   it('rejects payment_method: "venmo" (not a DB enum value)', () => {
-    const errors = validateTransactionWriteFields({ ...VALID_WRITE, payment_method: 'venmo' as never })
+    const errors = validateTransactionWriteFields({
+      ...VALID_WRITE,
+      payment_method: 'venmo' as never,
+    })
     expect(errors).not.toBeNull()
     expect(errors?.some((e) => e.field === 'payment_method')).toBe(true)
   })
@@ -397,9 +416,21 @@ describe('validateTransactionWriteFields — the third boundary (createTransacti
   })
 
   it('rejects a non-finite/zero/negative amount, same rule as the full contract', () => {
-    expect(validateTransactionWriteFields({ ...VALID_WRITE, amount: 0 })?.some((e) => e.field === 'amount')).toBe(true)
-    expect(validateTransactionWriteFields({ ...VALID_WRITE, amount: NaN })?.some((e) => e.field === 'amount')).toBe(true)
-    expect(validateTransactionWriteFields({ ...VALID_WRITE, amount: -5 })?.some((e) => e.field === 'amount')).toBe(true)
+    expect(
+      validateTransactionWriteFields({ ...VALID_WRITE, amount: 0 })?.some(
+        (e) => e.field === 'amount',
+      ),
+    ).toBe(true)
+    expect(
+      validateTransactionWriteFields({ ...VALID_WRITE, amount: NaN })?.some(
+        (e) => e.field === 'amount',
+      ),
+    ).toBe(true)
+    expect(
+      validateTransactionWriteFields({ ...VALID_WRITE, amount: -5 })?.some(
+        (e) => e.field === 'amount',
+      ),
+    ).toBe(true)
   })
 
   it('collects every failing field in one pass, all four at once', () => {
@@ -409,7 +440,12 @@ describe('validateTransactionWriteFields — the third boundary (createTransacti
       currency_code: 'dollars',
       payment_method: 'venmo' as never,
     })
-    expect(errors?.map((e) => e.field).sort()).toEqual(['amount', 'currency', 'direction', 'payment_method'])
+    expect(errors?.map((e) => e.field).sort()).toEqual([
+      'amount',
+      'currency',
+      'direction',
+      'payment_method',
+    ])
   })
 })
 

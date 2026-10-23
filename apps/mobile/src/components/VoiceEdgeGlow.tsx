@@ -78,8 +78,18 @@ function useBreathing(min: number, max: number, durationMs: number, active: bool
     }
     const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(value, { toValue: min, duration: durationMs / 2, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-        Animated.timing(value, { toValue: max, duration: durationMs / 2, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(value, {
+          toValue: min,
+          duration: durationMs / 2,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(value, {
+          toValue: max,
+          duration: durationMs / 2,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
       ]),
     )
     loop.start()
@@ -145,7 +155,14 @@ export function VoiceEdgeGlow({ level, active }: Props) {
         </Svg>
       </Animated.View>
       <Animated.View style={[StyleSheet.absoluteFill, { opacity: flare }]} pointerEvents="none">
-        <ShadowLayer id="glowFlare" width={width} height={height} spread={4} blur={26} alpha={0.6} />
+        <ShadowLayer
+          id="glowFlare"
+          width={width}
+          height={height}
+          spread={4}
+          blur={26}
+          alpha={0.6}
+        />
       </Animated.View>
     </>
   )

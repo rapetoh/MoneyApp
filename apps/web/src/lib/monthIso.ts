@@ -22,7 +22,10 @@ export function currentMonthIso(tz: string): string {
  *  matching `Date#getMonth()`'s convention — the shape every existing
  *  `LensProps.anchorMonth` consumer expects). Falls back to the current
  *  month in `tz` on missing/malformed input. */
-export function parseMonthIso(iso: string | undefined, tz: string): { year: number; month: number } {
+export function parseMonthIso(
+  iso: string | undefined,
+  tz: string,
+): { year: number; month: number } {
   if (iso && /^\d{4}-\d{2}$/.test(iso)) {
     const [y, m] = iso.split('-').map(Number)
     if (m >= 1 && m <= 12) return { year: y, month: m - 1 }

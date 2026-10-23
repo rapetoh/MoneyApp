@@ -1,6 +1,12 @@
 import { useEffect, useState, useCallback } from 'react'
 import { getCalendars } from 'expo-localization'
-import { getTransactions, upsertTransaction, softDeleteTransaction, updateTransactionFields, getTransactionById } from '../services/sync/transactionStore'
+import {
+  getTransactions,
+  upsertTransaction,
+  softDeleteTransaction,
+  updateTransactionFields,
+  getTransactionById,
+} from '../services/sync/transactionStore'
 import { enqueue } from '../services/sync/syncQueue'
 import { syncManager, type OutboxOutcome } from '../services/sync/SyncManager'
 import { DataEvents } from '../events/dataEvents'
@@ -60,7 +66,10 @@ export interface MutationResult {
  * locally at all, and also removes a second, redundant version increment
  * (`softDeleteTransaction` already bumped it).
  */
-export async function deleteTransactionAndEnqueue(userId: string, id: string): Promise<MutationResult> {
+export async function deleteTransactionAndEnqueue(
+  userId: string,
+  id: string,
+): Promise<MutationResult> {
   await softDeleteTransaction(id)
   const deleted = await getTransactionById(id)
   if (!deleted) return { id, status: 'synced', error: null } // nothing to delete - id never existed locally
@@ -143,8 +152,29 @@ export function useTransactions(userId: string | undefined) {
   }, [userId, loadLocal])
 
   async function createTransaction(
-    fields: Pick<Transaction, 'amount' | 'direction' | 'currency_code' | 'merchant' | 'note' | 'category_id' | 'payment_method'> &
-      Partial<Pick<Transaction, 'source' | 'raw_transcript' | 'ai_confidence' | 'is_recurring' | 'recurring_rule_id' | 'recurring_frequency' | 'merchant_domain' | 'transacted_at'>>,
+    fields: Pick<
+      Transaction,
+      | 'amount'
+      | 'direction'
+      | 'currency_code'
+      | 'merchant'
+      | 'note'
+      | 'category_id'
+      | 'payment_method'
+    > &
+      Partial<
+        Pick<
+          Transaction,
+          | 'source'
+          | 'raw_transcript'
+          | 'ai_confidence'
+          | 'is_recurring'
+          | 'recurring_rule_id'
+          | 'recurring_frequency'
+          | 'merchant_domain'
+          | 'transacted_at'
+        >
+      >,
   ): Promise<MutationResult> {
     if (!userId) return { id: null, status: 'rejected', error: 'Not authenticated' }
 
@@ -202,7 +232,13 @@ export function useTransactions(userId: string | undefined) {
     // adoption, `fx.ts:79`) dates the rate to the *civil* day the
     // transaction belongs to, not a bare UTC slice.
     const profileCurrency = getCurrentProfileCurrency()
-    const fx = await snapshotFx(transactedAt, fields.currency_code, profileCurrency, fields.amount, tz)
+    const fx = await snapshotFx(
+      transactedAt,
+      fields.currency_code,
+      profileCurrency,
+      fields.amount,
+      tz,
+    )
 
     // transactions.local_day (migration 017, NOT NULL) — the civil day
     // this transaction belongs to in the user's zone, resolved once here
@@ -278,7 +314,20 @@ export function useTransactions(userId: string | undefined) {
 
   async function editTransaction(
     id: string,
-    fields: Partial<Pick<Transaction, 'amount' | 'transacted_at' | 'merchant' | 'note' | 'category_id' | 'payment_method' | 'direction' | 'is_recurring' | 'recurring_frequency'>>,
+    fields: Partial<
+      Pick<
+        Transaction,
+        | 'amount'
+        | 'transacted_at'
+        | 'merchant'
+        | 'note'
+        | 'category_id'
+        | 'payment_method'
+        | 'direction'
+        | 'is_recurring'
+        | 'recurring_frequency'
+      >
+    >,
   ): Promise<MutationResult> {
     if (!userId) return { id, status: 'rejected', error: 'Not authenticated' }
 
@@ -296,8 +345,15 @@ export function useTransactions(userId: string | undefined) {
       fields.category_id !== before.category_id &&
       merchantKey(learnedMerchant)
     ) {
-      const name = await learnMerchantCategory(userId, learnedMerchant, fields.category_id).catch(() => null)
-      if (name) learned = { merchantName: name, merchantKey: merchantKey(learnedMerchant)!, categoryId: fields.category_id }
+      const name = await learnMerchantCategory(userId, learnedMerchant, fields.category_id).catch(
+        () => null,
+      )
+      if (name)
+        learned = {
+          merchantName: name,
+          merchantKey: merchantKey(learnedMerchant)!,
+          categoryId: fields.category_id,
+        }
     }
 
     // If the amount changed, the FX snapshot is now stale. Reuse the

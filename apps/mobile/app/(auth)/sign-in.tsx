@@ -115,7 +115,10 @@ export default function WelcomeSignInScreen() {
     if (error) {
       Alert.alert(t('auth.reset_failed', locale), error.message)
     } else {
-      Alert.alert(t('auth.check_email', locale), t('auth.reset_email_sent', locale).replace('{email}', trimmed))
+      Alert.alert(
+        t('auth.check_email', locale),
+        t('auth.reset_email_sent', locale).replace('{email}', trimmed),
+      )
     }
   }
 
@@ -127,10 +130,7 @@ export default function WelcomeSignInScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom', 'left', 'right']}>
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={isIOS ? 'padding' : undefined}
-      >
+      <KeyboardAvoidingView style={styles.flex} behavior={isIOS ? 'padding' : undefined}>
         <ScrollView
           contentContainerStyle={styles.content}
           showsVerticalScrollIndicator={false}
@@ -140,7 +140,6 @@ export default function WelcomeSignInScreen() {
               ("The Listening Drop" was the retired candidate; see
               packages/shared/src/brand.ts for PRODUCT_NAME vs. mark name.) */}
           <MurmurMark size={52} variant="sage" />
-
 
           <Text style={styles.headline}>{t('onboarding.welcome.headline', locale)}</Text>
 
@@ -174,11 +173,7 @@ export default function WelcomeSignInScreen() {
               onPress={handleGoogleSignIn}
               disabled={loading}
             >
-              <Text
-                style={
-                  isIOS ? styles.googleSecondaryText : styles.googleHeroText
-                }
-              >
+              <Text style={isIOS ? styles.googleSecondaryText : styles.googleHeroText}>
                 {t('auth.continue_google', locale)}
               </Text>
             </Pressable>
@@ -189,9 +184,7 @@ export default function WelcomeSignInScreen() {
                 onPress={handleAppleSignIn}
                 disabled={loading}
               >
-                <Text style={styles.appleSecondaryText}>
-                  {t('auth.continue_apple', locale)}
-                </Text>
+                <Text style={styles.appleSecondaryText}>{t('auth.continue_apple', locale)}</Text>
               </Pressable>
             )}
 
@@ -200,9 +193,7 @@ export default function WelcomeSignInScreen() {
               style={({ pressed }) => [styles.moreOptionsBtn, pressed && styles.btnPressed]}
             >
               <Text style={styles.moreOptionsText}>
-                {showEmailForm
-                  ? t('auth.hide_email_form', locale)
-                  : t('auth.more_options', locale)}
+                {showEmailForm ? t('auth.hide_email_form', locale) : t('auth.more_options', locale)}
               </Text>
             </Pressable>
 
@@ -260,19 +251,13 @@ export default function WelcomeSignInScreen() {
                   {loading ? (
                     <ActivityIndicator color="#FFFFFF" />
                   ) : (
-                    <Text style={styles.emailSubmitText}>
-                      {t('auth.sign_in', locale)}
-                    </Text>
+                    <Text style={styles.emailSubmitText}>{t('auth.sign_in', locale)}</Text>
                   )}
                 </Pressable>
                 <View style={styles.signUpRow}>
-                  <Text style={styles.signUpHint}>
-                    {t('auth.no_account', locale)}{' '}
-                  </Text>
+                  <Text style={styles.signUpHint}>{t('auth.no_account', locale)} </Text>
                   <Link href="/(auth)/sign-up">
-                    <Text style={styles.signUpLink}>
-                      {t('auth.create_one', locale)}
-                    </Text>
+                    <Text style={styles.signUpLink}>{t('auth.create_one', locale)}</Text>
                   </Link>
                 </View>
               </View>
@@ -309,7 +294,13 @@ const styles = StyleSheet.create({
     marginTop: 22,
   },
 
-  trustRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 14, paddingHorizontal: 4 },
+  trustRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 14,
+    paddingHorizontal: 4,
+  },
   trustText: {
     fontSize: 13,
     color: Colors.ink3 ?? Colors.textSecondary,

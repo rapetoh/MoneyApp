@@ -86,7 +86,9 @@ describe('takeQueuedCaptures', () => {
     expect(out.map((e) => e.id)).toEqual(['S2', 'S1'])
     // A blank-but-present phrase still queues (the drain answers "I did
     // not catch an amount"); only a missing one is dropped.
-    contents = [JSON.stringify({ id: 'S3', kind: 'phrase', source: 'shortcut' }), SIRI_LINE].join('\n')
+    contents = [JSON.stringify({ id: 'S3', kind: 'phrase', source: 'shortcut' }), SIRI_LINE].join(
+      '\n',
+    )
     expect(takeQueuedCaptures().map((e) => e.id)).toEqual(['S1'])
   })
 

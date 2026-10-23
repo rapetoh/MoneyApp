@@ -37,7 +37,8 @@ export function GoalsSection({
   locale: Locale
   tz: string
 }) {
-  const { goals, contributions, createGoal, updateGoal, archiveGoal, addContribution } = useGoals(userId)
+  const { goals, contributions, createGoal, updateGoal, archiveGoal, addContribution } =
+    useGoals(userId)
   const [editing, setEditing] = useState<SavingsGoal | null>(null)
   const [editorOpen, setEditorOpen] = useState(false)
   const [moneyFor, setMoneyFor] = useState<SavingsGoal | null>(null)
@@ -46,7 +47,11 @@ export function GoalsSection({
     () =>
       goals.map((g) => ({
         goal: g,
-        status: goalStatus(g, contributions.filter((c) => c.goal_id === g.id), tz),
+        status: goalStatus(
+          g,
+          contributions.filter((c) => c.goal_id === g.id),
+          tz,
+        ),
       })),
     [goals, contributions, tz],
   )
@@ -54,14 +59,24 @@ export function GoalsSection({
   function openGoal(goal: SavingsGoal) {
     Alert.alert(goal.name, undefined, [
       { text: t('goals.add_money', locale), onPress: () => setMoneyFor(goal) },
-      { text: t('goals.edit', locale), onPress: () => { setEditing(goal); setEditorOpen(true) } },
+      {
+        text: t('goals.edit', locale),
+        onPress: () => {
+          setEditing(goal)
+          setEditorOpen(true)
+        },
+      },
       {
         text: t('goals.remove', locale),
         style: 'destructive',
         onPress: () =>
           Alert.alert(t('goals.remove_confirm', locale), goal.name, [
             { text: t('common.cancel', locale), style: 'cancel' },
-            { text: t('goals.remove', locale), style: 'destructive', onPress: () => void archiveGoal(goal.id) },
+            {
+              text: t('goals.remove', locale),
+              style: 'destructive',
+              onPress: () => void archiveGoal(goal.id),
+            },
           ]),
       },
       { text: t('common.cancel', locale), style: 'cancel' },
@@ -74,7 +89,10 @@ export function GoalsSection({
         <Text style={styles.sectionHead}>{t('goals.title', locale)}</Text>
         {rows.length > 0 && (
           <Pressable
-            onPress={() => { setEditing(null); setEditorOpen(true) }}
+            onPress={() => {
+              setEditing(null)
+              setEditorOpen(true)
+            }}
             hitSlop={8}
             accessibilityRole="button"
             accessibilityLabel={t('goals.new', locale)}
@@ -87,7 +105,10 @@ export function GoalsSection({
       {rows.length === 0 ? (
         <Pressable
           style={({ pressed }) => [styles.emptyCard, pressed && { opacity: 0.7 }]}
-          onPress={() => { setEditing(null); setEditorOpen(true) }}
+          onPress={() => {
+            setEditing(null)
+            setEditorOpen(true)
+          }}
           accessibilityRole="button"
         >
           <View style={styles.emptyIcon}>
@@ -102,22 +123,41 @@ export function GoalsSection({
             <Pressable
               key={goal.id}
               onPress={() => openGoal(goal)}
-              style={({ pressed }) => [styles.row, i > 0 && styles.rowDivider, pressed && styles.rowPressed]}
+              style={({ pressed }) => [
+                styles.row,
+                i > 0 && styles.rowDivider,
+                pressed && styles.rowPressed,
+              ]}
               accessibilityRole="button"
               accessibilityLabel={`${goal.name}, ${formatMoney(status.saved, goal.currency_code, locale)} / ${formatMoney(goal.target_amount, goal.currency_code, locale)}`}
             >
               <View style={styles.top}>
-                <Text style={styles.name} numberOfLines={1}>{goal.name}</Text>
+                <Text style={styles.name} numberOfLines={1}>
+                  {goal.name}
+                </Text>
                 <PacePill pace={status.pace} locale={locale} />
               </View>
               <View style={styles.amounts}>
-                <Money value={status.saved} size={17} serif={false} sansWeight="700" currencyCode={goal.currency_code} locale={locale} />
+                <Money
+                  value={status.saved}
+                  size={17}
+                  serif={false}
+                  sansWeight="700"
+                  currencyCode={goal.currency_code}
+                  locale={locale}
+                />
                 <Text style={styles.of}>
                   {` / ${formatMoney(goal.target_amount, goal.currency_code, locale, { precision: 'whole' })}`}
                 </Text>
               </View>
               <View style={styles.track}>
-                <View style={[styles.fill, { width: `${status.pct * 100}%` }, status.pace === 'done' && styles.fillDone]} />
+                <View
+                  style={[
+                    styles.fill,
+                    { width: `${status.pct * 100}%` },
+                    status.pace === 'done' && styles.fillDone,
+                  ]}
+                />
               </View>
               <Text style={styles.caption}>{captionFor(status, goal, locale)}</Text>
             </Pressable>
@@ -131,27 +171,41 @@ export function GoalsSection({
         currency={currency}
         locale={locale}
         tz={tz}
-        onClose={() => { setEditorOpen(false); setEditing(null) }}
+        onClose={() => {
+          setEditorOpen(false)
+          setEditing(null)
+        }}
         onSave={(fields) =>
-          editing ? updateGoal(editing.id, fields) : createGoal({ ...fields, currency_code: currency })
+          editing
+            ? updateGoal(editing.id, fields)
+            : createGoal({ ...fields, currency_code: currency })
         }
       />
       <GoalMoneyModal
         goal={moneyFor}
         locale={locale}
         onClose={() => setMoneyFor(null)}
-        onSave={(amount) => (moneyFor ? addContribution(moneyFor.id, amount) : Promise.resolve(false))}
+        onSave={(amount) =>
+          moneyFor ? addContribution(moneyFor.id, amount) : Promise.resolve(false)
+        }
       />
     </View>
   )
 }
 
-function captionFor(status: ReturnType<typeof goalStatus>, goal: SavingsGoal, locale: Locale): string {
+function captionFor(
+  status: ReturnType<typeof goalStatus>,
+  goal: SavingsGoal,
+  locale: Locale,
+): string {
   if (status.pace === 'done') return t('goals.caption_done', locale)
   if (status.pace === 'overdue') return t('goals.caption_overdue', locale)
   if (status.perMonth != null && goal.target_date) {
     return t('goals.caption_per_month', locale)
-      .replace('{amount}', formatMoney(status.perMonth, goal.currency_code, locale, { precision: 'whole' }))
+      .replace(
+        '{amount}',
+        formatMoney(status.perMonth, goal.currency_code, locale, { precision: 'whole' }),
+      )
       .replace('{date}', formatTargetDate(goal.target_date, locale))
   }
   return t('goals.caption_left', locale).replace(
@@ -183,7 +237,9 @@ function PacePill({ pace, locale }: { pace: GoalPace; locale: Locale }) {
   if (!p.key) return null
   return (
     <View style={[styles.pill, p.tone === 'warn' && styles.pillWarn]}>
-      <Text style={[styles.pillText, p.tone === 'warn' && styles.pillTextWarn]}>{t(p.key, locale)}</Text>
+      <Text style={[styles.pillText, p.tone === 'warn' && styles.pillTextWarn]}>
+        {t(p.key, locale)}
+      </Text>
     </View>
   )
 }
@@ -205,7 +261,11 @@ function GoalEditorModal({
   locale: Locale
   tz: string
   onClose: () => void
-  onSave: (fields: { name: string; target_amount: number; target_date: string | null }) => Promise<boolean>
+  onSave: (fields: {
+    name: string
+    target_amount: number
+    target_date: string | null
+  }) => Promise<boolean>
 }) {
   const [name, setName] = useState('')
   const [amount, setAmount] = useState('')
@@ -291,7 +351,12 @@ function GoalEditorModal({
       {/* The label and the switch toggle separately: a Switch inside a
           toggling Pressable fires both and flips twice. */}
       <View style={styles.switchRow}>
-        <Pressable style={{ flex: 1 }} onPress={() => setHasDate((v) => !v)} accessibilityElementsHidden importantForAccessibility="no">
+        <Pressable
+          style={{ flex: 1 }}
+          onPress={() => setHasDate((v) => !v)}
+          accessibilityElementsHidden
+          importantForAccessibility="no"
+        >
           <Text style={styles.switchLabel}>{t('goals.by_date', locale)}</Text>
         </Pressable>
         <Switch
@@ -316,7 +381,9 @@ function GoalEditorModal({
           </View>
         ) : (
           <Pressable onPress={openAndroidDate} style={styles.dateRow} accessibilityRole="button">
-            <Text style={styles.dateText}>{date.toLocaleDateString(locale, { day: 'numeric', month: 'short', year: 'numeric' })}</Text>
+            <Text style={styles.dateText}>
+              {date.toLocaleDateString(locale, { day: 'numeric', month: 'short', year: 'numeric' })}
+            </Text>
           </Pressable>
         ))}
     </CenterModal>
@@ -464,19 +531,45 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   emptyLink: { fontFamily: Typography.fontFamily.sansSemiBold, fontSize: 13, color: Colors.accent },
-  card: { marginHorizontal: 16, backgroundColor: Colors.surface ?? '#FFFFFF', borderRadius: 22, overflow: 'hidden' },
+  card: {
+    marginHorizontal: 16,
+    backgroundColor: Colors.surface ?? '#FFFFFF',
+    borderRadius: 22,
+    overflow: 'hidden',
+  },
   row: { paddingHorizontal: 18, paddingVertical: 14 },
   rowDivider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: Colors.line },
   rowPressed: { backgroundColor: 'rgba(40,36,28,0.04)' },
   top: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
-  name: { flexShrink: 1, fontFamily: Typography.fontFamily.sansSemiBold, fontSize: 15, color: Colors.ink },
+  name: {
+    flexShrink: 1,
+    fontFamily: Typography.fontFamily.sansSemiBold,
+    fontSize: 15,
+    color: Colors.ink,
+  },
   amounts: { flexDirection: 'row', alignItems: 'baseline', marginTop: 6 },
   of: { fontFamily: Typography.fontFamily.sans, fontSize: 13, color: Colors.ink3 },
-  track: { marginTop: 10, height: 6, borderRadius: 3, backgroundColor: Colors.surface2 ?? '#F5F2EB', overflow: 'hidden' },
+  track: {
+    marginTop: 10,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: Colors.surface2 ?? '#F5F2EB',
+    overflow: 'hidden',
+  },
   fill: { height: '100%', borderRadius: 3, backgroundColor: Colors.accent },
   fillDone: { backgroundColor: Colors.accent },
-  caption: { marginTop: 6, fontFamily: Typography.fontFamily.sans, fontSize: 12, color: Colors.ink3 },
-  pill: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, backgroundColor: Colors.accentSoft },
+  caption: {
+    marginTop: 6,
+    fontFamily: Typography.fontFamily.sans,
+    fontSize: 12,
+    color: Colors.ink3,
+  },
+  pill: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    backgroundColor: Colors.accentSoft,
+  },
   pillWarn: { backgroundColor: '#F6ECD9' },
   pillText: { fontFamily: Typography.fontFamily.sansSemiBold, fontSize: 11, color: Colors.accent },
   pillTextWarn: { color: '#9A6B12' },
@@ -518,8 +611,17 @@ const styles = StyleSheet.create({
     paddingVertical: 0,
     textAlign: 'center',
   },
-  switchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 16 },
-  switchLabel: { fontFamily: Typography.fontFamily.sansSemiBold, fontSize: 14.5, color: Colors.ink },
+  switchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 16,
+  },
+  switchLabel: {
+    fontFamily: Typography.fontFamily.sansSemiBold,
+    fontSize: 14.5,
+    color: Colors.ink,
+  },
   dateRow: { marginTop: 10, alignItems: 'flex-start' },
   dateText: { fontFamily: Typography.fontFamily.sansSemiBold, fontSize: 15, color: Colors.accent },
   segment: {

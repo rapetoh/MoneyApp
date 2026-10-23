@@ -44,7 +44,9 @@ describe.skipIf(!DatabaseSync)('syncQueue', () => {
     await enqueue('create', 'c', { n: 3 }, 'transaction')
     // Force entry 'b' (the middle insert) to carry an EARLIER created_at
     // than 'a' — this is exactly what a backward clock jump produces.
-    await db.runAsync("UPDATE sync_queue SET created_at = '2000-01-01T00:00:00.000Z' WHERE entity_id = 'b'")
+    await db.runAsync(
+      "UPDATE sync_queue SET created_at = '2000-01-01T00:00:00.000Z' WHERE entity_id = 'b'",
+    )
 
     const batch = await getReadyBatch(0, 10, new Date().toISOString())
     assert.deepEqual(

@@ -13,10 +13,9 @@ interface Props {
 // Static silhouette the bars scale inside — lifted from LiveWave in the
 // 14a mockup (docs/voice redesign). 40 bars, values are height fractions.
 const SEED = [
-  0.35, 0.62, 0.28, 0.85, 0.44, 0.7, 0.95, 0.5, 0.33, 0.78,
-  0.6, 0.42, 0.9, 0.55, 0.3, 0.68, 0.82, 0.4, 0.58, 0.72,
-  1, 0.46, 0.36, 0.64, 0.88, 0.52, 0.3, 0.75, 0.6, 0.4,
-  0.92, 0.48, 0.34, 0.7, 0.8, 0.44, 0.56, 0.66, 0.38, 0.86,
+  0.35, 0.62, 0.28, 0.85, 0.44, 0.7, 0.95, 0.5, 0.33, 0.78, 0.6, 0.42, 0.9, 0.55, 0.3, 0.68, 0.82,
+  0.4, 0.58, 0.72, 1, 0.46, 0.36, 0.64, 0.88, 0.52, 0.3, 0.75, 0.6, 0.4, 0.92, 0.48, 0.34, 0.7, 0.8,
+  0.44, 0.56, 0.66, 0.38, 0.86,
 ]
 
 const SETTLED_SCALE = 0.28
@@ -25,12 +24,26 @@ const SETTLED_SCALE = 0.28
  *  keyframes — 0.28 ↔ 1, staggered duration and phase per bar), all on
  *  the native driver. `boost` multiplies on top so real mic level makes
  *  the whole field swell without ever being a precondition for motion. */
-function Bar({ index, height, active, boost }: { index: number; height: number; active: boolean; boost: Animated.Value }) {
+function Bar({
+  index,
+  height,
+  active,
+  boost,
+}: {
+  index: number
+  height: number
+  active: boolean
+  boost: Animated.Value
+}) {
   const loop = useRef(new Animated.Value(SETTLED_SCALE)).current
 
   useEffect(() => {
     if (!active) {
-      Animated.timing(loop, { toValue: SETTLED_SCALE, duration: 240, useNativeDriver: true }).start()
+      Animated.timing(loop, {
+        toValue: SETTLED_SCALE,
+        duration: 240,
+        useNativeDriver: true,
+      }).start()
       return
     }
     // Mockup timing: 0.7s + (i % 5) * 0.14s per full cycle, phase-shifted
@@ -38,8 +51,18 @@ function Bar({ index, height, active, boost }: { index: number; height: number; 
     const half = (700 + (index % 5) * 140) / 2
     const anim = Animated.loop(
       Animated.sequence([
-        Animated.timing(loop, { toValue: 1, duration: half, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-        Animated.timing(loop, { toValue: SETTLED_SCALE, duration: half, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(loop, {
+          toValue: 1,
+          duration: half,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(loop, {
+          toValue: SETTLED_SCALE,
+          duration: half,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
       ]),
     )
     const starter = setTimeout(() => anim.start(), (index % 7) * 70)

@@ -12,7 +12,13 @@ import type { PaymentMethod, TransactionDirection } from './transaction'
  *  `flow_type` in code (`deriveDirectionFromFlowType`,
  *  packages/ai/src/validateParsedExpense.ts) — the model is never
  *  trusted to state the sign itself. */
-export type FlowType = 'expense' | 'income' | 'transfer_out' | 'transfer_in' | 'refund' | 'reimbursement'
+export type FlowType =
+  | 'expense'
+  | 'income'
+  | 'transfer_out'
+  | 'transfer_in'
+  | 'refund'
+  | 'reimbursement'
 
 export interface ParsedExpense {
   amount: number
@@ -36,7 +42,14 @@ export interface ParsedExpense {
   clarifying_question: string | null
   // Recurring intelligence — AI guesses based on merchant/category context
   is_recurring_suggestion: boolean
-  recurring_frequency_suggestion: 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'quarterly' | 'yearly' | null
+  recurring_frequency_suggestion:
+    | 'daily'
+    | 'weekly'
+    | 'biweekly'
+    | 'monthly'
+    | 'quarterly'
+    | 'yearly'
+    | null
 }
 
 // ─── Typed parse boundary (fix-plan item 1.7) ───────────────────────────────

@@ -38,12 +38,19 @@ export function CaptureDemo({ locale, currency }: { locale: Locale; currency: st
       if (cancelled) return
       setShown(0)
       card.setValue(0)
-      words.forEach((_, i) => timers.push(setTimeout(() => !cancelled && setShown(i + 1), 500 + i * WORD_MS)))
+      words.forEach((_, i) =>
+        timers.push(setTimeout(() => !cancelled && setShown(i + 1), 500 + i * WORD_MS)),
+      )
       const landAt = 500 + words.length * WORD_MS + 250
       timers.push(
         setTimeout(() => {
           if (cancelled) return
-          Animated.spring(card, { toValue: 1, useNativeDriver: true, friction: 7, tension: 80 }).start()
+          Animated.spring(card, {
+            toValue: 1,
+            useNativeDriver: true,
+            friction: 7,
+            tension: 80,
+          }).start()
         }, landAt),
       )
       timers.push(setTimeout(run, landAt + HOLD_MS))
@@ -61,8 +68,18 @@ export function CaptureDemo({ locale, currency }: { locale: Locale; currency: st
     const loops = bars.map((v, i) =>
       Animated.loop(
         Animated.sequence([
-          Animated.timing(v, { toValue: 1, duration: 360 + i * 70, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-          Animated.timing(v, { toValue: 0.3, duration: 360 + i * 70, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+          Animated.timing(v, {
+            toValue: 1,
+            duration: 360 + i * 70,
+            easing: Easing.inOut(Easing.sin),
+            useNativeDriver: true,
+          }),
+          Animated.timing(v, {
+            toValue: 0.3,
+            duration: 360 + i * 70,
+            easing: Easing.inOut(Easing.sin),
+            useNativeDriver: true,
+          }),
         ]),
       ),
     )
@@ -74,7 +91,11 @@ export function CaptureDemo({ locale, currency }: { locale: Locale; currency: st
   const listening = shown < words.length
 
   return (
-    <View style={styles.wrap} accessible accessibilityLabel={`${t('welcome.demo_transcript', locale)}. ${formatMoney(amount, currency, locale)}`}>
+    <View
+      style={styles.wrap}
+      accessible
+      accessibilityLabel={`${t('welcome.demo_transcript', locale)}. ${formatMoney(amount, currency, locale)}`}
+    >
       <View style={styles.statusRow}>
         <View style={styles.bars}>
           {bars.map((v, i) => (
@@ -84,7 +105,9 @@ export function CaptureDemo({ locale, currency }: { locale: Locale; currency: st
             />
           ))}
         </View>
-        <Text style={styles.status}>{listening ? t('listening.eyebrow', locale) : t('voice.saved', locale)}</Text>
+        <Text style={styles.status}>
+          {listening ? t('listening.eyebrow', locale) : t('voice.saved', locale)}
+        </Text>
       </View>
 
       <Text style={styles.transcript}>
@@ -97,7 +120,9 @@ export function CaptureDemo({ locale, currency }: { locale: Locale; currency: st
           styles.card,
           {
             opacity: card,
-            transform: [{ translateY: card.interpolate({ inputRange: [0, 1], outputRange: [14, 0] }) }],
+            transform: [
+              { translateY: card.interpolate({ inputRange: [0, 1], outputRange: [14, 0] }) },
+            ],
           },
         ]}
       >
@@ -158,7 +183,17 @@ const styles = StyleSheet.create({
     borderWidth: Hairline.width,
     borderColor: Hairline.color,
   },
-  merchant: { fontSize: 15, color: Colors.ink, fontFamily: Typography.fontFamily.sansSemiBold, fontWeight: '600' },
-  category: { marginTop: 1, fontSize: 12.5, color: Colors.ink3, fontFamily: Typography.fontFamily.sans },
+  merchant: {
+    fontSize: 15,
+    color: Colors.ink,
+    fontFamily: Typography.fontFamily.sansSemiBold,
+    fontWeight: '600',
+  },
+  category: {
+    marginTop: 1,
+    fontSize: 12.5,
+    color: Colors.ink3,
+    fontFamily: Typography.fontFamily.sans,
+  },
   amount: { fontFamily: Typography.fontFamily.serif, fontSize: 20, color: Colors.ink },
 })

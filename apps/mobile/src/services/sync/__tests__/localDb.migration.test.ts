@@ -86,7 +86,9 @@ function userVersion(db: Shim): number {
 
 function dedupIndexSql(db: Shim): string | null {
   const row = db.raw
-    .prepare("SELECT sql FROM sqlite_master WHERE type = 'index' AND name = 'idx_txn_recurring_dedup'")
+    .prepare(
+      "SELECT sql FROM sqlite_master WHERE type = 'index' AND name = 'idx_txn_recurring_dedup'",
+    )
     .get() as { sql: string | null } | undefined
   return row?.sql ?? null
 }
@@ -285,11 +287,13 @@ describe.skipIf(!DatabaseSync)('localDb migration path (node:sqlite)', () => {
 
     expect(userVersion(db)).toBe(SCHEMA_VERSION)
     expect(columnNames(db)).toEqual(MANIFEST_SORTED)
-    const pm = (db.raw.prepare('PRAGMA table_info(transactions)').all() as {
-      name: string
-      notnull: number
-      dflt_value: string | null
-    }[]).find((c) => c.name === 'payment_method')
+    const pm = (
+      db.raw.prepare('PRAGMA table_info(transactions)').all() as {
+        name: string
+        notnull: number
+        dflt_value: string | null
+      }[]
+    ).find((c) => c.name === 'payment_method')
     expect(pm?.notnull).toBe(0)
     expect(pm?.dflt_value).toBe(null)
 
@@ -304,10 +308,14 @@ describe.skipIf(!DatabaseSync)('localDb migration path (node:sqlite)', () => {
     expect(plain.payment_method).toBe('cash')
 
     // Dedup sweep kept the earlier occurrence, soft-deleted the later.
-    const early = db.raw.prepare("SELECT is_deleted FROM transactions WHERE id = 'txn-rec-early'").get() as {
+    const early = db.raw
+      .prepare("SELECT is_deleted FROM transactions WHERE id = 'txn-rec-early'")
+      .get() as {
       is_deleted: number
     }
-    const late = db.raw.prepare("SELECT is_deleted FROM transactions WHERE id = 'txn-rec-late'").get() as {
+    const late = db.raw
+      .prepare("SELECT is_deleted FROM transactions WHERE id = 'txn-rec-late'")
+      .get() as {
       is_deleted: number
     }
     expect(early.is_deleted).toBe(0)
@@ -339,12 +347,13 @@ describe.skipIf(!DatabaseSync)('localDb migration path (node:sqlite)', () => {
     }
 
     // Relaunch: nothing replays, nothing changes.
-    const before = (db.raw.prepare('SELECT count(*) AS n FROM transactions').get() as { n: number }).n
+    const before = (db.raw.prepare('SELECT count(*) AS n FROM transactions').get() as { n: number })
+      .n
     await initDatabase(db)
     expect(userVersion(db)).toBe(SCHEMA_VERSION)
-    expect((db.raw.prepare('SELECT count(*) AS n FROM transactions').get() as { n: number }).n).toBe(
-      before,
-    )
+    expect(
+      (db.raw.prepare('SELECT count(*) AS n FROM transactions').get() as { n: number }).n,
+    ).toBe(before)
   })
 
   it('install hit by the defective rebuild gets its FX columns back', async () => {

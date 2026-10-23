@@ -55,7 +55,11 @@ export async function enqueue(
  * 2). `dueBy` (an ISO instant) excludes entries still inside their
  * backoff window.
  */
-export async function getReadyBatch(afterId: number, limit: number, dueBy: string): Promise<QueueEntry[]> {
+export async function getReadyBatch(
+  afterId: number,
+  limit: number,
+  dueBy: string,
+): Promise<QueueEntry[]> {
   const db = await getDb()
   const rows = await db.getAllAsync(
     `SELECT * FROM sync_queue
@@ -79,7 +83,11 @@ export async function markSynced(id: number): Promise<void> {
  * attempt with exponential backoff + jitter — the entry stays 'pending'
  * so it is retried, not lost.
  */
-export async function markTransientFailure(id: number, retryCount: number, error: string): Promise<void> {
+export async function markTransientFailure(
+  id: number,
+  retryCount: number,
+  error: string,
+): Promise<void> {
   const db = await getDb()
   const nextAttemptAt = new Date(Date.now() + computeBackoffMs(retryCount)).toISOString()
   await db.runAsync(
@@ -97,15 +105,17 @@ export async function markTransientFailure(id: number, retryCount: number, error
  */
 export async function markDeadLetter(id: number, error: string): Promise<void> {
   const db = await getDb()
-  await db.runAsync(
-    "UPDATE sync_queue SET status = 'dead', last_error = ? WHERE id = ?",
-    [error, id],
-  )
+  await db.runAsync("UPDATE sync_queue SET status = 'dead', last_error = ? WHERE id = ?", [
+    error,
+    id,
+  ])
 }
 
 export async function getDeadLetterEntries(): Promise<QueueEntry[]> {
   const db = await getDb()
-  const rows = await db.getAllAsync("SELECT * FROM sync_queue WHERE status = 'dead' ORDER BY id ASC")
+  const rows = await db.getAllAsync(
+    "SELECT * FROM sync_queue WHERE status = 'dead' ORDER BY id ASC",
+  )
   return rows as QueueEntry[]
 }
 
@@ -133,7 +143,9 @@ export async function retryDeadLetterEntry(id: number): Promise<void> {
  */
 export async function resetDeadLetterEntries(): Promise<void> {
   const db = await getDb()
-  await db.runAsync("UPDATE sync_queue SET status = 'pending', retry_count = 0, next_attempt_at = NULL WHERE status = 'dead'")
+  await db.runAsync(
+    "UPDATE sync_queue SET status = 'pending', retry_count = 0, next_attempt_at = NULL WHERE status = 'dead'",
+  )
 }
 
 export async function getPendingCount(): Promise<number> {
@@ -146,7 +158,9 @@ export async function getPendingCount(): Promise<number> {
 
 export async function getDeadCount(): Promise<number> {
   const db = await getDb()
-  const row = await db.getFirstAsync<{ n: number }>("SELECT COUNT(*) AS n FROM sync_queue WHERE status = 'dead'")
+  const row = await db.getFirstAsync<{ n: number }>(
+    "SELECT COUNT(*) AS n FROM sync_queue WHERE status = 'dead'",
+  )
   return row?.n ?? 0
 }
 

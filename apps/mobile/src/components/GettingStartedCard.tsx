@@ -1,5 +1,14 @@
 import { useEffect, useRef } from 'react'
-import { Alert, Animated, LayoutAnimation, Platform, Pressable, StyleSheet, Text, View } from 'react-native'
+import {
+  Alert,
+  Animated,
+  LayoutAnimation,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native'
 import Svg, { Circle } from 'react-native-svg'
 import { Ionicons } from '@expo/vector-icons'
 import { useReduceMotion } from '../hooks/useReduceMotion'
@@ -130,13 +139,20 @@ export function GettingStartedCard({
         <ProgressRing done={done} total={items.length} />
         <Text style={styles.title}>{t('start.title', locale)}</Text>
         <Text style={styles.progress}>
-          {t('start.progress', locale).replace('{done}', String(done)).replace('{total}', String(items.length))}
+          {t('start.progress', locale)
+            .replace('{done}', String(done))
+            .replace('{total}', String(items.length))}
         </Text>
         <View style={{ flex: 1 }} />
         <Animated.View
           style={{
             transform: [
-              { rotate: chevron.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '180deg'] }) },
+              {
+                rotate: chevron.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: ['0deg', '180deg'],
+                }),
+              },
             ],
           }}
         >
@@ -172,8 +188,14 @@ export function GettingStartedCard({
               size={20}
               color={item.done ? Colors.accent : Colors.ink4}
             />
-            <Text style={[styles.label, item.done && styles.labelDone]}>{t(`start.${item.key}`, locale)}</Text>
-            <Ionicons name="chevron-forward" size={15} color={item.done ? Colors.ink4 : Colors.ink3} />
+            <Text style={[styles.label, item.done && styles.labelDone]}>
+              {t(`start.${item.key}`, locale)}
+            </Text>
+            <Ionicons
+              name="chevron-forward"
+              size={15}
+              color={item.done ? Colors.ink4 : Colors.ink3}
+            />
           </Pressable>
         ))}
     </View>
@@ -197,10 +219,21 @@ const styles = StyleSheet.create({
   cardCollapsed: { paddingBottom: 14 },
   // The chevron sits at the end of the header's own tap target; the menu
   // is a separate, smaller target outside it (top-right of the card).
-  head: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 2, paddingRight: 26 },
+  head: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 2,
+    paddingRight: 26,
+  },
   more: { position: 'absolute', top: 12, right: 14, padding: 4 },
   headPressed: { opacity: 0.6 },
-  title: { fontSize: 15.5, color: Colors.ink, fontFamily: Typography.fontFamily.sansBold, fontWeight: '700' },
+  title: {
+    fontSize: 15.5,
+    color: Colors.ink,
+    fontFamily: Typography.fontFamily.sansBold,
+    fontWeight: '700',
+  },
   progress: { fontSize: 13, color: Colors.ink4, fontFamily: Typography.fontFamily.sansSemiBold },
   row: {
     flexDirection: 'row',
@@ -211,6 +244,12 @@ const styles = StyleSheet.create({
     borderTopColor: Hairline.color,
   },
   rowPressed: { opacity: 0.6 },
-  label: { flex: 1, fontSize: 14.5, color: Colors.ink, fontFamily: Typography.fontFamily.sansSemiBold, fontWeight: '600' },
+  label: {
+    flex: 1,
+    fontSize: 14.5,
+    color: Colors.ink,
+    fontFamily: Typography.fontFamily.sansSemiBold,
+    fontWeight: '600',
+  },
   labelDone: { color: Colors.ink4, textDecorationLine: 'line-through', fontWeight: '500' },
 })

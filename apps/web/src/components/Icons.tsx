@@ -106,8 +106,20 @@ export const Icon = {
   ),
   trend: ({ color = 'currentColor', size = 16 }: Props) => (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <path d="M4 17l5-5 4 4 7-8" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M15 8h5v5" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <path
+        d="M4 17l5-5 4 4 7-8"
+        stroke={color}
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M15 8h5v5"
+        stroke={color}
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   ),
   wallet: ({ color = 'currentColor', size = 16 }: Props) => (
@@ -124,7 +136,13 @@ export const Icon = {
   ),
   swap: ({ color = 'currentColor', size = 16 }: Props) => (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <path d="M8 4v16M8 4L5 7M8 4l3 3M16 20V4M16 20l-3-3M16 20l3-3" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <path
+        d="M8 4v16M8 4L5 7M8 4l3 3M16 20V4M16 20l-3-3M16 20l3-3"
+        stroke={color}
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   ),
   // Tight refresh-loop glyph used to mark recurring transactions inline.
@@ -183,7 +201,12 @@ export const Icon = {
   trash: ({ color = 'currentColor', size = 16 }: Props) => (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <path d="M4 7h16" stroke={color} strokeWidth="1.8" strokeLinecap="round" />
-      <path d="M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" stroke={color} strokeWidth="1.8" strokeLinecap="round" />
+      <path
+        d="M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"
+        stroke={color}
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
       <path
         d="M6 7l1 12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-12"
         stroke={color}

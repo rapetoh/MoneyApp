@@ -90,7 +90,11 @@ function fire(eventName: string, event: unknown) {
 
 const { useKeyboardLift } = await import('../useKeyboardLift')
 
-function Harness({ measureInWindow }: { measureInWindow: (cb: (x: number, y: number, w: number, h: number) => void) => void }) {
+function Harness({
+  measureInWindow,
+}: {
+  measureInWindow: (cb: (x: number, y: number, w: number, h: number) => void) => void
+}) {
   const ref = React.useRef<{ measureInWindow: typeof measureInWindow }>({ measureInWindow })
   useKeyboardLift(ref)
   return null
@@ -108,14 +112,19 @@ afterEach(() => {
 
 describe('useKeyboardLift — drives the lift from a real window measurement', () => {
   it('calls measureInWindow (not a cached layout frame) when the keyboard shows', () => {
-    const measureInWindow = vi.fn((cb: (x: number, y: number, w: number, h: number) => void) => cb(0, 844, 375, 0))
+    const measureInWindow = vi.fn((cb: (x: number, y: number, w: number, h: number) => void) =>
+      cb(0, 844, 375, 0),
+    )
 
     act(() => {
       renderer = TestRenderer.create(React.createElement(Harness, { measureInWindow }))
     })
 
     act(() => {
-      fire('keyboardWillChangeFrame', { endCoordinates: { height: 336, screenY: 508 }, duration: 250 })
+      fire('keyboardWillChangeFrame', {
+        endCoordinates: { height: 336, screenY: 508 },
+        duration: 250,
+      })
     })
 
     expect(measureInWindow).toHaveBeenCalledTimes(1)
@@ -133,7 +142,10 @@ describe('useKeyboardLift — drives the lift from a real window measurement', (
     })
 
     act(() => {
-      fire('keyboardWillChangeFrame', { endCoordinates: { height: 0, screenY: 844 }, duration: 200 })
+      fire('keyboardWillChangeFrame', {
+        endCoordinates: { height: 0, screenY: 844 },
+        duration: 200,
+      })
     })
 
     expect(measureInWindow).not.toHaveBeenCalled()

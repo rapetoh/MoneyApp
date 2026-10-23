@@ -1,10 +1,19 @@
 import OpenAI from 'openai'
 import { validateToken } from '../../../../lib/auth'
-import { getScanPrompt, validateParsedExpense, isParseRejection, PARSED_EXPENSE_JSON_SCHEMA } from '@voice-expense/ai'
+import {
+  getScanPrompt,
+  validateParsedExpense,
+  isParseRejection,
+  PARSED_EXPENSE_JSON_SCHEMA,
+} from '@voice-expense/ai'
 import type { NextRequest } from 'next/server'
 import { createJsonCompletionWithRetry } from '../../../../lib/aiCompletion'
 import { checkRateLimit } from '../../../../lib/rateLimit'
-import { contentLengthExceeds, isSupportedCurrency, isSupportedScanType } from '../../../../lib/parseGuards'
+import {
+  contentLengthExceeds,
+  isSupportedCurrency,
+  isSupportedScanType,
+} from '../../../../lib/parseGuards'
 import { getOpenAIEnv } from '../../../../lib/env'
 
 const openai = new OpenAI({ apiKey: getOpenAIEnv().OPENAI_API_KEY })
@@ -63,10 +72,16 @@ export async function POST(req: NextRequest) {
   // silently fall through to the paycheck branch's hardcoded
   // credit/Income/recurring defaults for content that isn't a paycheck).
   if (!isSupportedScanType(scanType)) {
-    return Response.json({ error: `unsupported scanType: ${JSON.stringify(scanType)}` }, { status: 400 })
+    return Response.json(
+      { error: `unsupported scanType: ${JSON.stringify(scanType)}` },
+      { status: 400 },
+    )
   }
   if (!isSupportedCurrency(currency)) {
-    return Response.json({ error: `unsupported currency: ${JSON.stringify(currency)}` }, { status: 400 })
+    return Response.json(
+      { error: `unsupported currency: ${JSON.stringify(currency)}` },
+      { status: 400 },
+    )
   }
 
   const prompt = getScanPrompt(scanType, currency)
@@ -90,7 +105,9 @@ export async function POST(req: NextRequest) {
         { role: 'system', content: prompt },
         {
           role: 'user',
-          content: [{ type: 'image_url', image_url: { url: `data:image/jpeg;base64,${imageBase64}` } }],
+          content: [
+            { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${imageBase64}` } },
+          ],
         },
       ],
     })
@@ -106,7 +123,9 @@ export async function POST(req: NextRequest) {
     // Fix-plan 1.7 part 3: "record the model id alongside ai_confidence" —
     // see parse-expense/route.ts's identical log line for why this is a
     // log trail rather than a DB column.
-    console.log(`[parse-scan] ok model=${MODEL} confidence=${result.confidence} retried=${completion.retried}`)
+    console.log(
+      `[parse-scan] ok model=${MODEL} confidence=${result.confidence} retried=${completion.retried}`,
+    )
     return Response.json(result)
   } catch (err) {
     // Message + status only — the raw OpenAI SDK error object embeds the

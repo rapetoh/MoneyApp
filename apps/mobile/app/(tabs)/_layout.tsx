@@ -16,7 +16,13 @@ import { useReduceMotion } from '../../src/hooks/useReduceMotion'
 import { ReminderPrimeSheet } from '../../src/components/ReminderPrimeSheet'
 import { purchasesEnabled } from '../../src/services/purchases'
 import { useVoiceSession } from '../../src/hooks/useVoiceSession'
-import { Colors, Typography, TAB_BAR_HEIGHT, TAB_BAR_BOTTOM_OFFSET, reportTabBarHeight } from '../../src/theme'
+import {
+  Colors,
+  Typography,
+  TAB_BAR_HEIGHT,
+  TAB_BAR_BOTTOM_OFFSET,
+  reportTabBarHeight,
+} from '../../src/theme'
 import { t, type Locale } from '@voice-expense/shared'
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name']
@@ -32,11 +38,7 @@ function TabIcon({
 }) {
   return (
     <View style={styles.tabIconWrap}>
-      <Ionicons
-        name={name}
-        size={22}
-        color={focused ? Colors.ink : Colors.ink4}
-      />
+      <Ionicons name={name} size={22} color={focused ? Colors.ink : Colors.ink4} />
       {badge && <View style={styles.tabBadge} />}
     </View>
   )
@@ -55,7 +57,12 @@ function RecordFab({ label, glow }: { label: string; glow: boolean }) {
   useEffect(() => {
     if (!glow || reduceMotion) return
     const loop = Animated.loop(
-      Animated.timing(ring, { toValue: 1, duration: 1600, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+      Animated.timing(ring, {
+        toValue: 1,
+        duration: 1600,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }),
     )
     loop.start()
     return () => {
@@ -71,21 +78,29 @@ function RecordFab({ label, glow }: { label: string; glow: boolean }) {
           style={[
             styles.fabGlow,
             {
-              opacity: reduceMotion ? 0.25 : ring.interpolate({ inputRange: [0, 1], outputRange: [0.45, 0] }),
-              transform: [{ scale: reduceMotion ? 1.2 : ring.interpolate({ inputRange: [0, 1], outputRange: [1, 1.6] }) }],
+              opacity: reduceMotion
+                ? 0.25
+                : ring.interpolate({ inputRange: [0, 1], outputRange: [0.45, 0] }),
+              transform: [
+                {
+                  scale: reduceMotion
+                    ? 1.2
+                    : ring.interpolate({ inputRange: [0, 1], outputRange: [1, 1.6] }),
+                },
+              ],
             },
           ]}
         />
       )}
-    <Pressable
-      style={({ pressed }) => [styles.recordButton, pressed && styles.recordButtonPressed]}
-      onPress={openVoice}
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      hitSlop={6}
-    >
-      <Ionicons name="mic" size={26} color={Colors.white} />
-    </Pressable>
+      <Pressable
+        style={({ pressed }) => [styles.recordButton, pressed && styles.recordButtonPressed]}
+        onPress={openVoice}
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        hitSlop={6}
+      >
+        <Ionicons name="mic" size={26} color={Colors.white} />
+      </Pressable>
     </View>
   )
 }
@@ -142,104 +157,106 @@ export default function TabsLayout() {
 
   return (
     <>
-    <Tabs
-      screenOptions={{
-        headerShown: false,
-        // Every tab mounts at launch, under the launch veil, instead of on
-        // its first tap. With lazy mounting the first visit to Budgets /
-        // Insights / More paid a whole-screen mount + layout on the tap —
-        // a visible ~100 ms flash before the content settled (owner review,
-        // Aug 16). Data is already preloaded at the root (query cache), so
-        // the eager mount is cheap and the first tap is instant.
-        lazy: false,
-        // Bar's bottom edge floats `TAB_BAR_BOTTOM_OFFSET` above the safe
-        // area, not a fixed 14pt off the physical screen edge — on a
-        // Home-button device (insets.bottom === 0) that's 8pt; on a Face ID
-        // device (insets.bottom === 34) that's 42pt, clearing the home
-        // indicator band instead of crowding it. See F12.
-        tabBarStyle: [styles.tabBar, { bottom: insets.bottom + TAB_BAR_BOTTOM_OFFSET }],
-        // Real iOS-style frosted glass via expo-blur. The bar's own
-        // backgroundColor is set to transparent in styles.tabBar so the
-        // blur + subtle tint show through. Falls back to a translucent
-        // white on platforms that don't support backdrop blur.
-        tabBarBackground: () => (
-          <BlurView
-            intensity={80}
-            tint="light"
-            style={styles.tabBarBlur}
-            // The background fills the pill, so its height IS the bar's real
-            // height — reported to `useTabBarClearance()` (theme/chrome.ts).
-            onLayout={(e) => reportTabBarHeight(e.nativeEvent.layout.height)}
-          />
-        ),
-        // Ink-on-quiet active state per the voice-redesign tab bar
-        // (docs/voice redesign, artboard 14) — no filled pill behind the
-        // active icon anymore; active reads as ink, inactive as ink4.
-        tabBarActiveTintColor: Colors.ink,
-        tabBarInactiveTintColor: Colors.ink4,
-        tabBarLabelStyle: styles.tabLabel,
-      }}
-    >
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: t('tabs.today', locale),
-          tabBarIcon: ({ focused }) => (
-            <TabIcon focused={focused} name={focused ? 'home' : 'home-outline'} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="insights"
-        options={{
-          title: t('tabs.insights', locale),
-          tabBarIcon: ({ focused }) => (
-            <TabIcon
-              focused={focused}
-              name={focused ? 'stats-chart' : 'stats-chart-outline'}
-              badge={insightsBadge}
+      <Tabs
+        screenOptions={{
+          headerShown: false,
+          // Every tab mounts at launch, under the launch veil, instead of on
+          // its first tap. With lazy mounting the first visit to Budgets /
+          // Insights / More paid a whole-screen mount + layout on the tap —
+          // a visible ~100 ms flash before the content settled (owner review,
+          // Aug 16). Data is already preloaded at the root (query cache), so
+          // the eager mount is cheap and the first tap is instant.
+          lazy: false,
+          // Bar's bottom edge floats `TAB_BAR_BOTTOM_OFFSET` above the safe
+          // area, not a fixed 14pt off the physical screen edge — on a
+          // Home-button device (insets.bottom === 0) that's 8pt; on a Face ID
+          // device (insets.bottom === 34) that's 42pt, clearing the home
+          // indicator band instead of crowding it. See F12.
+          tabBarStyle: [styles.tabBar, { bottom: insets.bottom + TAB_BAR_BOTTOM_OFFSET }],
+          // Real iOS-style frosted glass via expo-blur. The bar's own
+          // backgroundColor is set to transparent in styles.tabBar so the
+          // blur + subtle tint show through. Falls back to a translucent
+          // white on platforms that don't support backdrop blur.
+          tabBarBackground: () => (
+            <BlurView
+              intensity={80}
+              tint="light"
+              style={styles.tabBarBlur}
+              // The background fills the pill, so its height IS the bar's real
+              // height — reported to `useTabBarClearance()` (theme/chrome.ts).
+              onLayout={(e) => reportTabBarHeight(e.nativeEvent.layout.height)}
             />
           ),
+          // Ink-on-quiet active state per the voice-redesign tab bar
+          // (docs/voice redesign, artboard 14) — no filled pill behind the
+          // active icon anymore; active reads as ink, inactive as ink4.
+          tabBarActiveTintColor: Colors.ink,
+          tabBarInactiveTintColor: Colors.ink4,
+          tabBarLabelStyle: styles.tabLabel,
         }}
+      >
+        <Tabs.Screen
+          name="index"
+          options={{
+            title: t('tabs.today', locale),
+            tabBarIcon: ({ focused }) => (
+              <TabIcon focused={focused} name={focused ? 'home' : 'home-outline'} />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="insights"
+          options={{
+            title: t('tabs.insights', locale),
+            tabBarIcon: ({ focused }) => (
+              <TabIcon
+                focused={focused}
+                name={focused ? 'stats-chart' : 'stats-chart-outline'}
+                badge={insightsBadge}
+              />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="record"
+          options={{
+            title: '',
+            // Custom button: opens the in-place voice overlay instead of
+            // navigating. The route itself survives only as a redirect bridge
+            // for pre-redesign deep links (see app/(tabs)/record.tsx).
+            tabBarButton: () => (
+              <RecordFab label={t('voice.tap_to_record', locale)} glow={dayOneActive} />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="budgets"
+          options={{
+            title: t('tabs.budgets', locale),
+            tabBarIcon: ({ focused }) => (
+              <TabIcon focused={focused} name={focused ? 'wallet' : 'wallet-outline'} />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="more"
+          options={{
+            title: t('tabs.more', locale),
+            tabBarIcon: ({ focused }) => (
+              <TabIcon
+                focused={focused}
+                name={focused ? 'ellipsis-horizontal' : 'ellipsis-horizontal-outline'}
+              />
+            ),
+          }}
+        />
+      </Tabs>
+      <ReminderPrimeSheet
+        visible={primeVisible}
+        locale={locale}
+        onContinue={acceptPrime}
+        onDecline={declinePrime}
       />
-      <Tabs.Screen
-        name="record"
-        options={{
-          title: '',
-          // Custom button: opens the in-place voice overlay instead of
-          // navigating. The route itself survives only as a redirect bridge
-          // for pre-redesign deep links (see app/(tabs)/record.tsx).
-          tabBarButton: () => <RecordFab label={t('voice.tap_to_record', locale)} glow={dayOneActive} />,
-        }}
-      />
-      <Tabs.Screen
-        name="budgets"
-        options={{
-          title: t('tabs.budgets', locale),
-          tabBarIcon: ({ focused }) => (
-            <TabIcon focused={focused} name={focused ? 'wallet' : 'wallet-outline'} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="more"
-        options={{
-          title: t('tabs.more', locale),
-          tabBarIcon: ({ focused }) => (
-            <TabIcon
-              focused={focused}
-              name={focused ? 'ellipsis-horizontal' : 'ellipsis-horizontal-outline'}
-            />
-          ),
-        }}
-      />
-    </Tabs>
-    <ReminderPrimeSheet
-      visible={primeVisible}
-      locale={locale}
-      onContinue={acceptPrime}
-      onDecline={declinePrime}
-    />
     </>
   )
 }

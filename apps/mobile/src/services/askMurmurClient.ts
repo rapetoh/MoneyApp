@@ -50,7 +50,9 @@ export interface AskDataArgs {
 /** The wire-shaped data snapshot (also the input of the insight engine). */
 export function buildAskData(args: AskDataArgs): {
   transactions: AskMurmurTransaction[]
-  recurring_rules: Array<AskMurmurRecurringRuleV2 & { amount_in_profile_currency?: number | null; is_active?: boolean }>
+  recurring_rules: Array<
+    AskMurmurRecurringRuleV2 & { amount_in_profile_currency?: number | null; is_active?: boolean }
+  >
   budget: AskMurmurBudget | null
   now_utc: string
   time_zone: string
@@ -144,14 +146,22 @@ export function buildAskTurnRequest(args: {
   return {
     conversation_id: args.conversationId,
     message: args.message.trim(),
-    seed_insight: args.seedInsight ? { kind: args.seedInsight.kind, title: args.seedInsight.title, detail: args.seedInsight.detail } : null,
+    seed_insight: args.seedInsight
+      ? {
+          kind: args.seedInsight.kind,
+          title: args.seedInsight.title,
+          detail: args.seedInsight.detail,
+        }
+      : null,
     locale: args.data.locale,
     currency: args.data.currency,
     now_utc: snapshot.now_utc,
     time_zone: snapshot.time_zone,
     monthly_income: args.data.monthly_income,
     transactions: snapshot.transactions,
-    recurring_rules: snapshot.recurring_rules.map(({ amount_in_profile_currency: _a, is_active: _b, ...rest }) => rest),
+    recurring_rules: snapshot.recurring_rules.map(
+      ({ amount_in_profile_currency: _a, is_active: _b, ...rest }) => rest,
+    ),
     ...(snapshot.budget ? { budget: snapshot.budget } : {}),
   }
 }

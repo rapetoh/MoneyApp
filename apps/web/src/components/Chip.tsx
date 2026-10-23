@@ -16,7 +16,9 @@ export function Chip({
   categoryColor?: string | null
   size?: 'sm' | 'md'
 }) {
-  const { bg, fg } = categoryColor ? categoryPalette(categoryColor) : { bg: colors.surface2, fg: colors.ink3 }
+  const { bg, fg } = categoryColor
+    ? categoryPalette(categoryColor)
+    : { bg: colors.surface2, fg: colors.ink3 }
   const pad = size === 'sm' ? '3px 8px' : '5px 10px'
   const fs = size === 'sm' ? 11 : 12
   return (

@@ -234,20 +234,24 @@ export function BottomSheet({
         resetLift(e.duration ?? 200)
         return
       }
-      LayoutAnimation.configureNext(LayoutAnimation.create(
-        Math.max(e.duration ?? 220, 1),
-        LayoutAnimation.Types.keyboard,
-        LayoutAnimation.Properties.opacity,
-      ))
+      LayoutAnimation.configureNext(
+        LayoutAnimation.create(
+          Math.max(e.duration ?? 220, 1),
+          LayoutAnimation.Types.keyboard,
+          LayoutAnimation.Properties.opacity,
+        ),
+      )
       setKeyboardTop(e.endCoordinates.screenY)
       liftToOverlap(e.endCoordinates.screenY, e.duration ?? 220)
     })
     const hideSub = Keyboard.addListener(hideEventName as 'keyboardDidHide', (e: KeyboardEvent) => {
-      LayoutAnimation.configureNext(LayoutAnimation.create(
-        Math.max(e?.duration ?? 200, 1),
-        LayoutAnimation.Types.keyboard,
-        LayoutAnimation.Properties.opacity,
-      ))
+      LayoutAnimation.configureNext(
+        LayoutAnimation.create(
+          Math.max(e?.duration ?? 200, 1),
+          LayoutAnimation.Types.keyboard,
+          LayoutAnimation.Properties.opacity,
+        ),
+      )
       setKeyboardTop(null)
       resetLift(e?.duration ?? 200)
     })
@@ -262,9 +266,10 @@ export function BottomSheet({
   // top safe area and the keyboard — it then lifts by exactly the keyboard
   // height, landing its top at (or below) the safe area and its bottom on
   // the keyboard's edge, header always visible, body still scrollable.
-  const maxHeight = keyboardTop == null
-    ? windowHeight * maxHeightPercent
-    : Math.min(windowHeight * maxHeightPercent, keyboardTop - insets.top - 8)
+  const maxHeight =
+    keyboardTop == null
+      ? windowHeight * maxHeightPercent
+      : Math.min(windowHeight * maxHeightPercent, keyboardTop - insets.top - 8)
 
   return (
     <Modal

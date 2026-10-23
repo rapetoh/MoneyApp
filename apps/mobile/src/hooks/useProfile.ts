@@ -135,10 +135,7 @@ export function useProfile(userId: string | undefined) {
 
   async function updateProfile(updates: ProfileUpdate) {
     if (!userId) return false
-    const { error } = await supabase
-      .from('profiles')
-      .update(updates)
-      .eq('id', userId)
+    const { error } = await supabase.from('profiles').update(updates).eq('id', userId)
     if (!error) {
       await fetch()
       DataEvents.emitProfile(userId)

@@ -17,30 +17,32 @@ const MAX_CATEGORY_NAME_LENGTH = 40
 const MAX_CATEGORIES = 20
 
 export function sanitizeCategoryNames(categories: string[]): string[] {
-  return categories
-    .slice(0, MAX_CATEGORIES)
-    .map((c) => (typeof c === 'string' ? c : ''))
-    // Strip all control characters (newlines, tabs, carriage returns, and
-    // anything else in 0x00-0x1F/0x7F) — a category name has no legitimate
-    // use for one, and a newline is exactly what turns a "name" into a new
-    // instruction line once it's joined into the prompt. Also strip angle
-    // brackets so a category can never spell out `</user_categories>` and
-    // spoof the end of the delimited block it's inside.
-    // eslint-disable-next-line no-control-regex
-    .map((c) => c.replace(/[\x00-\x1F\x7F<>]/g, ' ').trim())
-    .map((c) => c.slice(0, MAX_CATEGORY_NAME_LENGTH))
-    .filter((c) => c.length > 0)
+  return (
+    categories
+      .slice(0, MAX_CATEGORIES)
+      .map((c) => (typeof c === 'string' ? c : ''))
+      // Strip all control characters (newlines, tabs, carriage returns, and
+      // anything else in 0x00-0x1F/0x7F) — a category name has no legitimate
+      // use for one, and a newline is exactly what turns a "name" into a new
+      // instruction line once it's joined into the prompt. Also strip angle
+      // brackets so a category can never spell out `</user_categories>` and
+      // spoof the end of the delimited block it's inside.
+      // eslint-disable-next-line no-control-regex
+      .map((c) => c.replace(/[\x00-\x1F\x7F<>]/g, ' ').trim())
+      .map((c) => c.slice(0, MAX_CATEGORY_NAME_LENGTH))
+      .filter((c) => c.length > 0)
+  )
 }
 
 /** How to turn a card descriptor or a spoken name into the business's real
  *  name. Shared by the voice parser and the import batch (merchantBatch.ts)
  *  so a merchant reads the same however it arrived. */
 export const MERCHANT_RULE =
-  "the business the money went to, written the way that business writes its own name. The text often contains a raw card-network descriptor, what a bank statement shows, not a name: store numbers (\"#3341\", \"T-1768\", \"F12345\", long digit runs, a leading \"711594-\"), payment-processor prefixes (\"SQ *\", \"TST*\", \"SP *\", \"PAYPAL *\", \"GOOGLE *\", \"DD *\", \"AMZN Mktp\"), location tails (\"CEDAR RAPIDS\", \"MARION IA\", \"LOS GATOS CA\"), abbreviations (\"WM SUPERCENTER\" is Walmart, \"WHSE\" is warehouse) and words cut off by the 22-character limit (\"Mcgrath Volkswa\" is McGrath Volkswagen). Return the real business name: drop numbers, prefixes, locations and noise; expand abbreviations and truncations when you recognise the business; name the brand rather than echo an abbreviation (\"Walmart\", not \"WM Supercenter\"); use its own capitalisation (\"McGrath Volkswagen\", \"Hy-Vee\", \"Chick-fil-A\", \"The Home Depot\", \"McDonald's\", \"Costco\"). When a platform paid a business (\"DD *DOORDASH CHIPOTLE\", \"PAYPAL *SPOTIFY\", \"GOOGLE *YouTubePremium\"), the merchant is the business (Chipotle, Spotify, YouTube Premium). Never invent a business you cannot identify; if unsure, return the descriptor without numbers and prefixes, in title case. Null only when there is no merchant at all."
+  'the business the money went to, written the way that business writes its own name. The text often contains a raw card-network descriptor, what a bank statement shows, not a name: store numbers ("#3341", "T-1768", "F12345", long digit runs, a leading "711594-"), payment-processor prefixes ("SQ *", "TST*", "SP *", "PAYPAL *", "GOOGLE *", "DD *", "AMZN Mktp"), location tails ("CEDAR RAPIDS", "MARION IA", "LOS GATOS CA"), abbreviations ("WM SUPERCENTER" is Walmart, "WHSE" is warehouse) and words cut off by the 22-character limit ("Mcgrath Volkswa" is McGrath Volkswagen). Return the real business name: drop numbers, prefixes, locations and noise; expand abbreviations and truncations when you recognise the business; name the brand rather than echo an abbreviation ("Walmart", not "WM Supercenter"); use its own capitalisation ("McGrath Volkswagen", "Hy-Vee", "Chick-fil-A", "The Home Depot", "McDonald\'s", "Costco"). When a platform paid a business ("DD *DOORDASH CHIPOTLE", "PAYPAL *SPOTIFY", "GOOGLE *YouTubePremium"), the merchant is the business (Chipotle, Spotify, YouTube Premium). Never invent a business you cannot identify; if unsure, return the descriptor without numbers and prefixes, in title case. Null only when there is no merchant at all.'
 
 /** How to pick the logo domain. Shared like MERCHANT_RULE. */
 export const MERCHANT_DOMAIN_RULE =
-  "the official website domain used to show the merchant's logo. Fill it whenever you recognise the business or the brand behind it, including regional chains and local franchises and dealers. Prefer a domain you are sure exists: when you do not know a local business's own site for certain, use its parent brand's domain instead of guessing (\"McGrath Volkswagen\" -> \"vw.com\", \"Toyota of Cedar Rapids\" -> \"toyota.com\", \"Marriott Cedar Rapids\" -> \"marriott.com\", \"WM SUPERCENTER\" -> \"walmart.com\", \"Kwik Star\" -> \"kwikstar.com\"). For a delivery order, use the restaurant's domain. Null only for a business you cannot identify at all."
+  'the official website domain used to show the merchant\'s logo. Fill it whenever you recognise the business or the brand behind it, including regional chains and local franchises and dealers. Prefer a domain you are sure exists: when you do not know a local business\'s own site for certain, use its parent brand\'s domain instead of guessing ("McGrath Volkswagen" -> "vw.com", "Toyota of Cedar Rapids" -> "toyota.com", "Marriott Cedar Rapids" -> "marriott.com", "WM SUPERCENTER" -> "walmart.com", "Kwik Star" -> "kwikstar.com"). For a delivery order, use the restaurant\'s domain. Null only for a business you cannot identify at all.'
 
 export function getPrompt(ctx: PromptContext): string {
   const safeCategories = sanitizeCategoryNames(ctx.categories)

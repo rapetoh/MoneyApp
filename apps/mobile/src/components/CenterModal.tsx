@@ -168,16 +168,29 @@ export function CenterModal({
       ]
 
   return (
-    <Modal visible transparent animationType="none" onRequestClose={requestClose} statusBarTranslucent>
+    <Modal
+      visible
+      transparent
+      animationType="none"
+      onRequestClose={requestClose}
+      statusBarTranslucent
+    >
       <View style={styles.root}>
         <Animated.View style={[styles.dim, { opacity: dim }]}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={onBackdrop} accessibilityElementsHidden />
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={onBackdrop}
+            accessibilityElementsHidden
+          />
         </Animated.View>
 
         {/* The visible area is the screen minus the keyboard; the card is
             centred inside it, with the top inset as a hard floor. */}
         <View
-          style={[styles.center, { paddingTop: insets.top + 12, paddingBottom: keyboardHeight + 12 }]}
+          style={[
+            styles.center,
+            { paddingTop: insets.top + 12, paddingBottom: keyboardHeight + 12 },
+          ]}
           pointerEvents="box-none"
         >
           <Animated.View
@@ -186,8 +199,7 @@ export function CenterModal({
               // Never taller than the screen minus its insets; the body
               // scrolls inside instead.
               {
-                maxHeight:
-                  windowHeight - insets.top - Math.max(keyboardHeight, insets.bottom) - 48,
+                maxHeight: windowHeight - insets.top - Math.max(keyboardHeight, insets.bottom) - 48,
                 opacity: card,
                 transform,
               },
@@ -238,7 +250,12 @@ export function CenterModal({
                     ) : (
                       // One line, always: a long translation shrinks the
                       // type instead of wrapping or clipping.
-                      <Text style={styles.primaryLabel} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
+                      <Text
+                        style={styles.primaryLabel}
+                        numberOfLines={1}
+                        adjustsFontSizeToFit
+                        minimumFontScale={0.85}
+                      >
                         {primaryLabel}
                       </Text>
                     )}

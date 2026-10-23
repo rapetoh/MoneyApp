@@ -18,7 +18,7 @@ const VALID_RECEIPT: Record<string, unknown> = {
   amount: 42.5,
   currency: 'USD',
   flow_type: 'expense',
-  merchant: 'Trader Joe\'s',
+  merchant: "Trader Joe's",
   merchant_domain: null,
   note: null,
   category_suggestion: 'Groceries',
@@ -34,8 +34,12 @@ const VALID_RECEIPT: Record<string, unknown> = {
 function mockFetchReturning(status: number, body: Record<string, unknown>): void {
   vi.stubGlobal(
     'fetch',
-    vi.fn(async () =>
-      new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } }),
+    vi.fn(
+      async () =>
+        new Response(JSON.stringify(body), {
+          status,
+          headers: { 'Content-Type': 'application/json' },
+        }),
     ),
   )
 }
@@ -61,7 +65,7 @@ describe('parseScan — ok: true', () => {
     expect(result.ok).toBe(true)
     if (!result.ok) return
     expect(result.expense.amount).toBe(42.5)
-    expect(result.expense.merchant).toBe('Trader Joe\'s')
+    expect(result.expense.merchant).toBe("Trader Joe's")
   })
 })
 
@@ -103,7 +107,11 @@ describe('parseScan — ok: false (the F3 fix)', () => {
   })
 
   it('falls back to a receipt-specific default reason when the model sets needs_clarification with no question text', async () => {
-    mockFetchReturning(200, { ...VALID_RECEIPT, needs_clarification: true, clarifying_question: null })
+    mockFetchReturning(200, {
+      ...VALID_RECEIPT,
+      needs_clarification: true,
+      clarifying_question: null,
+    })
     const result = await parseScan(opts('receipt'))
     expect(result.ok).toBe(false)
     if (result.ok) return
@@ -113,7 +121,9 @@ describe('parseScan — ok: false (the F3 fix)', () => {
 
 describe('parseScan — still throws on a boundary violation, distinct from a model rejection', () => {
   it('a 422 (validateParsedExpense already rejected it server-side) throws ParseValidationError', async () => {
-    mockFetchReturning(422, { errors: [{ field: 'amount', message: 'expected a finite number, got null' }] })
+    mockFetchReturning(422, {
+      errors: [{ field: 'amount', message: 'expected a finite number, got null' }],
+    })
     await expect(parseScan(opts('receipt'))).rejects.toBeInstanceOf(ParseValidationError)
   })
 

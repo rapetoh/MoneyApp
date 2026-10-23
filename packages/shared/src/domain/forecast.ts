@@ -195,7 +195,15 @@ export function forecastMonthly(
   // separately rather than blending the two and double-counting.
   const WINDOW_DAYS = 90
   const windowStart = addDays(now.y, now.m, now.d, -(WINDOW_DAYS - 1))
-  const windowStartInstant = civilDateTimeToInstant(windowStart.y, windowStart.m, windowStart.d, 0, 0, 0, tz)
+  const windowStartInstant = civilDateTimeToInstant(
+    windowStart.y,
+    windowStart.m,
+    windowStart.d,
+    0,
+    0,
+    0,
+    tz,
+  )
   const dailyBuckets = new Map<string, number>()
   for (let i = 0; i < WINDOW_DAYS; i++) {
     const day = addDays(windowStart.y, windowStart.m, windowStart.d, i)
@@ -224,15 +232,34 @@ export function forecastMonthly(
     (monthsCovered >= 2 && distinctSpendingDays >= 10) || (monthsCovered >= 1 && now.d >= 10)
 
   if (!confident) {
-    return { monthToDate, projected: null, range: null, usual, sampleMonths: monthsCovered, confident: false }
+    return {
+      monthToDate,
+      projected: null,
+      range: null,
+      usual,
+      sampleMonths: monthsCovered,
+      confident: false,
+    }
   }
 
   // Days remaining after "now" in the current civil month.
   const nextMonthStart = addMonthsClamped(now.y, now.m, 1, 1)
-  const daysInMonth = daysBetween(now.y, now.m, 1, nextMonthStart.y, nextMonthStart.m, nextMonthStart.d)
+  const daysInMonth = daysBetween(
+    now.y,
+    now.m,
+    1,
+    nextMonthStart.y,
+    nextMonthStart.m,
+    nextMonthStart.d,
+  )
   const daysRemaining = Math.max(0, daysInMonth - now.d)
 
-  const remainingCharges = chargesInWindow(recurringRules, nowInstant, monthStartBounds.endExclusive, tz)
+  const remainingCharges = chargesInWindow(
+    recurringRules,
+    nowInstant,
+    monthStartBounds.endExclusive,
+    tz,
+  )
   const recurringCommittedRemaining = remainingCharges
     .filter(({ rule }) => rule.direction === 'debit')
     .reduce((s, { rule }) => s + rule.amount, 0)

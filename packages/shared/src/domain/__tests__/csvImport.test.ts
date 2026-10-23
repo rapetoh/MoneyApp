@@ -16,7 +16,9 @@ import {
 
 describe('parseCsv', () => {
   it('quotes, doubled quotes, embedded commas and newlines, CRLF, BOM', () => {
-    const rows = parseCsv('﻿Date,Description,Amount\r\n10/05/2026,"STARBUCKS, #12 ""DT""",-4.50\r\n10/06/2026,"Line\nbreak",12\r\n')
+    const rows = parseCsv(
+      '﻿Date,Description,Amount\r\n10/05/2026,"STARBUCKS, #12 ""DT""",-4.50\r\n10/06/2026,"Line\nbreak",12\r\n',
+    )
     expect(rows).toEqual([
       ['Date', 'Description', 'Amount'],
       ['10/05/2026', 'STARBUCKS, #12 "DT"', '-4.50'],
@@ -25,12 +27,21 @@ describe('parseCsv', () => {
   })
 
   it('semicolon and tab delimiters', () => {
-    expect(parseCsv('a;b;c\n1;2;3')).toEqual([['a', 'b', 'c'], ['1', '2', '3']])
-    expect(parseCsv('a\tb\n1\t2')).toEqual([['a', 'b'], ['1', '2']])
+    expect(parseCsv('a;b;c\n1;2;3')).toEqual([
+      ['a', 'b', 'c'],
+      ['1', '2', '3'],
+    ])
+    expect(parseCsv('a\tb\n1\t2')).toEqual([
+      ['a', 'b'],
+      ['1', '2'],
+    ])
   })
 
   it('skips blank lines', () => {
-    expect(parseCsv('a,b\n\n1,2\n,\n')).toEqual([['a', 'b'], ['1', '2']])
+    expect(parseCsv('a,b\n\n1,2\n,\n')).toEqual([
+      ['a', 'b'],
+      ['1', '2'],
+    ])
   })
 })
 
@@ -108,11 +119,22 @@ describe('columns', () => {
   })
 
   it('debit and credit columns', () => {
-    const rows = parseCsv('Date,Description,Debit,Credit\n2026-10-05,Coffee,4.50,\n2026-10-06,Salary,,2000')
+    const rows = parseCsv(
+      'Date,Description,Debit,Credit\n2026-10-05,Coffee,4.50,\n2026-10-06,Salary,,2000',
+    )
     const m = detectColumns(rows, true)
     expect([m.debit, m.credit, m.amount]).toEqual([2, 3, null])
-    const { rows: out } = buildImportRows(rows, { header: true, mapping: m, dateOrder: 'ymd', decimalMark: '.', sign: 'negative_is_expense' })
-    expect(out.map((r) => [r.direction, r.amount])).toEqual([['debit', 4.5], ['credit', 2000]])
+    const { rows: out } = buildImportRows(rows, {
+      header: true,
+      mapping: m,
+      dateOrder: 'ymd',
+      decimalMark: '.',
+      sign: 'negative_is_expense',
+    })
+    expect(out.map((r) => [r.direction, r.amount])).toEqual([
+      ['debit', 4.5],
+      ['credit', 2000],
+    ])
   })
 
   it('no header: columns from the values', () => {
@@ -129,14 +151,36 @@ describe('columns', () => {
 })
 
 describe('buildImportRows', () => {
-  const rows = parseCsv('Date,Description,Amount\n10/05/2026,Coffee,-4.50\n10/06/2026,Refund,12.00\nbad,Nope,-1\n10/07/2026,Zero,0.00\n10/08/2026,NoAmount,')
+  const rows = parseCsv(
+    'Date,Description,Amount\n10/05/2026,Coffee,-4.50\n10/06/2026,Refund,12.00\nbad,Nope,-1\n10/07/2026,Zero,0.00\n10/08/2026,NoAmount,',
+  )
   const mapping = detectColumns(rows, true)
 
   it('signs, skips and lines', () => {
-    const { rows: out, skipped } = buildImportRows(rows, { header: true, mapping, dateOrder: 'mdy', decimalMark: '.', sign: 'negative_is_expense' })
+    const { rows: out, skipped } = buildImportRows(rows, {
+      header: true,
+      mapping,
+      dateOrder: 'mdy',
+      decimalMark: '.',
+      sign: 'negative_is_expense',
+    })
     expect(out).toEqual([
-      { line: 2, day: '2026-10-05', amount: 4.5, direction: 'debit', description: 'Coffee', category: null },
-      { line: 3, day: '2026-10-06', amount: 12, direction: 'credit', description: 'Refund', category: null },
+      {
+        line: 2,
+        day: '2026-10-05',
+        amount: 4.5,
+        direction: 'debit',
+        description: 'Coffee',
+        category: null,
+      },
+      {
+        line: 3,
+        day: '2026-10-06',
+        amount: 12,
+        direction: 'credit',
+        description: 'Refund',
+        category: null,
+      },
     ])
     expect(skipped).toEqual([
       { line: 4, reason: 'no_date' },
@@ -152,21 +196,49 @@ describe('buildImportRows', () => {
 })
 
 describe('findDuplicates', () => {
-  const row = (line: number, day: string, amount: number) => ({ line, day, amount, direction: 'debit' as const, description: '', category: null })
+  const row = (line: number, day: string, amount: number) => ({
+    line,
+    day,
+    amount,
+    direction: 'debit' as const,
+    description: '',
+    category: null,
+  })
 
   it('a logged purchase posted two days later is the same money', () => {
-    const dup = findDuplicates([row(2, '2026-10-07', 12.5)], [{ day: '2026-10-05', amount: 12.5, direction: 'debit' }])
+    const dup = findDuplicates(
+      [row(2, '2026-10-07', 12.5)],
+      [{ day: '2026-10-05', amount: 12.5, direction: 'debit' }],
+    )
     expect([...dup]).toEqual([2])
   })
 
   it('three days apart, a different amount or direction are not', () => {
-    expect(findDuplicates([row(2, '2026-10-08', 12.5)], [{ day: '2026-10-05', amount: 12.5, direction: 'debit' }]).size).toBe(0)
-    expect(findDuplicates([row(2, '2026-10-05', 12.51)], [{ day: '2026-10-05', amount: 12.5, direction: 'debit' }]).size).toBe(0)
-    expect(findDuplicates([row(2, '2026-10-05', 12.5)], [{ day: '2026-10-05', amount: 12.5, direction: 'credit' }]).size).toBe(0)
+    expect(
+      findDuplicates(
+        [row(2, '2026-10-08', 12.5)],
+        [{ day: '2026-10-05', amount: 12.5, direction: 'debit' }],
+      ).size,
+    ).toBe(0)
+    expect(
+      findDuplicates(
+        [row(2, '2026-10-05', 12.51)],
+        [{ day: '2026-10-05', amount: 12.5, direction: 'debit' }],
+      ).size,
+    ).toBe(0)
+    expect(
+      findDuplicates(
+        [row(2, '2026-10-05', 12.5)],
+        [{ day: '2026-10-05', amount: 12.5, direction: 'credit' }],
+      ).size,
+    ).toBe(0)
   })
 
   it('each existing transaction answers for one row', () => {
-    const dup = findDuplicates([row(2, '2026-10-05', 4.5), row(3, '2026-10-05', 4.5)], [{ day: '2026-10-05', amount: 4.5, direction: 'debit' }])
+    const dup = findDuplicates(
+      [row(2, '2026-10-05', 4.5), row(3, '2026-10-05', 4.5)],
+      [{ day: '2026-10-05', amount: 4.5, direction: 'debit' }],
+    )
     expect(dup.size).toBe(1)
   })
 
@@ -178,7 +250,8 @@ describe('findDuplicates', () => {
 })
 
 describe('importTransaction', () => {
-  const cat = (id: string, name: string) => ({ id, name, name_normalized: name.toLowerCase() }) as never
+  const cat = (id: string, name: string) =>
+    ({ id, name, name_normalized: name.toLowerCase() }) as never
   const categories = [cat('g', 'Groceries'), cat('c', 'Coffee'), cat('t', 'Transport')]
   const ctx = {
     userId: 'u',
@@ -189,10 +262,21 @@ describe('importTransaction', () => {
     nowIso: '2026-10-08T00:00:00Z',
     newId: () => 'id-1',
   }
-  const row = { line: 2, day: '2026-10-05', amount: 4.5, direction: 'debit' as const, description: 'STARBUCKS #04412', category: null }
+  const row = {
+    line: 2,
+    day: '2026-10-05',
+    amount: 4.5,
+    direction: 'debit' as const,
+    description: 'STARBUCKS #04412',
+    category: null,
+  }
 
   it('names it, dates it at local noon, files it, marks it imported', () => {
-    const t = importTransaction(row, { merchant: 'Starbucks', merchant_domain: 'starbucks.com', category: 'Coffee' }, ctx)
+    const t = importTransaction(
+      row,
+      { merchant: 'Starbucks', merchant_domain: 'starbucks.com', category: 'Coffee' },
+      ctx,
+    )
     expect(t.merchant).toBe('Starbucks')
     expect(t.merchant_domain).toBe('starbucks.com')
     expect(t.transacted_at).toBe('2026-10-05T17:00:00.000Z')
@@ -201,13 +285,24 @@ describe('importTransaction', () => {
     expect(t.amount_in_profile_currency).toBe(4.5)
   })
 
-  it('a learned category beats the AI; the file\'s own category beats both', () => {
-    expect(importTransaction(row, { merchant: 'Starbucks', merchant_domain: null, category: 'Coffee' }, ctx).category_id).toBe('g')
-    expect(importTransaction({ ...row, category: 'Transport' }, undefined, ctx).category_id).toBe('t')
+  it("a learned category beats the AI; the file's own category beats both", () => {
+    expect(
+      importTransaction(
+        row,
+        { merchant: 'Starbucks', merchant_domain: null, category: 'Coffee' },
+        ctx,
+      ).category_id,
+    ).toBe('g')
+    expect(importTransaction({ ...row, category: 'Transport' }, undefined, ctx).category_id).toBe(
+      't',
+    )
   })
 
   it('no AI answer: the cleaned descriptor and the local guess', () => {
-    const t = importTransaction({ ...row, description: 'SHELL OIL 57444091309' }, undefined, { ...ctx, rules: [] })
+    const t = importTransaction({ ...row, description: 'SHELL OIL 57444091309' }, undefined, {
+      ...ctx,
+      rules: [],
+    })
     expect(t.merchant).toMatch(/^Shell/)
     expect(t.merchant).not.toMatch(/\d/)
   })
@@ -215,7 +310,17 @@ describe('importTransaction', () => {
 
 describe('descriptorsToIdentify', () => {
   it('distinct, most frequent first', () => {
-    const r = (d: string) => ({ line: 1, day: '2026-01-01', amount: 1, direction: 'debit' as const, description: d, category: null })
-    expect(descriptorsToIdentify([r('A'), r('B'), r('B'), r(''), r('A'), r('B')])).toEqual(['B', 'A'])
+    const r = (d: string) => ({
+      line: 1,
+      day: '2026-01-01',
+      amount: 1,
+      direction: 'debit' as const,
+      description: d,
+      category: null,
+    })
+    expect(descriptorsToIdentify([r('A'), r('B'), r('B'), r(''), r('A'), r('B')])).toEqual([
+      'B',
+      'A',
+    ])
   })
 })

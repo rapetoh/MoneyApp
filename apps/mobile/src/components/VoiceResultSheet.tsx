@@ -34,7 +34,13 @@ import {
   localDay,
   normalizeParsedTransactedAt,
 } from '@voice-expense/shared'
-import type { ParsedExpense, Locale, Category, PaymentMethod, RecurringFrequency } from '@voice-expense/shared'
+import type {
+  ParsedExpense,
+  Locale,
+  Category,
+  PaymentMethod,
+  RecurringFrequency,
+} from '@voice-expense/shared'
 import { learnedCategoryFor } from '@voice-expense/shared'
 
 /** Pulls the numeric readings a clarifying question names — "Was that
@@ -121,7 +127,9 @@ export function VoiceResultSheet({
   const [note, setNote] = useState(parsed.note ?? '')
   const [direction, setDirection] = useState<'debit' | 'credit'>(parsed.direction ?? 'debit')
   const [categoryId, setCategoryId] = useState<string | null>(null)
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(parsed.payment_method ?? null)
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(
+    parsed.payment_method ?? null,
+  )
   const [isRecurring, setIsRecurring] = useState(parsed.is_recurring_suggestion ?? false)
   const [recurringFrequency, setRecurringFrequency] = useState<RecurringFrequency>(
     parsed.recurring_frequency_suggestion ?? 'monthly',
@@ -136,12 +144,15 @@ export function VoiceResultSheet({
   const userId = user?.id
   useEffect(() => {
     const valid = new Set(categories.map((c) => c.id))
-    const learned = userId ? learnedCategoryFor(parsed.merchant, cachedMerchantRules(userId), valid) : null
+    const learned = userId
+      ? learnedCategoryFor(parsed.merchant, cachedMerchantRules(userId), valid)
+      : null
     if (learned) {
       setCategoryId((cur) => cur ?? learned)
       return
     }
-    const aiId = resolveCategorySuggestion(parsed.category_suggestion, categories)?.category.id ?? null
+    const aiId =
+      resolveCategorySuggestion(parsed.category_suggestion, categories)?.category.id ?? null
     if (aiId) setCategoryId((cur) => cur ?? aiId)
     // Rules not loaded yet (first capture since launch): ask, and replace
     // the AI's pick only if the person has not changed it meanwhile.
@@ -162,9 +173,7 @@ export function VoiceResultSheet({
   // unmounts only once they land — the sheet is never yanked off-screen.
   const presence = usePresence()
   const reduceMotion = useReduceMotion()
-  const rise = reduceMotion
-    ? 0
-    : presence.interpolate({ inputRange: [0, 1], outputRange: [60, 0] })
+  const rise = reduceMotion ? 0 : presence.interpolate({ inputRange: [0, 1], outputRange: [60, 0] })
 
   const editHeight = windowHeight - insets.top - 44
 
@@ -180,7 +189,16 @@ export function VoiceResultSheet({
   } | null>(null)
 
   function enterEdit() {
-    editSnapshot.current = { amount, merchant, note, direction, categoryId, paymentMethod, isRecurring, recurringFrequency }
+    editSnapshot.current = {
+      amount,
+      merchant,
+      note,
+      direction,
+      categoryId,
+      paymentMethod,
+      isRecurring,
+      recurringFrequency,
+    }
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut)
     setMode('edit')
   }
@@ -258,7 +276,9 @@ export function VoiceResultSheet({
     () => categories.find((c) => c.id === categoryId) ?? null,
     [categories, categoryId],
   )
-  const categoryColor = selectedCategory ? (selectedCategory.color ?? merchantColor(selectedCategory.name)) : null
+  const categoryColor = selectedCategory
+    ? (selectedCategory.color ?? merchantColor(selectedCategory.name))
+    : null
 
   const whenLabel = useMemo(() => {
     const nowIso = new Date().toISOString()
@@ -268,7 +288,11 @@ export function VoiceResultSheet({
     const day = sameDay
       ? t('transactions.today', locale)
       : d.toLocaleDateString(locale, { month: 'short', day: 'numeric', timeZone: timezone })
-    const time = d.toLocaleTimeString(locale, { hour: 'numeric', minute: '2-digit', timeZone: timezone })
+    const time = d.toLocaleTimeString(locale, {
+      hour: 'numeric',
+      minute: '2-digit',
+      timeZone: timezone,
+    })
     // A repaired date-only parse has no honest time of day — show just the
     // day for it rather than a fabricated noon. Once the user has picked a
     // time themselves, it is honest and it shows.
@@ -277,10 +301,18 @@ export function VoiceResultSheet({
       normalizedTransactedAt != null &&
       parsed.transacted_at !== normalizedTransactedAt
     return dateOnly ? day : `${day} · ${time}`
-  }, [chosenTransactedAt, transactedAt, normalizedTransactedAt, parsed.transacted_at, timezone, locale])
+  }, [
+    chosenTransactedAt,
+    transactedAt,
+    normalizedTransactedAt,
+    parsed.transacted_at,
+    timezone,
+    locale,
+  ])
 
   const directionKey = direction === 'credit' ? 'voice.income_label' : 'voice.expense'
-  const clarify = parsed.needs_clarification && parsed.clarifying_question ? parsed.clarifying_question : null
+  const clarify =
+    parsed.needs_clarification && parsed.clarifying_question ? parsed.clarifying_question : null
   const clarifyChoices = clarify ? extractClarificationAmounts(clarify) : []
 
   return (
@@ -326,7 +358,12 @@ export function VoiceResultSheet({
 
             {/* Amount hero */}
             <View style={styles.amountHero}>
-              <Money value={isNaN(parsedAmount) ? 0 : parsedAmount} size={56} currencyCode={currency} locale={locale} />
+              <Money
+                value={isNaN(parsedAmount) ? 0 : parsedAmount}
+                size={56}
+                currencyCode={currency}
+                locale={locale}
+              />
             </View>
 
             {/* Clarification — a two-choice amount question when the parse
@@ -341,11 +378,19 @@ export function VoiceResultSheet({
                       return (
                         <Pressable
                           key={value}
-                          style={[styles.clarifyChoiceBtn, selected && styles.clarifyChoiceBtnActive]}
+                          style={[
+                            styles.clarifyChoiceBtn,
+                            selected && styles.clarifyChoiceBtnActive,
+                          ]}
                           onPress={() => setAmount(String(value))}
                           accessibilityRole="button"
                         >
-                          <Text style={[styles.clarifyChoiceText, selected && styles.clarifyChoiceTextActive]}>
+                          <Text
+                            style={[
+                              styles.clarifyChoiceText,
+                              selected && styles.clarifyChoiceTextActive,
+                            ]}
+                          >
                             {formatMoney(value, currency, locale)}
                           </Text>
                         </Pressable>
@@ -375,9 +420,22 @@ export function VoiceResultSheet({
                       category name — repeating it as a chip read as a
                       glitch (build 8: "Food & Dining / Food & Dining"). */}
                   {selectedCategory && merchant.trim().length > 0 && (
-                    <View style={[styles.categoryChip, { backgroundColor: (categoryColor ?? Colors.accent) + '22' }]}>
-                      <View style={[styles.categoryDot, { backgroundColor: categoryColor ?? Colors.accent }]} />
-                      <Text style={[styles.categoryChipText, { color: categoryColor ?? Colors.accent }]} numberOfLines={1}>
+                    <View
+                      style={[
+                        styles.categoryChip,
+                        { backgroundColor: (categoryColor ?? Colors.accent) + '22' },
+                      ]}
+                    >
+                      <View
+                        style={[
+                          styles.categoryDot,
+                          { backgroundColor: categoryColor ?? Colors.accent },
+                        ]}
+                      />
+                      <Text
+                        style={[styles.categoryChipText, { color: categoryColor ?? Colors.accent }]}
+                        numberOfLines={1}
+                      >
                         {selectedCategory.name}
                       </Text>
                     </View>
@@ -419,7 +477,11 @@ export function VoiceResultSheet({
                 </Pressable>
               )}
               <Pressable
-                style={({ pressed }) => [styles.saveBtn, (!canSave || saving) && styles.saveBtnDisabled, pressed && styles.pressed]}
+                style={({ pressed }) => [
+                  styles.saveBtn,
+                  (!canSave || saving) && styles.saveBtnDisabled,
+                  pressed && styles.pressed,
+                ]}
                 onPress={handleSave}
                 disabled={!canSave || saving}
                 accessibilityRole="button"
@@ -433,20 +495,23 @@ export function VoiceResultSheet({
                 )}
               </Pressable>
             </View>
-
           </View>
         ) : (
           /* ── 14c: expanded edit ── */
           <View style={{ flex: 1 }}>
             <View style={styles.editHeader}>
               <Pressable onPress={() => exitEdit(true)} hitSlop={10} accessibilityRole="button">
-                <Text style={styles.editHeaderCancel} numberOfLines={1}>{t('common.cancel', locale)}</Text>
+                <Text style={styles.editHeaderCancel} numberOfLines={1}>
+                  {t('common.cancel', locale)}
+                </Text>
               </Pressable>
               <Text style={styles.editHeaderTitle} numberOfLines={1}>
                 {t(direction === 'credit' ? 'voice.edit_income' : 'voice.edit_expense', locale)}
               </Text>
               <Pressable onPress={() => exitEdit(false)} hitSlop={10} accessibilityRole="button">
-                <Text style={styles.editHeaderDone} numberOfLines={1}>{t('common.done', locale)}</Text>
+                <Text style={styles.editHeaderDone} numberOfLines={1}>
+                  {t('common.done', locale)}
+                </Text>
               </Pressable>
             </View>
 
@@ -482,7 +547,12 @@ export function VoiceResultSheet({
                     inputAccessoryViewID={NUMERIC_ACCESSORY_ID}
                   />
                 </View>
-                <AmountAdjustChips value={amount} onChange={setAmount} currencyCode={currency} locale={locale} />
+                <AmountAdjustChips
+                  value={amount}
+                  onChange={setAmount}
+                  currencyCode={currency}
+                  locale={locale}
+                />
               </View>
 
               {/* Expense / Income */}
@@ -492,12 +562,20 @@ export function VoiceResultSheet({
                     key={d}
                     style={[
                       styles.directionBtn,
-                      direction === d && (d === 'debit' ? styles.directionDebitActive : styles.directionCreditActive),
+                      direction === d &&
+                        (d === 'debit'
+                          ? styles.directionDebitActive
+                          : styles.directionCreditActive),
                     ]}
                     onPress={() => setDirection(d)}
                     accessibilityRole="button"
                   >
-                    <Text style={[styles.directionLabel, direction === d && styles.directionLabelActive]}>
+                    <Text
+                      style={[
+                        styles.directionLabel,
+                        direction === d && styles.directionLabelActive,
+                      ]}
+                    >
                       {t(d === 'debit' ? 'voice.expense' : 'voice.income_label', locale)}
                     </Text>
                   </Pressable>
@@ -534,7 +612,10 @@ export function VoiceResultSheet({
                         <Pressable
                           key={c.id}
                           onPress={() => setCategoryId(selected ? null : c.id)}
-                          style={[styles.chip, selected && { backgroundColor: color + '22', borderColor: color }]}
+                          style={[
+                            styles.chip,
+                            selected && { backgroundColor: color + '22', borderColor: color },
+                          ]}
                         >
                           <View style={[styles.categoryDot, { backgroundColor: color }]} />
                           <Text
@@ -574,7 +655,11 @@ export function VoiceResultSheet({
               {/* Payment */}
               <View style={styles.field}>
                 <Text style={styles.fieldLabel}>{t('voice.payment_method', locale)}</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsRow}>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.chipsRow}
+                >
                   {PAYMENT_METHODS.map((m) => {
                     const selected = paymentMethod === m.value
                     return (
@@ -623,9 +708,17 @@ export function VoiceResultSheet({
                 </View>
               )}
 
-              <Pressable onPress={onDismiss} style={styles.discardWrap} hitSlop={8} accessibilityRole="button">
+              <Pressable
+                onPress={onDismiss}
+                style={styles.discardWrap}
+                hitSlop={8}
+                accessibilityRole="button"
+              >
                 <Text style={styles.discardText}>
-                  {t(direction === 'credit' ? 'voice.discard_income' : 'voice.discard_expense', locale)}
+                  {t(
+                    direction === 'credit' ? 'voice.discard_income' : 'voice.discard_expense',
+                    locale,
+                  )}
                 </Text>
               </Pressable>
             </ScrollView>
@@ -633,7 +726,11 @@ export function VoiceResultSheet({
             {/* Sticky footer */}
             <View style={[styles.editFooter, { paddingBottom: insets.bottom + 14 }]}>
               <Pressable
-                style={({ pressed }) => [styles.saveBtn, (!canSave || saving) && styles.saveBtnDisabled, pressed && styles.pressed]}
+                style={({ pressed }) => [
+                  styles.saveBtn,
+                  (!canSave || saving) && styles.saveBtnDisabled,
+                  pressed && styles.pressed,
+                ]}
                 onPress={handleSave}
                 disabled={!canSave || saving}
                 accessibilityRole="button"

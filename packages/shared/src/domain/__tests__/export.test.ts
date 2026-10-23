@@ -25,7 +25,12 @@ describe('buildExport — 2026-09-01T01:00:00Z reads as 2026-08-31 in America/Ch
   const result = buildExport({
     profile: CHICAGO_PROFILE,
     transactions: [
-      txn({ id: 'late-aug', transacted_at: '2026-09-01T01:00:00Z', amount: 40, amount_in_profile_currency: 40 }),
+      txn({
+        id: 'late-aug',
+        transacted_at: '2026-09-01T01:00:00Z',
+        amount: 40,
+        amount_in_profile_currency: 40,
+      }),
     ],
     categories: [{ id: 'cat-food', name: 'Food & Dining' }],
     dateFrom: '2026-08-01',
@@ -81,7 +86,12 @@ describe('buildExport — the row column reconciles with the header total (05-F2
       profile: CHICAGO_PROFILE,
       transactions: [
         txn({ id: 'spend', amount: 50, amount_in_profile_currency: 50, category_id: 'cat-food' }),
-        txn({ id: 'transfer', amount: 300, amount_in_profile_currency: 300, category_id: 'cat-save' }),
+        txn({
+          id: 'transfer',
+          amount: 300,
+          amount_in_profile_currency: 300,
+          category_id: 'cat-save',
+        }),
       ],
       categories: [
         { id: 'cat-food', name: 'Food & Dining' },
@@ -130,7 +140,14 @@ describe('exportSummaryJSON — the one shape both platforms produce (08-F32)', 
         transactions: [txn()],
         categories: [{ id: 'cat-food', name: 'Food & Dining' }],
         recurringRules: [
-          { id: 'r1', name: 'Netflix', amount: 15.49, direction: 'debit', frequency: 'monthly', is_active: true },
+          {
+            id: 'r1',
+            name: 'Netflix',
+            amount: 15.49,
+            direction: 'debit',
+            frequency: 'monthly',
+            is_active: true,
+          },
         ],
         dateFrom: '2026-08-01',
         dateTo: '2026-08-31',

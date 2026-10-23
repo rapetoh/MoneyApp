@@ -98,7 +98,11 @@ export function MonthPicker({
   // browser's own local zone would read the same instant as.
   function monthIsoLabel(monthIsoStr: string): string {
     const bounds = monthBounds(monthIsoStr, tz)
-    return new Date(bounds.start).toLocaleDateString(locale, { month: 'long', year: 'numeric', timeZone: tz })
+    return new Date(bounds.start).toLocaleDateString(locale, {
+      month: 'long',
+      year: 'numeric',
+      timeZone: tz,
+    })
   }
 
   function shift(months: number) {
@@ -139,12 +143,7 @@ export function MonthPicker({
         {label}
         <Icon.chev color={colors.ink3} size={10} />
       </button>
-      <button
-        type="button"
-        onClick={() => shift(1)}
-        style={styles.chevBtn}
-        aria-label="Next month"
-      >
+      <button type="button" onClick={() => shift(1)} style={styles.chevBtn} aria-label="Next month">
         <span style={{ display: 'inline-flex', transform: 'rotate(-90deg)' }}>
           <Icon.chev color={colors.ink3} size={10} />
         </span>

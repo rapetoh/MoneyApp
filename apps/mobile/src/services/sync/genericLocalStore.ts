@@ -27,7 +27,10 @@ export interface GenericStore {
 
 const IMMUTABLE_ON_CONFLICT = new Set(['id', 'user_id', 'client_id', 'created_at'])
 
-export function createGenericStore(tableName: string, columnNames: readonly string[]): GenericStore {
+export function createGenericStore(
+  tableName: string,
+  columnNames: readonly string[],
+): GenericStore {
   const columnList = columnNames.join(', ')
   const placeholders = columnNames.map(() => '?').join(', ')
   const setList = columnNames

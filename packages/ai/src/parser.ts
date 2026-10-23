@@ -46,7 +46,12 @@ function epochDayBucket(): number {
  *  A second user on the same device, a category added since the last
  *  parse, or the same phrase parsed a day later must never share a cache
  *  entry with the first. */
-function cacheKey(opts: Pick<ParseOptions, 'transcript' | 'locale' | 'currency' | 'categories' | 'userId' | 'todayCivilDate'>): string {
+function cacheKey(
+  opts: Pick<
+    ParseOptions,
+    'transcript' | 'locale' | 'currency' | 'categories' | 'userId' | 'todayCivilDate'
+  >,
+): string {
   const sortedCategories = [...opts.categories].sort().join(',')
   // The user's civil date participates too: when it's supplied it drives
   // the prompt's "today", so two parses across the user's own midnight

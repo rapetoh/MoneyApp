@@ -35,7 +35,10 @@ export function cleanMerchantDescriptor(raw: string | null | undefined): string 
   // CSV import).
   out = out
     .replace(/\s+(?:DES|INDN|CO ID|ID|ORIG ID|TRACE|WEB ID|PPD ID|CCD ID|TEL ID)\s*:.*$/i, '')
-    .replace(/\s+(?:PPD|CCD|WEB|TEL|ACH|ACH CREDIT|ACH DEBIT|DIR DEP|DIRECT DEP(?:OSIT)?)\b.*$/i, '')
+    .replace(
+      /\s+(?:PPD|CCD|WEB|TEL|ACH|ACH CREDIT|ACH DEBIT|DIR DEP|DIRECT DEP(?:OSIT)?)\b.*$/i,
+      '',
+    )
   out = out
     // Payment-processor prefixes: "SQ *", "TST*", "SP * ", "PAYPAL *",
     // "GOOGLE *", "DD *". The business follows the star.
@@ -69,7 +72,10 @@ export function cleanMerchantDescriptor(raw: string | null | undefined): string 
 export function normalizeMerchantDomain(raw: string | null | undefined): string | null {
   let d = (raw ?? '').trim().toLowerCase()
   if (!d || d === 'null' || d === 'none' || d === 'n/a') return null
-  d = d.replace(/^[a-z]+:\/\//, '').replace(/^www\./, '').split(/[/?#]/)[0]
+  d = d
+    .replace(/^[a-z]+:\/\//, '')
+    .replace(/^www\./, '')
+    .split(/[/?#]/)[0]
   return /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(d) ? d : null
 }
 

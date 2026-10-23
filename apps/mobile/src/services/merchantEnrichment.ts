@@ -31,7 +31,11 @@ import {
 } from '@voice-expense/shared'
 import { supabase } from '../lib/supabase'
 import { getApiUrl } from '../hooks/useApiUrl'
-import { getTransactions, getTransactionById, updateTransactionFields } from './sync/transactionStore'
+import {
+  getTransactions,
+  getTransactionById,
+  updateTransactionFields,
+} from './sync/transactionStore'
 import { enqueue } from './sync/syncQueue'
 import { syncManager } from './sync/SyncManager'
 import { getDb } from './sync/localDb'
@@ -58,7 +62,10 @@ const namingKey = (userId: string) => `merchant_naming:${userId}`
 async function readNaming(userId: string): Promise<Record<string, NamingEntry>> {
   try {
     const db = await getDb()
-    const row = await db.getFirstAsync<{ value: string }>('SELECT value FROM sync_meta WHERE key = ?', [namingKey(userId)])
+    const row = await db.getFirstAsync<{ value: string }>(
+      'SELECT value FROM sync_meta WHERE key = ?',
+      [namingKey(userId)],
+    )
     const parsed = row ? (JSON.parse(row.value) as unknown) : {}
     return parsed && typeof parsed === 'object' ? (parsed as Record<string, NamingEntry>) : {}
   } catch {
@@ -69,7 +76,10 @@ async function readNaming(userId: string): Promise<Record<string, NamingEntry>> 
 async function writeNaming(userId: string, queue: Record<string, NamingEntry>): Promise<void> {
   try {
     const db = await getDb()
-    await db.runAsync('INSERT OR REPLACE INTO sync_meta (key, value) VALUES (?, ?)', [namingKey(userId), JSON.stringify(queue)])
+    await db.runAsync('INSERT OR REPLACE INTO sync_meta (key, value) VALUES (?, ?)', [
+      namingKey(userId),
+      JSON.stringify(queue),
+    ])
   } catch {
     /* worst case the heuristic sweep still covers it */
   }
@@ -77,7 +87,12 @@ async function writeNaming(userId: string, queue: Record<string, NamingEntry>): 
 
 /** Remember a capture that was saved under its fallback name, and try to
  *  name it in a few seconds, without waiting for the next app open. */
-export async function queueForNaming(userId: string, id: string, raw: string, saved: string | null): Promise<void> {
+export async function queueForNaming(
+  userId: string,
+  id: string,
+  raw: string,
+  saved: string | null,
+): Promise<void> {
   const queue = await readNaming(userId)
   queue[id] = { raw, saved, tries: 0 }
   await writeNaming(userId, queue)

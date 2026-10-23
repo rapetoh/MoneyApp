@@ -23,9 +23,11 @@ function formatDay(isoDay: string, locale: string): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(isoDay)
   if (!m) return isoDay
   try {
-    return new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric', timeZone: 'UTC' }).format(
-      new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]))),
-    )
+    return new Intl.DateTimeFormat(locale, {
+      month: 'short',
+      day: 'numeric',
+      timeZone: 'UTC',
+    }).format(new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]))))
   } catch {
     return isoDay
   }
@@ -42,7 +44,12 @@ export function AskReplyBody({
   currency: string
   onAction?: (a: AskAction) => void
 }) {
-  const accent = reply.sentiment === 'positive' ? colors.accent : reply.sentiment === 'negative' ? '#A94646' : colors.ink
+  const accent =
+    reply.sentiment === 'positive'
+      ? colors.accent
+      : reply.sentiment === 'negative'
+        ? '#A94646'
+        : colors.ink
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10, minWidth: 0 }}>
       <div
@@ -57,7 +64,15 @@ export function AskReplyBody({
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
           {reply.actions.map((a, i) => (
             <button key={i} type="button" onClick={() => onAction(a)} style={styles.actionChip}>
-              {a.intent === 'show_transactions' ? <Icon.list color={colors.accent} size={13} /> : a.intent === 'open_recurring' || a.intent === 'create_rule' ? <Icon.recurring color={colors.accent} size={12} /> : a.intent === 'set_budget' ? <Icon.chart color={colors.accent} size={13} /> : <Icon.mic color={colors.accent} size={13} />}
+              {a.intent === 'show_transactions' ? (
+                <Icon.list color={colors.accent} size={13} />
+              ) : a.intent === 'open_recurring' || a.intent === 'create_rule' ? (
+                <Icon.recurring color={colors.accent} size={12} />
+              ) : a.intent === 'set_budget' ? (
+                <Icon.chart color={colors.accent} size={13} />
+              ) : (
+                <Icon.mic color={colors.accent} size={13} />
+              )}
               {askActionLabel(a, locale)}
             </button>
           ))}
@@ -83,9 +98,21 @@ function Block({ block, locale, currency }: { block: AskBlock; locale: Locale; c
         <div style={styles.card}>
           <div style={styles.eyebrow}>{block.caption}</div>
           {block.rows.map((r, i) => (
-            <div key={i} style={{ ...styles.row, borderTop: i === 0 ? 'none' : `0.5px solid ${colors.line}` }}>
-              <span style={{ fontSize: 13.5, color: r.muted ? colors.ink4 : colors.ink2 }}>{r.label}</span>
-              <span style={{ ...styles.rowValue, color: r.accent ? colors.accent : r.muted ? colors.ink4 : colors.ink }}>{r.value}</span>
+            <div
+              key={i}
+              style={{ ...styles.row, borderTop: i === 0 ? 'none' : `0.5px solid ${colors.line}` }}
+            >
+              <span style={{ fontSize: 13.5, color: r.muted ? colors.ink4 : colors.ink2 }}>
+                {r.label}
+              </span>
+              <span
+                style={{
+                  ...styles.rowValue,
+                  color: r.accent ? colors.accent : r.muted ? colors.ink4 : colors.ink,
+                }}
+              >
+                {r.value}
+              </span>
             </div>
           ))}
         </div>
@@ -95,9 +122,26 @@ function Block({ block, locale, currency }: { block: AskBlock; locale: Locale; c
         <div style={styles.card}>
           <div style={styles.eyebrow}>{block.caption}</div>
           {block.rows.map((r, i) => (
-            <div key={i} style={{ ...styles.txRow, borderTop: i === 0 ? 'none' : `0.5px solid ${colors.line}` }}>
+            <div
+              key={i}
+              style={{
+                ...styles.txRow,
+                borderTop: i === 0 ? 'none' : `0.5px solid ${colors.line}`,
+              }}
+            >
               <div style={{ minWidth: 0, flex: 1 }}>
-                <div style={{ fontSize: 14, fontWeight: 600, color: colors.ink, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.merchant}</div>
+                <div
+                  style={{
+                    fontSize: 14,
+                    fontWeight: 600,
+                    color: colors.ink,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {r.merchant}
+                </div>
                 <div style={{ fontSize: 12, color: colors.ink4, marginTop: 2 }}>
                   {formatDay(r.date, locale)}
                   {r.category ? ` · ${r.category}` : ''}
@@ -119,7 +163,10 @@ function Block({ block, locale, currency }: { block: AskBlock; locale: Locale; c
         <div style={styles.card}>
           <div style={styles.eyebrow}>{block.caption}</div>
           {block.steps.map((s, i) => (
-            <div key={i} style={{ display: 'flex', gap: 10, padding: '6px 0', alignItems: 'flex-start' }}>
+            <div
+              key={i}
+              style={{ display: 'flex', gap: 10, padding: '6px 0', alignItems: 'flex-start' }}
+            >
               <div style={styles.stepNum}>{i + 1}</div>
               <div style={{ fontSize: 14, lineHeight: 1.45, color: colors.ink2 }}>{s}</div>
             </div>
@@ -132,15 +179,73 @@ function Block({ block, locale, currency }: { block: AskBlock; locale: Locale; c
 }
 
 const styles: Record<string, CSSProperties> = {
-  text: { fontFamily: font.serif, fontSize: 19, lineHeight: 1.4, fontWeight: 500, letterSpacing: -0.3, color: colors.ink },
-  card: { background: colors.card, border: `0.5px solid ${colors.line}`, borderRadius: radius.xl, padding: '12px 14px' },
-  eyebrow: { fontSize: 11, fontWeight: 700, color: colors.ink3, letterSpacing: 0.6, textTransform: 'uppercase', fontFamily: font.sans, marginBottom: 8 },
-  figure: { fontFamily: font.serif, fontSize: 30, letterSpacing: -0.8, color: colors.ink, lineHeight: 1.1 },
+  text: {
+    fontFamily: font.serif,
+    fontSize: 19,
+    lineHeight: 1.4,
+    fontWeight: 500,
+    letterSpacing: -0.3,
+    color: colors.ink,
+  },
+  card: {
+    background: colors.card,
+    border: `0.5px solid ${colors.line}`,
+    borderRadius: radius.xl,
+    padding: '12px 14px',
+  },
+  eyebrow: {
+    fontSize: 11,
+    fontWeight: 700,
+    color: colors.ink3,
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+    fontFamily: font.sans,
+    marginBottom: 8,
+  },
+  figure: {
+    fontFamily: font.serif,
+    fontSize: 30,
+    letterSpacing: -0.8,
+    color: colors.ink,
+    lineHeight: 1.1,
+  },
   sub: { fontSize: 13, color: colors.ink3, marginTop: 4 },
-  row: { display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12, padding: '7px 0', fontFamily: font.sans },
-  rowValue: { fontFamily: font.display, fontSize: 14.5, fontWeight: 700, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', color: colors.ink },
-  txRow: { display: 'flex', alignItems: 'center', gap: 12, padding: '8px 0', fontFamily: font.sans },
-  stepNum: { width: 22, height: 22, borderRadius: 11, background: colors.accentSoft, color: colors.accent, fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  row: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
+    gap: 12,
+    padding: '7px 0',
+    fontFamily: font.sans,
+  },
+  rowValue: {
+    fontFamily: font.display,
+    fontSize: 14.5,
+    fontWeight: 700,
+    fontVariantNumeric: 'tabular-nums',
+    whiteSpace: 'nowrap',
+    color: colors.ink,
+  },
+  txRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 12,
+    padding: '8px 0',
+    fontFamily: font.sans,
+  },
+  stepNum: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    background: colors.accentSoft,
+    color: colors.accent,
+    fontSize: 12,
+    fontWeight: 700,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
   actionChip: {
     display: 'inline-flex',
     alignItems: 'center',

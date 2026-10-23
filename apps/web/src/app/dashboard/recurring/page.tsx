@@ -16,7 +16,10 @@ import {
 } from '../../../lib/recurringPatternDetector'
 import { usePlus } from '../../../lib/plus'
 import { useRealtime } from '../../../lib/useRealtime'
-import { RecurringRuleModal, type RecurringRuleFormValues } from '../../../components/RecurringRuleModal'
+import {
+  RecurringRuleModal,
+  type RecurringRuleFormValues,
+} from '../../../components/RecurringRuleModal'
 import type { RecurringRule, RecurringFrequency } from '@voice-expense/shared'
 import {
   nextOccurrence as sharedNextOccurrence,
@@ -136,7 +139,10 @@ function dayOffsetToLabel(dayOffset: number, tz: string, locale: string): string
   return new Date(instant).toLocaleDateString(locale, { month: 'short', day: 'numeric' })
 }
 
-function chargesIn30Days(rules: RecurringRule[], tz: string): Array<{ day: number; rule: RecurringRule }> {
+function chargesIn30Days(
+  rules: RecurringRule[],
+  tz: string,
+): Array<{ day: number; rule: RecurringRule }> {
   const todayIso = localDay(new Date().toISOString(), tz)
   const [ty, tm, td] = todayIso.split('-').map(Number)
   const startInstant = civilDateTimeToInstant(ty, tm, td, 0, 0, 0, tz)
@@ -145,7 +151,12 @@ function chargesIn30Days(rules: RecurringRule[], tz: string): Array<{ day: numbe
 
   const active = rules.filter((r) => r.is_active)
   const out: Array<{ day: number; rule: RecurringRule }> = []
-  for (const { rule, occurrence } of chargesInWindow(active, startInstant, endExclusiveInstant, tz)) {
+  for (const { rule, occurrence } of chargesInWindow(
+    active,
+    startInstant,
+    endExclusiveInstant,
+    tz,
+  )) {
     const occ = localParts(occurrence.instant, tz)
     const dayOffset = daysBetween(ty, tm, td, occ.y, occ.m, occ.d)
     out.push({ day: dayOffset + 1, rule })
@@ -164,9 +175,11 @@ export default function RecurringPage() {
   // (fix-plan 2.13 / audit 08-F21 family).
   const [loadError, setLoadError] = useState<string | null>(null)
   const [dismissed, setDismissed] = useState<Set<string>>(new Set())
-  const [profile, setProfile] = useState<{ currency_code?: string; locale?: string; timezone?: string } | null>(
-    null,
-  )
+  const [profile, setProfile] = useState<{
+    currency_code?: string
+    locale?: string
+    timezone?: string
+  } | null>(null)
   const [userId, setUserId] = useState<string | null>(null)
   // profiles.timezone (fix-plan 1.3 part 1, written by `TimezoneSync` in
   // dashboard/layout.tsx on every authenticated render) — every window
@@ -177,7 +190,9 @@ export default function RecurringPage() {
   const tz = profile?.timezone || 'UTC'
 
   async function load() {
-    const { data: { user } } = await supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
     if (!user) return
     setUserId(user.id)
     setDismissed(readDismissed(user.id))
@@ -203,7 +218,11 @@ export default function RecurringPage() {
         .select('id, name, color')
         .eq('user_id', user.id)
         .eq('is_archived', false),
-      supabase.from('profiles').select('currency_code, locale, timezone').eq('id', user.id).single(),
+      supabase
+        .from('profiles')
+        .select('currency_code, locale, timezone')
+        .eq('id', user.id)
+        .single(),
     ])
     const failure = r.error ?? t.error ?? c.error ?? p.error
     setLoadError(failure ? failure.message : null)
@@ -243,7 +262,9 @@ export default function RecurringPage() {
   }, [transactions, rules, dismissed, isPlus])
 
   async function acceptCandidate(c: RecurringPatternCandidate) {
-    const { data: { user } } = await supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
     if (!user) return
 
     // Anchor BOTH starts_at and last_generated to the candidate's own
@@ -360,7 +381,9 @@ export default function RecurringPage() {
   }
 
   async function handleModalSave(values: RecurringRuleFormValues): Promise<boolean> {
-    const { data: { user } } = await supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
     if (!user) return false
 
     const anchorParts = localParts(values.starts_at, tz)
@@ -376,11 +399,21 @@ export default function RecurringPage() {
       // charge") re-anchors `last_generated` to null so the new date is
       // the literal next occurrence rather than one cadence step past
       // it — mirrors `useRecurringRules.ts`'s `updateRule` on mobile.
-      let fxPayload: { amount_in_profile_currency: number | null; fx_rate_to_profile: number | null; fx_rate_date: string | null } | null = null
+      let fxPayload: {
+        amount_in_profile_currency: number | null
+        fx_rate_to_profile: number | null
+        fx_rate_date: string | null
+      } | null = null
       const amountOrCurrencyChanged =
         values.amount !== editingRule.amount || values.currency_code !== editingRule.currency_code
       if (amountOrCurrencyChanged) {
-        const fx = await snapshotFx(values.starts_at, values.currency_code, currency, values.amount, tz)
+        const fx = await snapshotFx(
+          values.starts_at,
+          values.currency_code,
+          currency,
+          values.amount,
+          tz,
+        )
         fxPayload = fx
       }
       const startsAtChanged = values.starts_at !== editingRule.starts_at
@@ -395,7 +428,9 @@ export default function RecurringPage() {
           frequency: values.frequency,
           interval: values.interval,
           ends_at: values.ends_at,
-          ...(startsAtChanged ? { starts_at: values.starts_at, last_generated: null, ...anchorPayload } : {}),
+          ...(startsAtChanged
+            ? { starts_at: values.starts_at, last_generated: null, ...anchorPayload }
+            : {}),
           ...(fxPayload ?? {}),
         })
         .eq('id', editingRule.id)
@@ -446,10 +481,15 @@ export default function RecurringPage() {
   // hard `.delete()`, which would bypass the `is_deleted` contract every
   // other synced entity on this table carries (migration 018/028).
   async function handleDeleteRule(rule: RecurringRule) {
-    if (!window.confirm(`Cancel ${rule.name ?? 'this recurring rule'}? This can't be undone.`)) return
+    if (!window.confirm(`Cancel ${rule.name ?? 'this recurring rule'}? This can't be undone.`))
+      return
     await supabase
       .from('recurring_rules')
-      .update({ is_deleted: true, deleted_at: new Date().toISOString(), version: (rule.version ?? 1) + 1 })
+      .update({
+        is_deleted: true,
+        deleted_at: new Date().toISOString(),
+        version: (rule.version ?? 1) + 1,
+      })
       .eq('id', rule.id)
     setModalOpen(false)
     await load()
@@ -477,7 +517,9 @@ export default function RecurringPage() {
   const currency = profile?.currency_code ?? 'USD'
   const locale = profile?.locale ?? 'en'
   const fmtShort = (v: number) =>
-    new Intl.NumberFormat(locale, { style: 'currency', currency, maximumFractionDigits: 0 }).format(v)
+    new Intl.NumberFormat(locale, { style: 'currency', currency, maximumFractionDigits: 0 }).format(
+      v,
+    )
 
   // Sorted active rules by next-charge date.
   const sortedActive = useMemo(() => {
@@ -521,8 +563,14 @@ export default function RecurringPage() {
   // Total + heaviest day for the calendar footer — bills (debits) only; a
   // paycheck is not a "charge" and must never make a day "heaviest" (owner
   // review Aug 16: two $2,500 deposits read as "$5,342 in charges").
-  const totalCharges = charges.reduce((s, c) => s + (c.rule.direction === 'debit' ? c.rule.amount : 0), 0)
-  const totalIncoming = charges.reduce((s, c) => s + (c.rule.direction === 'credit' ? c.rule.amount : 0), 0)
+  const totalCharges = charges.reduce(
+    (s, c) => s + (c.rule.direction === 'debit' ? c.rule.amount : 0),
+    0,
+  )
+  const totalIncoming = charges.reduce(
+    (s, c) => s + (c.rule.direction === 'credit' ? c.rule.amount : 0),
+    0,
+  )
   const heaviestEntry = (() => {
     let bestDay = 0
     let bestSum = 0
@@ -594,7 +642,10 @@ export default function RecurringPage() {
                 // spending.
                 <span>
                   Pattern detection is a{' '}
-                  <Link href="/dashboard/settings" style={{ color: colors.accent, textDecoration: 'none' }}>
+                  <Link
+                    href="/dashboard/settings"
+                    style={{ color: colors.accent, textDecoration: 'none' }}
+                  >
                     Murmur Plus
                   </Link>{' '}
                   feature.
@@ -628,7 +679,7 @@ export default function RecurringPage() {
               New patterns detected
             </div>
             {candidates.slice(0, 5).map((c, i) => {
-              const catName = c.category_id ? catMap[c.category_id]?.name ?? null : null
+              const catName = c.category_id ? (catMap[c.category_id]?.name ?? null) : null
               return (
                 <div
                   key={c.key}
@@ -647,7 +698,14 @@ export default function RecurringPage() {
                     size={32}
                   />
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontFamily: font.sans, fontSize: 13, fontWeight: 600, color: colors.ink }}>
+                    <div
+                      style={{
+                        fontFamily: font.sans,
+                        fontSize: 13,
+                        fontWeight: 600,
+                        color: colors.ink,
+                      }}
+                    >
                       {c.merchant}
                     </div>
                     <div style={{ fontSize: 11, color: colors.ink3, marginTop: 2 }}>
@@ -689,7 +747,11 @@ export default function RecurringPage() {
               {loading ? (
                 <div style={styles.empty}>Loading…</div>
               ) : loadError ? (
-                <ErrorState message="We couldn't load your recurring rules." detail={loadError} onRetry={load} />
+                <ErrorState
+                  message="We couldn't load your recurring rules."
+                  detail={loadError}
+                  onRetry={load}
+                />
               ) : sortedActive.length === 0 && inactive.length === 0 ? (
                 // Fix-plan 3.3: plan-aware — "accept a detected pattern"
                 // is a Plus feature (the banner above only renders when
@@ -698,7 +760,8 @@ export default function RecurringPage() {
                 // every plan, so it's the one action worth naming for
                 // everyone.
                 <div style={styles.empty}>
-                  No recurring rules yet. Add one manually, mark a transaction as recurring on mobile
+                  No recurring rules yet. Add one manually, mark a transaction as recurring on
+                  mobile
                   {isPlus ? ', or accept a detected pattern below.' : '.'}
                 </div>
               ) : (
@@ -713,7 +776,7 @@ export default function RecurringPage() {
                     // already sorts first among `sortedActive`, which is
                     // ascending by this same value).
                     const overdue = next != null && next.getTime() < Date.now()
-                    const catName = r.category_id ? catMap[r.category_id]?.name ?? null : null
+                    const catName = r.category_id ? (catMap[r.category_id]?.name ?? null) : null
                     return (
                       <div
                         key={r.id}
@@ -745,7 +808,9 @@ export default function RecurringPage() {
                           <MerchantLogo
                             name={r.name}
                             categoryName={catName}
-                            categoryColor={r.category_id ? catMap[r.category_id]?.color ?? null : null}
+                            categoryColor={
+                              r.category_id ? (catMap[r.category_id]?.color ?? null) : null
+                            }
                             size={28}
                             radius={8}
                           />
@@ -763,10 +828,18 @@ export default function RecurringPage() {
                             bold={700}
                           />
                         </div>
-                        <div style={{ color: colors.ink3, fontSize: 12, textTransform: 'capitalize' }}>
+                        <div
+                          style={{ color: colors.ink3, fontSize: 12, textTransform: 'capitalize' }}
+                        >
                           {freqLabel(r.frequency)}
                         </div>
-                        <div style={{ color: overdue ? colors.accent : colors.ink2, fontSize: 12, fontWeight: overdue ? 700 : 400 }}>
+                        <div
+                          style={{
+                            color: overdue ? colors.accent : colors.ink2,
+                            fontSize: 12,
+                            fontWeight: overdue ? 700 : 400,
+                          }}
+                        >
                           {overdue
                             ? 'Overdue'
                             : next
@@ -800,7 +873,7 @@ export default function RecurringPage() {
                     )
                   })}
                   {inactive.map((r, i) => {
-                    const catName = r.category_id ? catMap[r.category_id]?.name ?? null : null
+                    const catName = r.category_id ? (catMap[r.category_id]?.name ?? null) : null
                     return (
                       <div
                         key={r.id}
@@ -816,7 +889,9 @@ export default function RecurringPage() {
                           <MerchantLogo
                             name={r.name}
                             categoryName={catName}
-                            categoryColor={r.category_id ? catMap[r.category_id]?.color ?? null : null}
+                            categoryColor={
+                              r.category_id ? (catMap[r.category_id]?.color ?? null) : null
+                            }
                             size={28}
                             radius={8}
                           />
@@ -834,7 +909,9 @@ export default function RecurringPage() {
                             bold={700}
                           />
                         </div>
-                        <div style={{ color: colors.ink3, fontSize: 12, textTransform: 'capitalize' }}>
+                        <div
+                          style={{ color: colors.ink3, fontSize: 12, textTransform: 'capitalize' }}
+                        >
                           {freqLabel(r.frequency)}
                         </div>
                         <div style={{ color: colors.ink4, fontSize: 12 }}>Paused</div>
@@ -909,7 +986,9 @@ export default function RecurringPage() {
                         aspectRatio: 1,
                         borderRadius: 6,
                         background: items ? colors.accentSoft : colors.surface,
-                        border: items ? `0.5px solid ${colors.accent}` : `0.5px solid ${colors.line}`,
+                        border: items
+                          ? `0.5px solid ${colors.accent}`
+                          : `0.5px solid ${colors.line}`,
                         padding: 4,
                         display: 'flex',
                         flexDirection: 'column',
@@ -920,7 +999,14 @@ export default function RecurringPage() {
                     >
                       <div>{dayOfMonth}</div>
                       {items && (
-                        <div style={{ marginTop: 'auto', fontSize: 8, lineHeight: 1.1, fontWeight: 700 }}>
+                        <div
+                          style={{
+                            marginTop: 'auto',
+                            fontSize: 8,
+                            lineHeight: 1.1,
+                            fontWeight: 700,
+                          }}
+                        >
                           {items.length}
                         </div>
                       )}
@@ -943,7 +1029,9 @@ export default function RecurringPage() {
                   <b style={{ color: colors.ink }}>{fmtShort(totalCharges)}</b> in bills
                   {totalIncoming > 0 && (
                     <>
-                      {' '}and <b style={{ color: colors.ink }}>{fmtShort(totalIncoming)}</b> in expected income
+                      {' '}
+                      and <b style={{ color: colors.ink }}>{fmtShort(totalIncoming)}</b> in expected
+                      income
                     </>
                   )}{' '}
                   before {dayOffsetToLabel(31, tz, locale)}.

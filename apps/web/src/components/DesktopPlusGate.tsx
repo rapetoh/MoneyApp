@@ -118,7 +118,10 @@ function LockedPlus({
         .from('profiles')
         .select('plus_status, trial_ends_at')
         .eq('id', userId)
-        .maybeSingle<{ plus_status: 'active' | 'lapsed' | 'free' | null; trial_ends_at: string | null }>()
+        .maybeSingle<{
+          plus_status: 'active' | 'lapsed' | 'free' | null
+          trial_ends_at: string | null
+        }>()
       if (stopped || unlocked.current || !isPlusFromProfile(data)) return
       unlocked.current = true
       setPhase('unlocking')
@@ -169,15 +172,21 @@ function LockedPlus({
     surface === 'iphone'
       ? [
           { title: 'Open Murmur on this iPhone', sub: 'It opens straight on Plus.' },
-          { title: lapsed ? 'Renew Plus in the app' : 'Start Plus in the app', sub: 'Plans and free trial details are shown there.' },
+          {
+            title: lapsed ? 'Renew Plus in the app' : 'Start Plus in the app',
+            sub: 'Plans and free trial details are shown there.',
+          },
           { title: 'Come back here', sub: 'This page unlocks on its own.' },
         ]
       : [
           { title: 'Scan the code with your iPhone camera', sub: 'Murmur opens straight on Plus.' },
-          { title: lapsed ? 'Renew Plus in the app' : 'Start Plus in the app', sub: 'Plans and free trial details are shown there.' },
+          {
+            title: lapsed ? 'Renew Plus in the app' : 'Start Plus in the app',
+            sub: 'Plans and free trial details are shown there.',
+          },
           { title: 'This page unlocks on its own', sub: 'Usually within a few seconds.' },
         ]
-  const via = provider ? PROVIDER_LABEL[provider] ?? provider : null
+  const via = provider ? (PROVIDER_LABEL[provider] ?? provider) : null
   const initial = (email ?? '?').trim()[0]?.toUpperCase() ?? '?'
 
   return (
@@ -246,7 +255,12 @@ function LockedPlus({
                 <span className="mpg-account-sub">
                   {via ? `Signed in with ${via}` : 'Signed in'}
                   <span aria-hidden> · </span>
-                  <button type="button" className="mpg-switch" onClick={switchAccount} disabled={signingOut}>
+                  <button
+                    type="button"
+                    className="mpg-switch"
+                    onClick={switchAccount}
+                    disabled={signingOut}
+                  >
                     {signingOut ? 'Signing out…' : 'Use another account'}
                   </button>
                   {/* Phones get this screen full-bleed (the sidebar does not
@@ -265,7 +279,14 @@ function LockedPlus({
                 <>
                   <span className="mpg-check" aria-hidden>
                     <svg width="10" height="10" viewBox="0 0 10 10">
-                      <path d="M2 5.2 4.1 7.3 8 2.8" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                      <path
+                        d="M2 5.2 4.1 7.3 8 2.8"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.6"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
                     </svg>
                   </span>
                   Plus is on

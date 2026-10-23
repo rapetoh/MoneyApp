@@ -56,7 +56,9 @@ export default function PlusWelcomeScreen() {
         <Animated.View
           style={{
             opacity: rise,
-            transform: [{ translateY: rise.interpolate({ inputRange: [0, 1], outputRange: [14, 0] }) }],
+            transform: [
+              { translateY: rise.interpolate({ inputRange: [0, 1], outputRange: [14, 0] }) },
+            ],
           }}
         >
           <View style={styles.badge}>
@@ -126,7 +128,13 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: Colors.ink,
   },
-  lead: { marginTop: 10, fontSize: 15.5, lineHeight: 23, color: Colors.ink3, fontFamily: Typography.fontFamily.sans },
+  lead: {
+    marginTop: 10,
+    fontSize: 15.5,
+    lineHeight: 23,
+    color: Colors.ink3,
+    fontFamily: Typography.fontFamily.sans,
+  },
   list: { marginTop: 26, gap: 14 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 13 },
   iconTile: {
@@ -137,9 +145,31 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  rowText: { flex: 1, fontSize: 15, lineHeight: 21, color: Colors.ink, fontFamily: Typography.fontFamily.sans },
-  after: { marginTop: 26, fontSize: 13.5, color: Colors.ink4, fontFamily: Typography.fontFamily.sans },
+  rowText: {
+    flex: 1,
+    fontSize: 15,
+    lineHeight: 21,
+    color: Colors.ink,
+    fontFamily: Typography.fontFamily.sans,
+  },
+  after: {
+    marginTop: 26,
+    fontSize: 13.5,
+    color: Colors.ink4,
+    fontFamily: Typography.fontFamily.sans,
+  },
   footer: { paddingHorizontal: 28, paddingTop: 10, paddingBottom: 8 },
-  cta: { height: 56, borderRadius: 28, backgroundColor: Colors.ink, alignItems: 'center', justifyContent: 'center' },
-  ctaText: { color: Colors.white, fontSize: 17, fontWeight: '600', fontFamily: Typography.fontFamily.sansSemiBold },
+  cta: {
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: Colors.ink,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ctaText: {
+    color: Colors.white,
+    fontSize: 17,
+    fontWeight: '600',
+    fontFamily: Typography.fontFamily.sansSemiBold,
+  },
 })

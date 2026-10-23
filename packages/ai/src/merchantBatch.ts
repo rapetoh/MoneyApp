@@ -83,10 +83,15 @@ export function validateMerchantBatch(
 
   return descriptors.map((descriptor, i) => {
     const r = byDescriptor.get(descriptor) ?? list[i] ?? {}
-    const merchant = typeof r.merchant === 'string' && r.merchant.trim() ? r.merchant.trim().slice(0, 200) : null
-    const domain = normalizeMerchantDomain(typeof r.merchant_domain === 'string' ? r.merchant_domain : null)
+    const merchant =
+      typeof r.merchant === 'string' && r.merchant.trim() ? r.merchant.trim().slice(0, 200) : null
+    const domain = normalizeMerchantDomain(
+      typeof r.merchant_domain === 'string' ? r.merchant_domain : null,
+    )
     const category =
-      typeof r.category === 'string' ? (categorySet.get(r.category.trim().toLowerCase()) ?? null) : null
+      typeof r.category === 'string'
+        ? (categorySet.get(r.category.trim().toLowerCase()) ?? null)
+        : null
     return { descriptor, merchant, merchant_domain: domain, category }
   })
 }

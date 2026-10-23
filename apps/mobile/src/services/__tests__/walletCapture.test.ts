@@ -92,7 +92,12 @@ describe('normaliseSpoken', () => {
     expect(
       normaliseSpoken(
         spoken('five dollars at Walmart'),
-        { amount: 5, currency: 'USD', merchant: ' Walmart ', transacted_at: '2026-09-20T17:04:00Z' },
+        {
+          amount: 5,
+          currency: 'USD',
+          merchant: ' Walmart ',
+          transacted_at: '2026-09-20T17:04:00Z',
+        },
         'EUR',
         TZ,
         NOW,
@@ -121,7 +126,10 @@ describe('normaliseSpoken', () => {
     // validator rejected the row. Every Siri entry outside the dollar and
     // euro zones would have failed to save.
     expect(normaliseSpoken(spoken('4000 at Ramco'), null, 'XOF', TZ, NOW)?.currency).toBe('XOF')
-    expect(normaliseSpoken(spoken('4000 at Ramco'), { amount: 4000, currency: '' }, 'XOF', TZ, NOW)?.currency).toBe('XOF')
+    expect(
+      normaliseSpoken(spoken('4000 at Ramco'), { amount: 4000, currency: '' }, 'XOF', TZ, NOW)
+        ?.currency,
+    ).toBe('XOF')
   })
 
   it('keeps the symbol the speaker used over the profile currency', () => {
@@ -140,20 +148,38 @@ describe('normaliseSpoken', () => {
     // both Siri entries landed on Saturday at 7pm. Null back from the
     // repair means "no real date was said".
     const entry = { ...spoken('five dollars at Target'), captured_at: NOW }
-    const out = normaliseSpoken(entry, { amount: 5, transacted_at: '2026-09-20T00:00:00Z' }, 'USD', TZ, NOW)
+    const out = normaliseSpoken(
+      entry,
+      { amount: 5, transacted_at: '2026-09-20T00:00:00Z' },
+      'USD',
+      TZ,
+      NOW,
+    )
     expect(out?.transactedAt).toBe(NOW)
   })
 
   it('keeps a date the speaker actually named, at midday local', () => {
     const entry = { ...spoken('forty dollars at Shell on Friday'), captured_at: NOW }
-    const out = normaliseSpoken(entry, { amount: 40, transacted_at: '2026-09-18T00:00:00Z' }, 'USD', TZ, NOW)
+    const out = normaliseSpoken(
+      entry,
+      { amount: 40, transacted_at: '2026-09-18T00:00:00Z' },
+      'USD',
+      TZ,
+      NOW,
+    )
     // Midday in Chicago, not midnight UTC: the row lands on Friday.
     expect(out?.transactedAt).toBe('2026-09-18T17:00:00.000Z')
   })
 
   it('keeps a full instant untouched', () => {
     const entry = { ...spoken('nine dollars at Dunkin'), captured_at: NOW }
-    const out = normaliseSpoken(entry, { amount: 9, transacted_at: '2026-09-19T14:32:00.000Z' }, 'USD', TZ, NOW)
+    const out = normaliseSpoken(
+      entry,
+      { amount: 9, transacted_at: '2026-09-19T14:32:00.000Z' },
+      'USD',
+      TZ,
+      NOW,
+    )
     expect(out?.transactedAt).toBe('2026-09-19T14:32:00.000Z')
   })
 
@@ -168,7 +194,9 @@ describe('normaliseSpoken', () => {
     )
     // An expense, a Wallet capture and an unknown locale all pass through.
     expect(spokenTranscript(spoken('five at Target'), 'en')).toBe('five at Target')
-    expect(spokenTranscript({ ...base, amount: '$2.11', merchant: 'Shell', currency: '' }, 'en')).toBe('')
+    expect(
+      spokenTranscript({ ...base, amount: '$2.11', merchant: 'Shell', currency: '' }, 'en'),
+    ).toBe('')
     expect(spokenTranscript(spoken('two hundred from Acme', 'income'), 'de')).toBe(
       'Income received: two hundred from Acme',
     )

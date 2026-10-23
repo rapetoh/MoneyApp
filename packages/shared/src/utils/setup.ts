@@ -21,9 +21,21 @@ export const LOCALE_LABELS: Record<Locale, string> = {
 
 /** Currencies offered in the setup screen and in Settings, in display order. */
 export const SUPPORTED_CURRENCIES = [
-  'USD', 'EUR', 'GBP', 'CAD', 'AUD', 'CHF', 'JPY',
-  'BRL', 'MXN', 'INR', 'ZAR',
-  'XOF', 'XAF', 'NGN', 'GHS',
+  'USD',
+  'EUR',
+  'GBP',
+  'CAD',
+  'AUD',
+  'CHF',
+  'JPY',
+  'BRL',
+  'MXN',
+  'INR',
+  'ZAR',
+  'XOF',
+  'XAF',
+  'NGN',
+  'GHS',
 ] as const
 
 export type SupportedCurrency = (typeof SUPPORTED_CURRENCIES)[number]
@@ -31,7 +43,9 @@ export type SupportedCurrency = (typeof SUPPORTED_CURRENCIES)[number]
 /** The device's ISO 4217 code when Murmur supports it, else USD. */
 export function resolveCurrency(deviceCurrency: string | null | undefined): SupportedCurrency {
   const code = (deviceCurrency ?? '').toUpperCase()
-  return (SUPPORTED_CURRENCIES as readonly string[]).includes(code) ? (code as SupportedCurrency) : 'USD'
+  return (SUPPORTED_CURRENCIES as readonly string[]).includes(code)
+    ? (code as SupportedCurrency)
+    : 'USD'
 }
 
 /** Default region per app language, used when the device region doesn't

@@ -56,7 +56,10 @@ export interface EntityHandler {
  * already-lost race can never succeed, and the next pull reconciles
  * whatever the real state is.
  */
-async function versionGuardedDelete(table: string, payload: Record<string, unknown>): Promise<PushResult> {
+async function versionGuardedDelete(
+  table: string,
+  payload: Record<string, unknown>,
+): Promise<PushResult> {
   const id = payload.id as string
   const userId = payload.user_id as string
   const version = payload.version as number
@@ -103,9 +106,12 @@ export const ENTITY_HANDLERS: Record<SyncEntityType, EntityHandler> = {
       await upsertTransaction(row as Transaction)
     },
     async push(_operation, payload) {
-      const { error }: { error: PostgrestError | null } = await supabaseAny.rpc('sync_upsert_transaction', {
-        payload,
-      })
+      const { error }: { error: PostgrestError | null } = await supabaseAny.rpc(
+        'sync_upsert_transaction',
+        {
+          payload,
+        },
+      )
       return { error }
     },
     async pushDelete(payload) {

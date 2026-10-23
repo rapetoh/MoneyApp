@@ -52,8 +52,17 @@ export function goalStatus(
   const remaining = roundCents(Math.max(0, goal.target_amount - saved))
   const pct = goal.target_amount > 0 ? Math.min(1, saved / goal.target_amount) : 0
 
-  if (remaining === 0) return { saved, remaining, pct, pace: 'done', daysLeft: daysLeftTo(goal.target_date, tz, nowIso), perMonth: null }
-  if (!goal.target_date) return { saved, remaining, pct, pace: 'no_date', daysLeft: null, perMonth: null }
+  if (remaining === 0)
+    return {
+      saved,
+      remaining,
+      pct,
+      pace: 'done',
+      daysLeft: daysLeftTo(goal.target_date, tz, nowIso),
+      perMonth: null,
+    }
+  if (!goal.target_date)
+    return { saved, remaining, pct, pace: 'no_date', daysLeft: null, perMonth: null }
 
   const daysLeft = daysLeftTo(goal.target_date, tz, nowIso)!
   if (daysLeft < 0) return { saved, remaining, pct, pace: 'overdue', daysLeft, perMonth: null }
@@ -65,10 +74,14 @@ export function goalStatus(
   const start = localParts(goal.created_at, tz)
   const [ty, tm, td] = goal.target_date.split('-').map(Number)
   const totalDays = Math.max(1, daysBetween(start.y, start.m, start.d, ty, tm, td))
-  const elapsed = Math.min(totalDays, Math.max(0, daysBetween(start.y, start.m, start.d, now.y, now.m, now.d)))
+  const elapsed = Math.min(
+    totalDays,
+    Math.max(0, daysBetween(start.y, start.m, start.d, now.y, now.m, now.d)),
+  )
   const expected = goal.target_amount * (elapsed / totalDays)
   const slack = goal.target_amount * PACE_TOLERANCE
-  const pace: GoalPace = saved > expected + slack ? 'ahead' : saved >= expected - slack ? 'on_track' : 'behind'
+  const pace: GoalPace =
+    saved > expected + slack ? 'ahead' : saved >= expected - slack ? 'on_track' : 'behind'
 
   return { saved, remaining, pct, pace, daysLeft, perMonth }
 }

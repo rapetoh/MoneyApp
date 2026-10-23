@@ -10,7 +10,9 @@ import { DesktopPlusGate } from '../../components/DesktopPlusGate'
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
   // The profile read here only backs cosmetic chrome (sidebar display
@@ -77,7 +79,11 @@ export default async function DashboardLayout({ children }: { children: React.Re
           background: colors.background,
         }}
       >
-        <Sidebar displayName={displayName} recurringCount={recurringCount} lastSyncedAt={lastSyncedAt} />
+        <Sidebar
+          displayName={displayName}
+          recurringCount={recurringCount}
+          lastSyncedAt={lastSyncedAt}
+        />
         <main
           style={{
             flex: 1,

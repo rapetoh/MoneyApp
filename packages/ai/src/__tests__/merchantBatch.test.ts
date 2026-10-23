@@ -8,15 +8,35 @@ describe('validateMerchantBatch', () => {
     const out = validateMerchantBatch(
       {
         results: [
-          { descriptor: 'UBER *TRIP', merchant: 'Uber', merchant_domain: 'https://www.uber.com/', category: 'transport' },
-          { descriptor: 'WM SUPERCENTER #1489', merchant: 'Walmart', merchant_domain: 'walmart.com', category: 'Groceries' },
+          {
+            descriptor: 'UBER *TRIP',
+            merchant: 'Uber',
+            merchant_domain: 'https://www.uber.com/',
+            category: 'transport',
+          },
+          {
+            descriptor: 'WM SUPERCENTER #1489',
+            merchant: 'Walmart',
+            merchant_domain: 'walmart.com',
+            category: 'Groceries',
+          },
         ],
       },
       ['WM SUPERCENTER #1489', 'UBER *TRIP'],
       cats,
     )
-    expect(out[0]).toEqual({ descriptor: 'WM SUPERCENTER #1489', merchant: 'Walmart', merchant_domain: 'walmart.com', category: 'Groceries' })
-    expect(out[1]).toEqual({ descriptor: 'UBER *TRIP', merchant: 'Uber', merchant_domain: 'uber.com', category: 'Transport' })
+    expect(out[0]).toEqual({
+      descriptor: 'WM SUPERCENTER #1489',
+      merchant: 'Walmart',
+      merchant_domain: 'walmart.com',
+      category: 'Groceries',
+    })
+    expect(out[1]).toEqual({
+      descriptor: 'UBER *TRIP',
+      merchant: 'Uber',
+      merchant_domain: 'uber.com',
+      category: 'Transport',
+    })
   })
 
   it('a category not in the list, a junk domain or a missing answer come back null', () => {
@@ -25,12 +45,24 @@ describe('validateMerchantBatch', () => {
       ['X', 'Y'],
       cats,
     )
-    expect(out[0]).toEqual({ descriptor: 'X', merchant: null, merchant_domain: null, category: null })
-    expect(out[1]).toEqual({ descriptor: 'Y', merchant: null, merchant_domain: null, category: null })
+    expect(out[0]).toEqual({
+      descriptor: 'X',
+      merchant: null,
+      merchant_domain: null,
+      category: null,
+    })
+    expect(out[1]).toEqual({
+      descriptor: 'Y',
+      merchant: null,
+      merchant_domain: null,
+      category: null,
+    })
   })
 
   it('survives a malformed answer', () => {
-    expect(validateMerchantBatch('nope', ['A'], cats)).toEqual([{ descriptor: 'A', merchant: null, merchant_domain: null, category: null }])
+    expect(validateMerchantBatch('nope', ['A'], cats)).toEqual([
+      { descriptor: 'A', merchant: null, merchant_domain: null, category: null },
+    ])
   })
 
   it('the prompt carries the shared merchant rules and the category list', () => {

@@ -44,7 +44,11 @@ export default function DashboardError({
         fontFamily: font.sans,
       }}
     >
-      <ErrorState message="Something went wrong loading this page." detail={error.message} onRetry={reset} />
+      <ErrorState
+        message="Something went wrong loading this page."
+        detail={error.message}
+        onRetry={reset}
+      />
     </div>
   )
 }

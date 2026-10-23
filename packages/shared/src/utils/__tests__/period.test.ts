@@ -67,7 +67,7 @@ describe('monthBounds — the fix-plan "done when" fixture', () => {
     })
   })
 
-  it('produces a UTC month\'s bounds exactly 1st-to-1st with no zone offset', () => {
+  it("produces a UTC month's bounds exactly 1st-to-1st with no zone offset", () => {
     const b = monthBounds('2026-02', 'UTC')
     expect(b.start).toBe('2026-02-01T00:00:00.000Z')
     expect(b.endExclusive).toBe('2026-03-01T00:00:00.000Z')
@@ -247,11 +247,15 @@ describe('normalizeParsedTransactedAt', () => {
   })
 
   it('a real time of day passes through untouched', () => {
-    expect(normalizeParsedTransactedAt('2026-08-10T14:30:00Z', tz, now)).toBe('2026-08-10T14:30:00Z')
-    expect(normalizeParsedTransactedAt('2026-08-11T09:41:00-05:00', tz, now)).toBe('2026-08-11T09:41:00-05:00')
+    expect(normalizeParsedTransactedAt('2026-08-10T14:30:00Z', tz, now)).toBe(
+      '2026-08-10T14:30:00Z',
+    )
+    expect(normalizeParsedTransactedAt('2026-08-11T09:41:00-05:00', tz, now)).toBe(
+      '2026-08-11T09:41:00-05:00',
+    )
   })
 
-  it("date-only naming today (user tz) → null so the caller defaults to now", () => {
+  it('date-only naming today (user tz) → null so the caller defaults to now', () => {
     expect(normalizeParsedTransactedAt('2026-08-11', tz, now)).toBeNull()
     expect(normalizeParsedTransactedAt('2026-08-11T00:00:00Z', tz, now)).toBeNull()
     expect(normalizeParsedTransactedAt('2026-08-11T00:00:00.000Z', tz, now)).toBeNull()
@@ -267,6 +271,8 @@ describe('normalizeParsedTransactedAt', () => {
   })
 
   it('midnight in a non-UTC offset is real time info and passes through', () => {
-    expect(normalizeParsedTransactedAt('2026-08-10T00:00:00-05:00', tz, now)).toBe('2026-08-10T00:00:00-05:00')
+    expect(normalizeParsedTransactedAt('2026-08-10T00:00:00-05:00', tz, now)).toBe(
+      '2026-08-10T00:00:00-05:00',
+    )
   })
 })

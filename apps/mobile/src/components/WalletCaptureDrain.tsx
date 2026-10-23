@@ -249,7 +249,8 @@ export function WalletCaptureDrain() {
       if (result.error && result.status === 'rejected') return
 
       const savedId = result.id
-      if (!named && n.merchant && savedId) void queueForNaming(userId, savedId, n.merchant, merchantName)
+      if (!named && n.merchant && savedId)
+        void queueForNaming(userId, savedId, n.merchant, merchantName)
       const label = merchantName ?? t('voice.expense', locale)
       const money = formatMoney(n.amount, n.currency, locale)
       showUndo({
@@ -276,7 +277,8 @@ export function WalletCaptureDrain() {
         // Mockup copy (docs/money-app/project): "Captured from Apple Pay"
         // / "Merchant · Category · just now".
         title: `${t('applepay.notif_captured', locale)} · ${money}`,
-        body: `${label} · ${categoryName ?? t('applepay.uncategorised', locale)} · ${t('applepay.tap_to_edit', locale)}`,        merchant: merchantName,
+        body: `${label} · ${categoryName ?? t('applepay.uncategorised', locale)} · ${t('applepay.tap_to_edit', locale)}`,
+        merchant: merchantName,
         merchantDomain,
       })
     }
@@ -339,7 +341,9 @@ export function WalletCaptureDrain() {
         (await learnedCategoryId(userId, merchant, new Set(categories.map((c) => c.id)))) ??
         (parsed
           ? (resolveCategorySuggestion(parsed.category_suggestion, categories)?.category.id ?? null)
-          : null) ?? (guessCategoryFromMerchant(merchant, categories)?.category.id ?? null)
+          : null) ??
+        guessCategoryFromMerchant(merchant, categories)?.category.id ??
+        null
       const merchantDomain = parsed?.merchant_domain ?? brandDomainForMerchant(merchant)
 
       // The parser classifies intent and code derives the sign, so "I got
@@ -377,9 +381,7 @@ export function WalletCaptureDrain() {
         ? (categories.find((c) => c.id === categoryId)?.name ?? null)
         : null
       const label =
-        merchant ??
-        categoryName ??
-        t(isIncome ? 'voice.income_label' : 'voice.expense', locale)
+        merchant ?? categoryName ?? t(isIncome ? 'voice.income_label' : 'voice.expense', locale)
       showUndo({
         message: `${t('voice.saved', locale)} · ${label} ${money}`,
         undoLabel: t('common.undo', locale),
@@ -402,7 +404,8 @@ export function WalletCaptureDrain() {
         transactionId: savedId ?? null,
         userId,
         title: `${t('siri.notif_title', locale)} · ${money}`,
-        body: `${label} · ${categoryName ?? t('applepay.uncategorised', locale)} · ${t('applepay.tap_to_edit', locale)}`,        merchant,
+        body: `${label} · ${categoryName ?? t('applepay.uncategorised', locale)} · ${t('applepay.tap_to_edit', locale)}`,
+        merchant,
         merchantDomain,
       })
 

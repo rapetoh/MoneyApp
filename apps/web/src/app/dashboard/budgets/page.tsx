@@ -66,9 +66,11 @@ export default function BudgetsPage() {
   const [transactions, setTransactions] = useState<Txn[]>([])
   const [categories, setCategories] = useState<Cat[]>([])
   const [recurringRules, setRecurringRules] = useState<BudgetStatusRule[]>([])
-  const [profile, setProfile] = useState<{ currency_code?: string; locale?: string; timezone?: string } | null>(
-    null,
-  )
+  const [profile, setProfile] = useState<{
+    currency_code?: string
+    locale?: string
+    timezone?: string
+  } | null>(null)
   const [loading, setLoading] = useState(true)
   // `?edit=1[&amount=][&category=]` — Ask Murmur's "Set/Adjust budget"
   // action lands with the form open and prefilled (docs/ask-murmur/SPEC.md §1.4).
@@ -88,7 +90,9 @@ export default function BudgetsPage() {
   const [userId, setUserId] = useState<string | null>(null)
 
   async function load() {
-    const { data: { user } } = await supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
     if (!user) return
     setUserId(user.id)
     const [b, t, c, r, p] = await Promise.all([
@@ -104,14 +108,24 @@ export default function BudgetsPage() {
       // occurrence out of `committed` (fix-plan 2.5).
       supabase
         .from('transactions')
-        .select('amount, amount_in_profile_currency, direction, transacted_at, category_id, recurring_rule_id')
+        .select(
+          'amount, amount_in_profile_currency, direction, transacted_at, category_id, recurring_rule_id',
+        )
         .eq('user_id', user.id)
         .eq('is_deleted', false),
-      supabase.from('categories').select('id, name, kind, color').eq('user_id', user.id).eq('is_archived', false),
+      supabase
+        .from('categories')
+        .select('id, name, kind, color')
+        .eq('user_id', user.id)
+        .eq('is_archived', false),
       // `budgetStatus()`'s `committed` figure — active debit rules due in
       // the window that haven't posted as a transaction yet.
       supabase.from('recurring_rules').select('*').eq('user_id', user.id).eq('is_active', true),
-      supabase.from('profiles').select('currency_code, locale, timezone').eq('id', user.id).single(),
+      supabase
+        .from('profiles')
+        .select('currency_code, locale, timezone')
+        .eq('id', user.id)
+        .single(),
     ])
     const failure = b.error ?? t.error ?? c.error ?? r.error ?? p.error
     setLoadError(failure ? failure.message : null)
@@ -151,13 +165,20 @@ export default function BudgetsPage() {
     }
     setSaving(true)
     setError(null)
-    const { data: { user } } = await supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
     if (!user) return
 
     // Rollover (migration 040): the budget this one replaces hands over
     // what it had carried, so an edit never drops rolled-over money.
     const previous = budgets.find((b) => (b.category_id ?? '') === categoryId) ?? null
-    const carryIn = inheritedCarry(previous ? statusInput(previous) : null, rollover, txnsForStatus, profile?.timezone || 'UTC')
+    const carryIn = inheritedCarry(
+      previous ? statusInput(previous) : null,
+      rollover,
+      txnsForStatus,
+      profile?.timezone || 'UTC',
+    )
 
     // Deactivate the existing active budget in the same scope (overall,
     // or this category) — `.is('category_id', null)`, not
@@ -176,7 +197,9 @@ export default function BudgetsPage() {
       .update({ is_active: false })
       .eq('user_id', user.id)
       .eq('is_active', true)
-    deactivate = categoryId ? deactivate.eq('category_id', categoryId) : deactivate.is('category_id', null)
+    deactivate = categoryId
+      ? deactivate.eq('category_id', categoryId)
+      : deactivate.is('category_id', null)
     const { error: deactivateErr } = await deactivate
     if (deactivateErr) {
       setSaving(false)
@@ -241,7 +264,7 @@ export default function BudgetsPage() {
     () =>
       transactions.map((t) => ({
         ...t,
-        category_kind: t.category_id ? catMap[t.category_id]?.kind ?? null : null,
+        category_kind: t.category_id ? (catMap[t.category_id]?.kind ?? null) : null,
       })),
     [transactions, catMap],
   )
@@ -250,7 +273,10 @@ export default function BudgetsPage() {
     // Prefer a monthly overall — that's the default shape — but fall
     // back to any null-category budget the user set with a different
     // period (weekly, biweekly, quarterly, yearly).
-    return budgets.find((b) => b.category_id === null && b.period === 'monthly') ?? budgets.find((b) => b.category_id === null)
+    return (
+      budgets.find((b) => b.category_id === null && b.period === 'monthly') ??
+      budgets.find((b) => b.category_id === null)
+    )
   }, [budgets])
 
   // One shared implementation (`packages/shared/src/domain/budget.ts`,
@@ -272,7 +298,13 @@ export default function BudgetsPage() {
   // What this period has to spend: the amount plus any rollover carry.
   const overallCap = overallStatus?.available ?? overall?.amount ?? 0
   const overallOver = overall != null && overallSpent > overallCap
-  const overallPct = overall ? (overallCap > 0 ? Math.min(overallSpent / overallCap, 1) : overallSpent > 0 ? 1 : 0) : 0
+  const overallPct = overall
+    ? overallCap > 0
+      ? Math.min(overallSpent / overallCap, 1)
+      : overallSpent > 0
+        ? 1
+        : 0
+    : 0
   const overallRemaining = overall ? Math.max(0, overallCap - overallSpent) : 0
 
   // Buckets by status for the per-category list
@@ -280,11 +312,11 @@ export default function BudgetsPage() {
     return budgets
       .filter((b) => b.category_id !== null)
       .map((b) => {
-        const cName = b.category_id ? catMap[b.category_id]?.name ?? '-' : '-'
+        const cName = b.category_id ? (catMap[b.category_id]?.name ?? '-') : '-'
         // categories.color, not a name-regex guess (fix-plan 4.4) — this
         // is the same hex the category's own row/chip renders elsewhere,
         // so the budget bar can never disagree with it.
-        const cColor = b.category_id ? catMap[b.category_id]?.color ?? null : null
+        const cColor = b.category_id ? (catMap[b.category_id]?.color ?? null) : null
         const status = budgetStatus(statusInput(b), txnsForStatus, recurringRules, tz)
         const spent = status.spent + status.committed
         const cap = status.available
@@ -307,7 +339,9 @@ export default function BudgetsPage() {
   }, [perCat])
 
   const fmtShort = (v: number) =>
-    new Intl.NumberFormat(locale, { style: 'currency', currency, maximumFractionDigits: 0 }).format(v)
+    new Intl.NumberFormat(locale, { style: 'currency', currency, maximumFractionDigits: 0 }).format(
+      v,
+    )
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -345,7 +379,15 @@ export default function BudgetsPage() {
           }}
         >
           <div>
-            <div style={{ fontFamily: font.serif, fontSize: 28, fontWeight: 500, color: colors.ink, letterSpacing: -0.6 }}>
+            <div
+              style={{
+                fontFamily: font.serif,
+                fontSize: 28,
+                fontWeight: 500,
+                color: colors.ink,
+                letterSpacing: -0.6,
+              }}
+            >
               {periodTitle(overall?.period ?? 'monthly', locale)} budgets
             </div>
             <div style={{ fontSize: 13, color: colors.ink3, marginTop: 2 }}>
@@ -364,13 +406,23 @@ export default function BudgetsPage() {
                   {(overallStatus?.committed ?? 0) > 0 && (
                     <>
                       {' '}
-                      · <b style={{ color: colors.ink }}>{fmtShort(overallStatus!.committed)}</b> still due
+                      · <b style={{ color: colors.ink }}>
+                        {fmtShort(overallStatus!.committed)}
+                      </b>{' '}
+                      still due
                     </>
-                  )}
-                  {' '}· <b style={{ color: colors.ink }}>{fmtShort(overallCap)}</b> cap {periodSuffix(overall.period)}
+                  )}{' '}
+                  · <b style={{ color: colors.ink }}>{fmtShort(overallCap)}</b> cap{' '}
+                  {periodSuffix(overall.period)}
                   {(overallStatus?.carryover ?? 0) !== 0 && (
                     <>
-                      {' '}(includes <b style={{ color: colors.ink }}>{overallStatus!.carryover > 0 ? '+' : '\u2212'}{fmtShort(Math.abs(overallStatus!.carryover))}</b> rolled over)
+                      {' '}
+                      (includes{' '}
+                      <b style={{ color: colors.ink }}>
+                        {overallStatus!.carryover > 0 ? '+' : '\u2212'}
+                        {fmtShort(Math.abs(overallStatus!.carryover))}
+                      </b>{' '}
+                      rolled over)
                     </>
                   )}
                   .
@@ -419,7 +471,11 @@ export default function BudgetsPage() {
               </div>
               <div style={styles.field}>
                 <label style={styles.label}>Scope</label>
-                <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} style={styles.select}>
+                <select
+                  value={categoryId}
+                  onChange={(e) => setCategoryId(e.target.value)}
+                  style={styles.select}
+                >
                   <option value="">Overall</option>
                   {categories.map((c) => (
                     <option key={c.id} value={c.id}>
@@ -429,7 +485,15 @@ export default function BudgetsPage() {
                 </select>
               </div>
             </div>
-            <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, margin: '4px 0 14px', cursor: 'pointer' }}>
+            <label
+              style={{
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: 10,
+                margin: '4px 0 14px',
+                cursor: 'pointer',
+              }}
+            >
               <input
                 id="budget-rollover"
                 type="checkbox"
@@ -465,7 +529,14 @@ export default function BudgetsPage() {
           <div style={styles.ringCard}>
             <div style={styles.eyebrow}>Overall</div>
             <svg width="220" height="220" viewBox="0 0 220 220" style={{ margin: '10px 0' }}>
-              <circle cx="110" cy="110" r="88" fill="none" stroke={colors.surface2} strokeWidth="18" />
+              <circle
+                cx="110"
+                cy="110"
+                r="88"
+                fill="none"
+                stroke={colors.surface2}
+                strokeWidth="18"
+              />
               {overall && (
                 <circle
                   cx="110"
@@ -479,7 +550,14 @@ export default function BudgetsPage() {
                   strokeLinecap="round"
                 />
               )}
-              <text x="110" y="100" textAnchor="middle" fontSize="12" fill={colors.ink3} fontWeight="600">
+              <text
+                x="110"
+                y="100"
+                textAnchor="middle"
+                fontSize="12"
+                fill={colors.ink3}
+                fontWeight="600"
+              >
                 {overall ? `${Math.round(overallPct * 100)}% used` : 'No overall budget'}
               </text>
               {/* Gated behind `overall` (fix-plan 2.5's "Done when": the
@@ -501,18 +579,35 @@ export default function BudgetsPage() {
                   >
                     {fmtShort(overallSpent)}
                   </text>
-                  <text x="110" y="148" textAnchor="middle" fontSize="11" fill={colors.ink4} fontWeight="600">
+                  <text
+                    x="110"
+                    y="148"
+                    textAnchor="middle"
+                    fontSize="11"
+                    fill={colors.ink4}
+                    fontWeight="600"
+                  >
                     of {fmtShort(overallCap)}
                   </text>
                 </>
               )}
             </svg>
-            <div style={{ fontSize: 12, color: colors.ink3, textAlign: 'center', lineHeight: 1.5, padding: '0 10px' }}>
+            <div
+              style={{
+                fontSize: 12,
+                color: colors.ink3,
+                textAlign: 'center',
+                lineHeight: 1.5,
+                padding: '0 10px',
+              }}
+            >
               {loadError ? (
                 // Distinct from "no overall budget set yet" (fix-plan 2.13 /
                 // audit 08-F21) — a failed read must not read as an
                 // invitation to set a budget that may already exist.
-                <span style={{ color: colors.destructive, fontWeight: 600 }}>Couldn't load your budget.</span>
+                <span style={{ color: colors.destructive, fontWeight: 600 }}>
+                  Couldn't load your budget.
+                </span>
               ) : overall ? (
                 <>
                   {overallOver ? (
@@ -522,7 +617,8 @@ export default function BudgetsPage() {
                     </>
                   ) : (
                     <>
-                      <b style={{ color: colors.accent }}>{fmtShort(overallRemaining)}</b> remaining {periodSuffix(overall.period)}.
+                      <b style={{ color: colors.accent }}>{fmtShort(overallRemaining)}</b> remaining{' '}
+                      {periodSuffix(overall.period)}.
                     </>
                   )}
                 </>
@@ -537,7 +633,11 @@ export default function BudgetsPage() {
             {loading ? (
               <div style={styles.empty}>Loading…</div>
             ) : loadError ? (
-              <ErrorState message="We couldn't load your budgets." detail={loadError} onRetry={load} />
+              <ErrorState
+                message="We couldn't load your budgets."
+                detail={loadError}
+                onRetry={load}
+              />
             ) : perCat.length === 0 ? (
               <div style={styles.empty}>
                 No category budgets yet. Add one to track spending in a single area.
@@ -561,13 +661,31 @@ export default function BudgetsPage() {
                       borderBottom: i === perCat.length - 1 ? 'none' : `0.5px solid ${colors.line}`,
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        marginBottom: 8,
+                      }}
+                    >
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                         <Chip label={b.name} categoryColor={b.color} />
-                        <span style={{ fontSize: 11, color: colors.ink3, textTransform: 'capitalize' }}>{b.period}</span>
+                        <span
+                          style={{ fontSize: 11, color: colors.ink3, textTransform: 'capitalize' }}
+                        >
+                          {b.period}
+                        </span>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-                        <Money value={b.spent} currency={currency} locale={locale} size={16} serif={false} bold={700} />
+                        <Money
+                          value={b.spent}
+                          currency={currency}
+                          locale={locale}
+                          size={16}
+                          serif={false}
+                          bold={700}
+                        />
                         <span style={{ color: colors.ink4, fontSize: 12, fontWeight: 600 }}>
                           of {fmtShort(b.cap)}
                         </span>
@@ -588,12 +706,23 @@ export default function BudgetsPage() {
                               ? 'Near limit'
                               : `${fmtShort(b.cap - b.spent)} left`}
                         </span>
-                        <button onClick={() => handleRemove(b.id)} style={styles.removeBtn} title="Remove budget">
+                        <button
+                          onClick={() => handleRemove(b.id)}
+                          style={styles.removeBtn}
+                          title="Remove budget"
+                        >
                           ×
                         </button>
                       </div>
                     </div>
-                    <div style={{ height: 8, borderRadius: 4, background: colors.surface2, overflow: 'hidden' }}>
+                    <div
+                      style={{
+                        height: 8,
+                        borderRadius: 4,
+                        background: colors.surface2,
+                        overflow: 'hidden',
+                      }}
+                    >
                       <div
                         style={{
                           width: `${Math.min(b.pct, 1) * 100}%`,
@@ -655,22 +784,32 @@ function monthName(locale: string) {
  *  for a window that has nothing to do with April. */
 function periodTitle(period: BudgetPeriod, locale: string): string {
   switch (period) {
-    case 'weekly':    return 'This week\'s'
-    case 'biweekly':  return 'This fortnight\'s'
-    case 'quarterly': return 'This quarter\'s'
-    case 'yearly':    return 'This year\'s'
-    default:          return monthName(locale)
+    case 'weekly':
+      return "This week's"
+    case 'biweekly':
+      return "This fortnight's"
+    case 'quarterly':
+      return "This quarter's"
+    case 'yearly':
+      return "This year's"
+    default:
+      return monthName(locale)
   }
 }
 
 /** Body-copy suffix that follows "X of Y …" / "Z remaining …". */
 function periodSuffix(period: BudgetPeriod): string {
   switch (period) {
-    case 'weekly':    return 'this week'
-    case 'biweekly':  return 'this fortnight'
-    case 'quarterly': return 'this quarter'
-    case 'yearly':    return 'this year'
-    default:          return 'this month'
+    case 'weekly':
+      return 'this week'
+    case 'biweekly':
+      return 'this fortnight'
+    case 'quarterly':
+      return 'this quarter'
+    case 'yearly':
+      return 'this year'
+    default:
+      return 'this month'
   }
 }
 

@@ -28,7 +28,13 @@ import { NumericAccessory, NUMERIC_ACCESSORY_ID } from '../../src/components/Num
 import { useKeyboardLift } from '../../src/hooks/useKeyboardLift'
 import { Colors, Typography, Spacing, Radius } from '../../src/theme'
 import { t, currencySymbolFor, validateAmount, findRuleForTransaction } from '@voice-expense/shared'
-import type { Transaction, TransactionDirection, PaymentMethod, Locale, RecurringFrequency } from '@voice-expense/shared'
+import type {
+  Transaction,
+  TransactionDirection,
+  PaymentMethod,
+  Locale,
+  RecurringFrequency,
+} from '@voice-expense/shared'
 import { goBack } from '../../src/services/goBack'
 
 const PAYMENT_METHODS: { value: PaymentMethod; key: string }[] = [
@@ -145,8 +151,7 @@ export default function EditTransactionScreen() {
     // (a typo, a one-time adjustment) versus "this is the new amount
     // going forward" (a raise, a price change). Calendar apps prompt
     // for scope on this exact case. We do the same.
-    const isGenerated =
-      txn.source === 'recurring_generated' && linkedRule != null && isRecurring
+    const isGenerated = txn.source === 'recurring_generated' && linkedRule != null && isRecurring
 
     let applyToRule = false
     if (isGenerated) {
@@ -215,7 +220,9 @@ export default function EditTransactionScreen() {
         const uid = user.id
         const categoryName = categories.find((c) => c.id === learned.categoryId)?.name ?? ''
         showUndo({
-          message: t('rules.learned', locale).replace('{merchant}', learned.merchantName).replace('{category}', categoryName),
+          message: t('rules.learned', locale)
+            .replace('{merchant}', learned.merchantName)
+            .replace('{category}', categoryName),
           undoLabel: t('common.undo', locale),
           undo: () => forgetMerchantRule(uid, learned.merchantKey).then(() => undefined),
           durationMs: 5000,
@@ -254,15 +261,28 @@ export default function EditTransactionScreen() {
               style={[styles.directionBtn, direction === 'debit' && styles.directionBtnActive]}
               onPress={() => setDirection('debit')}
             >
-              <Text style={[styles.directionLabel, direction === 'debit' && styles.directionLabelActive]}>
+              <Text
+                style={[
+                  styles.directionLabel,
+                  direction === 'debit' && styles.directionLabelActive,
+                ]}
+              >
                 {t('voice.expense', locale)}
               </Text>
             </Pressable>
             <Pressable
-              style={[styles.directionBtn, direction === 'credit' && styles.directionBtnActiveIncome]}
+              style={[
+                styles.directionBtn,
+                direction === 'credit' && styles.directionBtnActiveIncome,
+              ]}
               onPress={() => setDirection('credit')}
             >
-              <Text style={[styles.directionLabel, direction === 'credit' && styles.directionLabelActiveIncome]}>
+              <Text
+                style={[
+                  styles.directionLabel,
+                  direction === 'credit' && styles.directionLabelActiveIncome,
+                ]}
+              >
                 {t('voice.income_label', locale)}
               </Text>
             </Pressable>
@@ -270,7 +290,9 @@ export default function EditTransactionScreen() {
 
           {/* Amount */}
           <View style={styles.amountContainer}>
-            <Text style={styles.currencySymbol}>{currencySymbolFor(txn?.currency_code || currency)}</Text>
+            <Text style={styles.currencySymbol}>
+              {currencySymbolFor(txn?.currency_code || currency)}
+            </Text>
             <TextInput
               style={styles.amountInput}
               value={amount}
@@ -333,7 +355,12 @@ export default function EditTransactionScreen() {
                       style={[styles.chip, paymentMethod === m.value && styles.chipActive]}
                       onPress={() => setPaymentMethod(m.value)}
                     >
-                      <Text style={[styles.chipLabel, paymentMethod === m.value && styles.chipLabelActive]}>
+                      <Text
+                        style={[
+                          styles.chipLabel,
+                          paymentMethod === m.value && styles.chipLabelActive,
+                        ]}
+                      >
                         {t(m.key, locale)}
                       </Text>
                     </Pressable>
@@ -380,7 +407,12 @@ export default function EditTransactionScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
-  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.background },
+  centered: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.background,
+  },
   flex: { flex: 1 },
   scroll: { flex: 1 },
   content: { padding: Spacing.base, gap: Spacing.base, paddingBottom: Spacing.lg },
@@ -405,10 +437,19 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
   },
-  directionBtn: { flex: 1, paddingVertical: Spacing.sm, alignItems: 'center', borderRadius: Radius.sm },
+  directionBtn: {
+    flex: 1,
+    paddingVertical: Spacing.sm,
+    alignItems: 'center',
+    borderRadius: Radius.sm,
+  },
   directionBtnActive: { backgroundColor: Colors.expense },
   directionBtnActiveIncome: { backgroundColor: Colors.income },
-  directionLabel: { fontFamily: Typography.fontFamily.sansSemiBold, fontSize: Typography.size.sm, color: Colors.textSecondary },
+  directionLabel: {
+    fontFamily: Typography.fontFamily.sansSemiBold,
+    fontSize: Typography.size.sm,
+    color: Colors.textSecondary,
+  },
   directionLabelActive: { color: Colors.white },
   directionLabelActiveIncome: { color: Colors.white },
   amountContainer: {
@@ -421,8 +462,20 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
   },
-  currencySymbol: { fontFamily: Typography.fontFamily.serif, fontSize: Typography.size['2xl'], fontWeight: '600', color: Colors.textSecondary },
-  amountInput: { flex: 1, fontFamily: Typography.fontFamily.serif, fontSize: Typography.size['4xl'], fontWeight: '600', letterSpacing: -0.6, color: Colors.text },
+  currencySymbol: {
+    fontFamily: Typography.fontFamily.serif,
+    fontSize: Typography.size['2xl'],
+    fontWeight: '600',
+    color: Colors.textSecondary,
+  },
+  amountInput: {
+    flex: 1,
+    fontFamily: Typography.fontFamily.serif,
+    fontSize: Typography.size['4xl'],
+    fontWeight: '600',
+    letterSpacing: -0.6,
+    color: Colors.text,
+  },
   fields: { gap: Spacing.base },
   field: { gap: Spacing.xs },
   // fontWeight pairs with fontFamily so this survives a fallback where the
@@ -446,11 +499,31 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
   },
   chipRow: { flexDirection: 'row', gap: Spacing.sm },
-  chip: { paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, borderRadius: Radius.full, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.card },
+  chip: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: Radius.full,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.card,
+  },
   chipActive: { backgroundColor: Colors.primaryLight, borderColor: Colors.primary },
-  chipLabel: { fontFamily: Typography.fontFamily.sans, fontSize: Typography.size.sm, color: Colors.textSecondary },
+  chipLabel: {
+    fontFamily: Typography.fontFamily.sans,
+    fontSize: Typography.size.sm,
+    color: Colors.textSecondary,
+  },
   chipLabelActive: { color: Colors.primary, fontFamily: Typography.fontFamily.sansSemiBold },
-  saveButton: { backgroundColor: Colors.primary, borderRadius: Radius.md, paddingVertical: Spacing.base, alignItems: 'center' },
+  saveButton: {
+    backgroundColor: Colors.primary,
+    borderRadius: Radius.md,
+    paddingVertical: Spacing.base,
+    alignItems: 'center',
+  },
   saveButtonDisabled: { opacity: 0.6 },
-  saveButtonText: { fontFamily: Typography.fontFamily.sansBold, fontSize: Typography.size.base, color: Colors.white },
+  saveButtonText: {
+    fontFamily: Typography.fontFamily.sansBold,
+    fontSize: Typography.size.base,
+    color: Colors.white,
+  },
 })
