@@ -21,9 +21,6 @@ if (Platform.OS === 'ios') {
   }
 }
 
-/** True when the native bridge is present (iOS build with the module). */
-export const walletCaptureBridgeAvailable = native != null
-
 /** Fires when the App Intent has queued a capture — drain now. */
 export function addCaptureAppendedListener(listener: (e: { id: string }) => void): Subscription {
   if (!native) return { remove: () => {} }
