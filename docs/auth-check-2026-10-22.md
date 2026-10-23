@@ -50,6 +50,12 @@ Google blocks embedded windows ("This browser or app may not be secure", verifie
 2. **Email service** for password reset: Supabase's built-in sender only reaches project team addresses, 2 per hour. Connect Resend (or similar) as custom SMTP with `itsmurmur.com` verified.
 3. **Google screen** says "continue to ohaqhwampmyoeaopdybd.supabase.co": fix with a Supabase custom domain (auth.itsmurmur.com, paid add-on) or Google OAuth brand verification.
 4. Only 9 accounts, none new since Sep 20: the sign-up message above is the likely reason on web.
+5. One real Google sign-in on Mac 1.0.2 (needs a real Google account; every step up to Google's own page was verified).
+
+## Housekeeping
+
+- The 6 `murmur.authtest.*@example.com` test accounts used for this check were deleted the same day.
+- The iPhone sign-up fix ships in the next iOS build (1.0.2). Expo's build service was in maintenance on Oct 22; the build is queued as soon as it is back.
 
 ## Notes
 
