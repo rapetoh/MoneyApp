@@ -46,7 +46,7 @@ Google blocks embedded windows ("This browser or app may not be secure", verifie
 
 ## Needs the owner
 
-1. ~~Apple secret~~ **Done Oct 23.** Owner created Sign in with Apple key `USZ8G929WP` (old key `T8NPJNMWB2` file was lost; `D5NYC4452X` belongs to Okili). Secret = ES256 JWT, iss `47WU47J52M`, sub `com.voiceexpense.app.service`, 180 days, set via Management API `external_apple_secret`. Verified: Supabase now gets `invalid_grant` for a fake code instead of `invalid_client`. **Renew before 2027-04-21** with the same key file (keep it safe; Apple never re-downloads it).
+1. ~~Apple secret~~ **Done Oct 23.** Owner created Sign in with Apple key `USZ8G929WP` (old key `T8NPJNMWB2` file was lost; `D5NYC4452X` belongs to Okili). Secret = ES256 JWT, iss `47WU47J52M`, sub `com.voiceexpense.app.service`, 180 days, set via Management API `external_apple_secret`. Verified: Supabase now gets `invalid_grant` for a fake code instead of `invalid_client`. **Renew before 2027-04-21** with the same key file (saved at `keys/AuthKey_USZ8G929WP.p8`, git-ignored by `*.p8`; Apple never re-downloads it).
 2. **Email service** for password reset: Supabase's built-in sender only reaches project team addresses, 2 per hour. Connect Resend (or similar) as custom SMTP with `itsmurmur.com` verified.
 3. **Google screen** says "continue to ohaqhwampmyoeaopdybd.supabase.co": fix with a Supabase custom domain (auth.itsmurmur.com, paid add-on) or Google OAuth brand verification.
 4. Only 9 accounts, none new since Sep 20: the sign-up message above is the likely reason on web.
