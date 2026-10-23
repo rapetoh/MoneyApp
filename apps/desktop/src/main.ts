@@ -43,6 +43,86 @@ function isAllowedNavigation(targetUrl: string): boolean {
 }
 
 /**
+ * Google and Apple sign-in run in the person's own browser, and come back
+ * through the app's local gateway (Oct 22 2026).
+ *
+ * History: 1.0.0 handed the provider to Safari with `shell.openExternal`,
+ * so the session cookie landed in Safari's jar and the app sat on
+ * "Redirecting..." forever. The unreleased 1.0.1 moved the flow into an
+ * in-app window, which Google refuses ("This browser or app may not be
+ * secure": it blocks sign-in from embedded browsers on purpose). The
+ * shape Google requires is the system browser plus a hand-back:
+ *
+ *   app: Continue with Google  ->  browser: Supabase -> Google -> Supabase
+ *   -> browser lands on http://127.0.0.1:<gateway>/auth/callback?code=...
+ *   -> the gateway answers the browser with "return to Murmur" and loads
+ *      that same callback in the app window, where the PKCE code verifier
+ *      cookie lives, so the code is exchanged in the app's own session.
+ *
+ * PKCE is also the safety: a code minted by any flow the app did not start
+ * cannot be exchanged without the verifier the app holds.
+ */
+let externalSignInStartedAt = 0
+/** A browser hand-back is honoured for this long after the app opened one. */
+const EXTERNAL_SIGN_IN_WINDOW_MS = 20 * 60 * 1000
+
+function isAuthFlowStart(targetUrl: string): boolean {
+  try {
+    const u = new URL(targetUrl)
+    return u.protocol === 'https:' && u.hostname.endsWith('.supabase.co') && u.pathname.startsWith('/auth/v1/authorize')
+  } catch {
+    return false
+  }
+}
+
+function startExternalSignIn(authorizeUrl: string): void {
+  externalSignInStartedAt = Date.now()
+  void shell.openExternal(authorizeUrl)
+}
+
+/** Requests from the app's own windows carry Electron's user agent; a hand-
+ *  back arrives from the person's browser, which does not. */
+function isFromAppWindow(req: http.IncomingMessage): boolean {
+  return String(req.headers['user-agent'] ?? '').includes('Electron/')
+}
+
+function isExternalSignInReturn(req: http.IncomingMessage): boolean {
+  return (
+    req.method === 'GET' &&
+    !!req.url &&
+    (req.url === '/auth/callback' || req.url.startsWith('/auth/callback?')) &&
+    !isFromAppWindow(req) &&
+    Date.now() - externalSignInStartedAt < EXTERNAL_SIGN_IN_WINDOW_MS
+  )
+}
+
+function finishExternalSignIn(req: http.IncomingMessage, res: http.ServerResponse): void {
+  externalSignInStartedAt = 0
+  const ok = !new URL(req.url ?? '/', 'http://local').searchParams.has('error')
+  // The app window does the code exchange right after this, so the tab
+  // only says where to look, never that sign-in already succeeded.
+  const title = ok ? 'Go back to Murmur' : 'Sign-in did not finish'
+  const body = ok ? 'Murmur is finishing your sign-in. You can close this tab.' : 'Go back to Murmur and try again.'
+  res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' })
+  res.end(
+    `<!doctype html><html><head><meta charset="utf-8"><title>${title}</title><meta name="viewport" content="width=device-width,initial-scale=1"></head>` +
+      `<body style="margin:0;min-height:100vh;display:grid;place-items:center;background:#F4F1EA;color:#1B1915;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">` +
+      `<div style="text-align:center;padding:32px"><div style="width:56px;height:56px;margin:0 auto 18px;border-radius:16px;background:#3F5A3E"></div>` +
+      `<h1 style="font-size:24px;font-weight:600;margin:0 0 8px">${title}</h1><p style="margin:0;color:#6C675E;font-size:15px">${body}</p></div></body></html>`,
+  )
+  // The app window finishes the exchange in its own session, then the
+  // callback route sends it on to the dashboard (or back to /login with
+  // the error).
+  if (appOrigin && mainWindow && !mainWindow.isDestroyed()) {
+    void mainWindow.loadURL(`${appOrigin}${req.url}`)
+    if (mainWindow.isMinimized()) mainWindow.restore()
+    mainWindow.show()
+    mainWindow.focus()
+    if (process.platform === 'darwin') app.focus({ steal: true })
+  }
+}
+
+/**
  * Blocks a same-frame navigation away from the app shell — the gap
  * `setWindowOpenHandler` below doesn't cover, because that only fires
  * for `window.open`-style new-window requests. A same-frame navigation
@@ -67,6 +147,12 @@ function guardNavigation(contents: Electron.WebContents): void {
   contents.on('will-navigate', (event, targetUrl) => {
     if (isAllowedNavigation(targetUrl)) return
     event.preventDefault()
+    // Sign-in goes to the person's browser and comes back through the
+    // gateway (see startExternalSignIn).
+    if (isAuthFlowStart(targetUrl)) {
+      startExternalSignIn(targetUrl)
+      return
+    }
     if (targetUrl.startsWith('http://') || targetUrl.startsWith('https://')) {
       shell.openExternal(targetUrl)
     }
@@ -146,17 +232,24 @@ function forwardableHeaders(headers: http.IncomingHttpHeaders): http.OutgoingHtt
 }
 
 function proxyTo(
-  target: { transport: typeof http | typeof https; hostname: string; port: number },
+  target: { transport: typeof http | typeof https; hostname: string; port: number; keepHost?: boolean },
   req: http.IncomingMessage,
   res: http.ServerResponse,
 ) {
+  const headers = forwardableHeaders(req.headers)
+  // The embedded Next server must see the address the window actually
+  // uses (the gateway's). Without it, the server builds absolute
+  // redirects on its own internal port: /auth/callback sent the window to
+  // localhost:<next port>, where the sign-in cookie set for the gateway's
+  // origin does not apply and /api/ai is not forwarded (Oct 22 2026).
+  if (target.keepHost && req.headers.host) headers.host = req.headers.host
   const upstream = target.transport.request(
     {
       hostname: target.hostname,
       port: target.port,
       path: req.url,
       method: req.method,
-      headers: forwardableHeaders(req.headers),
+      headers,
     },
     (upstreamRes) => {
       res.writeHead(upstreamRes.statusCode ?? 502, forwardableHeaders(upstreamRes.headers))
@@ -187,10 +280,14 @@ async function startGateway(nextPort: number): Promise<number> {
   const port = await findFreePort()
   const hosted = new URL(HOSTED_API_ORIGIN)
   const server = http.createServer((req, res) => {
+    if (isExternalSignInReturn(req)) {
+      finishExternalSignIn(req, res)
+      return
+    }
     if (req.url?.startsWith(HOSTED_API_PREFIX)) {
       proxyTo({ transport: https, hostname: hosted.hostname, port: 443 }, req, res)
     } else {
-      proxyTo({ transport: http, hostname: HOSTNAME, port: nextPort }, req, res)
+      proxyTo({ transport: http, hostname: HOSTNAME, port: nextPort, keepHost: true }, req, res)
     }
   })
   await new Promise<void>((resolve, reject) => {
@@ -281,10 +378,15 @@ function createWindow(url: string) {
   mainWindow.once('ready-to-show', () => mainWindow?.show())
 
   mainWindow.webContents.setWindowOpenHandler(({ url: openUrl }) => {
-    // External http(s) URLs hand off to the OS browser — never load
-    // them inside the app shell (avoids navigating away from the
-    // embedded Next server and keeps OAuth-style flows in Safari /
-    // Chrome where the user expects them).
+    // Sign-in goes to the person's browser and comes back through the
+    // gateway (see startExternalSignIn).
+    if (isAuthFlowStart(openUrl)) {
+      startExternalSignIn(openUrl)
+      return { action: 'deny' }
+    }
+    // Every other external http(s) URL hands off to the OS browser —
+    // never load one inside the app shell (avoids navigating away from
+    // the embedded Next server).
     if (openUrl.startsWith('http://') || openUrl.startsWith('https://')) {
       shell.openExternal(openUrl)
       return { action: 'deny' }
@@ -322,7 +424,10 @@ async function bootstrap() {
     const nextPort = await startEmbeddedServer()
     const gatewayPort = await startGateway(nextPort)
     appOrigin = `http://${HOSTNAME}:${gatewayPort}`
-    createWindow(`${appOrigin}/`)
+    // The app opens on the dashboard, never the marketing homepage with
+    // its "Get Murmur" download buttons (Oct 22 2026). The dashboard's
+    // server layout sends a signed-out person to /login.
+    createWindow(`${appOrigin}/dashboard`)
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     dialog.showErrorBox('Murmur failed to start', message)

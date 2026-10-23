@@ -43,11 +43,18 @@ export default function SignUpScreen() {
       return
     }
     setLoading(true)
-    const { error } = await signUpWithEmail(email.trim(), password)
-    setLoading(false)
+    const { data, error } = await signUpWithEmail(email.trim(), password)
     if (error) {
+      setLoading(false)
       Alert.alert(t('auth.sign_up_failed', locale), error.message)
+    } else if (data.session) {
+      // Email confirmation is off for this project: the account is live
+      // and signed in now, and the root layout moves on to onboarding the
+      // moment the session lands. The "check your email" screen (until
+      // Oct 22 2026) told people to wait for an email that never comes.
+      // The spinner stays until the layout takes over.
     } else {
+      setLoading(false)
       setDone(true)
     }
   }

@@ -1,7 +1,7 @@
 'use client'
 
 import { usePathname } from 'next/navigation'
-import type { ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { colors, font, radius } from '../lib/theme'
 import { Icon } from './Icons'
 import { PlusRefreshButton } from './PlusRefreshButton'
@@ -10,7 +10,7 @@ import { PlusRefreshButton } from './PlusRefreshButton'
  * The desktop app is part of Murmur Plus (pricing model, Sep 20 2026).
  *
  * The phone stays free forever; the big screen is one of the four things
- * Plus adds. Every new account holds Plus for its first seven days, so a
+ * Plus adds. Every new account holds Plus for its first 14 days, so a
  * new user sees the real dashboard first and this screen only after the
  * trial ends.
  *
@@ -23,6 +23,15 @@ const ALWAYS_OPEN = ['/dashboard/settings']
 
 export function DesktopPlusGate({ isPlus, children }: { isPlus: boolean; children: ReactNode }) {
   const pathname = usePathname() ?? ''
+  // The same screen serves the website and the Mac/Windows app; the
+  // heading names the one the person is actually in (Oct 22 2026: the
+  // website told browser users "The desktop app is part of Plus").
+  // Decided after mount: `window.murmur` exists only in the desktop
+  // shell, and reading it during render would differ from the server.
+  const [inDesktopApp, setInDesktopApp] = useState(false)
+  useEffect(() => {
+    setInDesktopApp(typeof window !== 'undefined' && !!(window as { murmur?: unknown }).murmur)
+  }, [])
   if (isPlus || ALWAYS_OPEN.some((p) => pathname.startsWith(p))) return <>{children}</>
 
   return (
@@ -58,7 +67,7 @@ export function DesktopPlusGate({ isPlus, children }: { isPlus: boolean; childre
           <Icon.sparkle size={24} color={colors.accent} />
         </div>
         <h1 style={{ fontFamily: font.serif, fontSize: 30, fontWeight: 500, color: colors.ink, margin: 0, lineHeight: 1.15 }}>
-          The desktop app is part of Murmur Plus
+          {inDesktopApp ? 'The desktop app is part of Murmur Plus' : 'Murmur on the web is part of Murmur Plus'}
         </h1>
         <p style={{ color: colors.ink3, fontSize: 15, lineHeight: 1.6, margin: '14px 0 0' }}>
           Keep logging on your phone for free, always. Plus adds this screen, Ask Murmur, automatic

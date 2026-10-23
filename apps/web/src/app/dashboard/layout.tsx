@@ -88,7 +88,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         >
           {/* The desktop app is a Plus feature (pricing model, Sep 20
               2026); Settings stays open so any account can be managed and
-              deleted from here. New accounts hold Plus for 7 days, so this
+              deleted from here. New accounts hold Plus for 14 days, so this
               gate only appears once a trial has ended. */}
           <DesktopPlusGate isPlus={isPlus}>{children}</DesktopPlusGate>
         </main>

@@ -53,6 +53,13 @@ const SECTIONS: Array<{ key: SectionKey; label: string }> = [
 
 export default function SettingsPage() {
   const supabase = createClient()
+  // The browser's zone, read after mount: the server renders in UTC, so
+  // reading it during render made the server and browser disagree
+  // (React hydration error #418 on every visit, Oct 22 2026).
+  const [deviceTimeZone, setDeviceTimeZone] = useState<string | null>(null)
+  useEffect(() => {
+    setDeviceTimeZone(Intl.DateTimeFormat().resolvedOptions().timeZone)
+  }, [])
   const [profile, setProfile] = useState<{
     id?: string
     display_name?: string | null
@@ -629,7 +636,7 @@ export default function SettingsPage() {
                   capture has landed, so this never shows a stale 'UTC'. */}
               <SettingRow
                 label="Time zone"
-                sub={profile?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone}
+                sub={profile?.timezone || deviceTimeZone || '-'}
               />
               <div
                 style={{

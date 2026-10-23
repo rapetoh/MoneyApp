@@ -53,8 +53,21 @@ function LoginForm() {
     if (error) {
       setError(error.message)
       setGoogleLoading(false)
+      return
     }
-    // On success, browser redirects — no further action needed
+    // On the web the page now leaves for Google. In the desktop app the
+    // sign-in continues in the person's browser and comes back on its own.
+    afterDesktopHandoff(setGoogleLoading)
+  }
+
+  // Desktop app (window.murmur exists only there): Google and Apple open in
+  // the person's own browser (Google refuses embedded windows), and the app
+  // finishes the sign-in when the browser hands back. Say so, and free the
+  // buttons, so closing that tab never leaves this page stuck on a spinner.
+  function afterDesktopHandoff(setProviderLoading: (v: boolean) => void) {
+    if (!(window as { murmur?: unknown }).murmur) return
+    setSuccess('Continue in your browser. Murmur signs you in here when you finish.')
+    setTimeout(() => setProviderLoading(false), 2500)
   }
 
   // Fix-plan 3.2 / audit 08-F9: the web login page offered exactly one
@@ -74,7 +87,9 @@ function LoginForm() {
     if (error) {
       setError(error.message)
       setAppleLoading(false)
+      return
     }
+    afterDesktopHandoff(setAppleLoading)
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -93,11 +108,19 @@ function LoginForm() {
         router.refresh()
       }
     } else {
-      const { error } = await supabase.auth.signUp({ email, password })
+      const { data, error } = await supabase.auth.signUp({ email, password })
       if (error) {
         setError(error.message)
         setLoading(false)
+      } else if (data.session) {
+        // Email confirmation is off for this project, so the account is
+        // live and signed in the moment it exists. Telling people to
+        // "check your email" here (until Oct 22 2026) sent every new web
+        // sign-up looking for an email that never comes.
+        router.push('/dashboard')
+        router.refresh()
       } else {
+        // Only if confirmation is ever switched on in Supabase.
         setSuccess('Check your email to confirm your account, then sign in.')
         setLoading(false)
         setMode('signin')

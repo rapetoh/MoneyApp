@@ -824,12 +824,22 @@ export function MindMapLens({ props, displayName }: { props: LensProps; displayN
               {props.monthLabel} {props.anchorYear}
             </div>
             <div
+              title={displayName}
               style={{
                 fontFamily: font.serif,
                 fontSize: 24,
                 fontWeight: 500,
                 letterSpacing: -0.5,
                 marginTop: 2,
+                // A long name (an email-derived one has no spaces to wrap
+                // at) stays inside the card instead of spilling across
+                // the map (Oct 22 2026).
+                maxWidth: '100%',
+                padding: '0 14px',
+                boxSizing: 'border-box',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
               }}
             >
               {displayName}
