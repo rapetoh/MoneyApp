@@ -186,7 +186,10 @@ export default function RootLayout() {
     // would fire on that same render and replace the screen with
     // /(tabs)/(onboarding) before the reset form ever appears. The screen
     // owns its own post-success navigation (`router.replace('/(tabs)')`).
-    const isPasswordReset = inAuthGroup && segments[1] === 'reset-password'
+    // `segments` is typed as the matched route's tuple, which is length 1
+    // when typed routes are generated fresh (CI); the runtime array is
+    // longer under (auth).
+    const isPasswordReset = inAuthGroup && (segments as string[])[1] === 'reset-password'
     // Email-confirmation landing (audit M1): /auth/callback exchanges the
     // link's code for a session itself, so it must not be redirected to
     // sign-in while that exchange is in flight.

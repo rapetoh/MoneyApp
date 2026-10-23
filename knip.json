@@ -8,7 +8,10 @@
     "apps/mobile/modules/notification-listener/**",
     "apps/mobile/plugins/**",
     "docs/money-app/project/**",
-    "supabase/functions/**"
+    "supabase/functions/**",
+    // Entry of the generated Deno bundle (scripts/build-shared-deno.mjs
+    // reads it by path); nothing imports it in TypeScript.
+    "packages/shared/src/edge.ts"
   ],
   "workspaces": {
     "apps/mobile": {
