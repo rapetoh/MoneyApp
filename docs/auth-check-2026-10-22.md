@@ -55,7 +55,7 @@ Google blocks embedded windows ("This browser or app may not be secure", verifie
 ## Housekeeping
 
 - The 6 `murmur.authtest.*@example.com` test accounts used for this check were deleted the same day.
-- The iPhone sign-up fix ships in the next iOS build (1.0.2). Expo's build service was in maintenance on Oct 22; the build is queued as soon as it is back.
+- The iPhone sign-up fix is in iOS 1.0.2 (90), built and uploaded from the Mac with Xcode on Oct 23 (Expo's free plan had used its 15 iOS builds for October). Local route: `expo prebuild --clean` with the production env from eas.json, set build number, `xcodebuild archive -allowProvisioningUpdates`, `xcodebuild -exportArchive` with destination upload. The EAS remote build number is 116, so the next EAS build (117) stays above it.
 
 ## Notes
 
