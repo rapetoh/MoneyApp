@@ -105,7 +105,7 @@ const FAQ: { q: string; a: string }[] = [
 // electron-builder stamps the version into it, so this constant has to move
 // with every desktop release or all three buttons 404. It is one edit, and
 // the desktop release runbook (docs/payments.md) names it.
-const DESKTOP_VERSION = '1.0.2'
+const DESKTOP_VERSION = '1.0.3'
 const REL = 'https://github.com/rapetoh/murmur-releases/releases/latest/download/'
 const MAC_DMG_ARM = `${REL}Murmur-${DESKTOP_VERSION}-arm64.dmg`
 const MAC_DMG_INTEL = `${REL}Murmur-${DESKTOP_VERSION}.dmg`
