@@ -22,7 +22,7 @@ Migration: `supabase/migrations/044_businesses.sql` (applied to prod Oct 29 2026
 | Surface | Web | iPhone |
 | --- | --- | --- |
 | Manage (add, rename, delete) | Settings > Businesses | More > Settings > Businesses |
-| Tag while logging by voice | "for the farm" tags it (AI picks only from the person's list) | same, plus a Business row in the voice sheet's edit view |
+| Tag while logging by voice | "for the farm" tags it (AI picks only from the person's list) | same, plus a Business row in the voice sheet's edit view. Siri sentences too ("Hey Siri, log an expense in Murmur" then "40 at Walmart for the farm"): the capture drain sends the list, cold launches read it from the device |
 | Tag when typing | Business field in the transaction form | Business chips in New and Edit |
 | See it | Business column, filter select (`?business=`), heading counts follow the filter | Business name in the row meta line, filter pills on All transactions, a Business row on the detail screen |
 | Move many | Checkboxes + "Move to..." bar | (web only for now) |
@@ -59,5 +59,12 @@ renders only once a business exists.
   (version bump), heading count, Export link keeps the business, edit, CSV +
   PDF per business, CSV import into a business, delete business returns rows
   to Personal.
-- iPhone: simulator run before the 1.0.2 upload (see the release notes in
-  `docs/payments.md` runbook for the Xcode path).
+- Old phones: a sync write without the `business_id` key keeps the tag; a new
+  phone can set it, clear it; an unknown id lands as Personal (5 checks
+  against prod).
+- iPhone 1.0.2 (91), simulator with Maestro: Settings row, add, duplicate
+  refused, rename, delete with confirm, typed entry tagged (synced with the
+  right business), Today and list labels, detail Business row, edit to another
+  business (synced, version 2), filter pills All / Personal / each business.
+- Not run live: speaking into the mic or Siri (the simulator has neither).
+  Both go through the same parser and the 8/8 eval above.

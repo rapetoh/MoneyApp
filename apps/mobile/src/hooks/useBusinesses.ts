@@ -8,6 +8,22 @@ import { DataEvents } from '../events/dataEvents'
 const EMPTY: Business[] = []
 const metaKey = (userId: string) => `businesses:${userId}`
 
+/** The list as last stored on the device: what a cold start (a Siri
+ *  sentence with the app closed) has before the hook has loaded. */
+export async function readCachedBusinesses(userId: string): Promise<Business[]> {
+  try {
+    const db = await getDb()
+    const row = await db.getFirstAsync<{ value: string }>(
+      'SELECT value FROM sync_meta WHERE key = ?',
+      [metaKey(userId)],
+    )
+    const stored = row ? (JSON.parse(row.value) as unknown) : null
+    return Array.isArray(stored) ? (stored as Business[]) : []
+  } catch {
+    return []
+  }
+}
+
 /**
  * The person's businesses (Supabase migration 044, docs/businesses.md).
  * A transaction with no business, or one pointing at a business that no
@@ -53,19 +69,10 @@ export function useBusinesses(userId: string | undefined) {
     if (!userId) return
     let cancelled = false
     ;(async () => {
-      try {
-        const db = await getDb()
-        const row = await db.getFirstAsync<{ value: string }>(
-          'SELECT value FROM sync_meta WHERE key = ?',
-          [metaKey(userId)],
-        )
-        const stored = row ? (JSON.parse(row.value) as Business[]) : null
-        // Only fills an empty cache: a fresher server answer always wins.
-        if (!cancelled && stored && Array.isArray(stored) && !cacheHas(`businesses:${userId}`)) {
-          setBusinesses(stored)
-        }
-      } catch {
-        /* nothing stored yet */
+      const stored = await readCachedBusinesses(userId)
+      // Only fills an empty cache: a fresher server answer always wins.
+      if (!cancelled && stored.length > 0 && !cacheHas(`businesses:${userId}`)) {
+        setBusinesses(stored)
       }
       await fetch()
     })()

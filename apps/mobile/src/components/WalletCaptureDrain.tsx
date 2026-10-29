@@ -24,6 +24,7 @@ import { AppState } from 'react-native'
 import { useAuth } from '../hooks/useAuth'
 import { useProfile } from '../hooks/useProfile'
 import { useCategories } from '../hooks/useCategories'
+import { useBusinesses, readCachedBusinesses } from '../hooks/useBusinesses'
 import { useTransactions, deleteTransactionAndEnqueue } from '../hooks/useTransactions'
 import { useUndo } from '../hooks/useUndo'
 import { getApiUrl } from '../hooks/useApiUrl'
@@ -80,10 +81,11 @@ export function WalletCaptureDrain() {
   const { categories } = useCategories(userId)
   const { createTransaction } = useTransactions(userId)
   const { showUndo } = useUndo()
+  const { businesses } = useBusinesses(userId)
 
   // Latest values for the async drain without re-subscribing.
-  const ref = useRef({ userId, profile, categories, createTransaction, showUndo })
-  ref.current = { userId, profile, categories, createTransaction, showUndo }
+  const ref = useRef({ userId, profile, categories, createTransaction, showUndo, businesses })
+  ref.current = { userId, profile, categories, createTransaction, showUndo, businesses }
 
   // Keep the on-disk copy of the three fields a background capture needs
   // in step with the profile. Siri and Apple Pay run with the app cold,
@@ -298,6 +300,12 @@ export function WalletCaptureDrain() {
       const { createTransaction, showUndo, userId } = ref.current
       if (!userId) return null
       const { currency: profileCurrency, locale, tz, categories } = prefs()
+      // "for the farm" files it there, as it does from the microphone
+      // (docs/businesses.md). Cold from Siri the hook has not loaded yet,
+      // so the copy on disk stands in.
+      const businesses = ref.current.businesses.length
+        ? ref.current.businesses
+        : await readCachedBusinesses(userId)
 
       let parsed: Awaited<ReturnType<typeof parseExpense>> | null = null
       try {
@@ -312,6 +320,7 @@ export function WalletCaptureDrain() {
             locale: locale as never,
             currency: profileCurrency,
             categories: categories.map((c) => c.name),
+            businesses: businesses.map((b) => b.name),
             apiBaseUrl,
             authToken: token,
             userId,
@@ -353,12 +362,17 @@ export function WalletCaptureDrain() {
         parsed?.direction ??
         deriveDirectionFromFlowType(entry.hint === 'income' ? 'income' : 'expense')
       const isIncome = direction === 'credit'
+      const spokenBusiness = parsed?.business?.toLowerCase()
+      const businessId = spokenBusiness
+        ? (businesses.find((b) => b.name.toLowerCase() === spokenBusiness)?.id ?? null)
+        : null
 
       const result = await createTransaction({
         amount,
         direction,
         currency_code: currency,
         merchant,
+        business_id: businessId,
         note: parsed?.note ?? null,
         category_id: categoryId,
         merchant_domain: merchantDomain,

@@ -293,6 +293,7 @@ export default function TransactionsScreen() {
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
+              style={styles.pillScroll}
               contentContainerStyle={styles.pillRow}
             >
               {[
@@ -330,6 +331,7 @@ export default function TransactionsScreen() {
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
+              style={styles.pillScroll}
               contentContainerStyle={styles.pillRow}
             >
               <Pressable
@@ -597,9 +599,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
   },
+  // Pill rows run to the screen edges so a cut-off last pill reads as
+  // "scroll for more", not as a clipped layout.
+  pillScroll: { marginHorizontal: -Spacing.base },
   pillRow: {
     gap: Spacing.sm,
     paddingBottom: 2,
+    paddingHorizontal: Spacing.base,
   },
   pill: {
     flexDirection: 'row',
