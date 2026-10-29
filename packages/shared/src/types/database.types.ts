@@ -238,6 +238,30 @@ export type Database = {
           },
         ]
       }
+      businesses: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       categories: {
         Row: {
           client_id: string
@@ -834,6 +858,7 @@ export type Database = {
           ai_confidence: number | null
           amount: number
           amount_in_profile_currency: number | null
+          business_id: string | null
           category_id: string | null
           client_created_at: string
           client_id: string
@@ -867,6 +892,7 @@ export type Database = {
           ai_confidence?: number | null
           amount: number
           amount_in_profile_currency?: number | null
+          business_id?: string | null
           category_id?: string | null
           client_created_at: string
           client_id: string
@@ -900,6 +926,7 @@ export type Database = {
           ai_confidence?: number | null
           amount?: number
           amount_in_profile_currency?: number | null
+          business_id?: string | null
           category_id?: string | null
           client_created_at?: string
           client_id?: string
@@ -931,6 +958,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: 'transactions_business_id_fkey'
+            columns: ['business_id']
+            isOneToOne: false
+            referencedRelation: 'businesses'
+            referencedColumns: ['id']
+          },
+          {
             foreignKeyName: 'transactions_category_id_fkey'
             columns: ['category_id']
             isOneToOne: false
@@ -951,13 +985,19 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      delete_business: { Args: { p_business_id: string }; Returns: number }
       recompute_monthly_income: { Args: { p_user: string }; Returns: undefined }
+      set_transactions_business: {
+        Args: { p_business_id: string | null; p_ids: string[] }
+        Returns: number
+      }
       sync_upsert_transaction: {
         Args: { payload: Json }
         Returns: {
           ai_confidence: number | null
           amount: number
           amount_in_profile_currency: number | null
+          business_id: string | null
           category_id: string | null
           client_created_at: string
           client_id: string

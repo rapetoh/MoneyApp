@@ -469,6 +469,9 @@ export function validateParsedExpense(
   const needsClarification = r.needs_clarification === true
   const clarifyingQuestion = needsClarification ? trimmedStringOrNull(r.clarifying_question) : null
   const isRecurringSuggestion = r.is_recurring_suggestion === true
+  // Only present when the request listed businesses; the route checks it
+  // against that list before answering.
+  const business = trimmedStringOrNull(r.business)
 
   if (errors.length > 0) {
     return { rejected: true, errors }
@@ -494,6 +497,7 @@ export function validateParsedExpense(
     // is_recurring_suggestion is false") rather than trusting the model to
     // keep the two fields consistent.
     recurring_frequency_suggestion: isRecurringSuggestion ? recurringFrequencySuggestion : null,
+    ...(business ? { business } : {}),
   }
 }
 

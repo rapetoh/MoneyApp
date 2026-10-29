@@ -13,6 +13,9 @@ interface Props {
   categoryName?: string | null
   /** Color for the category chip (defaults to ink3 when absent). Accepts hex. */
   categoryColor?: string | null
+  /** The business this row belongs to (migration 044); omitted for Personal
+   *  and for people without businesses. */
+  businessName?: string | null
   currency: string
   locale?: Locale
   /** If true, renders a hairline divider above the row (matches the stacked list style in Today). */
@@ -42,6 +45,7 @@ export function TransactionRow({
   transaction,
   categoryName,
   categoryColor,
+  businessName,
   currency,
   locale = 'en',
   showDivider = false,
@@ -97,6 +101,14 @@ export function TransactionRow({
               </View>
             ) : null}
             {categoryName ? <Text style={styles.metaDot}>·</Text> : null}
+            {businessName ? (
+              <>
+                <Text style={styles.metaBusiness} numberOfLines={1}>
+                  {businessName}
+                </Text>
+                <Text style={styles.metaDot}>·</Text>
+              </>
+            ) : null}
             {/* Engine-generated rows get the shared source-label vocabulary
                 (fix-plan 2.12) — a distinct fact from the repeat glyph
                 above, which marks "this transaction belongs to a
@@ -133,6 +145,12 @@ export function TransactionRow({
 }
 
 const styles = StyleSheet.create({
+  metaBusiness: {
+    fontFamily: Typography.fontFamily.sansSemiBold,
+    fontSize: 12,
+    color: Colors.ink2,
+    flexShrink: 1,
+  },
   row: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -52,6 +52,9 @@ export const TRANSACTION_COLUMNS = [
   // `upsertTransaction`'s note on why this is derived rather than read
   // straight from `txn` until every local writer supplies it.
   { name: 'occurrence_date', ddl: 'TEXT' },
+  // The business this money belongs to (Supabase migration 044); NULL is
+  // Personal.
+  { name: 'business_id', ddl: 'TEXT' },
   { name: 'client_id', ddl: 'TEXT NOT NULL' },
   { name: 'client_created_at', ddl: 'TEXT NOT NULL' },
   { name: 'version', ddl: 'INTEGER NOT NULL DEFAULT 1' },
@@ -306,6 +309,7 @@ export const MIGRATIONS: ReadonlyArray<(db: SchemaDb) => Promise<void>> = [
   consolidateLegacySchemaV1,
   addSyncContractV2,
   addOccurrenceDateColumnV3,
+  addBusinessIdV4,
 ]
 
 /** The version a fully-migrated database reports. Grows by appending to MIGRATIONS. */
@@ -533,6 +537,25 @@ async function addOccurrenceDateColumnV3(db: SchemaDb): Promise<void> {
     WHERE recurring_rule_id IS NOT NULL AND occurrence_date IS NULL
   `)
   await db.execAsync(RECURRING_DEDUP_INDEX_SQL)
+}
+
+/**
+ * v3 -> v4 (Oct 27 2026): transactions.business_id (Supabase migration 044).
+ *
+ * Rows pulled before this version arrived without their business: the old
+ * upsert had no such column. The transactions pull cursor is forgotten so
+ * the next pull re-reads every row once and fills it in; otherwise an edit
+ * made on this phone would push "Personal" over a business set on the web.
+ */
+async function addBusinessIdV4(db: SchemaDb): Promise<void> {
+  const live = await db.getAllAsync<{ name: string }>('PRAGMA table_info(transactions)')
+  if (!live.some((c) => c.name === 'business_id')) {
+    await db.execAsync('ALTER TABLE transactions ADD COLUMN business_id TEXT')
+  }
+  const meta = await db.getFirstAsync<{ name: string }>(
+    "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'sync_meta'",
+  )
+  if (meta) await db.execAsync("DELETE FROM sync_meta WHERE key = 'cursor:transaction'")
 }
 
 /**

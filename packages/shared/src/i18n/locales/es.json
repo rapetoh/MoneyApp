@@ -883,5 +883,19 @@
   "import.found_one": "1 transacción encontrada",
   "import.done_title_one": "1 transacción importada",
   "import.run_one": "Importar 1 transacción",
-  "import.skipped_one": "Se omitirá 1 línea sin fecha o importe."
+  "import.skipped_one": "Se omitirá 1 línea sin fecha o importe.",
+  "business.label": "Negocio",
+  "business.personal": "Personal",
+  "business.title": "Negocios",
+  "business.subtitle": "Separa una granja, una tienda o un trabajo extra de tus gastos personales. Etiqueta cualquier movimiento, o dilo al registrarlo (\"para la granja\"). Lo que no tiene etiqueta es Personal.",
+  "business.add_placeholder": "Nombra un negocio, p. ej. Granja",
+  "business.add": "Añadir",
+  "business.rename": "Renombrar",
+  "business.delete": "Eliminar",
+  "business.delete_title": "¿Eliminar {name}?",
+  "business.delete_body": "Sus movimientos vuelven a Personal. No se pierde nada.",
+  "business.duplicate": "Ya tienes un negocio con ese nombre.",
+  "business.all": "Todos",
+  "settings.businesses": "Negocios",
+  "settings.businesses_detail": "Separa tus negocios de tus gastos personales"
 }

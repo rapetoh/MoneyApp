@@ -50,6 +50,7 @@ function rowToTransaction(row: Record<string, unknown>, tz: string): Transaction
     // Not a stored local column — see `getDeviceTimeZone`'s docstring above.
     local_day: localDay(row.transacted_at as string, tz),
     occurrence_date: (row.occurrence_date as string) ?? null,
+    business_id: (row.business_id as string) ?? null,
     source: row.source as Transaction['source'],
     raw_transcript: (row.raw_transcript as string) ?? null,
     ai_confidence: (row.ai_confidence as number) ?? null,
@@ -113,6 +114,7 @@ export async function upsertTransaction(txn: Transaction): Promise<void> {
     // not a behaviour change, for every writer that still goes through
     // this function without supplying the real value.
     occurrence_date: txn.transacted_at.slice(0, 10),
+    business_id: txn.business_id ?? null,
     client_id: txn.client_id,
     client_created_at: txn.client_created_at,
     version: txn.version,
@@ -160,6 +162,7 @@ export async function upsertTransaction(txn: Transaction): Promise<void> {
       recurring_rule_id = excluded.recurring_rule_id,
       recurring_frequency = excluded.recurring_frequency,
       occurrence_date = excluded.occurrence_date,
+      business_id = excluded.business_id,
       version = excluded.version,
       is_deleted = excluded.is_deleted,
       deleted_at = excluded.deleted_at,
@@ -208,6 +211,8 @@ const UPDATABLE_TRANSACTION_FIELDS = new Set<string>([
   'direction',
   'is_recurring',
   'recurring_frequency',
+  // Oct 27, 2026: the business this money belongs to (migration 044).
+  'business_id',
 ])
 
 export async function updateTransactionFields(
@@ -225,6 +230,7 @@ export async function updateTransactionFields(
       | 'direction'
       | 'is_recurring'
       | 'recurring_frequency'
+      | 'business_id'
     >
   >,
 ): Promise<void> {

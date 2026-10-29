@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { createClient } from '../../../lib/supabase/client'
 import { colors, font, radius } from '../../../lib/theme'
 import { Toolbar } from '../../../components/Toolbar'
+import { useBusinesses } from '../../../lib/businesses'
 import { identifyMerchants } from '@voice-expense/ai'
 import {
   parseCsv,
@@ -109,6 +110,9 @@ export default function ImportPage() {
   const [file, setFile] = useState<Loaded | null>(null)
   const [statements, setStatements] = useState<Statements | null>(null)
   const [includeTransfers, setIncludeTransfers] = useState(false)
+  // Which business this batch belongs to (migration 044); '' is Personal.
+  const { businesses } = useBusinesses()
+  const [importBusiness, setImportBusiness] = useState('')
   const [includeDuplicates, setIncludeDuplicates] = useState(false)
   const [progress, setProgress] = useState<string | null>(null)
   const [result, setResult] = useState<{ count: number; held: number } | null>(null)
@@ -371,8 +375,8 @@ export default function ImportPage() {
         })
       : new Map()
     const nowIso = new Date().toISOString()
-    const txns = reading.toImport.map((r) =>
-      importTransaction(r, identities.get(r.description.slice(0, 120).trim()), {
+    const txns = reading.toImport.map((r) => ({
+      ...importTransaction(r, identities.get(r.description.slice(0, 120).trim()), {
         userId,
         categories,
         rules,
@@ -381,7 +385,8 @@ export default function ImportPage() {
         nowIso,
         newId: () => crypto.randomUUID(),
       }),
-    )
+      business_id: importBusiness || null,
+    }))
     let saved = 0
     for (let i = 0; i < txns.length; i += CHUNK) {
       setProgress(`Saving ${i} / ${txns.length}`)
@@ -534,6 +539,24 @@ export default function ImportPage() {
               <div style={s.note}>Not read: {statements.failed.join(', ')}.</div>
             )}
 
+            {businesses.length > 0 && (
+              <label style={s.field}>
+                <span style={s.label}>These transactions belong to</span>
+                <select
+                  style={s.select}
+                  value={importBusiness}
+                  onChange={(e) => setImportBusiness(e.target.value)}
+                >
+                  <option value="">Personal</option>
+                  {businesses.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+
             <button
               style={{ ...s.primary, opacity: reading.toImport.length ? 1 : 0.4 }}
               disabled={!reading.toImport.length}
@@ -658,6 +681,24 @@ export default function ImportPage() {
                 {reading.skipped.length === 1 ? '1 line' : `${reading.skipped.length} lines`}{' '}
                 without a date or amount will be skipped.
               </div>
+            )}
+
+            {businesses.length > 0 && (
+              <label style={s.field}>
+                <span style={s.label}>These transactions belong to</span>
+                <select
+                  style={s.select}
+                  value={importBusiness}
+                  onChange={(e) => setImportBusiness(e.target.value)}
+                >
+                  <option value="">Personal</option>
+                  {businesses.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
             )}
 
             <button

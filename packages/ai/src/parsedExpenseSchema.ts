@@ -72,3 +72,17 @@ export const PARSED_EXPENSE_JSON_SCHEMA = {
     ],
   },
 } as const
+
+/** The same schema plus `business`, sent only when the person has
+ *  businesses (migration 044), so everyone else's parse is unchanged. */
+export const PARSED_EXPENSE_WITH_BUSINESS_JSON_SCHEMA = {
+  ...PARSED_EXPENSE_JSON_SCHEMA,
+  schema: {
+    ...PARSED_EXPENSE_JSON_SCHEMA.schema,
+    properties: {
+      ...PARSED_EXPENSE_JSON_SCHEMA.schema.properties,
+      business: { type: ['string', 'null'] },
+    },
+    required: [...PARSED_EXPENSE_JSON_SCHEMA.schema.required, 'business'],
+  },
+} as const

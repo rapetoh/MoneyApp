@@ -24,6 +24,7 @@ import { Colors, Typography, Spacing, Radius, Hairline } from '../../src/theme'
 import { BottomSheet } from '../../src/components/BottomSheet'
 import { t, monthBounds, monthIso, formatMoney, type Locale } from '@voice-expense/shared'
 import type { Transaction } from '@voice-expense/shared'
+import { useBusinesses } from '../../src/hooks/useBusinesses'
 
 /** "2026-04" from the History calendar / Ask Murmur — validated to a month
  *  key; bounds are resolved in the user's zone with `monthBounds`. */
@@ -80,6 +81,9 @@ export default function TransactionsScreen() {
   // from a genuine outage.
   const { transactions, loading, error } = useTransactions(user?.id)
   const { categories, categoryMap } = useCategories(user?.id)
+  // Businesses (migration 044): 'all', 'personal', or a business id.
+  const { businesses, byId: businessById } = useBusinesses(user?.id)
+  const [selectedBusiness, setSelectedBusiness] = useState<string>('all')
   const { profile } = useProfile(user?.id)
   const { refreshing, onRefresh } = useManualRefresh(user?.id)
   const router = useRouter()
@@ -151,8 +155,24 @@ export default function TransactionsScreen() {
       result = result.filter((txn) => txn.category_id === selectedCategoryId)
     }
 
+    if (selectedBusiness !== 'all') {
+      result = result.filter((txn) => {
+        const id = txn.business_id && businessById.has(txn.business_id) ? txn.business_id : null
+        return selectedBusiness === 'personal' ? id === null : id === selectedBusiness
+      })
+    }
+
     return result
-  }, [transactions, search, selectedCategoryId, categoryMap, view, monthFilter])
+  }, [
+    transactions,
+    search,
+    selectedCategoryId,
+    categoryMap,
+    view,
+    monthFilter,
+    selectedBusiness,
+    businessById,
+  ])
 
   const sections = useMemo(() => groupByDate(filtered, locale), [filtered, locale])
   // Summary for the current scope — count + total, so the number the user
@@ -268,6 +288,43 @@ export default function TransactionsScreen() {
             clearButtonMode="while-editing"
           />
 
+          {/* Business pills (migration 044): only once the person has one. */}
+          {businesses.length > 0 && (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.pillRow}
+            >
+              {[
+                { id: 'all', name: t('business.all', locale) },
+                { id: 'personal', name: t('business.personal', locale) },
+                ...businesses,
+              ].map((b) => {
+                const active = selectedBusiness === b.id
+                return (
+                  <Pressable
+                    key={b.id}
+                    style={[styles.pill, active && styles.pillActive]}
+                    onPress={() => setSelectedBusiness(b.id)}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: active }}
+                  >
+                    {b.id !== 'all' && b.id !== 'personal' && (
+                      <Ionicons
+                        name="briefcase-outline"
+                        size={12}
+                        color={active ? Colors.white : Colors.ink3}
+                      />
+                    )}
+                    <Text style={[styles.pillLabel, active && styles.pillLabelActive]}>
+                      {b.name}
+                    </Text>
+                  </Pressable>
+                )
+              })}
+            </ScrollView>
+          )}
+
           {/* Category filter pills — only relevant on expenses view */}
           {view === 'expenses' && usedCategories.length > 0 && (
             <ScrollView
@@ -374,6 +431,9 @@ export default function TransactionsScreen() {
                   <TransactionRow
                     transaction={item}
                     categoryName={item.category_id ? categoryMap[item.category_id]?.name : null}
+                    businessName={
+                      item.business_id ? businessById.get(item.business_id)?.name : null
+                    }
                     currency={currency}
                     locale={locale}
                     onPress={() => router.push(`/transaction/${item.id}`)}

@@ -6,6 +6,9 @@ export interface ParseOptions {
   locale: Locale
   currency: string
   categories: string[]
+  /** The person's business names (migration 044). Sent only when non-empty,
+   *  so a person without businesses gets exactly the old request. */
+  businesses?: string[]
   apiBaseUrl: string
   authToken: string
   /** The signed-in user's id. Part of the cache key (see `cacheKey` below)
@@ -49,14 +52,15 @@ function epochDayBucket(): number {
 function cacheKey(
   opts: Pick<
     ParseOptions,
-    'transcript' | 'locale' | 'currency' | 'categories' | 'userId' | 'todayCivilDate'
+    'transcript' | 'locale' | 'currency' | 'categories' | 'businesses' | 'userId' | 'todayCivilDate'
   >,
 ): string {
   const sortedCategories = [...opts.categories].sort().join(',')
+  const sortedBusinesses = [...(opts.businesses ?? [])].sort().join(',')
   // The user's civil date participates too: when it's supplied it drives
   // the prompt's "today", so two parses across the user's own midnight
   // must not share an entry even inside one epoch-day bucket.
-  return `${opts.userId ?? ''}:${opts.locale}:${opts.currency}:${sortedCategories}:${epochDayBucket()}:${opts.todayCivilDate ?? ''}:${opts.transcript.toLowerCase().trim()}`
+  return `${opts.userId ?? ''}:${opts.locale}:${opts.currency}:${sortedCategories}:${sortedBusinesses}:${epochDayBucket()}:${opts.todayCivilDate ?? ''}:${opts.transcript.toLowerCase().trim()}`
 }
 
 /** Sign-out teardown (fix-plan item 1.7 / audit 02-F24's second half): a
@@ -104,6 +108,7 @@ export async function parseExpense(opts: ParseOptions): Promise<ParsedExpense> {
       locale: opts.locale,
       currency: opts.currency,
       categories: opts.categories,
+      ...(opts.businesses?.length ? { businesses: opts.businesses } : {}),
       todayCivilDate: opts.todayCivilDate,
     }),
   })

@@ -62,6 +62,9 @@ export interface ExportableTransaction {
   transacted_at: string
   fx_rate_to_profile?: number | null
   fx_rate_date?: string | null
+  /** The business name this row belongs to (migration 044); null/absent is
+   *  Personal. Resolved by the caller, which holds the business list. */
+  business?: string | null
 }
 
 export interface ExportCategory {
@@ -112,6 +115,8 @@ export interface ExportRow {
   source: string
   note: string
   isRecurring: boolean
+  /** Business name, or 'Personal'. */
+  business: string
 }
 
 export interface BuildExportInput {
@@ -189,6 +194,7 @@ export function buildExport(input: BuildExportInput): ExportResult {
         paymentMethod: t.payment_method ?? '',
         source: t.source ?? '',
         note: t.note ?? '',
+        business: t.business || 'Personal',
         isRecurring: !!t.is_recurring,
       }
     })

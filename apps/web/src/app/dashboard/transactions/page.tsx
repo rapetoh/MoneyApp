@@ -22,6 +22,13 @@ import { MonthPicker } from '../../../components/MonthPicker'
 import { ErrorState } from '../../../components/ErrorState'
 import { currentMonthIso } from '../../../lib/monthIso'
 import { useRealtime } from '../../../lib/useRealtime'
+import {
+  useBusinesses,
+  matchesBusiness,
+  businessName,
+  PERSONAL,
+  type BusinessFilter,
+} from '../../../lib/businesses'
 
 type Txn = {
   id: string
@@ -39,6 +46,7 @@ type Txn = {
   version?: number | null
   fx_rate_to_profile?: number | null
   amount_in_profile_currency?: number | null
+  business_id?: string | null
 }
 type Cat = { id: string; name: string; color?: string | null }
 
@@ -165,6 +173,18 @@ export default function TransactionsPage() {
   const [fCurrency, setFCurrency] = useState('USD')
   const [formError, setFormError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  // Businesses (migration 044, docs/businesses.md): a second label next to
+  // the category. Everything below stays hidden until one exists.
+  const { businesses, assign } = useBusinesses()
+  const knownBusinessIds = useMemo(() => new Set(businesses.map((b) => b.id)), [businesses])
+  const [businessFilter, setBusinessFilter] = useState<BusinessFilter>(
+    searchParams.get('business') ?? 'all',
+  )
+  const [fBusinessId, setFBusinessId] = useState('')
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [moveTarget, setMoveTarget] = useState('')
+  const [moving, setMoving] = useState(false)
+  const [moveError, setMoveError] = useState<string | null>(null)
 
   // Re-sync the in-page search when the toolbar pushes a new ?q= via the
   // global search field. Without this, navigating from another tab to
@@ -254,6 +274,14 @@ export default function TransactionsPage() {
     setFPayment('')
     setFDate(toLocalInputValue(new Date().toISOString()))
     setFCurrency(profile?.currency_code ?? 'USD')
+    // Adding while looking at one business files it there.
+    setFBusinessId(
+      businessFilter !== 'all' &&
+        businessFilter !== PERSONAL &&
+        knownBusinessIds.has(businessFilter)
+        ? businessFilter
+        : '',
+    )
     setFormError(null)
     setShowForm(true)
   }
@@ -269,6 +297,7 @@ export default function TransactionsPage() {
     setFPayment(t.payment_method ?? '')
     setFDate(toLocalInputValue(t.transacted_at))
     setFCurrency(t.currency_code || (profile?.currency_code ?? 'USD'))
+    setFBusinessId(t.business_id && knownBusinessIds.has(t.business_id) ? t.business_id : '')
     setFormError(null)
     setShowForm(true)
   }
@@ -342,6 +371,7 @@ export default function TransactionsPage() {
       category_id: cat.id,
       payment_method: fPayment || null,
       transacted_at: transactedAt,
+      business_id: fBusinessId || null,
     }
 
     if (editingId) {
@@ -488,6 +518,7 @@ export default function TransactionsPage() {
   const filtered = useMemo(() => {
     return transactions.filter((t) => {
       if (!matchesFilter(t, filter)) return false
+      if (!matchesBusiness(t.business_id, businessFilter, knownBusinessIds)) return false
       if (monthFilterActive) {
         const d = new Date(t.transacted_at)
         if (d < monthStart || d > monthEnd) return false
@@ -502,20 +533,67 @@ export default function TransactionsPage() {
       }
       return true
     })
-  }, [transactions, search, filter, monthFilterActive, monthStart, monthEnd])
+  }, [
+    transactions,
+    search,
+    filter,
+    monthFilterActive,
+    monthStart,
+    monthEnd,
+    businessFilter,
+    knownBusinessIds,
+  ])
+
+  function pickBusiness(value: BusinessFilter) {
+    setBusinessFilter(value)
+    setSelected(new Set())
+    const params = new URLSearchParams(searchParams.toString())
+    if (value === 'all') params.delete('business')
+    else params.set('business', value)
+    const qs = params.toString()
+    router.push(qs ? `${pathname}?${qs}` : pathname)
+  }
+
+  function toggleSelected(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  async function moveSelected() {
+    if (!selected.size || !moveTarget) return
+    setMoving(true)
+    setMoveError(null)
+    const e = await assign([...selected], moveTarget === PERSONAL ? null : moveTarget)
+    setMoving(false)
+    if (e) {
+      setMoveError(e)
+      return
+    }
+    setSelected(new Set())
+    setMoveTarget('')
+    await load()
+  }
+
+  const showBusinesses = businesses.length > 0
+  const allShownSelected = filtered.length > 0 && filtered.every((t) => selected.has(t.id))
 
   // Subtitle counts. When a month filter is active we count just that
   // month so the subtitle reflects what the user sees; when "All time" we
-  // count everything in the dataset.
+  // count everything in the dataset. A business filter scopes the counts
+  // too: looking at the farm, the heading counts the farm.
   const sourceSet = useMemo(
     () =>
-      monthFilterActive
-        ? transactions.filter((t) => {
-            const d = new Date(t.transacted_at)
-            return d >= monthStart && d <= monthEnd
-          })
-        : transactions,
-    [transactions, monthFilterActive, monthStart, monthEnd],
+      transactions.filter((t) => {
+        if (!matchesBusiness(t.business_id, businessFilter, knownBusinessIds)) return false
+        if (!monthFilterActive) return true
+        const d = new Date(t.transacted_at)
+        return d >= monthStart && d <= monthEnd
+      }),
+    [transactions, monthFilterActive, monthStart, monthEnd, businessFilter, knownBusinessIds],
   )
   const counts = useMemo(() => {
     let voice = 0
@@ -582,7 +660,11 @@ export default function TransactionsPage() {
               Add transaction
             </button>
             <Link
-              href="/dashboard/export"
+              href={
+                businessFilter === 'all'
+                  ? '/dashboard/export'
+                  : `/dashboard/export?business=${encodeURIComponent(businessFilter)}`
+              }
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -615,6 +697,22 @@ export default function TransactionsPage() {
             </div>
           </div>
           <div style={styles.filterTabs}>
+            {showBusinesses && (
+              <select
+                value={businessFilter}
+                onChange={(e) => pickBusiness(e.target.value)}
+                style={styles.businessSelect}
+                aria-label="Business"
+              >
+                <option value="all">All businesses</option>
+                <option value={PERSONAL}>Personal</option>
+                {businesses.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name}
+                  </option>
+                ))}
+              </select>
+            )}
             {FILTERS.map((f) => {
               const on = f.key === filter
               return (
@@ -717,6 +815,23 @@ export default function TransactionsPage() {
                   />
                 </div>
               )}
+              {showBusinesses && (
+                <div style={styles.field}>
+                  <label style={styles.label}>Business</label>
+                  <select
+                    value={fBusinessId}
+                    onChange={(e) => setFBusinessId(e.target.value)}
+                    style={styles.select}
+                  >
+                    <option value="">Personal</option>
+                    {businesses.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <div style={styles.field}>
                 <label style={styles.label}>Payment method</label>
                 <select
@@ -774,14 +889,61 @@ export default function TransactionsPage() {
           </div>
         )}
 
+        {showBusinesses && selected.size > 0 && (
+          <div style={styles.selectionBar}>
+            <span style={{ fontWeight: 700, color: colors.ink }}>
+              {selected.size === 1 ? '1 selected' : `${selected.size} selected`}
+            </span>
+            <select
+              value={moveTarget}
+              onChange={(e) => setMoveTarget(e.target.value)}
+              style={styles.businessSelect}
+              aria-label="Move to business"
+            >
+              <option value="">Move to…</option>
+              <option value={PERSONAL}>Personal</option>
+              {businesses.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={moveSelected}
+              disabled={!moveTarget || moving}
+              style={{ ...styles.saveBtn, opacity: !moveTarget || moving ? 0.5 : 1 }}
+            >
+              {moving ? 'Moving…' : 'Move'}
+            </button>
+            <button type="button" onClick={() => setSelected(new Set())} style={styles.cancelBtn}>
+              Clear
+            </button>
+            {moveError && <span style={{ color: colors.destructive }}>{moveError}</span>}
+          </div>
+        )}
+
         {/* Table */}
         <div style={styles.tableCard}>
           <div style={styles.tableHead}>
-            <div>Date</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              {showBusinesses && (
+                <input
+                  type="checkbox"
+                  checked={allShownSelected}
+                  onChange={() =>
+                    setSelected(allShownSelected ? new Set() : new Set(filtered.map((t) => t.id)))
+                  }
+                  style={{ accentColor: colors.accent }}
+                  aria-label="Select all shown"
+                />
+              )}
+              Date
+            </div>
             <div>Merchant</div>
             <div>Category</div>
             <div>Source</div>
-            <div>Account</div>
+            <div>Business</div>
             <div style={{ textAlign: 'right' }}>Amount</div>
             <div aria-hidden="true" />
           </div>
@@ -820,8 +982,21 @@ export default function TransactionsPage() {
                         i === filtered.length - 1 ? 'none' : `0.5px solid ${colors.line}`,
                     }}
                   >
-                    <div style={styles.dateCell}>
-                      {dateLabel} <span style={{ color: colors.ink4 }}>· {timeLabel}</span>
+                    <div
+                      style={{ ...styles.dateCell, display: 'flex', alignItems: 'center', gap: 8 }}
+                    >
+                      {showBusinesses && (
+                        <input
+                          type="checkbox"
+                          checked={selected.has(t.id)}
+                          onChange={() => toggleSelected(t.id)}
+                          style={{ accentColor: colors.accent }}
+                          aria-label={`Select ${t.merchant ?? 'transaction'}`}
+                        />
+                      )}
+                      <span>
+                        {dateLabel} <span style={{ color: colors.ink4 }}>· {timeLabel}</span>
+                      </span>
                     </div>
                     <div style={styles.merchantCell}>
                       <MerchantLogo
@@ -857,7 +1032,21 @@ export default function TransactionsPage() {
                     <div>
                       <SourceChip src={src} />
                     </div>
-                    <div style={{ color: colors.ink3, fontSize: 12 }}>Murmur</div>
+                    <div
+                      style={{
+                        color:
+                          showBusinesses && t.business_id && knownBusinessIds.has(t.business_id)
+                            ? colors.ink2
+                            : colors.ink4,
+                        fontSize: 12,
+                        fontWeight: 600,
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }}
+                    >
+                      {showBusinesses ? businessName(t.business_id, businesses) : '-'}
+                    </div>
                     <div style={{ textAlign: 'right' }}>
                       <Money
                         value={isIncome ? t.amount : -t.amount}
@@ -960,6 +1149,29 @@ const chipStyles: Record<string, React.CSSProperties> = {
 }
 
 const styles: Record<string, React.CSSProperties> = {
+  businessSelect: {
+    padding: '6px 10px',
+    border: `0.5px solid ${colors.line}`,
+    borderRadius: 999,
+    fontFamily: font.sans,
+    fontSize: 12,
+    fontWeight: 600,
+    color: colors.ink2,
+    background: colors.surface,
+    cursor: 'pointer',
+  },
+  selectionBar: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+    padding: '10px 14px',
+    background: colors.accentSoft,
+    borderRadius: radius.lg,
+    fontFamily: font.sans,
+    fontSize: 13,
+    color: colors.ink2,
+    flexWrap: 'wrap',
+  },
   content: { padding: '0 20px 20px', display: 'flex', flexDirection: 'column', gap: 14 },
   formCard: {
     background: colors.card,

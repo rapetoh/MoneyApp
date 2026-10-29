@@ -2,6 +2,7 @@
 export * from './types/database.types'
 export * from './types/transaction'
 export * from './types/category'
+export * from './types/business'
 export * from './types/budget'
 export * from './types/profile'
 export * from './types/sync'

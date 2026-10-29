@@ -22,6 +22,7 @@ import { Colors, Typography, Hairline } from '../../src/theme'
 import { formatCurrency, currencySymbolFor, t, findRuleForTransaction } from '@voice-expense/shared'
 import type { Transaction, Locale } from '@voice-expense/shared'
 import { goBack } from '../../src/services/goBack'
+import { useBusinesses } from '../../src/hooks/useBusinesses'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Sub-components (match mockup: DetailRow + ActionBtn shapes)
@@ -131,6 +132,7 @@ export default function TransactionDetailScreen() {
   const { user } = useAuth()
   const { profile } = useProfile(user?.id)
   const { categoryMap } = useCategories(user?.id)
+  const { byId: businessById } = useBusinesses(user?.id)
   const { rules } = useRecurringRules(user?.id)
   const locale = (profile?.locale ?? 'en') as Locale
   const currency = profile?.currency_code ?? 'USD'
@@ -319,6 +321,12 @@ export default function TransactionDetailScreen() {
               label={t('detail.payment', locale)}
               value={humanPayment(txn.payment_method, locale)}
             />
+            {txn.business_id && businessById.has(txn.business_id) ? (
+              <DetailRow
+                label={t('business.label', locale)}
+                value={businessById.get(txn.business_id)!.name}
+              />
+            ) : null}
             <DetailRow label={t('detail.note', locale)} value={txn.note} />
             <DetailRow
               label={t('detail.logged_via', locale)}

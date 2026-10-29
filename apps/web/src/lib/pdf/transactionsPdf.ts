@@ -59,6 +59,8 @@ export type TransactionsPdfInput = {
   /** Injected so tests are deterministic. */
   now?: Date
   fonts: PdfFonts
+  /** Whose books these are, e.g. a business name (migration 044). */
+  scopeLabel?: string
 }
 
 /** Characters `Intl` emits that a PDF font either lacks (U+202F narrow
@@ -259,7 +261,7 @@ export function buildTransactionsPdf(
   doc.setTextColor(...INK3)
   const n = rows.length
   text(
-    `${n} transaction${n === 1 ? '' : 's'} · ${f.rangeText} · Amounts in ${input.currency}`,
+    `${input.scopeLabel ? `${input.scopeLabel} · ` : ''}${n} transaction${n === 1 ? '' : 's'} · ${f.rangeText} · Amounts in ${input.currency}`,
     left,
     136,
   )

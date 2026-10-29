@@ -5,6 +5,8 @@ import {
   validateParsedExpense,
   isParseRejection,
   PARSED_EXPENSE_JSON_SCHEMA,
+  PARSED_EXPENSE_WITH_BUSINESS_JSON_SCHEMA,
+  sanitizeCategoryNames,
 } from '@voice-expense/ai'
 import type { Locale } from '@voice-expense/shared'
 import type { NextRequest } from 'next/server'
@@ -54,6 +56,7 @@ export async function POST(req: NextRequest) {
     locale?: string
     currency?: string
     categories?: string[]
+    businesses?: string[]
     todayCivilDate?: string
   }
   try {
@@ -62,7 +65,14 @@ export async function POST(req: NextRequest) {
     return Response.json({ error: 'Invalid JSON body' }, { status: 400 })
   }
 
-  const { transcript, locale = 'en', currency = 'USD', categories = [], todayCivilDate } = body
+  const {
+    transcript,
+    locale = 'en',
+    currency = 'USD',
+    categories = [],
+    businesses = [],
+    todayCivilDate,
+  } = body
   if (!transcript || typeof transcript !== 'string') {
     return Response.json({ error: 'transcript is required' }, { status: 400 })
   }
@@ -93,6 +103,12 @@ export async function POST(req: NextRequest) {
   if (!Array.isArray(categories) || categories.some((c) => typeof c !== 'string')) {
     return Response.json({ error: 'categories must be a string array' }, { status: 400 })
   }
+  if (!Array.isArray(businesses) || businesses.some((b) => typeof b !== 'string')) {
+    return Response.json({ error: 'businesses must be a string array' }, { status: 400 })
+  }
+  // Same caps and cleaning as category names (they reach the prompt the
+  // same way); an empty list keeps the request exactly as before.
+  const businessNames = sanitizeCategoryNames(businesses)
 
   // "Today" for the prompt comes from the *user's* civil date when the
   // client supplies one — the server's UTC date is already tomorrow for
@@ -110,12 +126,18 @@ export async function POST(req: NextRequest) {
     currency,
     today: civilDateOk ? todayCivilDate : new Date().toISOString().split('T')[0],
     categories,
+    businesses: businessNames,
   })
 
   try {
     const completion = await createJsonCompletionWithRetry(openai, {
       model: MODEL,
-      response_format: { type: 'json_schema', json_schema: PARSED_EXPENSE_JSON_SCHEMA },
+      response_format: {
+        type: 'json_schema',
+        json_schema: businessNames.length
+          ? PARSED_EXPENSE_WITH_BUSINESS_JSON_SCHEMA
+          : PARSED_EXPENSE_JSON_SCHEMA,
+      },
       // Deterministic classification — the same sentence must parse the
       // same way on every try. temperature 0 plus a fixed seed is the
       // strongest determinism OpenAI's API offers; neither is a hard
@@ -149,10 +171,16 @@ export async function POST(req: NextRequest) {
     // produced so a classification drift can be traced to a model change
     // without needing a DB column (no consumer needs the model id at
     // query time; this is an observability trail, not app state).
+    // A business the model names must be one of the person's, written as
+    // they wrote it; anything else is dropped rather than guessed.
+    const business = result.business
+      ? (businessNames.find((b) => b.toLowerCase() === result.business!.toLowerCase()) ?? null)
+      : null
+    const { business: _ignored, ...rest } = result
     console.log(
       `[parse-expense] ok model=${MODEL} confidence=${result.confidence} retried=${completion.retried}`,
     )
-    return Response.json(result)
+    return Response.json(business ? { ...rest, business } : rest)
   } catch (err) {
     // Message + status only — the raw OpenAI SDK error object embeds the
     // request body, i.e. the user's transcript.

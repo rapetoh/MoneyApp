@@ -50,6 +50,9 @@ export interface ParsedExpense {
     | 'quarterly'
     | 'yearly'
     | null
+  /** One of the person's business names when the transcript says the money
+   *  was for it ("for the farm"); absent otherwise (migration 044). */
+  business?: string | null
 }
 
 // ─── Typed parse boundary (fix-plan item 1.7) ───────────────────────────────

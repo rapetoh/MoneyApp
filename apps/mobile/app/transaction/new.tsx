@@ -36,6 +36,8 @@ import type {
 } from '@voice-expense/shared'
 import type { RecurringFrequency } from '@voice-expense/shared'
 import { goBack } from '../../src/services/goBack'
+import { useBusinesses } from '../../src/hooks/useBusinesses'
+import { BusinessPicker } from '../../src/components/BusinessPicker'
 
 const PAYMENT_METHODS: { value: PaymentMethod; key: string }[] = [
   { value: 'cash', key: 'payment.cash' },
@@ -79,6 +81,8 @@ export default function QuickEntryScreen() {
   const { user } = useAuth()
   const { profile } = useProfile(user?.id)
   const { categories, createCategory } = useCategories(user?.id)
+  const { businesses } = useBusinesses(user?.id)
+  const [businessId, setBusinessId] = useState<string | null>(null)
   const { createTransaction } = useTransactions(user?.id)
   const { showUndo } = useUndo()
   const { presentParsed } = useVoiceSession()
@@ -201,6 +205,7 @@ export default function QuickEntryScreen() {
       merchant: merchant.trim() || null,
       note: note.trim() || null,
       category_id: categoryId,
+      business_id: businessId,
       payment_method: fromCapture ? 'digital_wallet' : paymentMethod,
       ...(fromCapture && typeof params.capturedAt === 'string' && params.capturedAt
         ? { transacted_at: params.capturedAt }
@@ -319,6 +324,12 @@ export default function QuickEntryScreen() {
               selectedId={categoryId}
               onSelect={setCategoryId}
               onCreateCategory={createCategory}
+              locale={userLocale}
+            />
+            <BusinessPicker
+              businesses={businesses}
+              selectedId={businessId}
+              onSelect={setBusinessId}
               locale={userLocale}
             />
             <RecurringToggle

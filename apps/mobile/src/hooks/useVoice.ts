@@ -55,6 +55,9 @@ export function useVoice(
   /** IANA zone (profiles.timezone) — anchors the parse prompt's "today"
    *  to the user's civil date instead of the server's UTC clock. */
   userTimezone: string = 'UTC',
+  /** The person's business names (migration 044): "for the farm" tags the
+   *  parse. Empty keeps the request exactly as before. */
+  userBusinesses: string[] = [],
 ): UseVoiceReturn {
   const [state, setState] = useState<VoiceState>('idle')
   const [transcript, setTranscript] = useState('')
@@ -106,6 +109,10 @@ export function useVoice(
   const currencyRef = useRef(userCurrency)
   const localeRef = useRef(userLocale)
   const timezoneRef = useRef(userTimezone)
+  const businessesRef = useRef(userBusinesses)
+  useEffect(() => {
+    businessesRef.current = userBusinesses
+  }, [userBusinesses])
   useEffect(() => {
     categoriesRef.current = userCategories
   }, [userCategories])
@@ -212,6 +219,7 @@ export function useVoice(
         locale: localeRef.current as any,
         currency: currencyRef.current,
         categories: categoriesRef.current,
+        businesses: businessesRef.current,
         apiBaseUrl,
         authToken: token,
         userId,

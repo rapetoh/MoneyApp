@@ -36,6 +36,8 @@ import type {
   RecurringFrequency,
 } from '@voice-expense/shared'
 import { goBack } from '../../src/services/goBack'
+import { useBusinesses } from '../../src/hooks/useBusinesses'
+import { BusinessPicker } from '../../src/components/BusinessPicker'
 
 const PAYMENT_METHODS: { value: PaymentMethod; key: string }[] = [
   { value: 'cash', key: 'payment.cash' },
@@ -50,6 +52,7 @@ export default function EditTransactionScreen() {
   const { user } = useAuth()
   const { profile } = useProfile(user?.id)
   const { categories, createCategory } = useCategories(user?.id)
+  const { businesses, byId: businessById } = useBusinesses(user?.id)
   const { showUndo } = useUndo()
   const { editTransaction } = useTransactions(user?.id)
   const { rules, updateRule } = useRecurringRules(user?.id)
@@ -68,6 +71,7 @@ export default function EditTransactionScreen() {
   const [merchant, setMerchant] = useState('')
   const [note, setNote] = useState('')
   const [categoryId, setCategoryId] = useState<string | null>(null)
+  const [businessId, setBusinessId] = useState<string | null>(null)
   const [direction, setDirection] = useState<TransactionDirection>('debit')
   // null when the transaction has no payment method on record. The chip
   // row leaves every chip inactive in that state so the user can choose
@@ -102,6 +106,7 @@ export default function EditTransactionScreen() {
         setMerchant(data.merchant ?? '')
         setNote(data.note ?? '')
         setCategoryId(data.category_id)
+        setBusinessId(data.business_id ?? null)
         setDirection(data.direction)
         setPaymentMethod(data.payment_method)
         setIsRecurring(data.is_recurring ?? false)
@@ -182,6 +187,7 @@ export default function EditTransactionScreen() {
       payment_method: paymentMethod,
       is_recurring: isRecurring,
       recurring_frequency: isRecurring ? frequency : null,
+      business_id: businessId && businessById.has(businessId) ? businessId : null,
     })
 
     // Rule lifecycle (create on flag, deactivate on unflag of the template)
@@ -326,6 +332,18 @@ export default function EditTransactionScreen() {
                 locale={locale}
               />
             </View>
+
+            {businesses.length > 0 && (
+              <View style={styles.field}>
+                <Text style={styles.label}>{t('business.label', locale)}</Text>
+                <BusinessPicker
+                  businesses={businesses}
+                  selectedId={businessId}
+                  onSelect={setBusinessId}
+                  locale={locale}
+                />
+              </View>
+            )}
 
             <View style={styles.field}>
               <Text style={styles.label}>{t('voice.note', locale)}</Text>

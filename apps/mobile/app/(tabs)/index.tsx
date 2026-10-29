@@ -54,6 +54,7 @@ import {
 } from '@voice-expense/shared'
 import type { Locale, Transaction } from '@voice-expense/shared'
 import { useNowInstant } from '../../src/hooks/useNowInstant'
+import { useBusinesses } from '../../src/hooks/useBusinesses'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers — all civil-date math routes through packages/shared/src/utils/
@@ -195,6 +196,7 @@ export default function TodayScreen() {
     createTransaction,
   } = useTransactions(user?.id)
   const { categoryMap } = useCategories(user?.id)
+  const { byId: businessById } = useBusinesses(user?.id)
   const { profile, updateProfile } = useProfile(user?.id)
   const {
     budget,
@@ -570,6 +572,9 @@ export default function TodayScreen() {
                       transaction={txn}
                       categoryName={txn.category_id ? categoryMap[txn.category_id]?.name : null}
                       categoryColor={txn.category_id ? categoryMap[txn.category_id]?.color : null}
+                      businessName={
+                        txn.business_id ? businessById.get(txn.business_id)?.name : null
+                      }
                       currency={currency}
                       locale={locale}
                       showDivider={i > 0}

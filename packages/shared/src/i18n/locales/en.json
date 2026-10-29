@@ -883,5 +883,19 @@
   "import.found_one": "1 transaction found",
   "import.done_title_one": "1 transaction imported",
   "import.run_one": "Import 1 transaction",
-  "import.skipped_one": "1 line without a date or amount will be skipped."
+  "import.skipped_one": "1 line without a date or amount will be skipped.",
+  "business.label": "Business",
+  "business.personal": "Personal",
+  "business.title": "Businesses",
+  "business.subtitle": "Keep a farm, a shop or a side gig apart from your personal spending. Tag any transaction with one, or just say it when you log (\"for the farm\"). Anything untagged is Personal.",
+  "business.add_placeholder": "Name a business, e.g. Farm",
+  "business.add": "Add",
+  "business.rename": "Rename",
+  "business.delete": "Delete",
+  "business.delete_title": "Delete {name}?",
+  "business.delete_body": "Its transactions go back to Personal. Nothing is lost.",
+  "business.duplicate": "You already have a business with that name.",
+  "business.all": "All",
+  "settings.businesses": "Businesses",
+  "settings.businesses_detail": "Keep side businesses apart from personal spending"
 }

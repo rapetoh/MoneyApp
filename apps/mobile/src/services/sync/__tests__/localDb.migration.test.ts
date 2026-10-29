@@ -368,6 +368,31 @@ describe.skipIf(!DatabaseSync)('localDb migration path (node:sqlite)', () => {
     await assertUpsertRoundTrip(db, 'txn-after-restore')
   })
 
+  it('v3 install gains business_id and re-pulls transactions once (migration 044)', async () => {
+    const db = openShim(join(tmp, 'v3.db'))
+    await initDatabase(db)
+    // Rewind to a v3 install: no business_id yet, a transactions cursor
+    // already past rows the old app pulled without their business.
+    db.raw.exec('ALTER TABLE transactions DROP COLUMN business_id')
+    db.raw.exec('PRAGMA user_version = 3')
+    db.raw
+      .prepare('INSERT OR REPLACE INTO sync_meta (key, value) VALUES (?, ?)')
+      .run('cursor:transaction', '2026-10-01T00:00:00Z')
+    db.raw
+      .prepare('INSERT OR REPLACE INTO sync_meta (key, value) VALUES (?, ?)')
+      .run('cursor:category', '2026-10-01T00:00:00Z')
+
+    await initDatabase(db)
+
+    expect(userVersion(db)).toBe(SCHEMA_VERSION)
+    expect(columnNames(db)).toEqual(MANIFEST_SORTED)
+    const cursors = db.raw.prepare("SELECT key FROM sync_meta WHERE key LIKE 'cursor:%'").all() as {
+      key: string
+    }[]
+    expect(cursors.map((c) => c.key)).toEqual(['cursor:category'])
+    await assertUpsertRoundTrip(db, 'txn-v3')
+  })
+
   it('fresh install is stamped current and never replays migrations', async () => {
     const db = openShim(join(tmp, 'fresh.db'))
     await initDatabase(db)

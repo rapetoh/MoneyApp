@@ -883,5 +883,19 @@
   "import.found_one": "1 transaction trouvée",
   "import.done_title_one": "1 transaction importée",
   "import.run_one": "Importer 1 transaction",
-  "import.skipped_one": "1 ligne sans date ni montant sera ignorée."
+  "import.skipped_one": "1 ligne sans date ni montant sera ignorée.",
+  "business.label": "Activité",
+  "business.personal": "Personnel",
+  "business.title": "Activités",
+  "business.subtitle": "Séparez une ferme, une boutique ou une activité d’appoint de vos dépenses personnelles. Associez-y n’importe quelle transaction, ou dites-le simplement en l’enregistrant (« pour la ferme »). Le reste est Personnel.",
+  "business.add_placeholder": "Nommez une activité, ex. Ferme",
+  "business.add": "Ajouter",
+  "business.rename": "Renommer",
+  "business.delete": "Supprimer",
+  "business.delete_title": "Supprimer {name} ?",
+  "business.delete_body": "Ses transactions repassent en Personnel. Rien n’est perdu.",
+  "business.duplicate": "Vous avez déjà une activité avec ce nom.",
+  "business.all": "Toutes",
+  "settings.businesses": "Activités",
+  "settings.businesses_detail": "Séparez vos activités de vos dépenses personnelles"
 }

@@ -10,6 +10,7 @@ import { usePlus } from '../../../lib/plus'
 import { PlusRefreshButton } from '../../../components/PlusRefreshButton'
 import { changeCurrency } from '../../../lib/changeCurrency'
 import { formatRelativeSync } from '../../../lib/relativeTime'
+import { BusinessesCard } from '../../../components/BusinessesCard'
 import {
   SUPPORT_EMAIL,
   SUPPORT_MAILTO,
@@ -44,10 +45,19 @@ const LOCALES = [
   { value: 'pt', label: 'Portugu\u00eas' },
 ]
 
-type SectionKey = 'account' | 'sync' | 'plan' | 'privacy' | 'voice' | 'export' | 'about'
+type SectionKey =
+  | 'account'
+  | 'businesses'
+  | 'sync'
+  | 'plan'
+  | 'privacy'
+  | 'voice'
+  | 'export'
+  | 'about'
 
 const SECTIONS: Array<{ key: SectionKey; label: string }> = [
   { key: 'account', label: 'Account' },
+  { key: 'businesses', label: 'Businesses' },
   { key: 'sync', label: 'Sync & devices' },
   { key: 'plan', label: 'Plan & billing' },
   { key: 'privacy', label: 'Privacy' },
@@ -185,6 +195,7 @@ export default function SettingsPage() {
 
   const sectionRefs = useRef<Record<SectionKey, HTMLDivElement | null>>({
     account: null,
+    businesses: null,
     sync: null,
     plan: null,
     privacy: null,
@@ -641,6 +652,10 @@ export default function SettingsPage() {
                   </button>
                 </div>
               </form>
+            </SettingsCard>
+
+            <SettingsCard title="Businesses" refCb={(el) => (sectionRefs.current.businesses = el)}>
+              <BusinessesCard />
             </SettingsCard>
 
             <SettingsCard title="Sync & devices" refCb={(el) => (sectionRefs.current.sync = el)}>

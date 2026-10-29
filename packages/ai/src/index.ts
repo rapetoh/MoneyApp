@@ -6,7 +6,13 @@
 export { parseExpense, clearParseCache } from './parser'
 export { parseScan } from './scanParser'
 export type { ScanType, ScanOptions, ScanResult } from './scanParser'
-export { getPrompt, getScanPrompt, MERCHANT_RULE, MERCHANT_DOMAIN_RULE } from './prompt'
+export {
+  getPrompt,
+  getScanPrompt,
+  sanitizeCategoryNames,
+  MERCHANT_RULE,
+  MERCHANT_DOMAIN_RULE,
+} from './prompt'
 export {
   getMerchantBatchPrompt,
   validateMerchantBatch,
@@ -35,4 +41,7 @@ export {
   FLOW_TYPE_VALUES,
 } from './validateParsedExpense'
 export type { ValidateParsedExpenseOptions, TransactionWriteFields } from './validateParsedExpense'
-export { PARSED_EXPENSE_JSON_SCHEMA } from './parsedExpenseSchema'
+export {
+  PARSED_EXPENSE_JSON_SCHEMA,
+  PARSED_EXPENSE_WITH_BUSINESS_JSON_SCHEMA,
+} from './parsedExpenseSchema'

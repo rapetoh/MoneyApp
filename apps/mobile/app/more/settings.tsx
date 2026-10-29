@@ -645,6 +645,11 @@ export default function SettingsScreen() {
             label={t('settings.recurring', locale)}
             onPress={() => router.push('/recurring')}
           />
+          {/* Side businesses kept apart from personal spending (migration 044). */}
+          <SetRow
+            label={t('settings.businesses', locale)}
+            onPress={() => router.push('/more/businesses' as never)}
+          />
           {/* CSV import (docs/csv-import.md). */}
           <SetRow
             label={t('import.settings', locale)}

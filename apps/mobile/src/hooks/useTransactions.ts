@@ -173,6 +173,7 @@ export function useTransactions(userId: string | undefined) {
           | 'recurring_frequency'
           | 'merchant_domain'
           | 'transacted_at'
+          | 'business_id'
         >
       >,
   ): Promise<MutationResult> {
@@ -286,6 +287,8 @@ export function useTransactions(userId: string | undefined) {
       is_recurring: fields.is_recurring ?? false,
       recurring_rule_id: fields.recurring_rule_id ?? null,
       recurring_frequency: fields.is_recurring ? (fields.recurring_frequency ?? 'monthly') : null,
+      // Migration 044: the business this money belongs to; null is Personal.
+      business_id: fields.business_id ?? null,
       client_id: clientId,
       client_created_at: now,
       version: 1,
@@ -326,6 +329,7 @@ export function useTransactions(userId: string | undefined) {
         | 'direction'
         | 'is_recurring'
         | 'recurring_frequency'
+        | 'business_id'
       >
     >,
   ): Promise<MutationResult> {

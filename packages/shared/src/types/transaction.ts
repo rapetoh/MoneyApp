@@ -42,8 +42,14 @@ type TransactionUpdateRow = Database['public']['Tables']['transactions']['Update
 /** `Transaction` documents each field inline for readers of this file —
  *  see the generated `TransactionRow` (database.types.ts) for the raw
  *  column list this is derived from. */
-export type Transaction = Omit<TransactionRow, keyof NarrowedTransactionColumns> &
+export type Transaction = Omit<TransactionRow, keyof NarrowedTransactionColumns | 'business_id'> &
   NarrowedTransactionColumns & {
+    /** The business this money belongs to (migration 044); null is
+     *  Personal. Optional because a writer that predates businesses has no
+     *  opinion about it: the sync RPC leaves the stored value untouched
+     *  when the key is absent, and only sets it (null included) when
+     *  present. */
+    business_id?: string | null
     /** Amount converted to the user's profile currency using the FX
      *  rate on `fx_rate_date`. Null on historical rows that pre-date
      *  migration 011 and have foreign currencies awaiting backfill.

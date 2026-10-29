@@ -11,6 +11,13 @@ import { ErrorState } from '../../../components/ErrorState'
 import { usePlus } from '../../../lib/plus'
 import { buildTransactionsPdf, loadPdfFonts } from '../../../lib/pdf/transactionsPdf'
 import {
+  useBusinesses,
+  matchesBusiness,
+  businessName,
+  PERSONAL,
+  type BusinessFilter,
+} from '../../../lib/businesses'
+import {
   buildExport,
   exportSummaryJSON,
   localDay,
@@ -22,6 +29,7 @@ import {
 
 type Txn = {
   id: string
+  business_id?: string | null
   amount: number
   amount_in_profile_currency: number | null
   currency_code: string | null
@@ -82,6 +90,31 @@ export default function ExportPage() {
 
   const [dateFrom, setDateFrom] = useState(() => defaultDateRange().from)
   const [dateTo, setDateTo] = useState(() => defaultDateRange().to)
+  // One file per business for the CPA (migration 044).
+  const { businesses, loaded: businessesLoaded } = useBusinesses()
+  const knownBusinessIds = useMemo(() => new Set(businesses.map((b) => b.id)), [businesses])
+  const [exportBusiness, setExportBusiness] = useState<BusinessFilter>('all')
+  // Arriving from Transactions while it shows one business exports that one.
+  useEffect(() => {
+    const b = new URLSearchParams(window.location.search).get('business')
+    if (b) setExportBusiness(b)
+  }, [])
+  // A link to a business deleted since falls back to everything.
+  useEffect(() => {
+    if (
+      businessesLoaded &&
+      exportBusiness !== 'all' &&
+      exportBusiness !== PERSONAL &&
+      !knownBusinessIds.has(exportBusiness)
+    )
+      setExportBusiness('all')
+  }, [businessesLoaded, exportBusiness, knownBusinessIds])
+  const scopeLabel =
+    exportBusiness === 'all'
+      ? null
+      : exportBusiness === PERSONAL
+        ? 'Personal'
+        : businessName(exportBusiness, businesses)
 
   const load = useCallback(async () => {
     const {
@@ -137,23 +170,29 @@ export default function ExportPage() {
   // spreadsheet sum of the CSV's converted column always equals the
   // total printed above it.
   const exportResult = useMemo(() => {
-    const exportableTxns: ExportableTransaction[] = transactions.map((t) => ({
-      id: t.id,
-      amount: t.amount,
-      amount_in_profile_currency: t.amount_in_profile_currency,
-      currency_code: t.currency_code,
-      direction: t.direction,
-      merchant: t.merchant,
-      note: t.note,
-      category_id: t.category_id,
-      category_kind: t.category_id ? (catKindById.get(t.category_id) ?? null) : null,
-      payment_method: t.payment_method,
-      source: t.source,
-      is_recurring: t.is_recurring,
-      transacted_at: t.transacted_at,
-      fx_rate_to_profile: t.fx_rate_to_profile,
-      fx_rate_date: t.fx_rate_date,
-    }))
+    const exportableTxns: ExportableTransaction[] = transactions
+      .filter((t) => matchesBusiness(t.business_id, exportBusiness, knownBusinessIds))
+      .map((t) => ({
+        id: t.id,
+        amount: t.amount,
+        amount_in_profile_currency: t.amount_in_profile_currency,
+        currency_code: t.currency_code,
+        direction: t.direction,
+        merchant: t.merchant,
+        note: t.note,
+        category_id: t.category_id,
+        category_kind: t.category_id ? (catKindById.get(t.category_id) ?? null) : null,
+        payment_method: t.payment_method,
+        source: t.source,
+        is_recurring: t.is_recurring,
+        transacted_at: t.transacted_at,
+        fx_rate_to_profile: t.fx_rate_to_profile,
+        fx_rate_date: t.fx_rate_date,
+        business:
+          t.business_id && knownBusinessIds.has(t.business_id)
+            ? businessName(t.business_id, businesses)
+            : null,
+      }))
     return buildExport({
       profile: { currency_code: currency, locale, timezone: tz },
       transactions: exportableTxns,
@@ -172,6 +211,9 @@ export default function ExportPage() {
     tz,
     dateFrom,
     dateTo,
+    exportBusiness,
+    knownBusinessIds,
+    businesses,
   ])
 
   const filtered = exportResult.rows
@@ -180,7 +222,14 @@ export default function ExportPage() {
   const pendingCount = exportResult.summary.pendingCount
 
   function fileBase() {
-    return `murmur-${dateFrom}-to-${dateTo}`
+    const slug = scopeLabel
+      ? `-${scopeLabel
+          .toLowerCase()
+          .normalize('NFKD')
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-|-$/g, '')}`
+      : ''
+    return `murmur${slug}-${dateFrom}-to-${dateTo}`
   }
 
   function downloadBlob(blob: Blob, name: string) {
@@ -211,6 +260,7 @@ export default function ExportPage() {
         'Payment Method',
         'Source',
         'Note',
+        ...(businesses.length ? ['Business'] : []),
       ]
       const rows = filtered.map((r) => [
         r.date,
@@ -226,6 +276,7 @@ export default function ExportPage() {
         r.paymentMethod,
         r.source,
         r.note,
+        ...(businesses.length ? [r.business] : []),
       ])
       let csv =
         '\uFEFF' +
@@ -286,6 +337,7 @@ export default function ExportPage() {
         totalIncome,
         pendingCount,
         fonts,
+        scopeLabel: scopeLabel ?? undefined,
       })
       doc.save(`${fileBase()}.pdf`)
     } catch (e) {
@@ -336,8 +388,26 @@ export default function ExportPage() {
           </div>
         </div>
 
-        <Card title="Date range">
-          <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end' }}>
+        <Card title={businesses.length > 0 ? 'What to export' : 'Date range'}>
+          <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+            {businesses.length > 0 && (
+              <div style={styles.field}>
+                <label style={styles.label}>Business</label>
+                <select
+                  value={exportBusiness}
+                  onChange={(e) => setExportBusiness(e.target.value)}
+                  style={styles.input}
+                >
+                  <option value="all">Everything</option>
+                  <option value={PERSONAL}>Personal</option>
+                  {businesses.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div style={styles.field}>
               <label style={styles.label}>From</label>
               <input

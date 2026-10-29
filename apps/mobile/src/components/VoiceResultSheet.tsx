@@ -38,6 +38,7 @@ import type {
   ParsedExpense,
   Locale,
   Category,
+  Business,
   PaymentMethod,
   RecurringFrequency,
 } from '@voice-expense/shared'
@@ -71,6 +72,9 @@ export interface ConfirmedExpense {
   /** AI-parsed date this expense happened on (fix-plan 2.8). Null when the
    *  parse carried none → createTransaction defaults to now. */
   transactedAt: string | null
+  /** The business this money belongs to (migration 044); null is Personal.
+   *  Pre-filled when the person said it ("for the farm"). */
+  businessId: string | null
 }
 
 interface Props {
@@ -78,6 +82,8 @@ interface Props {
   transcript: string
   parseDurationMs: number | null
   categories: Category[]
+  /** The person's businesses; the Business picker shows only when there is one. */
+  businesses: Business[]
   onCreateCategory: (name: string, color?: string, icon?: string) => Promise<Category | null>
   onSave: (expense: ConfirmedExpense) => Promise<void>
   onDismiss: () => void
@@ -110,6 +116,7 @@ export function VoiceResultSheet({
   transcript,
   parseDurationMs,
   categories,
+  businesses,
   onCreateCategory,
   onSave,
   onDismiss,
@@ -135,6 +142,14 @@ export function VoiceResultSheet({
     parsed.recurring_frequency_suggestion ?? 'monthly',
   )
   const aiDetectedRecurring = parsed.is_recurring_suggestion ?? false
+  // "for the farm" → that business; the server only ever returns one of the
+  // names it was sent, matched here case-insensitively to its id.
+  const [businessId, setBusinessId] = useState<string | null>(
+    () =>
+      businesses.find((b) => b.name.toLowerCase() === (parsed.business ?? '').toLowerCase())?.id ??
+      null,
+  )
+  const selectedBusiness = businesses.find((b) => b.id === businessId) ?? null
 
   // A category the person taught Murmur for this merchant (migration 041,
   // src/services/merchantRules.ts) wins over the AI's suggestion. Then the
@@ -186,6 +201,7 @@ export function VoiceResultSheet({
     paymentMethod: PaymentMethod | null
     isRecurring: boolean
     recurringFrequency: RecurringFrequency
+    businessId: string | null
   } | null>(null)
 
   function enterEdit() {
@@ -198,6 +214,7 @@ export function VoiceResultSheet({
       paymentMethod,
       isRecurring,
       recurringFrequency,
+      businessId,
     }
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut)
     setMode('edit')
@@ -214,6 +231,7 @@ export function VoiceResultSheet({
       setPaymentMethod(s.paymentMethod)
       setIsRecurring(s.isRecurring)
       setRecurringFrequency(s.recurringFrequency)
+      setBusinessId(s.businessId)
     }
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut)
     setMode('confirm')
@@ -267,6 +285,7 @@ export function VoiceResultSheet({
       recurringFrequency,
       paymentMethod,
       transactedAt: chosenTransactedAt,
+      businessId,
     })
   }
 
@@ -445,6 +464,14 @@ export function VoiceResultSheet({
                     {whenLabel}
                   </Text>
                 </View>
+                {selectedBusiness && (
+                  <View style={styles.businessTag} testID="sheet-business-tag">
+                    <Ionicons name="briefcase-outline" size={11} color={Colors.ink2} />
+                    <Text style={styles.businessTagText} numberOfLines={1}>
+                      {selectedBusiness.name}
+                    </Text>
+                  </View>
+                )}
               </View>
               <Pressable onPress={enterEdit} hitSlop={10} accessibilityRole="button">
                 <Text style={styles.editLink}>{t('voice.edit', locale)}</Text>
@@ -637,6 +664,38 @@ export function VoiceResultSheet({
                 )}
               </View>
 
+              {/* Business (migration 044): only once the person has one. */}
+              {businesses.length > 0 && (
+                <View style={styles.field}>
+                  <Text style={styles.fieldLabel}>{t('business.label', locale)}</Text>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.chipsRow}
+                    keyboardShouldPersistTaps="handled"
+                  >
+                    {[{ id: null, name: t('business.personal', locale) }, ...businesses].map(
+                      (b) => {
+                        const selected = businessId === b.id
+                        return (
+                          <Pressable
+                            key={b.id ?? 'personal'}
+                            style={[styles.chip, selected && styles.chipActive]}
+                            onPress={() => setBusinessId(b.id)}
+                            accessibilityRole="button"
+                            accessibilityState={{ selected }}
+                          >
+                            <Text style={[styles.chipLabel, selected && styles.chipLabelActive]}>
+                              {b.name}
+                            </Text>
+                          </Pressable>
+                        )
+                      },
+                    )}
+                  </ScrollView>
+                </View>
+              )}
+
               {/* Date & time. Heard from the sentence ("on the 14th", "last
                   Friday") and correctable here: an expense is entered on
                   the day you think of it, not always the day it happened,
@@ -752,6 +811,22 @@ export function VoiceResultSheet({
 }
 
 const styles = StyleSheet.create({
+  businessTag: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    backgroundColor: Colors.surface2,
+  },
+  businessTagText: {
+    fontFamily: Typography.fontFamily.sansSemiBold,
+    fontSize: 11.5,
+    color: Colors.ink2,
+  },
   backdrop: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(27,25,21,0.18)',

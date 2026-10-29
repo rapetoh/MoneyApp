@@ -883,5 +883,19 @@
   "import.found_one": "1 transação encontrada",
   "import.done_title_one": "1 transação importada",
   "import.run_one": "Importar 1 transação",
-  "import.skipped_one": "1 linha sem data ou valor será ignorada."
+  "import.skipped_one": "1 linha sem data ou valor será ignorada.",
+  "business.label": "Negócio",
+  "business.personal": "Pessoal",
+  "business.title": "Negócios",
+  "business.subtitle": "Separe uma fazenda, uma loja ou um trabalho extra dos seus gastos pessoais. Marque qualquer transação, ou diga ao registrar (\"para a fazenda\"). O que não tem marca é Pessoal.",
+  "business.add_placeholder": "Dê um nome, ex. Fazenda",
+  "business.add": "Adicionar",
+  "business.rename": "Renomear",
+  "business.delete": "Excluir",
+  "business.delete_title": "Excluir {name}?",
+  "business.delete_body": "As transações voltam para Pessoal. Nada se perde.",
+  "business.duplicate": "Você já tem um negócio com esse nome.",
+  "business.all": "Todos",
+  "settings.businesses": "Negócios",
+  "settings.businesses_detail": "Separe seus negócios dos gastos pessoais"
 }

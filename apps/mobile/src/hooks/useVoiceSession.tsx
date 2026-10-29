@@ -24,6 +24,7 @@ import { Presence } from '../components/Presence'
 import { t, formatMoney, effectiveVoiceLanguage } from '@voice-expense/shared'
 import { haptic } from '../services/haptics'
 import type { Locale, ParsedExpense, TransactionSource } from '@voice-expense/shared'
+import { useBusinesses } from './useBusinesses'
 
 interface VoiceSessionApi {
   /** Start an in-place voice capture (14a) over whatever screen is showing.
@@ -72,8 +73,10 @@ export function VoiceSessionProvider({ children }: { children: ReactNode }) {
     getLocales()[0]?.regionCode,
   )
   const categoryNames = useMemo(() => categories.map((c) => c.name), [categories])
+  const { businesses } = useBusinesses(user?.id)
+  const businessNames = useMemo(() => businesses.map((b) => b.name), [businesses])
 
-  const voice = useVoice(currency, categoryNames, locale, timezone)
+  const voice = useVoice(currency, categoryNames, locale, timezone, businessNames)
   const [source, setSource] = useState<TransactionSource>('voice')
   const [saving, setSaving] = useState(false)
 
@@ -164,6 +167,7 @@ export function VoiceSessionProvider({ children }: { children: ReactNode }) {
       // The rule itself is created server-side by the transactions trigger
       // (migration 013) once this row syncs.
       recurring_frequency: expense.isRecurring ? expense.recurringFrequency : null,
+      business_id: expense.businessId,
     })
     setSaving(false)
 
@@ -255,6 +259,7 @@ export function VoiceSessionProvider({ children }: { children: ReactNode }) {
             transcript={voice.transcript}
             parseDurationMs={voice.parseDurationMs}
             categories={categories}
+            businesses={businesses}
             onCreateCategory={createCategory}
             onSave={handleSave}
             onDismiss={dismissAll}

@@ -20,6 +20,7 @@ const fonts: PdfFonts = {
 }
 
 const row = (o: Partial<ExportRow>): ExportRow => ({
+  business: 'Personal',
   date: '2026-08-08',
   time: '10:00',
   merchant: 'Starbucks',
