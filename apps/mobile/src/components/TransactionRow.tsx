@@ -1,10 +1,11 @@
 import React from 'react'
 import { View, Text, Pressable, StyleSheet } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
-import type { Transaction } from '@voice-expense/shared'
+import type { Business, Transaction } from '@voice-expense/shared'
 import { t, sourceLabel } from '@voice-expense/shared'
 import type { Locale } from '@voice-expense/shared'
 import { MerchantAvatar } from './MerchantAvatar'
+import { BusinessMark } from './BusinessMark'
 import { Money } from './Money'
 import { Colors, Typography, Hairline } from '../theme'
 
@@ -14,8 +15,8 @@ interface Props {
   /** Color for the category chip (defaults to ink3 when absent). Accepts hex. */
   categoryColor?: string | null
   /** The business this row belongs to (migration 044); omitted for Personal
-   *  and for people without businesses. */
-  businessName?: string | null
+   *  and for people without businesses. Drawn as its 14pt tile and name. */
+  business?: Pick<Business, 'name' | 'logo' | 'icon'> | null
   currency: string
   locale?: Locale
   /** If true, renders a hairline divider above the row (matches the stacked list style in Today). */
@@ -45,7 +46,7 @@ export function TransactionRow({
   transaction,
   categoryName,
   categoryColor,
-  businessName,
+  business,
   currency,
   locale = 'en',
   showDivider = false,
@@ -101,11 +102,14 @@ export function TransactionRow({
               </View>
             ) : null}
             {categoryName ? <Text style={styles.metaDot}>·</Text> : null}
-            {businessName ? (
+            {business ? (
               <>
-                <Text style={styles.metaBusiness} numberOfLines={1}>
-                  {businessName}
-                </Text>
+                <View style={styles.metaBusinessWrap}>
+                  <BusinessMark business={business} size={14} />
+                  <Text style={styles.metaBusiness} numberOfLines={1}>
+                    {business.name}
+                  </Text>
+                </View>
                 <Text style={styles.metaDot}>·</Text>
               </>
             ) : null}
@@ -145,6 +149,13 @@ export function TransactionRow({
 }
 
 const styles = StyleSheet.create({
+  metaBusinessWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    flexShrink: 1,
+    minWidth: 0,
+  },
   metaBusiness: {
     fontFamily: Typography.fontFamily.sansSemiBold,
     fontSize: 12,

@@ -1,34 +1,13 @@
 {
   "configVersion": 0,
   "apple": {
-    "version": "1.0.0",
+    "version": "1.0.2",
+    "copyright": "2026 Roch Apetoh",
     "release": {
-      "automaticRelease": false
+      "automaticRelease": true
     },
     "info": {
       "en-US": {
-        "title": "Expense Tracker - Murmur",
-        "screenshots": {
-          "APP_IPHONE_65": [
-            "store/apple/screenshot/en-US/APP_IPHONE_65/01-hero.png",
-            "store/apple/screenshot/en-US/APP_IPHONE_65/02-voice.png",
-            "store/apple/screenshot/en-US/APP_IPHONE_65/03-confirm.png",
-            "store/apple/screenshot/en-US/APP_IPHONE_65/04-apple-pay.png",
-            "store/apple/screenshot/en-US/APP_IPHONE_65/08-ask-murmur.png",
-            "store/apple/screenshot/en-US/APP_IPHONE_65/09-privacy.png",
-            "store/apple/screenshot/en-US/APP_IPHONE_65/07-recurring.png",
-            "store/apple/screenshot/en-US/APP_IPHONE_65/06-budgets.png",
-            "store/apple/screenshot/en-US/APP_IPHONE_65/05-insights.png"
-          ],
-          "APP_IPAD_PRO_3GEN_129": [
-            "store/apple/screenshot/en-US/APP_IPAD_PRO_3GEN_129/01-hero.png",
-            "store/apple/screenshot/en-US/APP_IPAD_PRO_3GEN_129/02-voice-flow.png",
-            "store/apple/screenshot/en-US/APP_IPAD_PRO_3GEN_129/04-patterns.png",
-            "store/apple/screenshot/en-US/APP_IPAD_PRO_3GEN_129/03-understand.png",
-            "store/apple/screenshot/en-US/APP_IPAD_PRO_3GEN_129/05-private.png"
-          ]
-        },
-        "subtitle": "Speak your spending",
         "description": "Murmur is the fastest way to know where your money goes. Say it once and it's filed: \"twelve fifty at Chipotle\" becomes a categorized expense before your phone is back in your pocket.\n\nNo bank logins. No spreadsheets. No forms.\n\nSPEAK, AND IT'S FILED\nOne tap, one sentence. Murmur hears the amount, the place and the category, in your language, and files it instantly. Income too: say what you earned and it lands on the right side of the ledger.\n\nPAY, AND IT CAPTURES ITSELF\nSet up one Shortcuts automation (Murmur walks you through it) and every purchase you make with your iPhone's wallet logs itself: amount, merchant, logo and category, with a quiet notification you can edit in one tap. Even pay-at-pump purchases that report no amount get parked and resolved, never lost.\n\nSEE THE MONTH CLEARLY\nInsights shows what you spent, how it compares to last month, where it went by category, and highlights that matter: an upcoming bill, a budget running hot, a purchase that is 8x your usual.\n\nBUDGETS AND RECURRING\nSet a budget and watch the daily pace. Recurring bills and income are first-class: Murmur knows what is coming and what is left after it.\n\n14 DAYS OF PLUS, NO CARD\nEvery new account starts with 14 days of Murmur Plus, no card needed: Ask Murmur, the desktop app, automatic recurring detection and the reports. After that, logging stays free for as long as you want, and Plus is there when you want the whole picture.\n\nASK MURMUR (PLUS)\nAsk anything about your own numbers: \"how am I doing against my budget?\", \"what should I cancel?\" Answers come from your data, instantly.\n\nYOUR DATA IS YOURS\nMurmur never connects to your bank. Your voice is turned into text on your phone whenever the device supports it, and audio is never stored. Export everything or erase everything, anytime.\n\nEVERYWHERE YOU ARE\nMurmur syncs across iPhone and the web dashboard at itsmurmur.com. Murmur Plus adds the Mac and Windows apps.\n\nMURMUR PLUS\nLogging stays free forever, with 3 Ask Murmur questions a month. Murmur Plus adds unlimited Ask Murmur, your full history and forecast, automatic recurring detection, formatted reports (CSV, PDF) and the Mac and Windows apps, and can be shared with your family through Family Sharing. Monthly or yearly, both with a 7-day free trial. Prices are shown in the app before you subscribe. Subscriptions renew automatically unless cancelled at least 24 hours before the period ends, and are managed in your App Store account settings.\n\nTerms of Service: https://itsmurmur.com/terms\nPrivacy Policy: https://itsmurmur.com/privacy",
         "keywords": [
           "expense",
@@ -39,15 +18,38 @@
           "spending",
           "finance",
           "ai",
+          "apple pay",
           "budgeting",
           "bills",
-          "subscription",
-          "receipts"
+          "subscription"
         ],
+        "releaseNotes": "New in this version:\n• Businesses: keep a farm, a shop or a side gig apart from your personal spending. Give each one its own logo, say \"for the farm\" when you log, and filter by business.\n• Apple Watch: log by voice from your wrist.\n• Home Screen widgets: speak or type an expense without opening the app.\n• Import your history from a bank CSV or another budgeting app.\n• Murmur remembers the category you give a merchant.\n• Budgets can roll over what you didn't spend, and you can set savings goals.\n• Card charges now show the real store name and logo.\n• Fixes and polish.",
         "marketingUrl": "https://itsmurmur.com",
         "supportUrl": "https://itsmurmur.com",
+        "title": "Expense Tracker - Murmur",
+        "subtitle": "Speak your spending",
         "privacyPolicyUrl": "https://itsmurmur.com/privacy",
-        "promoText": "One sentence and it's filed. Tap to pay and it captures itself. Murmur keeps your money story between you and your phone."
+        "screenshots": {
+          "APP_IPHONE_65": [
+            "store/apple/screenshot/en-US/APP_IPHONE_65/01-voice.png",
+            "store/apple/screenshot/en-US/APP_IPHONE_65/02-apple-pay.png",
+            "store/apple/screenshot/en-US/APP_IPHONE_65/03-ask-murmur.png",
+            "store/apple/screenshot/en-US/APP_IPHONE_65/04-privacy.png",
+            "store/apple/screenshot/en-US/APP_IPHONE_65/05-anywhere.png",
+            "store/apple/screenshot/en-US/APP_IPHONE_65/06-insights.png",
+            "store/apple/screenshot/en-US/APP_IPHONE_65/07-budgets.png",
+            "store/apple/screenshot/en-US/APP_IPHONE_65/08-recurring.png",
+            "store/apple/screenshot/en-US/APP_IPHONE_65/09-businesses.png",
+            "store/apple/screenshot/en-US/APP_IPHONE_65/10-import.png"
+          ],
+          "APP_IPAD_PRO_3GEN_129": [
+            "store/apple/screenshot/en-US/APP_IPAD_PRO_3GEN_129/01-voice.png",
+            "store/apple/screenshot/en-US/APP_IPAD_PRO_3GEN_129/02-apple-pay.png",
+            "store/apple/screenshot/en-US/APP_IPAD_PRO_3GEN_129/03-ask-murmur.png",
+            "store/apple/screenshot/en-US/APP_IPAD_PRO_3GEN_129/04-privacy.png",
+            "store/apple/screenshot/en-US/APP_IPAD_PRO_3GEN_129/05-anywhere.png"
+          ]
+        }
       }
     },
     "categories": [
@@ -83,7 +85,6 @@
       "parentalControls": false,
       "userGeneratedContent": false
     },
-    "copyright": "2026 Roch Apetoh",
     "review": {
       "firstName": "Roch",
       "lastName": "Apetoh",
@@ -92,7 +93,7 @@
       "demoUsername": "review@itsmurmur.com",
       "demoPassword": "Murmur-Review-8d9202f5",
       "demoRequired": true,
-      "notes": "DEMO ACCOUNT: on the sign-in screen tap 'More options' to reveal the email form, then sign in with the credentials above. The account is pre-loaded with sample transactions and a budget, so Today, Insights and Budgets all show data. CORE FLOW: tap the mic on the Today tab and say e.g. 'fifteen dollars at Starbucks'; the expense files itself. Speech is transcribed by the device (on-device recognition is requested); Murmur never records or transmits audio. ACCOUNT DELETION (guideline 5.1.1(v)): Settings > Account > Delete account, and also Settings > Privacy Center > Your data. One confirmation, then the account and every record attached to it are permanently deleted server-side and the app signs out. DATA EXPORT: Settings > Privacy Center > Export all my data. THIRD-PARTY AI: Murmur sends text to OpenAI through our own server to interpret spoken entries and scanned receipts (gpt-4o-mini) and to answer Ask Murmur (gpt-4o). Sent: the transcribed sentence or the scanned image, and for Ask Murmur the user's own transactions, recurring rules, income figure, currency, time zone and question. Never sent: name, email, account id, device ids, location. Murmur never connects to a bank. Disclosed at https://itsmurmur.com/privacy. SUBSCRIPTION: Murmur Plus (auto-renewable, 7-day free trial) under Settings > Subscription; it unlocks Ask Murmur (More > Ask Murmur), recurring detection, exports and the desktop apps. Everything else is included without a subscription. WALLET CAPTURE is an optional Shortcuts automation the user creates themselves from Settings; it is not needed to review the app. The app is iPhone-only and runs in compatibility mode on iPad."
+      "notes": "DEMO ACCOUNT: on the sign-in screen tap 'More options' to reveal the email form, then sign in with the credentials above. The account is pre-loaded with sample transactions and a budget, so Today, Insights and Budgets all show data. CORE FLOW: tap the mic on the Today tab and say e.g. 'fifteen dollars at Starbucks'; the expense files itself. Speech is transcribed by the device (on-device recognition is requested); Murmur never records or transmits audio. ACCOUNT DELETION (guideline 5.1.1(v)): Settings > Account > Delete account, and also Settings > Privacy Center > Your data. One confirmation, then the account and every record attached to it are permanently deleted server-side and the app signs out. A screen recording of this flow is attached; it uses a newly created account rather than the demo account so the demo credentials below stay valid for review. DATA EXPORT: Settings > Privacy Center > Export all my data. THIRD-PARTY AI (answering the questions from the previous review): Yes, the app uses third-party AI. The provider is OpenAI, called from our own server; the app never contacts OpenAI directly. gpt-4o-mini interprets spoken entries and scanned receipts, gpt-4o answers Ask Murmur. Sent to OpenAI: the transcribed sentence and the user's language, currency, category names and today's date; or the single image the user chose to scan; and for Ask Murmur the user's own transactions, recurring rules, monthly income figure, currency, time zone and typed question. Never sent: name, email address, account identifier, device identifiers, location, contacts, or any photo the user did not choose to scan. Audio is never recorded or transmitted. Requests use HTTPS, content is not used to train models, and none of it is used for advertising or tracking. Disclosed at https://itsmurmur.com/privacy. SUBSCRIPTION: Murmur Plus (auto-renewable, 7-day free trial) under Settings > Subscription; it unlocks Ask Murmur (More > Ask Murmur), recurring detection, exports and the desktop apps. Everything else is included without a subscription. WALLET CAPTURE is an optional Shortcuts automation the user creates themselves from Settings; it is not needed to review the app. The app is iPhone-only and runs in compatibility mode on iPad."
     }
   }
 }

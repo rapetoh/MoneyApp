@@ -20,6 +20,8 @@ import { Icon } from '../../../components/Icons'
 import { RowActions } from '../../../components/RowActions'
 import { MonthPicker } from '../../../components/MonthPicker'
 import { ErrorState } from '../../../components/ErrorState'
+import { BusinessMark } from '../../../components/BusinessMark'
+import { BusinessMoveMenu } from '../../../components/BusinessMoveMenu'
 import { currentMonthIso } from '../../../lib/monthIso'
 import { useRealtime } from '../../../lib/useRealtime'
 import {
@@ -177,6 +179,7 @@ export default function TransactionsPage() {
   // the category. Everything below stays hidden until one exists.
   const { businesses, assign } = useBusinesses()
   const knownBusinessIds = useMemo(() => new Set(businesses.map((b) => b.id)), [businesses])
+  const businessById = useMemo(() => new Map(businesses.map((b) => [b.id, b])), [businesses])
   const [businessFilter, setBusinessFilter] = useState<BusinessFilter>(
     searchParams.get('business') ?? 'all',
   )
@@ -894,20 +897,7 @@ export default function TransactionsPage() {
             <span style={{ fontWeight: 700, color: colors.ink }}>
               {selected.size === 1 ? '1 selected' : `${selected.size} selected`}
             </span>
-            <select
-              value={moveTarget}
-              onChange={(e) => setMoveTarget(e.target.value)}
-              style={styles.businessSelect}
-              aria-label="Move to business"
-            >
-              <option value="">Move to…</option>
-              <option value={PERSONAL}>Personal</option>
-              {businesses.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.name}
-                </option>
-              ))}
-            </select>
+            <BusinessMoveMenu businesses={businesses} value={moveTarget} onChange={setMoveTarget} />
             <button
               type="button"
               onClick={moveSelected}
@@ -965,6 +955,8 @@ export default function TransactionsPage() {
                 const catName = cat?.name ?? null
                 const catColor = cat?.color ?? null
                 const src = classifySource(t)
+                const rowBusiness =
+                  showBusinesses && t.business_id ? businessById.get(t.business_id) : undefined
                 const isIncome = t.direction === 'credit'
                 const dt = new Date(t.transacted_at)
                 const dateLabel = dt.toLocaleDateString(locale, { month: 'short', day: 'numeric' })
@@ -1032,20 +1024,28 @@ export default function TransactionsPage() {
                     <div>
                       <SourceChip src={src} />
                     </div>
+                    {/* A business is its tile and name; Personal stays plain text. */}
                     <div
                       style={{
-                        color:
-                          showBusinesses && t.business_id && knownBusinessIds.has(t.business_id)
-                            ? colors.ink2
-                            : colors.ink4,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        minWidth: 0,
+                        color: rowBusiness ? colors.ink2 : colors.ink4,
                         fontSize: 12,
                         fontWeight: 600,
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
                       }}
                     >
-                      {showBusinesses ? businessName(t.business_id, businesses) : '-'}
+                      {rowBusiness && <BusinessMark business={rowBusiness} size={18} />}
+                      <span
+                        style={{
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                        }}
+                      >
+                        {showBusinesses ? businessName(t.business_id, businesses) : '-'}
+                      </span>
                     </div>
                     <div style={{ textAlign: 'right' }}>
                       <Money

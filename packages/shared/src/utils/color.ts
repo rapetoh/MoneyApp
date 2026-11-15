@@ -211,6 +211,13 @@ export function guessDomain(name: string): string {
   return KNOWN_DOMAINS[normalized] ?? `${normalized}.com`
 }
 
+/** The table half of `guessDomain` only: a domain when the name is a known
+ *  brand, never the `<name>.com` guess. For places where a wrong logo is
+ *  worse than none ("Rent" would guess rent.com, a real site's logo). */
+export function knownDomain(name: string): string | null {
+  return KNOWN_DOMAINS[name.toLowerCase().replace(/[^a-z0-9]/g, '')] ?? null
+}
+
 // ─────────────────────────────────────────────────────────────────────────
 // Category tint derivation — `categories.color` is the single per-user,
 // user-editable source of truth (fix-plan 4.4). Chart surfaces used to

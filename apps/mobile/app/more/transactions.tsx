@@ -22,9 +22,20 @@ import { syncManager } from '../../src/services/sync/SyncManager'
 import { TransactionRow } from '../../src/components/TransactionRow'
 import { Colors, Typography, Spacing, Radius, Hairline } from '../../src/theme'
 import { BottomSheet } from '../../src/components/BottomSheet'
-import { t, monthBounds, monthIso, formatMoney, type Locale } from '@voice-expense/shared'
+import {
+  t,
+  monthBounds,
+  monthIso,
+  formatMoney,
+  isSpend,
+  type CategoryKind,
+  type Locale,
+} from '@voice-expense/shared'
 import type { Transaction } from '@voice-expense/shared'
 import { useBusinesses } from '../../src/hooks/useBusinesses'
+import { useNowInstant } from '../../src/hooks/useNowInstant'
+import { BusinessMark } from '../../src/components/BusinessMark'
+import { Money } from '../../src/components/Money'
 
 /** "2026-04" from the History calendar / Ask Murmur — validated to a month
  *  key; bounds are resolved in the user's zone with `monthBounds`. */
@@ -104,6 +115,36 @@ export default function TransactionsScreen() {
   const locale = (profile?.locale ?? 'en') as Locale
   const currency = profile?.currency_code ?? 'USD'
   const tz = profile?.timezone || 'UTC'
+  const nowInstant = useNowInstant(tz)
+
+  // One business picked: its header card. Spent is this calendar month's
+  // spend for that business (transfers and income left out, the same
+  // `isSpend` rule Insights uses), in the profile currency, whatever the
+  // month chip and search say: the card answers "how is the farm doing
+  // this month", the list below keeps its own filters.
+  const businessCard = useMemo(() => {
+    const business =
+      selectedBusiness !== 'all' && selectedBusiness !== 'personal'
+        ? businessById.get(selectedBusiness)
+        : undefined
+    if (!business) return null
+    const bounds = monthBounds(monthIso(nowInstant, tz), tz)
+    let spent = 0
+    let count = 0
+    for (const tx of transactions) {
+      if (tx.is_deleted || tx.business_id !== business.id) continue
+      if (tx.transacted_at < bounds.start || tx.transacted_at >= bounds.endExclusive) continue
+      if (tx.amount_in_profile_currency == null) continue
+      // `categories.kind` is CHECK-constrained; the row type sees a string.
+      const kind = tx.category_id
+        ? ((categoryMap[tx.category_id]?.kind ?? null) as CategoryKind | null)
+        : null
+      if (!isSpend(tx, kind)) continue
+      spent += tx.amount_in_profile_currency
+      count += 1
+    }
+    return { business, spent, count }
+  }, [selectedBusiness, businessById, transactions, categoryMap, nowInstant, tz])
 
   // Months that actually have data (newest first) — the month sheet's rows.
   const monthOptions = useMemo(() => {
@@ -310,13 +351,7 @@ export default function TransactionsScreen() {
                     accessibilityRole="button"
                     accessibilityState={{ selected: active }}
                   >
-                    {b.id !== 'all' && b.id !== 'personal' && (
-                      <Ionicons
-                        name="briefcase-outline"
-                        size={12}
-                        color={active ? Colors.white : Colors.ink3}
-                      />
-                    )}
+                    {'user_id' in b && <BusinessMark business={b} size={16} />}
                     <Text style={[styles.pillLabel, active && styles.pillLabelActive]}>
                       {b.name}
                     </Text>
@@ -360,6 +395,38 @@ export default function TransactionsScreen() {
                 )
               })}
             </ScrollView>
+          )}
+
+          {/* One business picked: its face and this month's spend, right
+              above its transactions. */}
+          {businessCard && (
+            <View style={styles.businessCard} testID="business-header-card">
+              <BusinessMark business={businessCard.business} size={44} />
+              <View style={styles.businessCardText}>
+                <Text style={styles.businessCardName} numberOfLines={1}>
+                  {businessCard.business.name}
+                </Text>
+                <Text style={styles.businessCardMeta} numberOfLines={1}>
+                  {businessCard.count === 1
+                    ? t('business.month_count_one', locale)
+                    : t('business.month_count_many', locale).replace(
+                        '{count}',
+                        String(businessCard.count),
+                      )}
+                </Text>
+              </View>
+              <View style={styles.businessCardTotal}>
+                <Money
+                  value={businessCard.spent}
+                  size={20}
+                  serif={false}
+                  sansWeight="700"
+                  currencyCode={currency}
+                  locale={locale}
+                />
+                <Text style={styles.businessCardMeta}>{t('business.month_spent', locale)}</Text>
+              </View>
+            </View>
           )}
         </View>
 
@@ -433,9 +500,7 @@ export default function TransactionsScreen() {
                   <TransactionRow
                     transaction={item}
                     categoryName={item.category_id ? categoryMap[item.category_id]?.name : null}
-                    businessName={
-                      item.business_id ? businessById.get(item.business_id)?.name : null
-                    }
+                    business={item.business_id ? businessById.get(item.business_id) : null}
                     currency={currency}
                     locale={locale}
                     onPress={() => router.push(`/transaction/${item.id}`)}
@@ -622,6 +687,36 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.text,
     borderColor: Colors.text,
   },
+  // Header card for one business (same white card + soft shadow as the
+  // transaction cards below).
+  businessCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    backgroundColor: Colors.card,
+    borderRadius: Radius.lg,
+    paddingHorizontal: Spacing.base,
+    paddingVertical: Spacing.md,
+    shadowColor: Colors.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  businessCardText: { flex: 1, minWidth: 0, gap: 2 },
+  businessCardName: {
+    fontFamily: Typography.fontFamily.sansSemiBold,
+    fontSize: 16,
+    fontWeight: '600',
+    letterSpacing: -0.2,
+    color: Colors.ink ?? Colors.text,
+  },
+  businessCardMeta: {
+    fontFamily: Typography.fontFamily.sans,
+    fontSize: 12.5,
+    color: Colors.ink3 ?? Colors.textSecondary,
+  },
+  businessCardTotal: { alignItems: 'flex-end', gap: 2 },
   pillDot: {
     width: 8,
     height: 8,

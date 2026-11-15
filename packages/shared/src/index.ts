@@ -46,6 +46,8 @@ export * from './domain/categoryResolver'
 export * from './domain/merchantBrand'
 export * from './domain/merchantRules'
 export * from './domain/goals'
+// Business identity (migration 045): the twelve icons and the name-based default.
+export * from './domain/businessIcon'
 export * from './domain/csvImport'
 
 // i18n

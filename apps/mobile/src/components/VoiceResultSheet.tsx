@@ -17,6 +17,7 @@ import { DateTimeField } from './DateTimeField'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Money } from './Money'
 import { MerchantAvatar } from './MerchantAvatar'
+import { BusinessMark } from './BusinessMark'
 import { AmountAdjustChips } from './AmountAdjustChips'
 import { RecurringToggle } from './RecurringToggle'
 import { NumericAccessory, NUMERIC_ACCESSORY_ID } from './NumericAccessory'
@@ -466,7 +467,7 @@ export function VoiceResultSheet({
                 </View>
                 {selectedBusiness && (
                   <View style={styles.businessTag} testID="sheet-business-tag">
-                    <Ionicons name="briefcase-outline" size={11} color={Colors.ink2} />
+                    <BusinessMark business={selectedBusiness} size={14} />
                     <Text style={styles.businessTagText} numberOfLines={1}>
                       {selectedBusiness.name}
                     </Text>
@@ -680,11 +681,16 @@ export function VoiceResultSheet({
                         return (
                           <Pressable
                             key={b.id ?? 'personal'}
-                            style={[styles.chip, selected && styles.chipActive]}
+                            style={[
+                              styles.chip,
+                              b.id !== null && styles.chipWithMark,
+                              selected && styles.chipActive,
+                            ]}
                             onPress={() => setBusinessId(b.id)}
                             accessibilityRole="button"
                             accessibilityState={{ selected }}
                           >
+                            {'user_id' in b && <BusinessMark business={b} size={18} />}
                             <Text style={[styles.chipLabel, selected && styles.chipLabelActive]}>
                               {b.name}
                             </Text>
@@ -815,9 +821,10 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 5,
     marginTop: 6,
-    paddingHorizontal: 8,
+    paddingLeft: 4,
+    paddingRight: 8,
     paddingVertical: 3,
     borderRadius: 999,
     backgroundColor: Colors.surface2,
@@ -1204,6 +1211,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
   },
+  // A business chip leads with its tile, closer to the pill's rounded end.
+  chipWithMark: { paddingLeft: 7 },
   chipActive: {
     backgroundColor: Colors.primaryLight,
     borderColor: Colors.primary,

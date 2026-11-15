@@ -11,6 +11,8 @@
 // merchants ("Canteen Des Moines 2") keep the letter tile — the honest
 // ceiling without a paid data feed.
 
+import { guessDomain, knownDomain } from '../utils/color'
+
 /** Strips a card-network descriptor down to its name: store numbers,
  *  payment-processor prefixes and trailing location junk.
  *  "Target T-1768" -> "Target", "711594-Mcgrath Volkswa" -> "Mcgrath Volkswa",
@@ -90,6 +92,32 @@ export function normalizeMerchantDomain(raw: string | null | undefined): string 
 export function merchantLogoSrc(domain: string): string {
   const host = domain.startsWith('www.') ? domain : `www.${domain}`
   return `https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=http://${host}&size=128`
+}
+
+/**
+ * A merchant's logo URL from its name and, when known, its domain: the
+ * stored domain first, then the brand table ("Target T-1768" -> target.com),
+ * then a guess from the cleaned descriptor. Null when there is no name.
+ *
+ * One chain for the app, the web and the server's bill notifications
+ * (Nov 13 2026). `guess: false` drops the `<name>.com` guess and keeps
+ * only domains known for sure: a notification is a claim, and a bill
+ * named "Rent" must not arrive wearing rent.com's logo.
+ */
+export function merchantLogoUrl(
+  merchant: string | null | undefined,
+  merchantDomain?: string | null,
+  opts: { guess?: boolean } = {},
+): string | null {
+  const name = merchant?.trim()
+  if (!name) return null
+  const cleaned = cleanMerchantDescriptor(name)
+  const domain =
+    merchantDomain ??
+    brandDomainForMerchant(name) ??
+    (opts.guess === false ? knownDomain(cleaned) : guessDomain(cleaned))
+  if (!domain) return null
+  return merchantLogoSrc(domain)
 }
 
 /**

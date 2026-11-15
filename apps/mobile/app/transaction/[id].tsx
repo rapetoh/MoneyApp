@@ -18,6 +18,7 @@ import { syncManager } from '../../src/services/sync/SyncManager'
 import { DataEvents } from '../../src/events/dataEvents'
 import { MerchantAvatar } from '../../src/components/MerchantAvatar'
 import { Money } from '../../src/components/Money'
+import { BusinessMark } from '../../src/components/BusinessMark'
 import { Colors, Typography, Hairline } from '../../src/theme'
 import { formatCurrency, currencySymbolFor, t, findRuleForTransaction } from '@voice-expense/shared'
 import type { Transaction, Locale } from '@voice-expense/shared'
@@ -31,17 +32,27 @@ import { useBusinesses } from '../../src/hooks/useBusinesses'
 function DetailRow({
   label,
   value,
+  leading,
   last,
 }: {
   label: string
   value: string | null
+  /** Drawn before the value, e.g. a business's tile. */
+  leading?: React.ReactNode
   last?: boolean
 }) {
   if (!value) return null
   return (
     <View style={[styles.detailRow, !last && styles.detailRowDivider]}>
       <Text style={styles.detailLabel}>{label}</Text>
-      <Text style={styles.detailValue}>{value}</Text>
+      {leading ? (
+        <View style={styles.detailValueRow}>
+          {leading}
+          <Text style={[styles.detailValue, styles.detailValueInRow]}>{value}</Text>
+        </View>
+      ) : (
+        <Text style={styles.detailValue}>{value}</Text>
+      )}
     </View>
   )
 }
@@ -325,6 +336,7 @@ export default function TransactionDetailScreen() {
               <DetailRow
                 label={t('business.label', locale)}
                 value={businessById.get(txn.business_id)!.name}
+                leading={<BusinessMark business={businessById.get(txn.business_id)!} size={20} />}
               />
             ) : null}
             <DetailRow label={t('detail.note', locale)} value={txn.note} />
@@ -503,6 +515,8 @@ const styles = StyleSheet.create({
     color: Colors.ink ?? Colors.text,
     marginTop: 2,
   },
+  detailValueRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },
+  detailValueInRow: { marginTop: 0, flexShrink: 1 },
 
   // Actions
   actionsRow: {

@@ -102,8 +102,10 @@ vi.mock('react-native-safe-area-context', () => ({
 }))
 
 const { Modal } = (await import('react-native')) as unknown as { Modal: React.ComponentType<any> }
-const { Pressable } = (await import('react-native')) as unknown as {
+const { Pressable, ScrollView, View } = (await import('react-native')) as unknown as {
   Pressable: React.ComponentType<any>
+  ScrollView: React.ComponentType<any>
+  View: React.ComponentType<any>
 }
 const { BottomSheet } = await import('../BottomSheet')
 
@@ -156,9 +158,7 @@ describe('BottomSheet — onClose wiring (F14 / F18)', () => {
     act(() => {
       renderer = TestRenderer.create(React.createElement(Harness))
     })
-    // The backdrop is the outermost Pressable (wraps the whole sheet and
-    // stops nothing); the sheet body's own Pressable — the second one —
-    // stops propagation instead, so it must not also close on press.
+    // The backdrop is the first Pressable: a layer behind the sheet.
     const backdrop = renderer!.root.findAllByType(Pressable)[0]
 
     act(() => {
@@ -179,5 +179,68 @@ describe('BottomSheet — onClose wiring (F14 / F18)', () => {
     })
 
     expect(renderer!.root.findByType(Modal).props.visible).toBe(false)
+  })
+})
+
+// Nov 15 2026: the sheet sat inside two Pressables (backdrop + a
+// stopPropagation body). A Pressable is one accessibility element, so
+// VoiceOver read the whole sheet as a single item ("Cancel, Choose an icon,
+// Shop, Farm and garden, ...") and no icon or row inside could be chosen.
+describe('BottomSheet: screen reader structure', () => {
+  it('no Pressable wraps the sheet body', () => {
+    act(() => {
+      renderer = TestRenderer.create(React.createElement(Harness))
+    })
+    const scroll = renderer!.root.findByType(ScrollView)
+    let node = scroll.parent
+    while (node) {
+      expect(node.type).not.toBe(Pressable)
+      node = node.parent
+    }
+  })
+
+  it('the backdrop is hidden from screen readers and the sheet is modal', () => {
+    act(() => {
+      renderer = TestRenderer.create(React.createElement(Harness))
+    })
+    const backdrop = renderer!.root.findAllByType(Pressable)[0]
+    expect(backdrop.props.accessibilityElementsHidden).toBe(true)
+    expect(backdrop.props.importantForAccessibility).toBe('no-hide-descendants')
+    const sheet = renderer!.root.findByProps({ accessibilityViewIsModal: true })
+    expect(sheet.type).toBe(View)
+  })
+
+  it('the escape gesture closes the sheet', () => {
+    act(() => {
+      renderer = TestRenderer.create(React.createElement(Harness))
+    })
+    act(() => {
+      renderer!.root.findByProps({ accessibilityViewIsModal: true }).props.onAccessibilityEscape()
+    })
+    expect(renderer!.root.findByType(Modal).props.visible).toBe(false)
+  })
+
+  it('an empty cancelLabel renders no Cancel button', () => {
+    act(() => {
+      renderer = TestRenderer.create(
+        React.createElement(BottomSheet, {
+          visible: true,
+          onClose: () => {},
+          title: 'More options',
+          cancelLabel: '',
+          children: 'Body',
+        }),
+      )
+    })
+    // Only the backdrop is pressable: no unnamed button in the header.
+    expect(renderer!.root.findAllByType(Pressable)).toHaveLength(1)
+  })
+
+  it('Cancel is announced as a button', () => {
+    act(() => {
+      renderer = TestRenderer.create(React.createElement(Harness))
+    })
+    const cancel = renderer!.root.findByProps({ children: 'Cancel' })
+    expect(cancel.parent!.props.accessibilityRole).toBe('button')
   })
 })

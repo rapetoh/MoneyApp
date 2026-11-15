@@ -255,8 +255,13 @@ mostly string data.
 | 4 | `notify-sweep` deployed (`--no-verify-jwt`, it checks the key itself) | done Oct 4 |
 | 5 | Migration 037: `notify-sweep-hourly`, `10 * * * *` | done Oct 4, after a manual run through the same Vault path returned HTTP 200 `{"considered":1,"sent":0,"reasons":{"quiet_hours":1}}` |
 | 6 | App build with push registration | build 68 (TestFlight Oct 3) |
+| 7 | Migration 046: token hand-over on sign-in | applied Nov 13 2026 (owner OK), trigger `push_tokens_hand_over` verified in `pg_trigger`; tested locally first (PGlite, 12/12, reproduces the production error) |
 
 A device only receives once it has opened build 68 or later, which registers its push token.
+
+**Nov 13 2026 defect (fixed by 046).** A phone that signed out of one account and into another could never register again: its token's row still belonged to the first account, and the `push_tokens_own` policy refuses the upsert's update half (`42501 ... (USING expression)`, visible as `push_registration` / `upsert_error` in `app_events`). The owner's phone hit this from Oct 23. Production then held only two token rows in total. 046 adds a `before insert` trigger that removes the previous owner's row for the same token, so the insert goes through under the normal policy; a spoofed `user_id` is still refused and the removal rolls back with it. Server only, every shipped build benefits. Check after applying: `select props->>'outcome', count(*) from app_events where event = 'push_registration' and created_at > now() - interval '1 day' group by 1`.
+
+Two `push_registration` outcomes on one install can alternate between `no_permission` (`undetermined`) and a later attempt that gets past the permission step within a minute. Not yet explained; the later attempt shows iOS permission is in fact granted.
 
 The Supabase personal access token (root `.env`, `SUPABASE_ACCESS_TOKEN`) was renamed and reissued Oct 4 after the old "Murmur CLI" token expired; it is scoped to this project. It is needed for `supabase functions deploy` and `gen-db-types.sh`, nothing at runtime.
 
@@ -354,6 +359,22 @@ shows, from `merchantLogoUrl`, as an iOS notification attachment
 - No known logo (the favicon service answers 404), a slow network (3 s cap) or
   any error: the banner posts without an image. Never a placeholder, since the
   app icon is already on the left, and never a delayed confirmation.
-- Not on the evening reminder (it is about no one expense) or the server
-  notifications yet. Bill notifications could carry the biller's logo but
-  need a Notification Service Extension; deferred.
+- Not on the evening reminder (it is about no one expense).
+
+### Server notifications (Nov 13 2026)
+
+The Oct 4 note deferred logos on server notifications and the owner was never
+told; on Nov 13 the owner saw a bill alert without one. Now:
+
+| Piece | What it does |
+| --- | --- |
+| `NotificationCandidate.image` | `bill_tomorrow`, `bill_missing`, `bill_week_heavy` (the first bill, the one the body names) carry the biller's logo URL |
+| `merchantLogoUrl(name, domain, { guess: false })` | shared, one chain for app, web and server; on notifications only domains known for sure (brand table, known domains). "Rent" would guess rent.com, a real site with a real logo (checked: HTTP 200), so a generic name gets no image |
+| `notify-sweep` | sets `mutableContent: true` and `data.image` when there is an image |
+| `targets/notification-service` | iOS Notification Service Extension: reads `userInfo.body.image` (Expo puts remote data under `body`), downloads it (8 s, https only, png/jpeg/gif), attaches it; anything else shows the banner as sent |
+
+Builds without the extension ignore `mutable-content` and show the banner as
+before. The extension is a new Apple target
+(`com.voiceexpense.app.notification-service`): the first EAS build that
+includes it needs a provisioning profile, which only an Apple ID login with
+2FA can create.

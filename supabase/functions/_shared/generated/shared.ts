@@ -929,6 +929,188 @@ function safeTz(tz) {
   }
 }
 
+// packages/shared/src/utils/color.ts
+var KNOWN_DOMAINS = {
+  netflix: "netflix.com",
+  spotify: "spotify.com",
+  amazon: "amazon.com",
+  walmart: "walmart.com",
+  target: "target.com",
+  costco: "costco.com",
+  starbucks: "starbucks.com",
+  mcdonalds: "mcdonalds.com",
+  uber: "uber.com",
+  ubereats: "ubereats.com",
+  lyft: "lyft.com",
+  apple: "apple.com",
+  google: "google.com",
+  microsoft: "microsoft.com",
+  adobe: "adobe.com",
+  hulu: "hulu.com",
+  disneyplus: "disneyplus.com",
+  disney: "disney.com",
+  hbomax: "hbomax.com",
+  youtube: "youtube.com",
+  paypal: "paypal.com",
+  venmo: "venmo.com",
+  cashapp: "cash.app",
+  bestbuy: "bestbuy.com",
+  homedepot: "homedepot.com",
+  lowes: "lowes.com",
+  ikea: "ikea.com",
+  nike: "nike.com",
+  adidas: "adidas.com",
+  zara: "zara.com",
+  sephora: "sephora.com",
+  wholefoods: "wholefoods.com",
+  traderjoes: "traderjoes.com",
+  kroger: "kroger.com",
+  walgreens: "walgreens.com",
+  cvs: "cvs.com",
+  tmobile: "t-mobile.com",
+  verizon: "verizon.com",
+  att: "att.com",
+  comcast: "comcast.com",
+  chipotle: "chipotle.com",
+  doordash: "doordash.com",
+  grubhub: "grubhub.com",
+  airbnb: "airbnb.com",
+  booking: "booking.com",
+  expedia: "expedia.com",
+  playstation: "playstation.com",
+  xbox: "xbox.com",
+  steam: "steampowered.com",
+  github: "github.com",
+  notion: "notion.so",
+  slack: "slack.com",
+  zoom: "zoom.us",
+  dropbox: "dropbox.com",
+  chickfila: "chick-fil-a.com",
+  burgerking: "bk.com",
+  wendys: "wendys.com",
+  dominos: "dominos.com",
+  pizzahut: "pizzahut.com",
+  subways: "subway.com",
+  subway: "subway.com",
+  dunkin: "dunkindonuts.com",
+  panera: "panerabread.com"
+};
+function guessDomain(name) {
+  const normalized = name.toLowerCase().replace(/[^a-z0-9]/g, "");
+  return KNOWN_DOMAINS[normalized] ?? `${normalized}.com`;
+}
+function knownDomain(name) {
+  return KNOWN_DOMAINS[name.toLowerCase().replace(/[^a-z0-9]/g, "")] ?? null;
+}
+
+// packages/shared/src/domain/merchantBrand.ts
+function cleanMerchantDescriptor(raw) {
+  const s = (raw ?? "").trim();
+  if (!s) return "";
+  let out = s;
+  const firstComma = out.indexOf(",");
+  if (firstComma > 0) out = out.slice(0, firstComma);
+  out = out.replace(/\s+(?:DES|INDN|CO ID|ID|ORIG ID|TRACE|WEB ID|PPD ID|CCD ID|TEL ID)\s*:.*$/i, "").replace(
+    /\s+(?:PPD|CCD|WEB|TEL|ACH|ACH CREDIT|ACH DEBIT|DIR DEP|DIRECT DEP(?:OSIT)?)\b.*$/i,
+    ""
+  );
+  out = out.replace(/^(?:SQ|TST|SP|PP|PY|IC|DD|PAYPAL|GOOGLE|APL)\s*\*\s*/i, "").replace(/^\d{3,}[\s\-#*]*/, "").replace(/\*(?=[A-Za-z0-9]*\d)[A-Za-z0-9]+/g, " ").replace(/#\s?\d+/g, " ").replace(/\b(?:T|ST|STR|NO|STORE|UNIT)[-.]?\s?\d{2,}\b/gi, " ").replace(/\b[A-Z]{1,2}\d{4,}\b/gi, " ").replace(/\b\d{4,}\b/g, " ");
+  out = out.replace(/\s{2,}/g, " ").replace(/^[\s\-\u2013\u2014#*.,:]+|[\s\-\u2013\u2014#*,:]+$/g, "").trim();
+  return out || s;
+}
+function merchantLogoSrc(domain) {
+  const host = domain.startsWith("www.") ? domain : `www.${domain}`;
+  return `https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=http://${host}&size=128`;
+}
+function merchantLogoUrl(merchant, merchantDomain, opts = {}) {
+  const name = merchant?.trim();
+  if (!name) return null;
+  const cleaned = cleanMerchantDescriptor(name);
+  const domain = merchantDomain ?? brandDomainForMerchant(name) ?? (opts.guess === false ? knownDomain(cleaned) : guessDomain(cleaned));
+  if (!domain) return null;
+  return merchantLogoSrc(domain);
+}
+var BRAND_DOMAINS = [
+  { pattern: /\btarget\b/i, domain: "target.com" },
+  { pattern: /\bwal-?mart\b/i, domain: "walmart.com" },
+  { pattern: /\bcostco\b/i, domain: "costco.com" },
+  { pattern: /\bsam'?s club\b/i, domain: "samsclub.com" },
+  { pattern: /\b(amazon|amzn)\b/i, domain: "amazon.com" },
+  { pattern: /\bstarbucks\b/i, domain: "starbucks.com" },
+  { pattern: /\bchick[- ]?fil[- ]?a\b/i, domain: "chick-fil-a.com" },
+  { pattern: /\bmcdonald/i, domain: "mcdonalds.com" },
+  { pattern: /\bchipotle\b/i, domain: "chipotle.com" },
+  { pattern: /\bdunkin/i, domain: "dunkindonuts.com" },
+  { pattern: /\bpanera\b/i, domain: "panerabread.com" },
+  { pattern: /\bwendy'?s\b/i, domain: "wendys.com" },
+  { pattern: /\btaco bell\b/i, domain: "tacobell.com" },
+  { pattern: /\bkfc\b/i, domain: "kfc.com" },
+  { pattern: /\bpopeyes\b/i, domain: "popeyes.com" },
+  { pattern: /\bdomino'?s\b/i, domain: "dominos.com" },
+  { pattern: /\bpizza hut\b/i, domain: "pizzahut.com" },
+  { pattern: /\bfive guys\b/i, domain: "fiveguys.com" },
+  { pattern: /\bculver'?s\b/i, domain: "culvers.com" },
+  { pattern: /\bsubway\b/i, domain: "subway.com" },
+  { pattern: /\bsonic\b/i, domain: "sonicdrivein.com" },
+  { pattern: /\barby'?s\b/i, domain: "arbys.com" },
+  { pattern: /\bdairy queen\b/i, domain: "dairyqueen.com" },
+  { pattern: /\bshake shack\b/i, domain: "shakeshack.com" },
+  { pattern: /\bpanda express\b/i, domain: "pandaexpress.com" },
+  { pattern: /\bdoordash\b/i, domain: "doordash.com" },
+  { pattern: /\buber\s?eats\b/i, domain: "ubereats.com" },
+  { pattern: /\bgrubhub\b/i, domain: "grubhub.com" },
+  { pattern: /\binstacart\b/i, domain: "instacart.com" },
+  { pattern: /\buber\b/i, domain: "uber.com" },
+  { pattern: /\blyft\b/i, domain: "lyft.com" },
+  { pattern: /\bmaverik\b/i, domain: "maverik.com" },
+  { pattern: /\bkwik\s?(star|trip)\b/i, domain: "kwiktrip.com" },
+  { pattern: /\bmurphy\s?(usa|express)?\b/i, domain: "murphyusa.com" },
+  { pattern: /\bshell\b/i, domain: "shell.com" },
+  { pattern: /\bchevron\b/i, domain: "chevron.com" },
+  { pattern: /\bexxon\b/i, domain: "exxon.com" },
+  { pattern: /\bcasey'?s\b/i, domain: "caseys.com" },
+  { pattern: /\bkum\s?&?\s?go\b/i, domain: "kumandgo.com" },
+  { pattern: /\bspeedway\b/i, domain: "speedway.com" },
+  { pattern: /\bcircle\s?k\b/i, domain: "circlek.com" },
+  { pattern: /\b7-?eleven\b/i, domain: "7-eleven.com" },
+  { pattern: /\bwawa\b/i, domain: "wawa.com" },
+  { pattern: /\bsheetz\b/i, domain: "sheetz.com" },
+  { pattern: /\bkroger\b/i, domain: "kroger.com" },
+  { pattern: /\bhy-?vee\b/i, domain: "hy-vee.com" },
+  { pattern: /\baldi\b/i, domain: "aldi.us" },
+  { pattern: /\btrader joe'?s\b/i, domain: "traderjoes.com" },
+  { pattern: /\bwhole foods\b/i, domain: "wholefoodsmarket.com" },
+  { pattern: /\bwalgreens\b/i, domain: "walgreens.com" },
+  { pattern: /\bcvs\b/i, domain: "cvs.com" },
+  { pattern: /\bbest ?buy\b/i, domain: "bestbuy.com" },
+  { pattern: /\bhome ?depot\b/i, domain: "homedepot.com" },
+  { pattern: /\blowe'?s\b/i, domain: "lowes.com" },
+  { pattern: /\bdollar tree\b/i, domain: "dollartree.com" },
+  { pattern: /\bdollar general\b/i, domain: "dollargeneral.com" },
+  { pattern: /\bikea\b/i, domain: "ikea.com" },
+  { pattern: /\bnetflix\b/i, domain: "netflix.com" },
+  { pattern: /\bspotify\b/i, domain: "spotify.com" },
+  { pattern: /\bapple\.com\/bill|itunes\b/i, domain: "apple.com" },
+  { pattern: /\bpetco\b/i, domain: "petco.com" },
+  { pattern: /\bpetsmart\b/i, domain: "petsmart.com" },
+  { pattern: /\bchewy\b/i, domain: "chewy.com" },
+  { pattern: /\bsephora\b/i, domain: "sephora.com" },
+  { pattern: /\bulta\b/i, domain: "ulta.com" },
+  { pattern: /\bairbnb\b/i, domain: "airbnb.com" },
+  { pattern: /\bmarriott\b/i, domain: "marriott.com" },
+  { pattern: /\bhilton\b/i, domain: "hilton.com" },
+  { pattern: /\bdelta\b/i, domain: "delta.com" },
+  { pattern: /\bsouthwest\b/i, domain: "southwest.com" }
+];
+function brandDomainForMerchant(raw) {
+  const s = (raw ?? "").trim();
+  if (!s) return null;
+  for (const { pattern, domain } of BRAND_DOMAINS) {
+    if (pattern.test(s)) return domain;
+  }
+  return null;
+}
+
 // packages/shared/src/domain/notifications.ts
 var PRIORITY = {
   billing_issue: 100,
@@ -1050,6 +1232,7 @@ function planNotifications(input) {
       for (const o of occ) {
         upcoming.push({
           name: r.name?.trim() || t("ask.insight_unnamed_rule", locale),
+          logo: merchantLogoUrl(r.name, null, { guess: false }),
           amount: ruleAmount(r),
           instant: o.instant,
           ruleId: String(r.id ?? r.name ?? "rule"),
@@ -1104,6 +1287,7 @@ function planNotifications(input) {
       title: T("notif.bill_tomorrow_title", { name: tomorrow.name, amount: m(tomorrow.amount) }),
       body: leftAfterBills !== null ? T("notif.bill_tomorrow_body_left", { left: m(leftAfterBills) }) : T("notif.bill_tomorrow_body", { due: m(stillDue) }),
       data: { screen: "recurring", rule: tomorrow.ruleId },
+      ...tomorrow.logo ? { image: tomorrow.logo } : {},
       // Money leaving an account within a day is the definition of the
       // level: still actionable, and useless if it arrives late.
       urgency: "time-sensitive"
@@ -1118,6 +1302,8 @@ function planNotifications(input) {
       title: T("notif.bill_week_title", { count: upcoming.length, amount: m(total) }),
       body: T("notif.bill_week_body", { name: upcoming[0].name, amount: m(upcoming[0].amount) }),
       data: { screen: "recurring" },
+      // The body names the first bill, so its logo is the one shown.
+      ...upcoming[0].logo ? { image: upcoming[0].logo } : {},
       urgency: "passive"
     });
   }
@@ -1148,6 +1334,7 @@ function planNotifications(input) {
       return a !== null && Math.abs(a - amount) <= Math.max(1, amount * 0.1);
     });
     if (matched) continue;
+    const logo = merchantLogoUrl(r.name, null, { guess: false });
     out.push({
       family: "bill",
       kind: "bill_missing",
@@ -1158,6 +1345,7 @@ function planNotifications(input) {
       }),
       body: T("notif.bill_missing_body", { amount: m(amount) }),
       data: { screen: "recurring", rule: String(r.id ?? "") },
+      ...logo ? { image: logo } : {},
       urgency: "active"
     });
     break;

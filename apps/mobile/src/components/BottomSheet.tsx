@@ -51,7 +51,9 @@ export interface BottomSheetProps {
  * Owns backdrop, handle, header (Cancel / title / right slot), a
  * `flexShrink: 1` scrollable body, an optional pinned footer,
  * `useSafeAreaInsets().bottom` padding, and `onRequestClose` wired to the
- * same `onClose` as the backdrop press and the header Cancel.
+ * same `onClose` as the backdrop press, the header Cancel and the screen
+ * reader escape gesture. The backdrop is a layer behind the sheet, not a
+ * Pressable around it, so every row inside stays its own VoiceOver element.
  *
  * Motion (Aug 16 2026): the RN `<Modal>` is used purely as a host window
  * (`animationType="none"`) and the sheet drives its own choreography from
@@ -279,8 +281,20 @@ export function BottomSheet({
       onRequestClose={onClose}
       testID={testID}
     >
-      <Pressable ref={hostRef} style={styles.host} onPress={onClose} accessibilityRole="none">
-        <Animated.View pointerEvents="none" style={[styles.backdrop, { opacity: backdrop }]} />
+      <View ref={hostRef} style={styles.host}>
+        {/* Tap outside to close: a layer behind the sheet, never a wrapper
+            around it. A Pressable wrapping the sheet made VoiceOver read the
+            whole sheet as one element, so no row or button inside could be
+            reached (Nov 15 2026). Screen readers close with Cancel or the
+            escape gesture instead, the same as CenterModal. */}
+        <Animated.View style={[styles.backdrop, { opacity: backdrop }]}>
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={onClose}
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+          />
+        </Animated.View>
         <Animated.View
           onLayout={handleSheetLayout}
           style={[
@@ -289,18 +303,29 @@ export function BottomSheet({
             { transform: [{ translateY: Animated.add(translateY, Animated.multiply(lift, -1)) }] },
           ]}
         >
-          <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
+          <View style={styles.sheet} accessibilityViewIsModal onAccessibilityEscape={onClose}>
             <View style={styles.handleRow}>
               <View style={styles.handle} />
             </View>
 
             {(title || headerRight) && (
               <View style={styles.header}>
-                <Pressable onPress={onClose} hitSlop={10} style={styles.headerSide}>
-                  <Text style={styles.navText} numberOfLines={1}>
-                    {cancelLabel}
-                  </Text>
-                </Pressable>
+                {/* An empty label means the sheet has no Cancel (it closes
+                    with its own Done): no unnamed button for VoiceOver. */}
+                {cancelLabel ? (
+                  <Pressable
+                    onPress={onClose}
+                    hitSlop={10}
+                    style={styles.headerSide}
+                    accessibilityRole="button"
+                  >
+                    <Text style={styles.navText} numberOfLines={1}>
+                      {cancelLabel}
+                    </Text>
+                  </Pressable>
+                ) : (
+                  <View style={styles.headerSide} />
+                )}
                 <Text style={styles.title} numberOfLines={1}>
                   {title}
                 </Text>
@@ -324,9 +349,9 @@ export function BottomSheet({
             {footer && (
               <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>{footer}</View>
             )}
-          </Pressable>
+          </View>
         </Animated.View>
-      </Pressable>
+      </View>
     </Modal>
   )
 }

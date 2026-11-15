@@ -572,9 +572,7 @@ export default function TodayScreen() {
                       transaction={txn}
                       categoryName={txn.category_id ? categoryMap[txn.category_id]?.name : null}
                       categoryColor={txn.category_id ? categoryMap[txn.category_id]?.color : null}
-                      businessName={
-                        txn.business_id ? businessById.get(txn.business_id)?.name : null
-                      }
+                      business={txn.business_id ? businessById.get(txn.business_id) : null}
                       currency={currency}
                       locale={locale}
                       showDivider={i > 0}

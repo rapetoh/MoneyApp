@@ -1,31 +1,15 @@
 import { Image } from 'expo-image'
-import {
-  guessDomain,
-  brandDomainForMerchant,
-  cleanMerchantDescriptor,
-  merchantLogoSrc,
-} from '@voice-expense/shared'
+import { merchantLogoUrl } from '@voice-expense/shared'
 import type { Transaction, RecurringRule } from '@voice-expense/shared'
 
 /**
- * The one place a merchant logo URL is built — `MerchantAvatar` renders it,
- * `prefetchMerchantLogos` warms it. Google's favicon service, fetched
- * directly (see color.ts's rationale for not proxying).
+ * The one place a merchant logo URL is built lives in shared
+ * (`merchantLogoUrl`, also used by the web and the server's bill
+ * notifications). `MerchantAvatar` renders it, `prefetchMerchantLogos`
+ * warms it. Google's favicon service, fetched directly (see color.ts's
+ * rationale for not proxying).
  */
-export function merchantLogoUrl(
-  merchant: string | null | undefined,
-  merchantDomain?: string | null,
-): string | null {
-  const name = merchant?.trim()
-  if (!name) return null
-  // Brand table first ("Target T-1768" → target.com — guessDomain would
-  // build targett1768.com and 404, owner remark Aug 24); then the naive
-  // guess from the *cleaned* descriptor so store numbers can't poison it.
-  const domain =
-    merchantDomain ?? brandDomainForMerchant(name) ?? guessDomain(cleanMerchantDescriptor(name))
-  if (!domain) return null
-  return merchantLogoSrc(domain)
-}
+export { merchantLogoUrl }
 
 // URLs already handed to the cache this process — a repeat call for the
 // same set is a no-op, so every data hook can call `prefetchMerchantLogos`

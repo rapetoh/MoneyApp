@@ -8,15 +8,8 @@
 // now live once in `@voice-expense/shared` (fix-plan 4.4) so this file and
 // the mobile version can no longer diverge.
 import { useEffect, useState } from 'react'
-import {
-  merchantColor,
-  guessDomain,
-  categoryPalette,
-  brandDomainForMerchant,
-  cleanMerchantDescriptor,
-} from '@voice-expense/shared'
+import { merchantColor, categoryPalette, merchantLogoUrl } from '@voice-expense/shared'
 import { font } from '../lib/theme'
-import { merchantLogoSrc } from '@voice-expense/shared'
 
 export function MerchantLogo({
   name,
@@ -58,15 +51,11 @@ export function MerchantLogo({
       ? categoryPalette(categoryColor).fg
       : merchantColor(fallbackSource)
 
-  // Same chain as mobile's merchantLogo.ts (fix completely, both surfaces):
-  // stored domain → brand table ("Target T-1768" → target.com) → naive
-  // guess from the cleaned descriptor.
-  const domain = hasMerchant
-    ? (merchantDomain ??
-      brandDomainForMerchant(name!) ??
-      guessDomain(cleanMerchantDescriptor(name!)))
-    : null
-  const logoUrl = domain && !logoFailed ? merchantLogoSrc(domain) : null
+  // Shared chain (mobile, web and bill notifications): stored domain →
+  // brand table ("Target T-1768" → target.com) → naive guess from the
+  // cleaned descriptor.
+  const url = hasMerchant ? merchantLogoUrl(name, merchantDomain) : null
+  const logoUrl = url && !logoFailed ? url : null
 
   if (logoUrl) {
     return (

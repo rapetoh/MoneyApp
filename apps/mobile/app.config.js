@@ -178,8 +178,11 @@ module.exports = {
         {
           cameraPermission:
             'Murmur uses the camera only to scan a receipt or paycheck you point it at, so the amount and place can be filled in for you.',
+          // Also the logo photo for a business (Settings > Businesses,
+          // migration 045). The picker is the system one and returns only
+          // the photo picked; this string covers the cases iOS still asks.
           photosPermission:
-            'Murmur opens your photo library only when you choose a receipt or paycheck image, so the amount and place can be filled in for you.',
+            'Murmur opens your photo library only when you choose a photo: a receipt or paycheck to fill in an entry, or a logo for one of your businesses.',
         },
       ],
       // Android-only: adds MoneyNotificationListenerService to AndroidManifest.xml

@@ -250,6 +250,40 @@ describe('bill family', () => {
     expect(kinds(out)).not.toContain('bill_missing')
   })
 
+  it('carries the logo of a known biller, for the banner image', () => {
+    const spotify = { ...rentRule, id: 'rule-spotify', name: 'Spotify', amount: 10.99, amount_in_profile_currency: 10.99 }
+    const c = planNotifications(input({ rules: [spotify] })).find((x) => x.kind === 'bill_tomorrow')!
+    expect(c.image).toContain('www.spotify.com')
+    expect(c.image).toMatch(/^https:\/\//)
+  })
+
+  it('carries no logo for a generic bill name, never a guessed one', () => {
+    // "Rent" would guess rent.com, a real site with a real logo.
+    const c = planNotifications(input({ rules: [rentRule] })).find((x) => x.kind === 'bill_tomorrow')!
+    expect(c.image).toBeUndefined()
+  })
+
+  it('puts the first bill\'s logo on a heavy week, and the missing bill\'s on bill_missing', () => {
+    const far = (id: string, name: string, day: number) => ({
+      ...rentRule,
+      id,
+      name,
+      amount: 60,
+      amount_in_profile_currency: 60,
+      anchor_day: day,
+      starts_at: `2026-01-${String(day).padStart(2, '0')}T13:00:00.000Z`,
+    })
+    const week = planNotifications(
+      input({ rules: [far('a', 'Netflix', 19), far('b', 'Rent', 20), far('c', 'Gym', 21)] }),
+    ).find((x) => x.kind === 'bill_week_heavy')!
+    expect(week.body).toContain('Netflix')
+    expect(week.image).toContain('www.netflix.com')
+    const missing = planNotifications(
+      input({ rules: [{ ...rentRule, name: 'Hulu', anchor_day: 10, starts_at: '2026-01-10T13:00:00.000Z' }] }),
+    ).find((x) => x.kind === 'bill_missing')!
+    expect(missing.image).toContain('www.hulu.com')
+  })
+
   it('does not treat a bill due yesterday as missing (the charge may be in flight)', () => {
     const out = planNotifications(
       input({ rules: [{ ...rentRule, anchor_day: 14, starts_at: '2026-01-14T13:00:00.000Z' }] }),

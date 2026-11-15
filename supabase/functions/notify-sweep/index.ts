@@ -71,6 +71,10 @@ interface ExpoMessage {
   interruptionLevel?: 'passive' | 'active' | 'time-sensitive' | 'critical'
   channelId?: string
   _contentAvailable?: boolean
+  /** iOS: hands the message to the app's notification service extension
+   *  before display, which is what attaches `data.image` (the merchant's
+   *  logo). Builds without the extension show the banner as sent. */
+  mutableContent?: boolean
 }
 
 function toExpoMessage(token: string, c: NotificationCandidate): ExpoMessage {
@@ -81,7 +85,8 @@ function toExpoMessage(token: string, c: NotificationCandidate): ExpoMessage {
     // Passive messages arrive without a sound: a weekly recap does not
     // need to interrupt a room.
     sound: c.urgency === 'passive' ? null : 'default',
-    data: { ...c.data, kind: c.kind, family: c.family },
+    data: { ...c.data, kind: c.kind, family: c.family, ...(c.image ? { image: c.image } : {}) },
+    ...(c.image ? { mutableContent: true } : {}),
     interruptionLevel: c.urgency,
     // Android channels, one per family, so muting recaps in system
     // settings cannot also mute a failed payment.

@@ -44,6 +44,7 @@ import { computeAskInsights, type AskInsightRule } from './askInsights'
 import { occurrencesInWindow } from './recurrence'
 import { roundCents } from '../utils/currency'
 import { localDay, localParts } from '../utils/period'
+import { merchantLogoUrl } from './merchantBrand'
 
 // ─── vocabulary ────────────────────────────────────────────────────────────
 
@@ -80,6 +81,14 @@ export interface NotificationCandidate {
   body: string
   /** Deep-link payload. Every notification opens the screen that proves it. */
   data: Record<string, string>
+  /**
+   * The merchant's logo, shown on the right of the banner (Nov 13 2026,
+   * owner: alerts about a merchant carry its logo, as the Apple Pay and Siri
+   * banners already do). The iPhone's notification service extension
+   * downloads it; no image, a 404 or a slow network and the banner shows
+   * without one. Only set when the notification is about one merchant.
+   */
+  image?: string
   urgency: NotificationUrgency
   /** Bypasses the weekly cap and the family switch. Billing and security only. */
   transactional?: boolean
@@ -289,6 +298,8 @@ export function planNotifications(input: NotificationPlanInput): NotificationCan
   // three bill candidates below.
   interface Upcoming {
     name: string
+    /** The rule's logo when its name is a known brand; null otherwise. */
+    logo: string | null
     amount: number
     instant: string
     ruleId: string
@@ -305,6 +316,7 @@ export function planNotifications(input: NotificationPlanInput): NotificationCan
       for (const o of occ) {
         upcoming.push({
           name: r.name?.trim() || t('ask.insight_unnamed_rule', locale),
+          logo: merchantLogoUrl(r.name, null, { guess: false }),
           amount: ruleAmount(r),
           instant: o.instant,
           ruleId: String(r.id ?? r.name ?? 'rule'),
@@ -378,6 +390,7 @@ export function planNotifications(input: NotificationPlanInput): NotificationCan
           ? T('notif.bill_tomorrow_body_left', { left: m(leftAfterBills) })
           : T('notif.bill_tomorrow_body', { due: m(stillDue) }),
       data: { screen: 'recurring', rule: tomorrow.ruleId },
+      ...(tomorrow.logo ? { image: tomorrow.logo } : {}),
       // Money leaving an account within a day is the definition of the
       // level: still actionable, and useless if it arrives late.
       urgency: 'time-sensitive',
@@ -393,6 +406,8 @@ export function planNotifications(input: NotificationPlanInput): NotificationCan
       title: T('notif.bill_week_title', { count: upcoming.length, amount: m(total) }),
       body: T('notif.bill_week_body', { name: upcoming[0].name, amount: m(upcoming[0].amount) }),
       data: { screen: 'recurring' },
+      // The body names the first bill, so its logo is the one shown.
+      ...(upcoming[0].logo ? { image: upcoming[0].logo } : {}),
       urgency: 'passive',
     })
   }
@@ -430,6 +445,7 @@ export function planNotifications(input: NotificationPlanInput): NotificationCan
       return a !== null && Math.abs(a - amount) <= Math.max(1, amount * 0.1)
     })
     if (matched) continue
+    const logo = merchantLogoUrl(r.name, null, { guess: false })
     out.push({
       family: 'bill',
       kind: 'bill_missing',
@@ -440,6 +456,7 @@ export function planNotifications(input: NotificationPlanInput): NotificationCan
       }),
       body: T('notif.bill_missing_body', { amount: m(amount) }),
       data: { screen: 'recurring', rule: String(r.id ?? '') },
+      ...(logo ? { image: logo } : {}),
       urgency: 'active',
     })
     break // one missing-bill message at a time, not one per rule

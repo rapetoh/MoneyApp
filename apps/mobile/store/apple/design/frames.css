@@ -1,0 +1,16 @@
+/* Murmur App Store set v2 (Nov 2026): the brand's own type.
+   Fraunces = the website's display serif (OFL). Plus Jakarta Sans + DM Mono =
+   the app's UI fonts (OFL, from apps/mobile/assets/fonts). New York and SF
+   Rounded are Apple system fonts: the render server serves them from
+   /System/Library/Fonts at capture time; they are never stored in the bundle. */
+@font-face { font-family: "Fraunces"; src: url("fonts/Fraunces.ttf") format("truetype"); font-weight: 100 900; font-style: normal; }
+@font-face { font-family: "Fraunces"; src: url("fonts/Fraunces-Italic.ttf") format("truetype"); font-weight: 100 900; font-style: italic; }
+@font-face { font-family: "Plus Jakarta Sans"; src: url("fonts/PlusJakartaSans-Regular.ttf") format("truetype"); font-weight: 400 500; }
+@font-face { font-family: "Plus Jakarta Sans"; src: url("fonts/PlusJakartaSans-SemiBold.ttf") format("truetype"); font-weight: 600; }
+@font-face { font-family: "Plus Jakarta Sans"; src: url("fonts/PlusJakartaSans-Bold.ttf") format("truetype"); font-weight: 700 900; }
+@font-face { font-family: "DM Mono"; src: url("fonts/DMMono-Regular.ttf") format("truetype"); font-weight: 400; }
+@font-face { font-family: "DM Mono"; src: url("fonts/DMMono-Medium.ttf") format("truetype"); font-weight: 500 700; }
+@font-face { font-family: "New York"; src: url("fonts/NewYork.ttf") format("truetype"); font-weight: 100 1000; font-style: normal; }
+@font-face { font-family: "New York"; src: url("fonts/NewYorkItalic.ttf") format("truetype"); font-weight: 100 1000; font-style: italic; }
+@font-face { font-family: "SF Rounded"; src: url("fonts/SFNSRounded.ttf") format("truetype"); font-weight: 100 1000; }
+@font-face { font-family: "SF Compact Rounded"; src: url("fonts/SFCompactRounded.ttf") format("truetype"); font-weight: 100 1000; }
