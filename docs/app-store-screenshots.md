@@ -1,13 +1,18 @@
 # App Store screenshots (v3, Nov 2026)
 
-10 iPhone (1284×2778) + 5 iPad (2064×2752). Replaces the Sep 2026 set.
+10 iPhone (1284×2778) + 5 iPad (2064×2752) + 1 Apple Watch (416×496). Replaces the Sep 2026 set.
+
+**Apple Watch is required** since 1.0.2 ships the Watch app: App Review refused the first submit with
+"App screenshot missing (APPLE_WATCH)". `APP_WATCH_SERIES_10/01-watch.png` is a real capture of the
+watch app on an Apple Watch Series 11 (46mm) simulator (watchOS 27, paired with an iOS 27 iPhone sim),
+flattened to an opaque PNG. Maestro cannot drive watchOS, so it shows the main screen, not a saved reply.
 
 | | |
 | --- | --- |
 | Edit | `apps/mobile/store/apple/design/frames.jsx` (frames), `frames.css` (fonts), `photos/`, `logos/` |
 | Pack | `node apps/mobile/store/apple/pack-screenshots.mjs` builds `docs/Murmur App Store Screenshots v3 (Standalone).html` (open it in a browser to see every frame; `#ip-03` shows one) |
 | Render | `node apps/mobile/store/apple/render-screenshots.mjs` (Mac only, all 15 in about 80 s) |
-| Output | `apps/mobile/store/apple/screenshot/en-US/APP_IPHONE_65`, `APP_IPAD_PRO_3GEN_129` |
+| Output | `apps/mobile/store/apple/screenshot/en-US/APP_IPHONE_65`, `APP_IPAD_PRO_3GEN_129`, `APP_WATCH_SERIES_10` |
 | Upload | `store.config.json` lists the files in order (EAS metadata), or drag them into App Store Connect |
 | Editable | only while a version is in Prepare for Submission (or rejected) |
 
