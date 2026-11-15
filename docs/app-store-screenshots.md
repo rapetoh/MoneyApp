@@ -16,6 +16,23 @@ flattened to an opaque PNG. Maestro cannot drive watchOS, so it shows the main s
 | Upload | `store.config.json` lists the files in order (EAS metadata), or drag them into App Store Connect |
 | Editable | only while a version is in Prepare for Submission (or rejected) |
 
+## Product page header (iOS 27, Nov 2026)
+
+The wide image at the top of the App Store page. Optional, new in iOS 27,
+reviewed on its own (Asset Library), and it can go live on an already
+released version. Not uploaded yet: it goes up after 1.0.2 is approved.
+
+| | |
+| --- | --- |
+| Size | 3840 x 1646 (21:9), no alpha. Apple's art safe area: 1646 x 661 at x 1097, y 493 |
+| Idea | "Speak your *spending.*" (frame 1's line) on forest green, inside the safe area. Outside it: the "Listening" bubble, the filed Starbucks card, drifting merchant logos (cropped away on phones) |
+| Rules (Apple) | one idea, short phrase, no prices/offers/URLs, no platform or marketplace logos, 4+ |
+| Edit | `apps/mobile/store/apple/design/header.html` (1920 x 823 CSS px) |
+| Render | `node apps/mobile/store/apple/render-header.mjs` (headless Chrome at 2x, sips flattens alpha, checks size) |
+| Output | `apps/mobile/store/apple/header/en-US/header-3840x1646.png` |
+| Upload | App Store Connect > the version > Product Page Information > Header and Search Results > Header. EAS metadata and apple-utils do not support this placement yet |
+| Search results | No separate image on purpose: without one, the App Store shows frames 1 to 3, which were designed for search |
+
 ## The order, and why
 
 Search results show only frames 1 to 3. They carry the whole pitch; the rest

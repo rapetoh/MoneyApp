@@ -1,0 +1,135 @@
+<!doctype html>
+<!--
+  Murmur App Store product page header (iOS 27 "Header" placement, Nov 2026).
+  Authored at 1920x823 CSS px, rendered at 2x = 3840x1646, the exact size
+  App Store Connect takes (21:9). Apple's art safe area is 1646x661 px at
+  x 1097, y 493 (half scale: 823x330.5 at x 548.5, y 246.5): the headline
+  lives there and nothing else does. Everything outside it is atmosphere
+  that may be cropped on some devices: the voice bubble, the filed card and
+  the drifting merchant logos.
+  Rules (Apple, asset best practices): one clear idea, a short phrase, no
+  prices or offers, no URLs, no platform or marketplace logos, 4+ content.
+  The $6.50 on the card is an example expense, not a price.
+  Render: node apps/mobile/store/apple/render-header.mjs
+-->
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  @font-face { font-family: "Fraunces"; src: url("fonts/Fraunces.ttf") format("truetype"); font-weight: 100 900; font-style: normal; }
+  @font-face { font-family: "Fraunces"; src: url("fonts/Fraunces-Italic.ttf") format("truetype"); font-weight: 100 900; font-style: italic; }
+  @font-face { font-family: "Jakarta"; src: url("../../../assets/fonts/PlusJakartaSans-Regular.ttf") format("truetype"); font-weight: 400 500; }
+  @font-face { font-family: "Jakarta"; src: url("../../../assets/fonts/PlusJakartaSans-SemiBold.ttf") format("truetype"); font-weight: 600; }
+  @font-face { font-family: "Jakarta"; src: url("../../../assets/fonts/PlusJakartaSans-Bold.ttf") format("truetype"); font-weight: 700 900; }
+  @font-face { font-family: "New York"; src: url("file:///System/Library/Fonts/NewYork.ttf") format("truetype"); font-weight: 100 1000; }
+  @font-face { font-family: "New York"; src: url("file:///System/Library/Fonts/NewYorkItalic.ttf") format("truetype"); font-weight: 100 1000; font-style: italic; }
+
+  :root { --sage: #3F5A3E; --sageL: #A9C29F; --cream: #F7F5F0; --ink: #1B1915; --ink3: #7A7468; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1920px; height: 823px; overflow: hidden; background: #1F3125; }
+  .canvas {
+    position: relative; width: 1920px; height: 823px; overflow: hidden;
+    background: radial-gradient(70% 115% at 50% 8%, #4C6E51 0%, #33503A 34%, #22382A 66%, #18271C 100%);
+    font-family: "Jakarta", -apple-system, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .grain { position: absolute; inset: 0; opacity: 0.07; mix-blend-mode: screen; pointer-events: none;
+    background-image: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.6 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: 220px 220px; }
+  .waves { position: absolute; inset: 0; }
+
+  /* Safe area: the only place the message lives. */
+  .safe { position: absolute; left: 548.5px; top: 246.5px; width: 823px; height: 330.5px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+  .eyebrow { display: inline-flex; align-items: center; gap: 10px; font-size: 15px; font-weight: 700;
+    letter-spacing: 3px; text-transform: uppercase; color: var(--sageL); margin-bottom: 18px; }
+  .eyebrow i { width: 8px; height: 8px; border-radius: 4px; background: var(--sageL); display: block; }
+  h1 { font-family: "Fraunces", "New York", Georgia, serif; font-weight: 500; font-size: 120px; line-height: 0.98;
+    letter-spacing: -0.035em; word-spacing: 0.05em; color: var(--cream); }
+  h1 .l2 { display: block; margin-top: 10px; }
+  h1 em { font-style: italic; color: var(--sageL); font-weight: 500; }
+
+  /* Atmosphere: the voice moment, left; the filed entry, right. */
+  .card { position: absolute; background: var(--cream); border-radius: 26px; color: var(--ink);
+    box-shadow: 0 34px 70px rgba(5, 12, 7, 0.45), 0 2px 0 rgba(255, 255, 255, 0.5) inset; }
+  .listen { left: 84px; top: 222px; width: 410px; padding: 24px 30px 26px; transform: rotate(-3deg); }
+  .label { display: flex; align-items: center; gap: 9px; font-size: 13px; font-weight: 700; letter-spacing: 1.6px;
+    text-transform: uppercase; color: var(--sage); margin-bottom: 12px; }
+  .quote { font-family: "New York", Georgia, serif; font-style: italic; font-size: 30px; line-height: 1.22; letter-spacing: -0.01em; }
+  .filed { right: 50px; top: 326px; width: 462px; padding: 22px 28px 24px; transform: rotate(2.5deg); }
+  .row { display: flex; align-items: center; gap: 16px; }
+  .tile { width: 58px; height: 58px; border-radius: 15px; background: #fff; display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 0 0 1px rgba(27, 25, 21, 0.08); flex: none; overflow: hidden; }
+  .tile img { width: 100%; height: 100%; object-fit: cover; }
+  .merchant { font-size: 25px; font-weight: 700; letter-spacing: -0.01em; }
+  .meta { display: flex; align-items: center; gap: 8px; margin-top: 6px; font-size: 14px; color: var(--ink3); white-space: nowrap; }
+  .chip { background: #ECE7DA; color: #5A5448; font-weight: 600; border-radius: 999px; padding: 3px 10px; }
+  .amount { margin-left: auto; font-family: "New York", Georgia, serif; font-size: 46px; letter-spacing: -0.02em; font-weight: 500; }
+  .amount small { font-size: 22px; vertical-align: 18px; margin-right: 2px; color: #4A453D; }
+  .check { width: 22px; height: 22px; border-radius: 11px; background: var(--sage); display: inline-flex; align-items: center; justify-content: center; }
+
+  /* Drifting merchant logos: depth by size, blur and opacity. */
+  .logo { position: absolute; border-radius: 24%; background: #fff; overflow: hidden;
+    box-shadow: 0 18px 40px rgba(5, 12, 7, 0.40); }
+  .logo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+</style>
+</head>
+<body>
+<div class="canvas">
+  <svg class="waves" viewBox="0 0 1920 823" preserveAspectRatio="none" aria-hidden="true">
+    <defs>
+      <linearGradient id="fade" x1="0" x2="1" y1="0" y2="0">
+        <stop offset="0" stop-color="#A9C29F" stop-opacity="0"/>
+        <stop offset="0.22" stop-color="#A9C29F" stop-opacity="1"/>
+        <stop offset="0.78" stop-color="#A9C29F" stop-opacity="1"/>
+        <stop offset="1" stop-color="#A9C29F" stop-opacity="0"/>
+      </linearGradient>
+    </defs>
+    <!-- The icon's two waves, stretched across the canvas behind the headline. -->
+    <path d="M-40 452 C 240 392, 480 392, 720 440 S 1200 512, 1440 450 S 1800 384, 1960 430" fill="none" stroke="url(#fade)" stroke-width="3" opacity="0.16"/>
+    <path d="M-40 500 C 240 440, 480 446, 720 488 S 1200 560, 1440 500 S 1800 436, 1960 478" fill="none" stroke="url(#fade)" stroke-width="3" opacity="0.10"/>
+    <path d="M-40 404 C 260 352, 500 348, 740 392 S 1180 462, 1420 404 S 1800 338, 1960 384" fill="none" stroke="url(#fade)" stroke-width="2" opacity="0.08"/>
+  </svg>
+  <div class="grain"></div>
+
+  <!-- Logos, far layer (soft) -->
+  <div class="logo" style="left: 46px; top: 74px; width: 70px; height: 70px; filter: blur(2.5px); opacity: .55; transform: rotate(-8deg)"><img src="logos/costco.com.png"></div>
+  <div class="logo" style="left: 300px; top: 560px; width: 64px; height: 64px; filter: blur(2px); opacity: .5; transform: rotate(6deg)"><img src="logos/wholefoodsmarket.com.png"></div>
+  <div class="logo" style="right: 330px; top: 70px; width: 62px; height: 62px; filter: blur(2.5px); opacity: .5; transform: rotate(9deg)"><img src="logos/traderjoes.com.png"></div>
+  <div class="logo" style="right: 58px; top: 640px; width: 70px; height: 70px; filter: blur(2px); opacity: .5; transform: rotate(-6deg)"><img src="logos/lyft.com.png"></div>
+  <!-- Logos, near layer -->
+  <div class="logo" style="left: 370px; top: 96px; width: 92px; height: 92px; transform: rotate(7deg)"><img src="logos/target.com.png"></div>
+  <div class="logo" style="left: 128px; top: 520px; width: 100px; height: 100px; transform: rotate(-6deg)"><img src="logos/chipotle.com.png"></div>
+  <div class="logo" style="right: 150px; top: 150px; width: 96px; height: 96px; transform: rotate(-7deg)"><img src="logos/sweetgreen.com.png"></div>
+  <div class="logo" style="right: 420px; top: 600px; width: 84px; height: 84px; transform: rotate(8deg)"><img src="logos/shell.us.png"></div>
+
+  <div class="card listen">
+    <div class="label">
+      <svg width="20" height="16" viewBox="0 0 20 16" aria-hidden="true"><g fill="#3F5A3E"><rect x="0" y="5" width="2.6" height="6" rx="1.3"/><rect x="4.4" y="2" width="2.6" height="12" rx="1.3"/><rect x="8.8" y="0" width="2.6" height="16" rx="1.3"/><rect x="13.2" y="3" width="2.6" height="10" rx="1.3"/><rect x="17.4" y="6" width="2.6" height="4" rx="1.3"/></g></svg>
+      Listening
+    </div>
+    <div class="quote">&ldquo;Six fifty at Starbucks<br>for a latte&rdquo;</div>
+  </div>
+
+  <div class="card filed">
+    <div class="label">
+      <span class="check"><svg width="12" height="10" viewBox="0 0 12 10" aria-hidden="true"><path d="M1 5.2 4.3 8.4 11 1.6" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+      Filed
+    </div>
+    <div class="row">
+      <div class="tile"><img src="logos/starbucks.com.png"></div>
+      <div>
+        <div class="merchant">Starbucks</div>
+        <div class="meta"><span class="chip">Coffee &amp; tea</span><span>Today 9:41 AM</span></div>
+      </div>
+      <div class="amount"><small>$</small>6<span style="color:#7A7468">.50</span></div>
+    </div>
+  </div>
+
+  <div class="safe">
+    <div class="eyebrow"><i></i>Voice-first &middot; Privacy-first</div>
+    <h1>Speak your<em class="l2">spending.</em></h1>
+  </div>
+</div>
+</body>
+</html>
